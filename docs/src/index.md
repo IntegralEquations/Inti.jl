@@ -4,7 +4,7 @@ CurrentModule = Inti
 
 # Inti
 
-Documentation for [Inti](https://github.com/maltezfaria/Inti.jl).
+Documentation for [Inti](https://github.com/IntegralEquations/Inti.jl).
 
 ```@index
 ```
