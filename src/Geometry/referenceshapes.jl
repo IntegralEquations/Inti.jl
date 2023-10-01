@@ -29,7 +29,7 @@ function standard_basis_vector(T, ::Val{I}, ::Val{N}) where {I,N}
     v[I] = one(T)
     SVector(v)
 end
-vertices(::ReferenceSimplex{N}) where {N} = ntuple(i -> standard_basis_vector(Int64, Val{i}, Val{N}), N) |> SVector
+vertices(::ReferenceSimplex{N}) where {N} = ntuple(i -> i == 1 ? zero(SVector{N, Int64}) : standard_basis_vector(Int64, Val(i-1), Val(N)), N+1) |> SVector
 center(::ReferenceSimplex{N}) where {N} = svector(i -> 1 / (N + 1), N )
 
 """
