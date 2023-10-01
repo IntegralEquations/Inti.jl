@@ -10,31 +10,6 @@ examples of concrete subtypes.
 abstract type AbstractReferenceShape end
 
 """
-    struct ReferenceTriangle
-
-Singleton type representing the triangle with vertices `(0,0),(1,0),(0,1)`
-"""
-struct ReferenceTriangle <: AbstractReferenceShape end
-geometric_dimension(::ReferenceTriangle) = 2
-ambient_dimension(::ReferenceTriangle) = 2
-vertices(::ReferenceTriangle) = SVector(0, 0), SVector(1, 0), SVector(0, 1)
-Base.in(x, ::ReferenceTriangle) = 0 ≤ x[1] ≤ 1 && 0 ≤ x[2] ≤ 1 - x[1]
-center(::ReferenceTriangle) = svector(i -> 1 / 3, 3)
-
-"""
-    struct ReferenceTetrahedron
-
-Singleton type representing the tetrahedron with vertices
-`(0,0,0),(0,0,1),(0,1,0),(1,0,0)`
-"""
-struct ReferenceTetrahedron <: AbstractReferenceShape end
-geometric_dimension(::ReferenceTetrahedron) = 3
-ambient_dimension(::ReferenceTetrahedron) = 3
-vertices(::ReferenceTetrahedron) = SVector(0, 0, 0), SVector(1, 0, 0), SVector(0, 1, 0), SVector(0, 0, 1)
-Base.in(x,::ReferenceTetrahedron) = 0 ≤ x[1] ≤ 1 && 0 ≤ x[2] ≤ 1 - x[1] && 0 ≤ x[3] ≤ 1 - x[1] - x[2]
-center(::ReferenceTetrahedron) = svector(i -> 1 / 4, 4)
-
-"""
     struct ReferenceSimplex{N}
 
 Singleton type representing the N-simplex with N+1 vertices
@@ -49,14 +24,28 @@ function Base.in(x, ::ReferenceSimplex{N}) where {N}
     end
     return true
 end
-
 function standard_basis_vector(T, ::Val{I}, ::Val{N}) where {I,N}
     v = zero(MVector{N,T})
     v[I] = one(T)
     SVector(v)
 end
-
 vertices(::ReferenceSimplex{N}) where {N} = ntuple(i -> standard_basis_vector(Int64, Val{i}, Val{N}), N) |> SVector
+center(::ReferenceSimplex{N}) where {N} = svector(i -> 1 / (N + 1), N )
+
+"""
+    struct ReferenceTriangle
+
+Singleton type representing the triangle with vertices `(0,0),(1,0),(0,1)`
+"""
+const ReferenceTriangle = ReferenceSimplex{2}
+
+"""
+    struct ReferenceTetrahedron
+
+Singleton type representing the tetrahedron with vertices
+`(0,0,0),(0,0,1),(0,1,0),(1,0,0)`
+"""
+const ReferenceTetrahedron = ReferenceSimplex{3}
 
 """
     struct ReferenceHyperCube{N} <: AbstractReferenceShape{N}
