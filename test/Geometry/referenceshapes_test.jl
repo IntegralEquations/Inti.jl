@@ -1,5 +1,5 @@
 using Test
-import Inti
+using Inti
 using StaticArrays
 
 @testset "Line" begin
@@ -33,5 +33,16 @@ end
     x = SVector(1.0, 0.0, 0.0) # point on edge
     @test x ∈ t
     x = SVector(1.1, 0.0, 0.0)
+    @test !in(x, t)
+end
+@testset "NSimplex" begin
+    t = Inti.ReferenceSimplex{4}()
+    @test Inti.ambient_dimension(t) == 4
+    @test Inti.geometric_dimension(t) == 4
+    x = SVector(0.5, 0.4, 0.0, 0.05)
+    @test x ∈ t
+    x = SVector(1.0, 0.0, 0.0, 0.0)
+    @test x ∈ t
+    x = SVector(1.1, 0.0, 0.0, 0.0)
     @test !in(x, t)
 end
