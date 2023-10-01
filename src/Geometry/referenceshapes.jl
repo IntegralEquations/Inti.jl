@@ -34,8 +34,29 @@ vertices(::ReferenceTetrahedron) = SVector(0, 0, 0), SVector(1, 0, 0), SVector(0
 Base.in(x,::ReferenceTetrahedron) = 0 ≤ x[1] ≤ 1 && 0 ≤ x[2] ≤ 1 - x[1] && 0 ≤ x[3] ≤ 1 - x[1] - x[2]
 center(::ReferenceTetrahedron) = svector(i -> 1 / 4, 4)
 
+"""
+    struct ReferenceSimplex{N}
 
-# TODO: generalize structs above to `ReferenceSimplex{N}` and
+Singleton type representing the N-simplex with N+1 vertices
+`(0,...,0),(0,...,0,1),(0,...,0,1,0),(1,0,...,0)`
+"""
+struct ReferenceSimplex{N} <: AbstractReferenceShape end
+geometric_dimension(::ReferenceSimplex{N}) where {N} = N
+ambient_dimension(::ReferenceSimplex{N}) where {N} = N
+function Base.in(x, ::ReferenceSimplex{N}) where {N}
+    for i in range(1, N)
+        0 ≤ x[i] ≤ 1 - sum(x[1:i-1]) || return false
+    end
+    return true
+end
+
+function standard_basis_vector(T, ::Val{I}, ::Val{N}) where {I,N}
+    v = zero(MVector{N,T})
+    v[I] = one(T)
+    SVector(v)
+end
+
+vertices(::ReferenceSimplex{N}) where {N} = ntuple(i -> standard_basis_vector(Int64, Val{i}, Val{N}), N) |> SVector
 
 """
     struct ReferenceHyperCube{N} <: AbstractReferenceShape{N}
