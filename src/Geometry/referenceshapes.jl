@@ -44,7 +44,7 @@ struct ReferenceSimplex{N} <: AbstractReferenceShape end
 geometric_dimension(::ReferenceSimplex{N}) where {N} = N
 ambient_dimension(::ReferenceSimplex{N}) where {N} = N
 function Base.in(x, ::ReferenceSimplex{N}) where {N}
-    for i in range(1, N)
+    for i in 1:N
         0 ≤ x[i] ≤ 1 - sum(x[1:i-1]) || return false
     end
     return true
