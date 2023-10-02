@@ -9,7 +9,7 @@ include("utils.jl")
 
 # basic interpolation and integration
 include("reference_shapes.jl")
-# include("reference_interpolation.jl")
+include("reference_interpolation.jl")
 # include("reference_integration.jl")
 
 # # geometry and meshes
