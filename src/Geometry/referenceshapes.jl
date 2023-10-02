@@ -24,12 +24,7 @@ function Base.in(x, ::ReferenceSimplex{N}) where {N}
     end
     return true
 end
-function standard_basis_vector(T, ::Val{I}, ::Val{N}) where {I,N}
-    v = zero(MVector{N,T})
-    v[I] = one(T)
-    SVector(v)
-end
-vertices(::ReferenceSimplex{N}) where {N} = ntuple(i -> i == 1 ? zero(SVector{N, Int64}) : standard_basis_vector(Int64, Val(i-1), Val(N)), N+1) |> SVector
+vertices(::ReferenceSimplex{N}) where {N} = svector(i -> i == 1 ? zero(SVector{N, Int64}) : standard_basis_vector(i-1, Val(N)), N+1)
 center(::ReferenceSimplex{N}) where {N} = svector(i -> 1 / (N + 1), N )
 
 """
