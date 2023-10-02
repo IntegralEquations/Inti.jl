@@ -17,7 +17,7 @@ Instances `el` of `AbstractElement` are expected to implement:
 abstract type AbstractElement{D<:AbstractReferenceShape,T} end
 
 function (el::AbstractElement)(x)
-    return abstractmethod(el)
+    return interface_method(el)
 end
 
 """
@@ -27,13 +27,13 @@ Given a (possibly vector-valued) functor `f : 𝐑ᵐ → 𝐅ⁿ`, return the `
 matrix `Aᵢⱼ = ∂fᵢ/∂xⱼ`.Both `x` and `f(x)` are expected to be of `SVector` type.
 """
 function jacobian(f, x)
-    return abstractmethod(f)
+    return interface_method(f)
 end
 
 domain(::AbstractElement{D,T}) where {D,T} = D()
 return_type(::AbstractElement{D,T}) where {D,T} = T
-domain_dimension(t::AbstractElement) = domain(t) | center |> length
-range_dimension(el::AbstractElement{R,T}) where {R,T} = length(T)
+domain_dimension(t::AbstractElement) = domain(t) |> center |> length
+range_dimension(el::AbstractElement{R,T}) where {R,T} = domain(t) |> center |> el |> length
 
 """
     struct LagrangeElement{D,Np,T} <: AbstractElement{D,T}
@@ -53,6 +53,7 @@ vals(el::LagrangeElement) = el.vals
 
 """
     reference_nodes(el::LagrangeElement)
+    reference_nodes(::Type{<:LagrangeElement})
 
 Return the reference nodes on `domain(el)` used for the polynomial
 interpolation. The function values on these nodes completely determines the
@@ -64,7 +65,7 @@ ordering](https://gmsh.info/doc/texinfo/gmsh.html#Node-ordering) on `gmsh`
 documentation).
 """
 function reference_nodes(el::LagrangeElement)
-    return abstractmethod(el)
+    return interface_method(el)
 end
 
 # infer missig information from type of vals
@@ -113,7 +114,7 @@ TODO: Eventually this could/should be automated.
 =#
 
 # P1 for ReferenceLine
-function reference_nodes(::LagrangeLine{2})
+function reference_nodes(::Type{LagrangeLine{2}})
     return SVector(SVector(0.0), SVector(1.0))
 end
 
@@ -128,7 +129,7 @@ function jacobian(el::LagrangeLine{2}, u)
 end
 
 # P2 for ReferenceLine
-function reference_nodes(::LagrangeLine{3})
+function reference_nodes(::Type{LagrangeLine{3}})
     return SVector(SVector(0.0), SVector(1.0), SVector(0.5))
 end
 
@@ -144,7 +145,7 @@ function jacobian(el::LagrangeLine{3}, u)
 end
 
 # P1 for ReferenceTriangle
-function reference_nodes(::LagrangeTriangle{3})
+function reference_nodes(::Type{LagrangeTriangle{3}})
     return SVector(SVector(0.0, 0.0), SVector(1.0, 0.0), SVector(0.0, 1.0))
 end
 
@@ -230,6 +231,7 @@ end
 
 """
     degree(el::LagrangeElement)
+    degree(el::Type{<:LagrangeElement})
 
 The polynomial degree of the element. A `LagrangeElement` of degree `K` and
 domain `D` belongs to the space [`PolynomialSpace{D,K}`](@ref).
@@ -250,3 +252,4 @@ function degree(::Type{LagrangeElement{D,Np}})::Int where {D,Np}
         notimplemented()
     end
 end
+degree(el::LagrangeElement) = typeof(el) |> degree
