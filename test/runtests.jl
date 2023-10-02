@@ -1,10 +1,11 @@
 using Inti
-using Test
+using SafeTestsets
 using Aqua
 
-@testset "Inti.jl" begin
-    @testset "Code quality (Aqua.jl)" begin
-        Aqua.test_all(Inti)
-    end
-    # Write your tests here.
+@safetestset "Code quality" begin
+    include("aqua_test.jl")
+end
+
+@safetestset "Geometry" begin
+    @safetestset "Reference shapes" include("Geometry/referenceshapes_test.jl")
 end

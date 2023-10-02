@@ -1,5 +1,11 @@
 module Inti
 
-# Write your package code here.
+const PROJECT_ROOT = pkgdir(Inti)
+
+using StaticArrays
+
+include("utils.jl")
+include("Geometry/Geometry.jl")
+
 
 end
