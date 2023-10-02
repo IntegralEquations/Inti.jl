@@ -1,13 +1,13 @@
 """
-    abstract type AbstractReferenceShape
+    abstract type ReferenceShape
 
 A fixed reference domain/shape. Used mostly for defining more complex shapes as
-transformations mapping an `AbstractReferenceShape` to some region of `ℜᴹ`.
+transformations mapping an `ReferenceShape` to some region of `ℜᴹ`.
 
 See e.g. [`ReferenceLine`](@ref) or [`ReferenceTriangle`](@ref) for some
 examples of concrete subtypes.
 """
-abstract type AbstractReferenceShape end
+abstract type ReferenceShape end
 
 """
     struct ReferenceSimplex{N}
@@ -15,7 +15,7 @@ abstract type AbstractReferenceShape end
 Singleton type representing the N-simplex with N+1 vertices
 `(0,...,0),(0,...,0,1),(0,...,0,1,0),(1,0,...,0)`
 """
-struct ReferenceSimplex{N} <: AbstractReferenceShape end
+struct ReferenceSimplex{N} <: ReferenceShape end
 geometric_dimension(::ReferenceSimplex{N}) where {N} = N
 ambient_dimension(::ReferenceSimplex{N}) where {N} = N
 function Base.in(x, ::ReferenceSimplex{N}) where {N}
@@ -43,12 +43,12 @@ Singleton type representing the tetrahedron with vertices
 const ReferenceTetrahedron = ReferenceSimplex{3}
 
 """
-    struct ReferenceHyperCube{N} <: AbstractReferenceShape{N}
+    struct ReferenceHyperCube{N} <: ReferenceShape{N}
 
 Singleton type representing the axis-aligned hypercube in `N` dimensions with
 the lower corner at the origin and the upper corner at `(1,1,…,1)`.
 """
-struct ReferenceHyperCube{N} <: AbstractReferenceShape end
+struct ReferenceHyperCube{N} <: ReferenceShape end
 geometric_dimension(::ReferenceHyperCube{N}) where {N} = N
 ambient_dimension(::ReferenceHyperCube{N}) where {N} = N
 vertices(::ReferenceHyperCube{N}) where {N} = ntuple(i -> SVector(ntuple(j -> (i >> j) & 1, N)), 2^N)
