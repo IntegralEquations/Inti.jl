@@ -1,10 +1,10 @@
 """
-    abstract type AbstractElement{D,T}
+    abstract type ReferenceInterpolant{D,T}
 
-Interpolanting function mapping points on the domain `D<:AbstractReferenceShape`
+Interpolanting function mapping points on the domain `D<:ReferenceShape`
 (of singleton type) to a value of type `T`.
 
-Instances `el` of `AbstractElement` are expected to implement:
+Instances `el` of `ReferenceInterpolant` are expected to implement:
 - `el(x̂)`: evaluate the interpolation scheme at the (reference) coordinate `x̂
   ∈ D`.
 - `jacobian(el,x̂)` : evaluate the jacobian matrix of the interpolation at the
@@ -14,9 +14,9 @@ Instances `el` of `AbstractElement` are expected to implement:
     For performance reasons, both `el(x̂)` and `jacobian(el,x̂)` should
     take as input a `StaticVector` and output a static vector or static array.
 """
-abstract type AbstractElement{D<:AbstractReferenceShape,T} end
+abstract type ReferenceInterpolant{D<:ReferenceShape,T} end
 
-function (el::AbstractElement)(x)
+function (el::ReferenceInterpolant)(x)
     return interface_method(el)
 end
 
@@ -30,13 +30,13 @@ function jacobian(f, x)
     return interface_method(f)
 end
 
-domain(::AbstractElement{D,T}) where {D,T} = D()
-return_type(::AbstractElement{D,T}) where {D,T} = T
-domain_dimension(t::AbstractElement) = domain(t) |> center |> length
-range_dimension(el::AbstractElement{R,T}) where {R,T} = domain(t) |> center |> el |> length
+domain(::ReferenceInterpolant{D,T}) where {D,T} = D()
+return_type(::ReferenceInterpolant{D,T}) where {D,T} = T
+domain_dimension(t::ReferenceInterpolant) = domain(t) |> center |> length
+range_dimension(el::ReferenceInterpolant{R,T}) where {R,T} = domain(el) |> center |> el |> length
 
 """
-    struct LagrangeElement{D,Np,T} <: AbstractElement{D,T}
+    struct LagrangeElement{D,Np,T} <: ReferenceInterpolant{D,T}
 
 A polynomial `p : D → T` uniquely defined by its `Np` values on the `Np` reference nodes
 of `D`.
@@ -45,7 +45,7 @@ The return type `T` should be a vector space (i.e. support addition and
 multiplication by scalars). For istance, `T` could be a number or a vector, but
 not a `Tuple`.
 """
-struct LagrangeElement{D,Np,T} <: AbstractElement{D,T}
+struct LagrangeElement{D,Np,T} <: ReferenceInterpolant{D,T}
     vals::SVector{Np,T}
 end
 
@@ -233,8 +233,7 @@ end
     degree(el::LagrangeElement)
     degree(el::Type{<:LagrangeElement})
 
-The polynomial degree of the element. A `LagrangeElement` of degree `K` and
-domain `D` belongs to the space [`PolynomialSpace{D,K}`](@ref).
+The polynomial degree `el`.
 """
 function degree(::Type{LagrangeElement{D,Np}})::Int where {D,Np}
     if D == ReferenceLine

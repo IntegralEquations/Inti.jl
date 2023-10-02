@@ -62,3 +62,17 @@ function return_type(f, args...)
     @debug "using `Base.promote_op` to infer return type. Consider defining `return_type(::typeof($f),args...)`."
     return Base.promote_op(f, args...)
 end
+
+"""
+    domain(f)
+
+Given a function-like object `f: Ω → R`, return `Ω`.
+"""
+function domain end
+
+"""
+    image(f)
+
+Given a function-like object `f: Ω → R`, return `f(Ω)`.
+"""
+function image end
