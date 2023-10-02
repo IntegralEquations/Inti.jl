@@ -10,6 +10,7 @@ using LinearAlgebra
         x̂ = Inti.reference_nodes(Inti.LagrangeLine{3})
         vals = f.(x̂)
         p = Inti.LagrangeLine(vals)
+        @test Inti.return_type(p) == Float64
         @test p(0) ≈ 0
         @test p(1) ≈ 1
         @test p(0.1) ≈ 0.1^2
@@ -35,6 +36,7 @@ using LinearAlgebra
             SVector(-1.0, 0)
         )
         t = Inti.LagrangeTriangle(vtx)
+        @test Inti.return_type(t) == SVector{2,Float64}
         @test Inti.domain_dimension(t) == 2
         @test Inti.range_dimension(t) == 2
         # triangle in 3d
