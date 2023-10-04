@@ -26,7 +26,7 @@ end
     x = SVector(1.1, 0.0)
     @test !in(x, t)
     @test Inti.center(t) == SVector(1/3, 1/3)
-    @test Inti.vertices(t) == SVector{3, SVector{2, Int64}}([0, 0], [1, 0], [0, 1])
+    @test Inti.vertices(t) == SVector([0, 0], [1, 0], [0, 1])
 end
 @testset "Tetrahedron" begin
     t = Inti.ReferenceTetrahedron()
@@ -39,7 +39,7 @@ end
     x = SVector(1.1, 0.0, 0.0)
     @test !in(x, t)
     @test Inti.center(t) == SVector(1/4, 1/4, 1/4)
-    @test Inti.vertices(t) == SVector{4, SVector{3, Int64}}([0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1])
+    @test Inti.vertices(t) == SVector([0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1])
 end
 @testset "NSimplex" begin
     t = Inti.ReferenceSimplex{4}()
@@ -52,5 +52,5 @@ end
     x = SVector(1.1, 0.0, 0.0, 0.0)
     @test !in(x, t)
     @test Inti.center(t) == SVector(1/5, 1/5, 1/5, 1/5)
-    @test Inti.vertices(t) == SVector{5, SVector{4, Int64}}([0, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1])
+    @test Inti.vertices(t) == SVector([0, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1])
 end
