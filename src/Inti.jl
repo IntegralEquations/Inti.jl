@@ -13,9 +13,10 @@ include("reference_interpolation.jl")
 include("quad_rules_tables.jl")
 include("reference_integration.jl")
 
-# # geometry and meshes
-# include("domain.jl")
-# include("mesh.jl")
+# geometry and meshes
+include("entities.jl")
+include("domain.jl")
+include("mesh.jl")
 
 # # integral operators
 # include("integral_potentials.jl")
