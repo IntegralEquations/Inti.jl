@@ -6,7 +6,7 @@ DocMeta.setdocmeta!(Inti, :DocTestSetup, :(using Inti); recursive=true)
 makedocs(;
     modules=[Inti],
     authors="Luiz M. Faria",
-    repo="https://github.com/IntegralEquations/Inti.jl/blob/{commit}{path}#{line}",
+    repo="",
     sitename="Inti.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",

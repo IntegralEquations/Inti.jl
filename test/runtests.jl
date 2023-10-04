@@ -11,3 +11,5 @@ using Aqua
 @safetestset "Reference interpolation" include("reference_interpolation_test.jl")
 
 @safetestset "Reference integration" include("reference_integration_test.jl")
+
+@safetestset "Gmsh import" include("gmsh_test.jl")
