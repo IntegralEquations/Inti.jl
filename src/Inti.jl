@@ -3,6 +3,7 @@ module Inti
 const PROJECT_ROOT = pkgdir(Inti)
 
 using StaticArrays
+using Printf
 
 # helper functions
 include("utils.jl")
