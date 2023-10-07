@@ -16,7 +16,9 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "Meshing" => "geo_and_meshes.md",
     ],
+    pagesonly = true,
 )
 
 deploydocs(;

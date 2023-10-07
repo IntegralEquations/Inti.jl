@@ -8,9 +8,11 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [weakdeps]
 Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
 [extensions]
 IntiGmshExt = "Gmsh"
+IntiMakieExt = "Makie"
 
 [compat]
 Gmsh = "0.2"

@@ -31,6 +31,7 @@ function jacobian(f, x)
 end
 
 domain(::ReferenceInterpolant{D,T}) where {D,T} = D()
+domain(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = D()
 return_type(::ReferenceInterpolant{D,T}) where {D,T} = T
 domain_dimension(t::ReferenceInterpolant) = domain(t) |> center |> length
 range_dimension(el::ReferenceInterpolant{R,T}) where {R,T} = domain(el) |> center |> el |> length
