@@ -23,7 +23,7 @@ gmsh.finalize()
 - You can plot a `msh` if you have a `Makie` backend (e.g. `GLMakie`)
 
 ```@example gmsh-sphere
-using GLMakie
+using CairoMakie
 Γ = Inti.external_boundary(Ω)
 poly(view(msh,Γ);strokewidth=1,color=:lightgray, transparency=true)
 ```
@@ -40,7 +40,7 @@ Two-dimensional meshes are very similar:
 ```@example gmsh-disk
     using Inti
     using Gmsh
-    using GLMakie
+    using CairoMakie
     gmsh.initialize()
     gmsh.option.setNumber("General.Verbosity", 2)
     gmsh.model.add("Disk")
