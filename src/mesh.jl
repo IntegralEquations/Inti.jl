@@ -113,6 +113,38 @@ function Base.iterate(iter::ElementIterator{<:LagrangeElement,<:LagrangeMesh}, s
     return iter[state], state + 1
 end
 
+# convert a mesh to 2d by ignoring third component. Note that this also requires
+# converting various element types to their 2d counterpart. These are needed
+# because some meshers like gmsh always create three-dimensional objects, so we
+# must convert after importing the mesh
+function _convert_to_2d(mesh::LagrangeMesh{3,T}) where {T}
+    # create new dictionaries for elements and ent2tagsdict with 2d elements as keys
+    new_etype2mat = empty(mesh.etype2mat)
+    new_ent2tags  = empty(mesh.ent2tags)
+    for (E, tags) in mesh.etype2mat
+        E2d = _convert_to_2d(E)
+        new_etype2mat[E2d] = tags
+    end
+    for (ent, dict) in mesh.ent2tags
+        new_dict = empty(dict)
+        for (E, tags) in dict
+            E2d = _convert_to_2d(E)
+            new_dict[E2d] = tags
+        end
+        new_ent2tags[ent] = new_dict
+    end
+    # construct new 2d mesh
+    return LagrangeMesh{2,T}(
+                [x[1:2] for x in mesh.nodes],
+                new_etype2mat,
+                new_ent2tags
+            )
+end
+
+function _convert_to_2d(::Type{LagrangeElement{R,N,SVector{3,T}}}) where {R,N,T}
+    return LagrangeElement{R,N,SVector{2,T}}
+end
+
 """
     struct SubMesh{N,T} <: AbstractMesh{N,T}
 
