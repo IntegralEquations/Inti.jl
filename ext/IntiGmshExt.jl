@@ -134,7 +134,7 @@ function Inti.gmsh_import_mesh(Ω::Inti.Domain; dim=3)
     if dim == 3
         return msh
     elseif dim == 2
-        return convert_to_2d(msh)
+        return Inti._convert_to_2d(msh)
     else
         error("`dim` value must be `2` or `3`")
     end

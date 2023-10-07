@@ -34,3 +34,21 @@ more details on possible arguments):
 ```@example gmsh-sphere
 poly(view(msh,Ω);strokewidth=1,color=:lightgray, transparency=true)
 ```
+
+Two-dimensional meshes are very similar:
+
+```@example gmsh-disk
+    using Inti
+    using Gmsh
+    using GLMakie
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Verbosity", 2)
+    gmsh.model.add("Disk")
+    gmsh.model.occ.addDisk(0,0,0,1,1)
+    gmsh.model.occ.synchronize()
+    gmsh.model.mesh.generate(2)
+    Ω   = Inti.gmsh_import_domain(;dim=2)
+    msh = Inti.gmsh_import_mesh(Ω;dim=2)
+    gmsh.finalize()
+    poly(view(msh,Ω);strokewidth=2)
+```
