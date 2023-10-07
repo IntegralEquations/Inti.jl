@@ -84,9 +84,8 @@ const ENTITIES = Dict{Tuple{Int,Int},AbstractEntity}()
     global_add_entity!(ent::AbstractEntity)
 
 Add `ent` to the global dictionary [`ENTITIES`](@ref) and update [`TAGS`](@ref)
-with its `(dim,tag)` key. This function should be called by the inner constructor
-of *every* [`AbstractEntity`](@ref); see the constructor of
-[`GmshEntity`](@ref) for an example.
+with its `(dim,tag)` key. This function should be called by the inner
+constructor of *every* [`AbstractEntity`](@ref).
 """
 function global_add_entity!(ent::AbstractEntity)
     d, t = geometric_dimension(ent), tag(ent)

@@ -5,10 +5,9 @@ An abstract mesh structure in dimension `N` with primite data of type `T` (e.g.
 `Float64` for double precision representation).
 
 Concrete subtypes of `AbstractMesh` should implement [`ElementIterator`](@ref)
-for accessing the mesh elements, and [`NodeIterator`](@ref) for accesing the
-mesh nodes.
+for accessing the mesh elements.
 
-# See also: [`LagrangeMesh`](@ref), [`UniformCartesianMesh`](@ref)
+See also: [`LagrangeMesh`](@ref)
 """
 abstract type AbstractMesh{N,T} end
 
@@ -104,7 +103,7 @@ end
 function Base.getindex(iter::ElementIterator{E,<:LagrangeMesh}, i::Int) where {E<:LagrangeElement}
     tags = iter.mesh.etype2mat[E]::Matrix{Int}
     node_tags = view(tags, :, i)
-    vtx = view(iter.msh.nodes, node_tags)
+    vtx = view(iter.mesh.nodes, node_tags)
     el = E(vtx)
     return el
 end
@@ -142,6 +141,10 @@ end
 Base.view(m::LagrangeMesh, Ω::Domain) = SubMesh(m, Ω)
 Base.view(m::LagrangeMesh, ent::AbstractEntity) = SubMesh(m, Domain(ent))
 
+ambient_dimension(::SubMesh{N}) where {N} = N
+
+geometric_dimension(msh::SubMesh) = geometric_dimension(msh.domain)
+
 element_types(msh::SubMesh) = keys(msh.etype2etags)
 
 # ElementIterator for submesh
@@ -154,9 +157,9 @@ end
 function Base.getindex(iter::ElementIterator{E,<:SubMesh}, i::Int) where {E<:LagrangeElement}
     submsh = iter.mesh
     p_msh  = submsh.parent # parent mesh
-    idxs   = submsh.etyp2etags[E]::Vector{Int}
+    idxs   = submsh.etype2etags[E]::Vector{Int}
     iglob = idxs[i] # global index of element in parent mesh
-    iter = ElementIterator(p_msh, E) # iterator over parent mesh
+    iter = elements(p_msh, E) # iterator over parent mesh
     return iter[iglob]
 end
 

@@ -5,6 +5,7 @@ using Test
 # for now that check that the code below does not error
 @test begin
     gmsh.initialize()
+    gmsh.option.setNumber("General.Verbosity", 2)
     gmsh.model.add("Sphere")
     gmsh.model.occ.addSphere(0,0,0,1)
     gmsh.model.occ.synchronize()
@@ -13,4 +14,5 @@ using Test
     Ω   = Inti.gmsh_import_domain(;dim=3)
     msh = Inti.gmsh_import_mesh(Ω;dim=3)
     gmsh.finalize()
+    return true
 end

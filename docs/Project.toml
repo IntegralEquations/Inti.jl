@@ -1,3 +1,5 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
+Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
 Inti = "fb74042b-437e-4c5b-88cf-d4e2beb394d5"

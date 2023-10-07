@@ -6,7 +6,7 @@ using Printf
 using StaticArrays
 
 function __init__()
-    @info "Loading Inti Gmsh extension"
+    @info "Loading Inti.jl Gmsh extension"
 end
 
 """
