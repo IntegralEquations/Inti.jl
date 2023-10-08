@@ -76,6 +76,10 @@ Return the element types present in the `msh`.
 """
 element_types(msh::LagrangeMesh) = keys(msh.etype2mat)
 
+nodes(msh::LagrangeMesh) = msh.nodes
+elements(msh::LagrangeMesh) = msh.etype2mat
+ent2tags(msh::LagrangeMesh) = msh.ent2tags
+
 """
     dom2elt(m::LagrangeMesh,Ω,E)
 

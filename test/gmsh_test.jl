@@ -13,7 +13,7 @@ using Test
     Ω   = Inti.gmsh_import_domain(;dim=2)
     msh = Inti.gmsh_import_mesh(Ω;dim=2)
     gmsh.finalize()
-    return true
+    true == true
 end
 
 @test begin
@@ -27,5 +27,5 @@ end
     Ω   = Inti.gmsh_import_domain(;dim=3)
     msh = Inti.gmsh_import_mesh(Ω;dim=3)
     gmsh.finalize()
-    return true
+    true == true
 end
