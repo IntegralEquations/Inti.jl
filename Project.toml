@@ -5,15 +5,16 @@ version = "0.1.0"
 [deps]
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
-WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [weakdeps]
+WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
 [extensions]
 IntiGmshExt = "Gmsh"
 IntiMakieExt = "Makie"
+IntiVTKExt = "WriteVTK"
 
 [compat]
 Gmsh = "0.2"
