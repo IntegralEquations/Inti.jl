@@ -1,6 +1,12 @@
-@info "including vtk.jl"
+module IntiVTKExt
 
 using WriteVTK
+import Inti
+using StaticArrays
+
+function __init__()
+    @info "Loading Inti.jl VTK extension"
+end
 
 """
     vtk_mesh_file(mesh::LagrangeMesh[, Ω::Domain], name::String)
@@ -40,12 +46,12 @@ To save a sequence of solutions (time steps, iterations), simply append
 the number of the element to the file name.
 Paraview will recognize the sequence automatically.
 """
-function vtk_mesh_file(mesh::LagrangeMesh, name::String)
+function Inti.vtk_mesh_file(mesh::Inti.LagrangeMesh, name::String)
     points = _vtk_points(mesh)
     cells = _vtk_cells(mesh)
     return vtk_grid(name * ".vtu", points, cells)
 end
-function vtk_mesh_file(mesh::LagrangeMesh, Ω::Domain, name::String)
+function Inti.vtk_mesh_file(mesh::Inti.LagrangeMesh, Ω::Inti.Domain, name::String)
     points = _vtk_points(mesh)
     cells = _vtk_cells(mesh, Ω)
     return vtk_grid(name * ".vtu", points, cells)
@@ -56,10 +62,10 @@ end
 
 Creates the matrix of nodes in the format required by `WriteVTK`.
 """
-function _vtk_points(mesh::LagrangeMesh)
-    vtx = zeros(Float64, 3, length(nodes(mesh)))
-    for (i, nd) in enumerate(nodes(mesh))
-        vtx[1:ambient_dimension(mesh), i] = nd
+function _vtk_points(mesh::Inti.LagrangeMesh)
+    vtx = zeros(Float64, 3, length(Inti.nodes(mesh)))
+    for (i, nd) in enumerate(Inti.nodes(mesh))
+        vtx[1:Inti.ambient_dimension(mesh), i] = nd
     end
     return vtx
 end
@@ -78,25 +84,25 @@ function _vtk_cells(tags, E::DataType)
     vtk_cell_type, ind = etype_to_vtk_cell_type[E]
     return [MeshCell(vtk_cell_type, tags[ind, i]) for i in 1:size(tags, 2)]
 end
-function _vtk_cells(mesh::LagrangeMesh, Ω::Domain)
+function _vtk_cells(mesh::Inti.LagrangeMesh, Ω::Inti.Domain)
     cells = MeshCell[]
     # Loop on `ElementaryEntity`
     for ω in Ω
         # Loop on `AbstractElement`
-        for (E, ind) in ent2tags(mesh)[ω]
+        for (E, ind) in Inti.ent2tags(mesh)[ω]
             # Subset corresponding to the `ElementaryEntity`
-            tags = elements(mesh)[E][:, ind]
+            tags = Inti.elements(mesh)[E][:, ind]
             append!(cells, _vtk_cells(tags, E))
         end
     end
     return cells
 end
-function _vtk_cells(mesh::LagrangeMesh)
+function _vtk_cells(mesh::Inti.LagrangeMesh)
     cells = MeshCell[]
     # Loop on `AbstractElement`
-    for (E, tags) in elements(mesh)
+    for (E, tags) in Inti.elements(mesh)
         # Export only the cells of the largest geometrical dimension
-        if domain_dimension(E) == ambient_dimension(mesh)
+        if Inti.domain_dimension(E) == Inti.ambient_dimension(mesh)
             append!(cells, _vtk_cells(tags, E))
         end
     end
@@ -134,11 +140,13 @@ See VTK specification [Fig. 2] on
 """
 const etype_to_vtk_cell_type = Dict(SVector{3,Float64} => (VTKCellTypes.VTK_VERTEX,
                                                            collect(1:1)),
-                                    LagrangeLine{2,SVector{3,Float64}} => (VTKCellTypes.VTK_LINE,
-                                                                           collect(1:2)),
-                                    LagrangeTriangle{3,SVector{2,Float64}} => (VTKCellTypes.VTK_TRIANGLE,
-                                                                               collect(1:3)),
-                                    LagrangeTriangle{3,SVector{3,Float64}} => (VTKCellTypes.VTK_TRIANGLE,
-                                                                               collect(1:3)),
-                                    LagrangeTetrahedron{4,SVector{3,Float64}} => (VTKCellTypes.VTK_TETRA,
-                                                                                  collect(1:4)))
+                                    Inti.LagrangeLine{2,SVector{3,Float64}} => (VTKCellTypes.VTK_LINE,
+                                                                                collect(1:2)),
+                                    Inti.LagrangeTriangle{3,SVector{2,Float64}} => (VTKCellTypes.VTK_TRIANGLE,
+                                                                                    collect(1:3)),
+                                    Inti.LagrangeTriangle{3,SVector{3,Float64}} => (VTKCellTypes.VTK_TRIANGLE,
+                                                                                    collect(1:3)),
+                                    Inti.LagrangeTetrahedron{4,SVector{3,Float64}} => (VTKCellTypes.VTK_TETRA,
+                                                                                       collect(1:4)))
+
+end # module IntiVTKExt

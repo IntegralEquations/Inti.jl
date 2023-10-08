@@ -4,7 +4,6 @@ const PROJECT_ROOT = pkgdir(Inti)
 
 using StaticArrays
 using Printf
-using WriteVTK
 
 # helper functions
 include("utils.jl")
@@ -19,9 +18,6 @@ include("reference_integration.jl")
 include("entities.jl")
 include("domain.jl")
 include("mesh.jl")
-
-# IO
-include("vtk.jl")
 
 # # integral operators
 # include("integral_potentials.jl")

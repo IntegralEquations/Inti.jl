@@ -215,3 +215,5 @@ two-dimensional mesh by projecting the original mesh onto the `x,y` plane.
     finalization.
 """
 function gmsh_import_mesh end
+
+function vtk_mesh_file end
