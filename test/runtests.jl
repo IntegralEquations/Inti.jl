@@ -12,4 +12,8 @@ using Aqua
 
 @safetestset "Reference integration" include("reference_integration_test.jl")
 
+@safetestset "Quadrature" include("quadrature_test.jl")
+
 @safetestset "Gmsh import" include("gmsh_test.jl")
+
+@safetestset "VTK export" include("vtkIO_test.jl")
