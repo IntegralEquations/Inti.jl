@@ -203,30 +203,3 @@ function (q::TensorProductQuadrature{N})() where {N}
     weights_iter = (prod(w) for w in Iterators.product(weights1d...))
     return nodes_iter, weights_iter
 end
-
-"""
-    qrule_for_reference_shape(ref,order)
-
-Given a `ref`erence shape and a desired quadrature `order`, return
-an appropiate quadrature rule.
-"""
-function qrule_for_reference_shape(ref, order)
-    if ref === ReferenceLine() || ref === :line
-        return Fejer(; order)
-        # return Fejer(; order)
-    elseif ref === ReferenceSquare() || ref === :square
-        qx = qrule_for_reference_shape(ReferenceLine(), order)
-        qy = qx
-        return TensorProductQuadrature(qx, qy)
-    elseif ref === ReferenceCube() || ref === :cube
-        qx = qrule_for_reference_shape(ReferenceLine(), order)
-        qy = qz = qx
-        return TensorProductQuadrature(qx, qy, qz)
-    elseif ref isa ReferenceTriangle || ref === :triangle
-        return Gauss(; domain=ref, order=order)
-    elseif ref isa ReferenceTetrahedron || ref === :tetrahedron
-        return Gauss(; domain=ref, order=order)
-    else
-        error("no appropriate quadrature rule found.")
-    end
-end
