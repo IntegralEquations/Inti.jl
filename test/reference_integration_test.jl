@@ -28,7 +28,7 @@ end
         @test Inti.domain(q) == d
         @test all(qnode ∈ d for qnode in x)
         for i in 0:p, j in 0:p
-            i + p > p && continue
+            i + j > p && continue
             @test Inti.integrate(x -> x[1]^i * x[2]^j, q) ≈ exa(i, j)
         end
     end
@@ -64,7 +64,7 @@ end
         @test Inti.domain(q) == d
         @test all(qnode ∈ d for qnode in x)
         for i in 0:p, j in 0:p
-            i + p > p && continue
+            i + j > p && continue
             @test Inti.integrate(x -> x[1]^i * x[2]^j, q) ≈ exa(i, j)
         end
     end
