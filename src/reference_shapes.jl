@@ -75,3 +75,11 @@ const ReferenceSquare = ReferenceHyperCube{2}
 Singleton type representing the unit cube `[0,1]³`.
 """
 const ReferenceCube = ReferenceHyperCube{3}
+
+# since ReferenceShapes are singletons, define methods on the type to be
+# equivalent to methods on instantiation of the type
+geometric_dimension(E::Type{<:ReferenceShape}) = geometric_dimension(E())
+ambient_dimension(E::Type{<:ReferenceShape}) = ambient_dimension(E())
+vertices(E::Type{<:ReferenceShape}) = vertices(E())
+center(E::Type{<:ReferenceShape}) = center(E())
+Base.in(E::Type{<:ReferenceShape}) = in(E())
