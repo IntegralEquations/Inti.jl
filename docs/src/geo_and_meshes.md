@@ -8,14 +8,15 @@
 using Inti
 using Gmsh
 
+gmsh_ext = Inti.get_gmsh_extension()
 gmsh.initialize()
 gmsh.model.add("Sphere")
 gmsh.model.occ.addSphere(0,0,0,1)
 gmsh.model.occ.synchronize()
 gmsh.model.mesh.generate(3)
 ents = gmsh.model.getEntities()
-Ω   = Inti.gmsh_import_domain(;dim=3)
-msh = Inti.gmsh_import_mesh(Ω;dim=3)
+Ω   = gmsh_ext.import_domain(;dim=3)
+msh = gmsh_ext.import_mesh(Ω;dim=3)
 gmsh.finalize()
 ```
 
@@ -41,14 +42,15 @@ Two-dimensional meshes are very similar:
     using Inti
     using Gmsh
     using CairoMakie
+    gmsh_ext = Inti.get_gmsh_extension()
     gmsh.initialize()
     gmsh.option.setNumber("General.Verbosity", 2)
     gmsh.model.add("Disk")
     gmsh.model.occ.addDisk(0,0,0,1,1)
     gmsh.model.occ.synchronize()
     gmsh.model.mesh.generate(2)
-    Ω   = Inti.gmsh_import_domain(;dim=2)
-    msh = Inti.gmsh_import_mesh(Ω;dim=2)
+    Ω   = gmsh_ext.import_domain(;dim=2)
+    msh = gmsh_ext.import_mesh(Ω;dim=2)
     gmsh.finalize()
     poly(view(msh,Ω);strokewidth=2)
 ```

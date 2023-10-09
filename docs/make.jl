@@ -1,10 +1,20 @@
 using Inti
 using Documenter
 
+# load package needed for extensions
+using Gmsh
+using WriteVTK
+using CairoMakie
+
 DocMeta.setdocmeta!(Inti, :DocTestSetup, :(using Inti); recursive=true)
 
 makedocs(;
-    modules=[Inti],
+    modules=[
+        Inti,
+        Inti.get_gmsh_extension(),
+        Inti.get_vtk_extension(),
+        Inti.get_makie_extension(),
+    ],
     authors="Luiz M. Faria",
     repo="",
     sitename="Inti.jl",
@@ -17,6 +27,7 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Meshing" => "geo_and_meshes.md",
+        "References" => "references.md",
     ],
     pagesonly = true,
 )

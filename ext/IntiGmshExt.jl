@@ -12,7 +12,7 @@ end
 """
     struct GmshEntity <: AbstractEntity
 
-Concrete type of [`AbstractEntity`](@ref) generated using the `gmsh` API.
+Concrete type of [`AbstractEntity`](@ref Inti.AbstractEntity) generated using the `gmsh` API.
 """
 struct GmshEntity <: Inti.AbstractEntity
     dim::Int
@@ -44,7 +44,7 @@ Inti.boundary(e::GmshEntity) = e.boundary
 """
     import_domain([model;dim=3])
 
-Construct a [`Domain`](@ref) from the `gmsh` `model` with all entities of
+Construct a [`Domain`](@ref Inti.Domain) from the `gmsh` `model` with all entities of
 dimension `dim`; by defaul the current `gmsh` model is used.
 
 !!! note
@@ -107,7 +107,7 @@ end
 """
     read_geo(fname::String;dim=3)
 
-Read a `.geo` file and generate a [`Domain`](@ref) with all entities of
+Read a `.geo` file and generate a [`Domain`](@ref Inti.Domain) with all entities of
 dimension `dim`.
 
 !!! danger
@@ -191,7 +191,7 @@ end
 
 Recursively populate the dictionaries `etype2mat` and `ent2tag` in `msh` for the
 entities in `Ω`. After all entities have been processed, the function recurses
-on the [`skeleton`](@ref) of `Ω`.
+on the [`skeleton`](@ref Inti.skeleton) of `Ω`.
 """
 function _domain_to_mesh!(msh, Ω::Inti.Domain, shift)
     isempty(Ω) && (return msh)
