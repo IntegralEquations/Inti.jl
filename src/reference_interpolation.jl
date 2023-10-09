@@ -30,10 +30,15 @@ function jacobian(f, x)
     return interface_method(f)
 end
 
+# TODO Should we use SType here?
 domain(::ReferenceInterpolant{D,T}) where {D,T} = D()
+domain(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = D()
 return_type(::ReferenceInterpolant{D,T}) where {D,T} = T
-domain_dimension(t::ReferenceInterpolant) = domain(t) |> center |> length
+return_type(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = T
+domain_dimension(t::ReferenceInterpolant{D,T}) where {D,T} = domain(t) |> center |> length
+domain_dimension(t::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = domain(t) |> center |> length
 range_dimension(el::ReferenceInterpolant{R,T}) where {R,T} = domain(el) |> center |> el |> length
+range_dimension(el::Type{<:ReferenceInterpolant{R,T}}) where {R,T} = domain(el) |> center |> el |> length
 
 """
     struct LagrangeElement{D,Np,T} <: ReferenceInterpolant{D,T}
