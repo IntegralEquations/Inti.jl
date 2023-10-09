@@ -93,29 +93,3 @@ Iterating over a domain means iterating over its entities.
 Base.iterate(Ω::Domain, state=1) = iterate(entities(Ω), state)
 
 Base.isempty(Ω::Domain) = isempty(entities(Ω))
-
-############################################################################################
-# Implementation of a concrete type of AbstractEntity that is generated using
-# gmsh. The functionality using the gmsh API is implemented in the extension
-# IntiGmshExt.jl
-############################################################################################
-
-"""
-    gmsh_import_domain([model;dim=3])
-
-Construct a [`Domain`](@ref) from the `gmsh` `model` with all entities of
-dimension `dim`; by defaul the current `gmsh` model is used.
-
-!!! note
-    This function assumes that `gmsh` has been initialized, and
-    does not handle its finalization.
-"""
-function gmsh_import_domain end
-
-"""
-    gmsh_model_summary([model])
-
-Print a summary of the `gmsh` `model` to the console; by defaul the current
-model is used.
-"""
-function gmsh_model_summary end

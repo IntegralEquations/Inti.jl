@@ -203,17 +203,3 @@ function Base.iterate(iter::ElementIterator{<:LagrangeElement,<:SubMesh}, state=
     state > length(iter) && (return nothing)
     return iter[state], state + 1
 end
-
-"""
-    gmsh_import_mesh(Ω;[dim=3])
-
-Create a `LagrangeMesh` for the entities in `Ω`. Passing `dim=2` will create a
-two-dimensional mesh by projecting the original mesh onto the `x,y` plane.
-
-!!! danger
-    This function assumes that `gmsh` has been initialized, and does not handle its
-    finalization.
-"""
-function gmsh_import_mesh end
-
-function vtk_mesh_file end

@@ -9,7 +9,7 @@ function __init__()
 end
 
 """
-    vtk_mesh_file(mesh::LagrangeMesh[, Ω::Domain], name::String)
+    mesh_file(mesh::LagrangeMesh[, Ω::Domain], name::String)
 
 Creates a `VTK` file (.vtu) with name `name` containing the mesh information.
 It is possible to export only a `Domain` (i.e. only a part of the mesh).
@@ -20,14 +20,14 @@ We refer to its documentation for more information.
 Warning: the output is not an actual file (on disk).
 To save it, simply write:
 
-    vtk_mesh_file(mesh, "my_mesh") |> vtk_save
+    mesh_file(mesh, "my_mesh") |> vtk_save
 
 (Noting that you will need to be `using WriteVTK` to do so)
 
 To add some data (scalar or vector values at the mesh nodes or mesh cells)
 for visualization purposes, you can do for instance:
 
-    vtkfile = vtk_mesh_file(mesh, name)
+    vtkfile = mesh_file(mesh, name)
     vtkfile["my_point_data", VTKPointData()] = pdata
     vtkfile["my_cell_data", VTKCellData()] = cdata
     vtk_save(vtkfile)
@@ -37,7 +37,7 @@ It is possible also to export a partition `Ωs::Vector{Domain}` using
 
     vtmfile = vtk_multiblock(name)
     for (Ω, pdata) in zip(Ωs, pdatas)
-        vtkfile = vtk_mesh_file(mesh, Ω, name)
+        vtkfile = mesh_file(mesh, Ω, name)
         vtkfile["my_point_data", VTKPointData()] = pdata
     end
     vtk_save(vtmfile)
@@ -46,12 +46,12 @@ To save a sequence of solutions (time steps, iterations), simply append
 the number of the element to the file name.
 Paraview will recognize the sequence automatically.
 """
-function Inti.vtk_mesh_file(mesh::Inti.LagrangeMesh, name::String)
+function mesh_file(mesh::Inti.LagrangeMesh, name::String)
     points = _vtk_points(mesh)
     cells = _vtk_cells(mesh)
     return vtk_grid(name * ".vtu", points, cells)
 end
-function Inti.vtk_mesh_file(mesh::Inti.LagrangeMesh, Ω::Inti.Domain, name::String)
+function mesh_file(mesh::Inti.LagrangeMesh, Ω::Inti.Domain, name::String)
     points = _vtk_points(mesh)
     cells = _vtk_cells(mesh, Ω)
     return vtk_grid(name * ".vtu", points, cells)
