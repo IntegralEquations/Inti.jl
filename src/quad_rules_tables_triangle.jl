@@ -215,7 +215,7 @@ const TRIANGLE_G12N33 = ((SVector(0.4882173897740, 0.4882173897740), 0.012865533
 ## weights is 0.5
 
 ## -----------------------------------------------------------------------------
-#*! Quadrature rule for an interpolation of order 1 on the triangle *#
+#*! Interpolatory quadrature rule of order 1 on the triangle *#
 #* 'Spectra of Multiplication Operators as a Numerical Tool', B. Vioreanu and Rokhlin, V.
 
 const TRIANGLE_VR1N1 = ((SVector(0.3333333333333333, 0.3333333333333334), 0.5000000000000000),)
@@ -223,7 +223,7 @@ const TRIANGLE_VR1N1 = ((SVector(0.3333333333333333, 0.3333333333333334), 0.5000
 ## weights is 0.5. Vioreanu-Rokhlin interpolation degree n=0
 
 ## -----------------------------------------------------------------------------
-#*! Quadrature rule for an interpolation of order 2 on the triangle *#
+#*! Interpolatory quadrature rule of order 2 on the triangle *#
 #* 'Spectra of Multiplication Operators as a Numerical Tool', B. Vioreanu and Rokhlin, V.
 
 const TRIANGLE_VR2N3 = ((SVector(0.16666666666666663, 0.6666666666666667),  0.1666666666666667),
@@ -233,7 +233,7 @@ const TRIANGLE_VR2N3 = ((SVector(0.16666666666666663, 0.6666666666666667),  0.16
 ## weights is 0.5. Vioreanu-Rokhlin interpolation degree n=1
 
 ## -----------------------------------------------------------------------------
-#*! Quadrature rule for an interpolation of order 4 on the triangle *#
+#*! Interpolatory quadrature rule of order 4 on the triangle *#
 #* 'Spectra of Multiplication Operators as a Numerical Tool', B. Vioreanu and Rokhlin, V.
 
 const TRIANGLE_VR4N6 = ((SVector(0.09157621350977069, 0.8168475729804586),   0.0549758718276609),
@@ -246,7 +246,7 @@ const TRIANGLE_VR4N6 = ((SVector(0.09157621350977069, 0.8168475729804586),   0.0
 ## weights is 0.5. Vioreanu-Rokhlin interpolation degree n=2
 
 ## -----------------------------------------------------------------------------
-#*! Quadrature rule for an interpolation of order 5 on the triangle *#
+#*! Interpolatory quadrature rule of order 5 on the triangle *#
 #* 'Spectra of Multiplication Operators as a Numerical Tool', B. Vioreanu and Rokhlin, V.
 
 const TRIANGLE_VR5N10 = ((SVector(0.31397939767698096, 0.07109443567989363), 0.051683140693245144),
@@ -263,7 +263,7 @@ const TRIANGLE_VR5N10 = ((SVector(0.31397939767698096, 0.07109443567989363), 0.0
 ## weights is 0.5. Vioreanu-Rokhlin interpolation degree n=3
 
 ## -----------------------------------------------------------------------------
-#*! Quadrature rule for an interpolation of order 7 on the triangle *#
+#*! Interpolatory quadrature rule of order 7 on the triangle *#
 #* 'Spectra of Multiplication Operators as a Numerical Tool', B. Vioreanu and Rokhlin, V.
 
 const TRIANGLE_VR7N15 = ((SVector(0.23334689298486896,  0.04816980611752469), 0.02735780884051768),
@@ -285,7 +285,7 @@ const TRIANGLE_VR7N15 = ((SVector(0.23334689298486896,  0.04816980611752469), 0.
 ## weights is 0.5. Vioreanu-Rokhlin interpolation degree n=4
 
 ## -----------------------------------------------------------------------------
-#*! Quadrature rule for an interpolation of order 9 on the triangle *#
+#*! Interpolatory quadrature rule of order 9 on the triangle *#
 #* 'Spectra of Multiplication Operators as a Numerical Tool', B. Vioreanu and Rokhlin, V.
 
 #const TRIANGLE_VR9N21 = ((SVector(0.3760587715777944,   0.039308471878585736), 0.020848748691929018),
@@ -335,7 +335,7 @@ const TRIANGLE_VR9N21 = ((SVector(0.6079612843856868,   0.19601935780715662), 0.
 ## weights is 0.5. Vioreanu-Rokhlin interpolation degree n=5
 
 ## -----------------------------------------------------------------------------
-#*! Quadrature rule for an interpolation of order 11 on the triangle *#
+#*! Interpolatory quadrature rule of order 11 on the triangle *#
 #* 'Spectra of Multiplication Operators as a Numerical Tool', B. Vioreanu and Rokhlin, V.
 
 #const TRIANGLE_VR11N28 = ((SVector(0.3307142459409232,   0.1487254480002739),  0.029592073234374485),
@@ -398,7 +398,7 @@ const TRIANGLE_VR11N28 = ((SVector(0.33333333333333337,  0.33333333333333337),  
 ## weights is 0.5. Vioreanu-Rokhlin interpolation degree n=6
 
 ## -----------------------------------------------------------------------------
-#*! Quadrature rule for an interpolation of order 12 on the triangle *#
+#*! Interpolatory quadrature rule of order 12 on the triangle *#
 #* 'Spectra of Multiplication Operators as a Numerical Tool', B. Vioreanu and Rokhlin, V.
 
 const TRIANGLE_VR12N36 = ((SVector(0.2661098644687711,   0.116477244011243),    0.020763451059891802),
@@ -441,7 +441,7 @@ const TRIANGLE_VR12N36 = ((SVector(0.2661098644687711,   0.116477244011243),    
 ## weights is 0.5. Vioreanu-Rokhlin interpolation degree n=7
 
 ## -----------------------------------------------------------------------------
-#*! Quadrature rule for an interpolation of order 14 on the triangle *#
+#*! Interpolatory Quadrature rule of order 14 on the triangle *#
 #* 'Spectra of Multiplication Operators as a Numerical Tool', B. Vioreanu and Rokhlin, V.
 
 const TRIANGLE_VR14N45 = ((SVector(0.3613457256370316,   0.09727105953484604),  0.01877035539118598),
@@ -493,7 +493,7 @@ const TRIANGLE_VR14N45 = ((SVector(0.3613457256370316,   0.09727105953484604),  
 ## weights is 0.5. Vioreanu-Rokhlin interpolation degree n=8
 
 ## -----------------------------------------------------------------------------
-#*! Quadrature rule for an interpolation of order 16 on the triangle *#
+#*! Interpolatory quadrature rule of order 16 on the triangle *#
 #* 'Spectra of Multiplication Operators as a Numerical Tool', B. Vioreanu and Rokhlin, V.
 
 const TRIANGLE_VR16N55 = ((SVector(0.33611895029553246,  0.19163564145756365),  0.01727637826140909),
@@ -555,7 +555,7 @@ const TRIANGLE_VR16N55 = ((SVector(0.33611895029553246,  0.19163564145756365),  
 ## weights is 0.5. Vioreanu-Rokhlin interpolation degree n=9
 
 ## -----------------------------------------------------------------------------
-#*! Quadrature rule for an interpolation of order 17 on the triangle *#
+#*! Interpolatory quadrature rule of order 17 on the triangle *#
 #* 'Spectra of Multiplication Operators as a Numerical Tool', B. Vioreanu and Rokhlin, V.
 
 const TRIANGLE_VR17N66 = ((SVector(0.2811126637309341,   0.16124400348663967),  0.014440478584297225),

@@ -65,13 +65,11 @@ end
         @test all(qnode ∈ d for qnode in x)
         for i in 0:p, j in 0:p
             i + p > p && continue
-            @info p, i, j
             @test Inti.integrate(x -> x[1]^i * x[2]^j, q) ≈ exa(i, j)
         end
     end
 end
 
-# TODO No VR on tets yet; no-op testset
 @testset "Vioreanu-Rokhlin quad on tetrahedron" begin
     d = Inti.ReferenceTetrahedron()
     # exact value for x^a*y^b*z^c integrate over reference tetrahedron

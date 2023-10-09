@@ -81,8 +81,16 @@ const TETRAHEDRON_GAUSS_NPTS_TO_ORDER = Dict((v, k)
                                              for (k, v) in TETRAHEDRON_GAUSS_ORDER_TO_NPTS)
 
 # TODO
-const TETRAHEDRON_VR_QRULES = Dict()
-const TETRAHEDRON_VR_ORDER_TO_NPTS = Dict()
+const TETRAHEDRON_VR_QRULES = Dict(1 => TETRAHEDRON_VR1N1,
+                                   4 => TETRAHEDRON_VR2N4,
+                                   10 => TETRAHEDRON_VR3N10,
+                                   20 => TETRAHEDRON_VR5N20,
+                                   35 => TETRAHEDRON_VR6N35)
+const TETRAHEDRON_VR_ORDER_TO_NPTS = Dict(1 => 1,
+                                          2 => 4,
+                                          3 => 10,
+                                          5 => 20,
+                                          6 => 35)
 const TETRAHEDRON_VR_NPTS_TO_ORDER = Dict((v, k) for (k, v) in TETRAHEDRON_VR_ORDER_TO_NPTS)
 
 ##
