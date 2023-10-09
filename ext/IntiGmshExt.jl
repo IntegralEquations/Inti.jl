@@ -52,13 +52,14 @@ dimension `dim`; by defaul the current `gmsh` model is used.
     does not handle its finalization.
 """
 function import_domain(model=gmsh.model.getCurrent(); dim=3)
+    gmsh.isInitialized() == 1 || error("gmsh is not initialized. Try `gmsh.initialize` first.")
     Ω = Inti.Domain() # Create empty domain
     _import_domain!(Ω, model; dim)
     return Ω
 end
 
 """
-    import_domain!(Ω::Domain,[model;dim=3])
+    _import_domain!(Ω::Domain,[model;dim=3])
 
 Like [`import_domain`](@ref), but appends entities to `Ω` instead of
 creating a new domain.
@@ -155,6 +156,7 @@ two-dimensional mesh by projecting the original mesh onto the `x,y` plane.
     finalization.
 """
 function import_mesh(Ω::Inti.Domain; dim=3)
+    gmsh.isInitialized() == 1 || error("gmsh is not initialized. Try `gmsh.initialize` first.")
     msh = Inti.LagrangeMesh{3,Float64}()
     _import_mesh!(msh, Ω)
     if dim == 3
@@ -251,8 +253,7 @@ function _type_tag_to_etype(tag)
     name, dim, order, num_nodes, ref_nodes, num_primary_nodes = gmsh.model.mesh.getElementProperties(tag)
     num_nodes = Int(num_nodes) #convert to Int64
     if occursin("Point", name)
-        error("Point elements are not supported")
-        etype = Inti.LagrangePoint{3,Float64}
+        etype = SVector{3,Float64}
     elseif occursin("Line", name)
         etype = Inti.LagrangeLine{num_nodes,T}
     elseif occursin("Triangle", name)

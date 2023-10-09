@@ -98,13 +98,13 @@ end
 # implement the interface for ElementIterator of lagrange elements on a generic
 # mesh. The elements are constructed on the flight based on the global nodes and
 # the connectivity list stored
-function Base.length(iter::ElementIterator{E,<:LagrangeMesh}) where {E<:LagrangeElement}
+function Base.length(iter::ElementIterator{E,<:LagrangeMesh}) where {E}
     tags = iter.mesh.etype2mat[E]::Matrix{Int}
     _, Nel = size(tags)
     return Nel
 end
 
-function Base.getindex(iter::ElementIterator{E,<:LagrangeMesh}, i::Int) where {E<:LagrangeElement}
+function Base.getindex(iter::ElementIterator{E,<:LagrangeMesh}, i::Int) where {E}
     tags = iter.mesh.etype2mat[E]::Matrix{Int}
     node_tags = view(tags, :, i)
     vtx = view(iter.mesh.nodes, node_tags)
