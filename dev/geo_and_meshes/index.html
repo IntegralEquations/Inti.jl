@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Meshing · Inti.jl</title><meta name="title" content="Meshing · Inti.jl"/><meta property="og:title" content="Meshing · Inti.jl"/><meta property="twitter:title" content="Meshing · Inti.jl"/><meta name="description" content="Documentation for Inti.jl."/><meta property="og:description" content="Documentation for Inti.jl."/><meta property="twitter:description" content="Documentation for Inti.jl."/><meta property="og:url" content="https://IntegralEquations.github.io/Inti.jl/geo_and_meshes/"/><meta property="twitter:url" content="https://IntegralEquations.github.io/Inti.jl/geo_and_meshes/"/><link rel="canonical" href="https://IntegralEquations.github.io/Inti.jl/geo_and_meshes/"/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">Inti.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Meshing</a><ul class="internal"><li><a class="tocitem" href="#Overview"><span>Overview</span></a></li><li><a class="tocitem" href="#gmsh-section"><span>Gmsh</span></a></li></ul></li><li><a class="tocitem" href="../references/">References</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Meshing</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Meshing</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl/blob/main/docs/src/geo_and_meshes.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="geometry-and-meshes-section"><a class="docs-heading-anchor" href="#geometry-and-meshes-section">Geometry and meshes</a><a id="geometry-and-meshes-section-1"></a><a class="docs-heading-anchor-permalink" href="#geometry-and-meshes-section" title="Permalink"></a></h1><h2 id="Overview"><a class="docs-heading-anchor" href="#Overview">Overview</a><a id="Overview-1"></a><a class="docs-heading-anchor-permalink" href="#Overview" title="Permalink"></a></h2><h2 id="gmsh-section"><a class="docs-heading-anchor" href="#gmsh-section">Gmsh</a><a id="gmsh-section-1"></a><a class="docs-heading-anchor-permalink" href="#gmsh-section" title="Permalink"></a></h2><pre><code class="language-julia hljs">using Inti
+using Gmsh
+
+gmsh_ext = Inti.get_gmsh_extension()
+gmsh.initialize()
+gmsh.model.add(&quot;Sphere&quot;)
+gmsh.model.occ.addSphere(0,0,0,1)
+gmsh.model.occ.synchronize()
+gmsh.model.mesh.generate(3)
+ents = gmsh.model.getEntities()
+Ω   = gmsh_ext.import_domain(;dim=3)
+msh = gmsh_ext.import_mesh(Ω;dim=3)
+gmsh.finalize()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
+Info    : [ 40%] Meshing curve 2 (Circle)
+Info    : Done meshing 1D (Wall 0.0001797s, CPU 0.000177s)
+Info    : Meshing 2D...
+Info    : Meshing surface 1 (Sphere, Frontal-Delaunay)
+Info    : Done meshing 2D (Wall 0.0121954s, CPU 0.01219s)
+Info    : Meshing 3D...
+Info    : 3D Meshing 1 volume with 1 connected component
+Info    : Tetrahedrizing 160 nodes...
+Info    : Done tetrahedrizing 168 nodes (Wall 0.0021387s, CPU 0.002139s)
+Info    : Reconstructing mesh...
+Info    :  - Creating surface mesh
+Info    :  - Identifying boundary edges
+Info    :  - Recovering boundary
+Info    : Done reconstructing mesh (Wall 0.0039861s, CPU 0.003983s)
+Info    : Found volume 1
+Info    : It. 0 - 0 nodes created - worst tet radius 3.49551 (nodes removed 0 0)
+Info    : 3D refinement terminated (204 nodes total):
+Info    :  - 0 Delaunay cavities modified for star shapeness
+Info    :  - 0 nodes could not be inserted
+Info    :  - 698 tetrahedra created in 0.0029088 sec. (239961 tets/s)
+Info    : Done meshing 3D (Wall 0.0175371s, CPU 0.009595s)
+Info    : Optimizing mesh...
+Info    : Optimizing volume 1
+Info    : Optimization starts (volume = 4.04051) with worst = 0.0215055 / average = 0.737765:
+Info    : 0.00 &lt; quality &lt; 0.10 :         1 elements
+Info    : 0.10 &lt; quality &lt; 0.20 :         9 elements
+Info    : 0.20 &lt; quality &lt; 0.30 :         7 elements
+Info    : 0.30 &lt; quality &lt; 0.40 :        15 elements
+Info    : 0.40 &lt; quality &lt; 0.50 :        28 elements
+Info    : 0.50 &lt; quality &lt; 0.60 :        40 elements
+Info    : 0.60 &lt; quality &lt; 0.70 :       105 elements
+Info    : 0.70 &lt; quality &lt; 0.80 :       221 elements
+Info    : 0.80 &lt; quality &lt; 0.90 :       206 elements
+Info    : 0.90 &lt; quality &lt; 1.00 :        66 elements
+Info    : 16 edge swaps, 3 node relocations (volume = 4.04051): worst = 0.306908 / average = 0.754398 (Wall 0.0003671s, CPU 0.000358s)
+Info    : No ill-shaped tets in the mesh :-)
+Info    : 0.00 &lt; quality &lt; 0.10 :         0 elements
+Info    : 0.10 &lt; quality &lt; 0.20 :         0 elements
+Info    : 0.20 &lt; quality &lt; 0.30 :         0 elements
+Info    : 0.30 &lt; quality &lt; 0.40 :        15 elements
+Info    : 0.40 &lt; quality &lt; 0.50 :        28 elements
+Info    : 0.50 &lt; quality &lt; 0.60 :        34 elements
+Info    : 0.60 &lt; quality &lt; 0.70 :       106 elements
+Info    : 0.70 &lt; quality &lt; 0.80 :       219 elements
+Info    : 0.80 &lt; quality &lt; 0.90 :       209 elements
+Info    : 0.90 &lt; quality &lt; 1.00 :        72 elements
+Info    : Done optimizing mesh (Wall 0.000943301s, CPU 0.000921s)
+Info    : 204 nodes 1011 elements</code></pre><ul><li>You can take views of the mesh <code>msh</code> by passing a domain to the <code>view</code> function</li><li>You can plot a <code>msh</code> if you have a <code>Makie</code> backend (e.g. <code>GLMakie</code>)</li></ul><pre><code class="language-julia hljs">using CairoMakie
+Γ = Inti.external_boundary(Ω)
+poly(view(msh,Γ);strokewidth=1,color=:lightgray, transparency=true)</code></pre><img src="4c30d4d6.png" alt="Example block output"/><p>You can also plot the volume mesh (see the Documentation of <code>Makie.poly</code> for more details on possible arguments):</p><pre><code class="language-julia hljs">poly(view(msh,Ω);strokewidth=1,color=:lightgray, transparency=true)</code></pre><img src="66ac4b8d.png" alt="Example block output"/><p>Two-dimensional meshes are very similar:</p><pre><code class="language-julia hljs">    using Inti
+    using Gmsh
+    using CairoMakie
+    gmsh_ext = Inti.get_gmsh_extension()
+    gmsh.initialize()
+    gmsh.option.setNumber(&quot;General.Verbosity&quot;, 2)
+    gmsh.model.add(&quot;Disk&quot;)
+    gmsh.model.occ.addDisk(0,0,0,1,1)
+    gmsh.model.occ.synchronize()
+    gmsh.model.mesh.generate(2)
+    Ω   = gmsh_ext.import_domain(;dim=2)
+    msh = gmsh_ext.import_mesh(Ω;dim=2)
+    gmsh.finalize()
+    poly(view(msh,Ω);strokewidth=2)</code></pre><img src="b265c2b3.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../references/">References »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.1.0 on <span class="colophon-date" title="Monday 9 October 2023 18:59">Monday 9 October 2023</span>. Using Julia version 1.9.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
