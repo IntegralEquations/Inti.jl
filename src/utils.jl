@@ -76,3 +76,78 @@ function domain end
 Given a function-like object `f: Ω → R`, return `f(Ω)`.
 """
 function image end
+
+"""
+    _integration_measure(J::AbstractMatrix)
+
+Given the Jacobian matrix `J` of a transformation `f : ℝᴹ → ℝᴺ`, compute the
+integration measure `√det(JᵀJ)`.
+"""
+function _integration_measure(jac::AbstractMatrix)
+    M, N = size(jac)
+    if M == N
+        abs(det(jac)) # cheaper when `M=N`
+    else
+        g = det(transpose(jac) * jac)
+        g < -sqrt(eps()) && (@warn "negative integration measure g=$g")
+        g = max(g, 0)
+        sqrt(g)
+    end
+end
+
+"""
+    _normal(jac::SMatrix{M,N})
+
+Given a an `M` by `N` matrix representing the jacobian of a codimension one
+object, compute the normal vector.
+"""
+function _normal(jac::SMatrix{N,M}) where {N,M}
+    msg = "computing the normal vector requires the element to be of co-dimension one."
+    @assert (N - M == 1) msg
+    if M == 1 # a line in 2d
+        t = jac[:, 1] # tangent vector
+        n = SVector(t[2], -t[1]) |> normalize
+        return n
+    elseif M == 2 # a surface in 3d
+        t₁ = jac[:, 1]
+        t₂ = jac[:, 2]
+        n = cross(t₁, t₂) |> normalize
+        return n
+    else
+        notimplemented()
+    end
+end
+
+# helper functions to retrieve extensions
+"""
+    get_gmsh_extension()
+
+Get the Gmsh extension, if available.
+"""
+function get_gmsh_extension()
+    ext = Base.get_extension(Inti,:IntiGmshExt)
+    isnothing(ext) && error("Gmsh extension not available. Try `using Gmsh` first.")
+    return ext
+end
+
+"""
+    get_makie_extension()
+
+Get the Makie extension, if available.
+"""
+function get_makie_extension()
+    ext = Base.get_extension(Inti,:IntiMakieExt)
+    isnothing(ext) && error("Makie extension not available. Try e.g. `using CairoMakie` first.")
+    return ext
+end
+
+"""
+    get_vtk_extension()
+
+Get the VTK extension, if available.
+"""
+function get_vtk_extension()
+    ext = Base.get_extension(Inti,:IntiVTKExt)
+    isnothing(ext) && error("VTK extension not available. Try e.g. `using WriteVTK` first.")
+    return ext
+end
