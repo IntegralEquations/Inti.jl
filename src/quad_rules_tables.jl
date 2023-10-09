@@ -41,27 +41,32 @@ const TRIANGLE_GAUSS_ORDER_TO_NPTS = Dict(1 => 1,
                                           12 => 33)
 const TRIANGLE_GAUSS_NPTS_TO_ORDER = Dict((v, k) for (k, v) in TRIANGLE_GAUSS_ORDER_TO_NPTS)
 
+## -----------------------------------------------------------------------------
+#*! Note: Quadratures TRIANGLE_VR8N21, TRIANGLE_VR10N28 and TRIANGLE_VR15N55 are each claimed in the paper
+#* 'Spectra of Multiplication Operators as a Numerical Tool', B. Vioreanu and Rokhlin, V.
+#* to be of a quadrature degree exactly one higher, respectively 9, 11, and 16. This is not observed
+#* in practice. See also the comments in the tables in quad_rules_tables_triangle.jl.
 const TRIANGLE_VR_QRULES = Dict(1 => TRIANGLE_VR1N1,
                                 3 => TRIANGLE_VR2N3,
                                 6 => TRIANGLE_VR4N6,
                                 10 => TRIANGLE_VR5N10,
                                 15 => TRIANGLE_VR7N15,
-                                21 => TRIANGLE_VR9N21,
-                                28 => TRIANGLE_VR11N28,
+                                21 => TRIANGLE_VR8N21,
+                                28 => TRIANGLE_VR10N28,
                                 36 => TRIANGLE_VR12N36,
                                 45 => TRIANGLE_VR14N45,
-                                55 => TRIANGLE_VR16N55,
+                                55 => TRIANGLE_VR15N55,
                                 66 => TRIANGLE_VR17N66)
 const TRIANGLE_VR_ORDER_TO_NPTS = Dict(1 => 1,
                                        2 => 3,
                                        4 => 6,
                                        5 => 10,
                                        7 => 15,
-                                       9 => 21,
-                                       11 => 28,
+                                       8 => 21,
+                                       10 => 28,
                                        12 => 36,
                                        14 => 45,
-                                       16 => 55,
+                                       15 => 55,
                                        17 => 66)
 const TRIANGLE_VR_NPTS_TO_ORDER = Dict((v, k) for (k, v) in TRIANGLE_VR_ORDER_TO_NPTS)
 
