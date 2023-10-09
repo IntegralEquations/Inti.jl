@@ -85,12 +85,24 @@ const TETRAHEDRON_VR_QRULES = Dict(1 => TETRAHEDRON_VR1N1,
                                    4 => TETRAHEDRON_VR2N4,
                                    10 => TETRAHEDRON_VR3N10,
                                    20 => TETRAHEDRON_VR5N20,
-                                   35 => TETRAHEDRON_VR6N35)
+                                   35 => TETRAHEDRON_VR6N35,
+                                   56 => TETRAHEDRON_VR7N56,
+                                   84 => TETRAHEDRON_VR9N84,
+                                   120 => TETRAHEDRON_VR10N120,
+                                   165 => TETRAHEDRON_VR11N165,
+                                   220 => TETRAHEDRON_VR13N220,
+                                   286 => TETRAHEDRON_VR15N286)
 const TETRAHEDRON_VR_ORDER_TO_NPTS = Dict(1 => 1,
                                           2 => 4,
                                           3 => 10,
                                           5 => 20,
-                                          6 => 35)
+                                          6 => 35,
+                                          7 => 56,
+                                          9 => 84,
+                                          10 => 120,
+                                          11 => 165,
+                                          13 => 220,
+                                          15 => 286)
 const TETRAHEDRON_VR_NPTS_TO_ORDER = Dict((v, k) for (k, v) in TETRAHEDRON_VR_ORDER_TO_NPTS)
 
 ##
