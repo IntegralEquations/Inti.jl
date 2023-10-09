@@ -52,6 +52,44 @@ end
     end
 end
 
+@testset "Vioreanu-Rokhlin quad on triangle" begin
+    d = Inti.ReferenceTriangle()
+    # exact value for x^a*y^b integrate over reference triangle
+    exa = (a, b) -> factorial(a) * factorial(b) / factorial(a + b + 2)
+    # check all quadrature implemented
+    orders = keys(Inti.TRIANGLE_VR_ORDER_TO_NPTS)
+    for p in orders
+        q = Inti.VioreanuRokhlin(; domain=d, order=p)
+        x, w = q()
+        @test Inti.domain(q) == d
+        @test all(qnode ∈ d for qnode in x)
+        for i in 0:p, j in 0:p
+            i + p > p && continue
+            @info p, i, j
+            @test Inti.integrate(x -> x[1]^i * x[2]^j, q) ≈ exa(i, j)
+        end
+    end
+end
+
+# TODO No VR on tets yet; no-op testset
+@testset "Vioreanu-Rokhlin quad on tetrahedron" begin
+    d = Inti.ReferenceTetrahedron()
+    # exact value for x^a*y^b*z^c integrate over reference tetrahedron
+    exa = (a, b, c) -> factorial(a) * factorial(b) * factorial(c) / factorial(a + b + c + 3)
+    # check all quadrature implemented
+    orders = keys(Inti.TETRAHEDRON_VR_ORDER_TO_NPTS)
+    for p in orders
+        q = Inti.VioreanuRokhlin(; domain=d, order=p)
+        x, w = q()
+        @test Inti.domain(q) == d
+        @test all(qnode ∈ d for qnode in x)
+        for i in 0:p, j in 0:p, k in 0:p
+            i + j + k > p && continue
+            @test Inti.integrate(x -> x[1]^i * x[2]^j * x[3]^k, q) ≈ exa(i, j, k)
+        end
+    end
+end
+
 @testset "Tensor product quad on square" begin
     px = 10
     py = 12
