@@ -13,26 +13,26 @@ ents = gmsh.model.getEntities()
 msh = gmsh_ext.import_mesh(Ω;dim=3)
 gmsh.finalize()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : [ 40%] Meshing curve 2 (Circle)
-Info    : Done meshing 1D (Wall 0.000199502s, CPU 0.000198s)
+Info    : Done meshing 1D (Wall 0.000183899s, CPU 0.000181s)
 Info    : Meshing 2D...
 Info    : Meshing surface 1 (Sphere, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.0125892s, CPU 0.012564s)
+Info    : Done meshing 2D (Wall 0.0121862s, CPU 0.01218s)
 Info    : Meshing 3D...
 Info    : 3D Meshing 1 volume with 1 connected component
 Info    : Tetrahedrizing 160 nodes...
-Info    : Done tetrahedrizing 168 nodes (Wall 0.00205342s, CPU 0.002053s)
+Info    : Done tetrahedrizing 168 nodes (Wall 0.00216339s, CPU 0.002164s)
 Info    : Reconstructing mesh...
 Info    :  - Creating surface mesh
 Info    :  - Identifying boundary edges
 Info    :  - Recovering boundary
-Info    : Done reconstructing mesh (Wall 0.00378845s, CPU 0.003785s)
+Info    : Done reconstructing mesh (Wall 0.00401418s, CPU 0.004011s)
 Info    : Found volume 1
 Info    : It. 0 - 0 nodes created - worst tet radius 3.49551 (nodes removed 0 0)
 Info    : 3D refinement terminated (204 nodes total):
 Info    :  - 0 Delaunay cavities modified for star shapeness
 Info    :  - 0 nodes could not be inserted
-Info    :  - 698 tetrahedra created in 0.00281923 sec. (247584 tets/s)
-Info    : Done meshing 3D (Wall 0.0182627s, CPU 0.006299s)
+Info    :  - 698 tetrahedra created in 0.00288538 sec. (241908 tets/s)
+Info    : Done meshing 3D (Wall 0.0175882s, CPU 0.01364s)
 Info    : Optimizing mesh...
 Info    : Optimizing volume 1
 Info    : Optimization starts (volume = 4.04051) with worst = 0.0215055 / average = 0.737765:
@@ -46,7 +46,7 @@ Info    : 0.60 &lt; quality &lt; 0.70 :       105 elements
 Info    : 0.70 &lt; quality &lt; 0.80 :       221 elements
 Info    : 0.80 &lt; quality &lt; 0.90 :       206 elements
 Info    : 0.90 &lt; quality &lt; 1.00 :        66 elements
-Info    : 16 edge swaps, 3 node relocations (volume = 4.04051): worst = 0.306908 / average = 0.754398 (Wall 0.000369205s, CPU 0.000361s)
+Info    : 16 edge swaps, 3 node relocations (volume = 4.04051): worst = 0.306908 / average = 0.754398 (Wall 0.000373798s, CPU 0.000366s)
 Info    : No ill-shaped tets in the mesh :-)
 Info    : 0.00 &lt; quality &lt; 0.10 :         0 elements
 Info    : 0.10 &lt; quality &lt; 0.20 :         0 elements
@@ -58,7 +58,7 @@ Info    : 0.60 &lt; quality &lt; 0.70 :       106 elements
 Info    : 0.70 &lt; quality &lt; 0.80 :       219 elements
 Info    : 0.80 &lt; quality &lt; 0.90 :       209 elements
 Info    : 0.90 &lt; quality &lt; 1.00 :        72 elements
-Info    : Done optimizing mesh (Wall 0.000953711s, CPU 0.000933s)
+Info    : Done optimizing mesh (Wall 0.000960195s, CPU 0.000939s)
 Info    : 204 nodes 1011 elements</code></pre><ul><li>You can take views of the mesh <code>msh</code> by passing a domain to the <code>view</code> function</li><li>You can plot a <code>msh</code> if you have a <code>Makie</code> backend (e.g. <code>GLMakie</code>)</li></ul><pre><code class="language-julia hljs">using CairoMakie
 Γ = Inti.external_boundary(Ω)
 poly(view(msh,Γ);strokewidth=1,color=:lightgray, transparency=true)</code></pre><img src="4c30d4d6.png" alt="Example block output"/><p>You can also plot the volume mesh (see the Documentation of <code>Makie.poly</code> for more details on possible arguments):</p><pre><code class="language-julia hljs">poly(view(msh,Ω);strokewidth=1,color=:lightgray, transparency=true)</code></pre><img src="66ac4b8d.png" alt="Example block output"/><p>Two-dimensional meshes are very similar:</p><pre><code class="language-julia hljs">    using Inti
@@ -74,4 +74,4 @@ poly(view(msh,Γ);strokewidth=1,color=:lightgray, transparency=true)</code></pre
     Ω   = gmsh_ext.import_domain(;dim=2)
     msh = gmsh_ext.import_mesh(Ω;dim=2)
     gmsh.finalize()
-    poly(view(msh,Ω);strokewidth=2)</code></pre><img src="b265c2b3.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../references/">References »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.1.0 on <span class="colophon-date" title="Monday 9 October 2023 19:13">Monday 9 October 2023</span>. Using Julia version 1.9.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+    poly(view(msh,Ω);strokewidth=2)</code></pre><img src="b265c2b3.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../references/">References »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.1.0 on <span class="colophon-date" title="Tuesday 10 October 2023 20:01">Tuesday 10 October 2023</span>. Using Julia version 1.9.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
