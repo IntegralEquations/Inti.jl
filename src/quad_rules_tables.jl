@@ -70,6 +70,10 @@ const TRIANGLE_VR_ORDER_TO_NPTS = Dict(1 => 1,
                                        17 => 66)
 const TRIANGLE_VR_NPTS_TO_ORDER = Dict((v, k) for (k, v) in TRIANGLE_VR_ORDER_TO_NPTS)
 
+const TRIANGLE_VR_IORDER_TO_QORDER = Dict(0 => 1, 1 => 2, 2 => 4, 3 => 5, 4 => 7, 5 => 8,
+                                          6 => 10, 7 => 12, 8 => 14, 9 => 15, 10 => 17)
+const TRIANGLE_VR_QORDER_TO_IORDER = Dict((v, k) for (k, v) in TRIANGLE_VR_IORDER_TO_QORDER)
+
 const TETAHEDRON_GAUSS_QRULES = Dict(1 => TETAHEDRON_G1N1,
                                      4 => TETAHEDRON_G2N4,
                                      5 => TETAHEDRON_G3N5,
@@ -85,7 +89,6 @@ const TETRAHEDRON_GAUSS_ORDER_TO_NPTS = Dict(1 => 1, 2 => 4, 3 => 5, 4 => 11, 5 
 const TETRAHEDRON_GAUSS_NPTS_TO_ORDER = Dict((v, k)
                                              for (k, v) in TETRAHEDRON_GAUSS_ORDER_TO_NPTS)
 
-# TODO
 const TETRAHEDRON_VR_QRULES = Dict(1 => TETRAHEDRON_VR1N1,
                                    4 => TETRAHEDRON_VR2N4,
                                    10 => TETRAHEDRON_VR3N10,
@@ -109,6 +112,10 @@ const TETRAHEDRON_VR_ORDER_TO_NPTS = Dict(1 => 1,
                                           13 => 220,
                                           15 => 286)
 const TETRAHEDRON_VR_NPTS_TO_ORDER = Dict((v, k) for (k, v) in TETRAHEDRON_VR_ORDER_TO_NPTS)
+
+const TETRAHEDRON_VR_IORDER_TO_QORDER = Dict(0 => 1, 1 => 2, 2 => 3, 3 => 5, 4 => 6, 5 => 7,
+                                             6 => 9, 7 => 10, 8 => 11, 9 => 13, 10 => 15)
+const TETRAHEDRON_VR_QORDER_TO_IORDER = Dict((v, k) for (k, v) in TETRAHEDRON_VR_IORDER_TO_QORDER)
 
 ##
 const GAUSS_QRULES = Dict(ReferenceTriangle => TRIANGLE_GAUSS_QRULES,
