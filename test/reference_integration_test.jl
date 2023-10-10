@@ -3,7 +3,7 @@ using LinearAlgebra
 using Inti
 
 @testset "Fejer quadrature" begin
-    N = 5
+    N = 6
     q = Inti.Fejer{N}()
     x, w = q()
     D = Inti.domain(q)
@@ -39,7 +39,7 @@ end
         allintegrated = true
         for i in 0:(p+1), j in 0:(p+1)
             i + j > (p+1) && continue
-            Inti.integrate(x -> x[1]^i * x[2]^j, q) ≈ exa(i, j) || (allintegrated = false)
+            Inti.integrate(x -> x[1]^i * x[2]^j, q) ≈ exa(i, j) || (allintegrated = false; break)
         end
         @test allintegrated == false
     end
@@ -65,7 +65,7 @@ end
         allintegrated = true
         for i in 0:(p+1), j in 0:(p+1), k in 0:(p+1)
             i + j + k > (p+1) && continue
-            Inti.integrate(x -> x[1]^i * x[2]^j * x[3]^k, q) ≈ exa(i, j, k) || (allintegrated = false)
+            Inti.integrate(x -> x[1]^i * x[2]^j * x[3]^k, q) ≈ exa(i, j, k) || (allintegrated = false; break)
         end
         @test allintegrated == false
     end
@@ -91,7 +91,7 @@ end
         allintegrated = true
         for i in 0:(p+1), j in 0:(p+1)
             i + j > (p+1) && continue
-            Inti.integrate(x -> x[1]^i * x[2]^j, q) ≈ exa(i, j) || (allintegrated = false)
+            Inti.integrate(x -> x[1]^i * x[2]^j, q) ≈ exa(i, j) || (allintegrated = false; break)
         end
         @test allintegrated == false
     end
@@ -117,7 +117,7 @@ end
         allintegrated = true
         for i in 0:(p+1), j in 0:(p+1), k in 0:(p+1)
             i + j + k > (p+1) && continue
-            Inti.integrate(x -> x[1]^i * x[2]^j * x[3]^k, q) ≈ exa(i, j, k) || (allintegrated = false)
+            Inti.integrate(x -> x[1]^i * x[2]^j * x[3]^k, q) ≈ exa(i, j, k) || (allintegrated = false; break)
         end
         @test allintegrated == false
     end
