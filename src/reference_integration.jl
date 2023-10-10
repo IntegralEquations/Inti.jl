@@ -90,7 +90,8 @@ Fejer(; order::Int) = Fejer(order + 1)
 """
     order(q::ReferenceQuadrature)
 
-A quadrature of order `p` integrates all polynomials of degree `≤ p`.
+A quadrature of order `p` (sometimes called degree of precision) integrates all
+polynomials of degree `≤ p` but not `≤ p + 1`.
 """
 order(::Fejer{N}) where {N} = N - 1
 
