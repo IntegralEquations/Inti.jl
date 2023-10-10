@@ -90,7 +90,8 @@ Fejer(; order::Int) = Fejer(order + 1)
 """
     order(q::ReferenceQuadrature)
 
-A quadrature of order `p` integrates all polynomials of degree `≤ p`.
+A quadrature of order `p` (sometimes called degree of precision) integrates all
+polynomials of degree `≤ p` but not `≤ p + 1`.
 """
 order(::Fejer{N}) where {N} = N - 1
 
@@ -202,4 +203,65 @@ function (q::TensorProductQuadrature{N})() where {N}
     nodes_iter = (SVector(x) for x in Iterators.product(nodes1d...))
     weights_iter = (prod(w) for w in Iterators.product(weights1d...))
     return nodes_iter, weights_iter
+end
+
+"""
+    struct VioreanuRokhlin{D,N} <: ReferenceQuadrature{D}
+
+Tabulated `N`-point Vioreanu-Rokhlin quadrature rule for integration over `D`.
+"""
+struct VioreanuRokhlin{D,N} <: ReferenceQuadrature{D}
+    # VR quadrature should be constructed using the order, and not the number
+    # of nodes. This ensures you don't instantiate quadratures which are not
+    # tabulated.
+    function VioreanuRokhlin(; domain, order)
+        domain == :triangle && (domain = ReferenceTriangle())
+        domain == :tetrehedron && (domain = ReferenceTetrahedron())
+        if domain isa ReferenceTriangle
+            msg = "VioreanuRokhlin quadrature of order $order not available for ReferenceTriangle"
+            haskey(TRIANGLE_VR_ORDER_TO_NPTS, order) || error(msg)
+            n = TRIANGLE_VR_ORDER_TO_NPTS[order]
+        elseif domain isa ReferenceTetrahedron
+            msg = "VioreanuRokhlin quadrature of order $order not available for ReferenceTetrahedron"
+            haskey(TETRAHEDRON_VR_ORDER_TO_NPTS, order) || error(msg)
+            n = TETRAHEDRON_VR_ORDER_TO_NPTS[order]
+        else
+            error("Tabulated Vioreanu-Rokhlin quadratures only available for `ReferenceTriangle` or `ReferenceTetrahedron`")
+        end
+        return new{typeof(domain),n}()
+    end
+end
+
+function order(q::VioreanuRokhlin{ReferenceTriangle,N}) where {N}
+    return TRIANGLE_VR_NPTS_TO_ORDER[N]
+end
+
+function order(q::VioreanuRokhlin{ReferenceTetrahedron,N}) where {N}
+    return TETRAHEDRON_VR_NPTS_TO_ORDER[N]
+end
+
+@generated function (q::VioreanuRokhlin{D,N})() where {D,N}
+    x, w = _get_vioreanurokhlin_qcoords_and_qweights(D, N)
+    return :($x, $w)
+end
+
+"""
+    _get_vioreanurokhlin_qcoords_and_qweights(R::Type{<:ReferenceShape{D}}, N) where D
+
+Returns the `N`-point Vioreanu-Rokhlin qnodes and qweights `(x, w)` for integration over `R`.
+"""
+function _get_vioreanurokhlin_qcoords_and_qweights(R::Type{<:ReferenceShape}, N)
+    D = ambient_dimension(R())
+    if !haskey(VR_QRULES, R) || !haskey(VR_QRULES[R], N)
+        error("quadrature rule not found")
+    end
+    qrule = VR_QRULES[R][N]
+    @assert length(qrule) == N
+    # qnodes
+    qnodestype = SVector{N,SVector{D,Float64}}
+    x = qnodestype([q[1] for q in qrule])
+    # qweights
+    qweightstype = SVector{N,Float64}
+    w = qweightstype([q[2] for q in qrule])
+    return x, w
 end
