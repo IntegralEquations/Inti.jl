@@ -70,6 +70,8 @@ const TRIANGLE_VR_ORDER_TO_NPTS = Dict(1 => 1,
                                        17 => 66)
 const TRIANGLE_VR_NPTS_TO_ORDER = Dict((v, k) for (k, v) in TRIANGLE_VR_ORDER_TO_NPTS)
 
+# The Vioreanu-Rokhlin quadratures also function as well-conditioned nodes for polynomial interpolation on the
+# ReferenceSimplex{N}. Here we list the corresponding interpolation degrees associated with the quadrature rule.
 const TRIANGLE_VR_IORDER_TO_QORDER = Dict(0 => 1, 1 => 2, 2 => 4, 3 => 5, 4 => 7, 5 => 8,
                                           6 => 10, 7 => 12, 8 => 14, 9 => 15, 10 => 17)
 const TRIANGLE_VR_QORDER_TO_IORDER = Dict((v, k) for (k, v) in TRIANGLE_VR_IORDER_TO_QORDER)
@@ -113,6 +115,8 @@ const TETRAHEDRON_VR_ORDER_TO_NPTS = Dict(1 => 1,
                                           15 => 286)
 const TETRAHEDRON_VR_NPTS_TO_ORDER = Dict((v, k) for (k, v) in TETRAHEDRON_VR_ORDER_TO_NPTS)
 
+# The Vioreanu-Rokhlin quadratures also function as well-conditioned nodes for polynomial interpolation on the
+# ReferenceSimplex{N}. Here we list the corresponding interpolation degrees associated with the quadrature rule.
 const TETRAHEDRON_VR_IORDER_TO_QORDER = Dict(0 => 1, 1 => 2, 2 => 3, 3 => 5, 4 => 6, 5 => 7,
                                              6 => 9, 7 => 10, 8 => 11, 9 => 13, 10 => 15)
 const TETRAHEDRON_VR_QORDER_TO_IORDER = Dict((v, k) for (k, v) in TETRAHEDRON_VR_IORDER_TO_QORDER)
