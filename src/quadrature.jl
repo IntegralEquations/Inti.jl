@@ -11,6 +11,21 @@ struct QuadratureNode{N,T<:Real}
 end
 
 """
+    coords(q::QuadratureNode)
+
+Return the spatial coordinates of `q`.
+"""
+coords(q::QuadratureNode) = q.coords
+
+# useful for using either a quadrature node or a just a simple point in
+# `IntegralOperators`.
+coords(x::Union{SVector,NTuple}) = SVector(x)
+
+
+normal(q::QuadratureNode) = q.normal
+weight(q::QuadratureNode) = q.weight
+
+"""
     struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
 
 A collection of [`QuadratureNode`](@ref)s used to integrate over an
@@ -24,7 +39,7 @@ struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
 end
 
 # AbstractArray interface
-Base.size(quad::Quadrature) = (length(quad.qnodes),)
+Base.size(quad::Quadrature) = size(quad.qnodes)
 Base.getindex(quad::Quadrature, i) = quad.qnodes[i]
 
 ambient_dimension(quad::Quadrature) = ambient_dimension(quad.mesh)
