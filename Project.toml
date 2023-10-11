@@ -10,11 +10,13 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [weakdeps]
 Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
+HMatrices = "8646bddf-ab1c-4fa7-9c51-ba187d647618"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [extensions]
 IntiGmshExt = "Gmsh"
+IntiHMatricesExt = "HMatrices"
 IntiMakieExt = "Makie"
 IntiVTKExt = "WriteVTK"
 
