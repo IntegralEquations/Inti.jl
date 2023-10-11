@@ -4,6 +4,7 @@ const PROJECT_ROOT = pkgdir(Inti)
 
 using LinearAlgebra
 using StaticArrays
+using SpecialFunctions
 using Printf
 
 # helper functions
@@ -20,6 +21,10 @@ include("entities.jl")
 include("domain.jl")
 include("mesh.jl")
 include("quadrature.jl")
+
+# Nyström methods
+include("kernels.jl")
+include("nystrom.jl")
 
 # # integral operators
 # include("integral_potentials.jl")
