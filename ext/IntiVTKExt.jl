@@ -46,12 +46,12 @@ To save a sequence of solutions (time steps, iterations), simply append
 the number of the element to the file name.
 Paraview will recognize the sequence automatically.
 """
-function WriteVTK.vtk_grid(name::String,mesh::Inti.LagrangeMesh)
+function WriteVTK.vtk_grid(name::String, mesh::Inti.LagrangeMesh)
     points = _vtk_points(mesh)
     cells = _vtk_cells(mesh)
     return WriteVTK.vtk_grid(name * ".vtu", points, cells)
 end
-function WriteVTK.vtk_grid(name::String,mesh::Inti.LagrangeMesh, Ω::Inti.Domain)
+function WriteVTK.vtk_grid(name::String, mesh::Inti.LagrangeMesh, Ω::Inti.Domain)
     points = _vtk_points(mesh)
     cells = _vtk_cells(mesh, Ω)
     return WriteVTK.vtk_grid(name * ".vtu", points, cells)
@@ -140,7 +140,8 @@ See VTK specification [Fig. 2] on
 """
 const etype_to_vtk_cell_type = Dict(
     SVector{3,Float64} => (WriteVTK.VTKCellTypes.VTK_VERTEX, collect(1:1)),
-    Inti.LagrangeLine{2,SVector{3,Float64}} => (WriteVTK.VTKCellTypes.VTK_LINE, collect(1:2)),
+    Inti.LagrangeLine{2,SVector{3,Float64}} =>
+        (WriteVTK.VTKCellTypes.VTK_LINE, collect(1:2)),
     Inti.LagrangeTriangle{3,SVector{2,Float64}} =>
         (WriteVTK.VTKCellTypes.VTK_TRIANGLE, collect(1:3)),
     Inti.LagrangeTriangle{3,SVector{3,Float64}} =>

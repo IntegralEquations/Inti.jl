@@ -17,10 +17,10 @@ using WriteVTK
     Ω = Inti.gmsh_import_domain(; dim = 3)
     M = Inti.gmsh_import_mesh(Ω; dim = 3)
     fname = joinpath(Inti.PROJECT_ROOT, "test", "ball")
-    vtk = vtk_grid(fname,M)
+    vtk = vtk_grid(fname, M)
     vtk_save(vtk)
     rm(joinpath(Inti.PROJECT_ROOT, "test", "ball.vtu"))
-    vtk_save(vtk_grid(joinpath(Inti.PROJECT_ROOT, "test", "ball"),M, Ω))
+    vtk_save(vtk_grid(joinpath(Inti.PROJECT_ROOT, "test", "ball"), M, Ω))
     rm(joinpath(Inti.PROJECT_ROOT, "test", "ball.vtu"))
     vtk_save(
         vtk_grid(
