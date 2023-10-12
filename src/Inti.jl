@@ -3,6 +3,7 @@ module Inti
 const PROJECT_ROOT = pkgdir(Inti)
 
 using LinearAlgebra
+using NearestNeighbors
 using SparseArrays
 using StaticArrays
 using LinearMaps
