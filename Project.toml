@@ -22,6 +22,7 @@ IntiVTKExt = "WriteVTK"
 
 [compat]
 Gmsh = "0.2"
+HMatrices = "0.2"
 SpecialFunctions = "2"
 StaticArrays = "1"
 WriteVTK = "1"
