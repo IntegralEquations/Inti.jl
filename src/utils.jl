@@ -10,7 +10,7 @@ Utility functions that have nowhere obvious to go.
 Create an `SVector` of length n, computing each element as f(i), where i is the
 index of the element.
 """
-svector(f,n)=  ntuple(f,n) |> SVector
+svector(f, n) = ntuple(f, n) |> SVector
 
 """
     interface_method(x)
@@ -28,7 +28,7 @@ interface_method(x) = interface_method(typeof(x))
 
 Create an `SVector` of length N with a 1 in the kth position and zeros elsewhere.
 """
-standard_basis_vector(k, n::Val{N}) where {N} = svector(i-> i == k ? 1 : 0, n)
+standard_basis_vector(k, n::Val{N}) where {N} = svector(i -> i == k ? 1 : 0, n)
 
 """
     ambient_dimension(x)
@@ -125,7 +125,7 @@ end
 Get the Gmsh extension, if available.
 """
 function get_gmsh_extension()
-    ext = Base.get_extension(Inti,:IntiGmshExt)
+    ext = Base.get_extension(Inti, :IntiGmshExt)
     isnothing(ext) && error("Gmsh extension not available. Try `using Gmsh` first.")
     return ext
 end
@@ -136,8 +136,9 @@ end
 Get the Makie extension, if available.
 """
 function get_makie_extension()
-    ext = Base.get_extension(Inti,:IntiMakieExt)
-    isnothing(ext) && error("Makie extension not available. Try e.g. `using CairoMakie` first.")
+    ext = Base.get_extension(Inti, :IntiMakieExt)
+    isnothing(ext) &&
+        error("Makie extension not available. Try e.g. `using CairoMakie` first.")
     return ext
 end
 
@@ -147,7 +148,7 @@ end
 Get the VTK extension, if available.
 """
 function get_vtk_extension()
-    ext = Base.get_extension(Inti,:IntiVTKExt)
+    ext = Base.get_extension(Inti, :IntiVTKExt)
     isnothing(ext) && error("VTK extension not available. Try e.g. `using WriteVTK` first.")
     return ext
 end

@@ -132,7 +132,9 @@ struct Gauss{D,N} <: ReferenceQuadrature{D}
             haskey(TETRAHEDRON_GAUSS_ORDER_TO_NPTS, order) || error(msg)
             n = TETRAHEDRON_GAUSS_ORDER_TO_NPTS[order]
         else
-            error("Tabulated Gauss quadratures only available for `ReferenceTriangle` or `ReferenceTetrahedron`")
+            error(
+                "Tabulated Gauss quadratures only available for `ReferenceTriangle` or `ReferenceTetrahedron`",
+            )
         end
         return new{typeof(domain),n}()
     end
@@ -226,7 +228,9 @@ struct VioreanuRokhlin{D,N} <: ReferenceQuadrature{D}
             haskey(TETRAHEDRON_VR_ORDER_TO_NPTS, order) || error(msg)
             n = TETRAHEDRON_VR_ORDER_TO_NPTS[order]
         else
-            error("Tabulated Vioreanu-Rokhlin quadratures only available for `ReferenceTriangle` or `ReferenceTetrahedron`")
+            error(
+                "Tabulated Vioreanu-Rokhlin quadratures only available for `ReferenceTriangle` or `ReferenceTetrahedron`",
+            )
         end
         return new{typeof(domain),n}()
     end

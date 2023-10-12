@@ -20,7 +20,7 @@ struct GmshEntity <: Inti.AbstractEntity
     tag::Int
     boundary::Vector{GmshEntity}
     model::String
-    function GmshEntity(d::Integer, gmshtag::Integer, model, boundary=GmshEntity[])
+    function GmshEntity(d::Integer, gmshtag::Integer, model, boundary = GmshEntity[])
         msg = "an elementary entities in the boundary has the wrong dimension"
         for b in boundary
             @assert geometric_dimension(b) == d - 1 msg
@@ -51,8 +51,9 @@ dimension `dim`; by defaul the current `gmsh` model is used.
     This function assumes that `gmsh` has been initialized, and
     does not handle its finalization.
 """
-function import_domain(model=gmsh.model.getCurrent(); dim=3)
-    gmsh.isInitialized() == 1 || error("gmsh is not initialized. Try `gmsh.initialize` first.")
+function import_domain(model = gmsh.model.getCurrent(); dim = 3)
+    gmsh.isInitialized() == 1 ||
+        error("gmsh is not initialized. Try `gmsh.initialize` first.")
     Ω = Inti.Domain() # Create empty domain
     _import_domain!(Ω, model; dim)
     return Ω
@@ -68,7 +69,7 @@ creating a new domain.
     This function assumes that `gmsh` has been initialized, and does not handle its
     finalization.
 """
-function _import_domain!(Ω::Inti.Domain, model=gmsh.model.getCurrent(); dim=3)
+function _import_domain!(Ω::Inti.Domain, model = gmsh.model.getCurrent(); dim = 3)
     old_model = gmsh.model.getCurrent()
     gmsh.model.setCurrent(model)
     dim_tags = gmsh.model.getEntities(dim)
@@ -91,8 +92,7 @@ This is a helper function, and should not be called by itself.
 function _fill_entity_boundary!(ent, model)
     combine  = true # FIXME: what should we use here?
     oriented = false
-    dim_tags = gmsh.model.getBoundary((Inti.geometric_dimension(ent), gmshtag(ent)), combine,
-                                      oriented)
+    dim_tags = gmsh.model.getBoundary((Inti.geometric_dimension(ent), gmshtag(ent)), combine, oriented)
     for (d, t) in dim_tags
         # if haskey(ENTITIES,(d,t))
         #     bnd = ENTITIES[(d,t)]
@@ -115,7 +115,7 @@ dimension `dim`.
     This function assumes that `gmsh` has been initialized, and does not handle its
     finalization.
 """
-function read_geo(fname; dim=3)
+function read_geo(fname; dim = 3)
     Ω = Domain() # Create empty domain
     try
         gmsh.open(fname)
@@ -155,8 +155,9 @@ two-dimensional mesh by projecting the original mesh onto the `x,y` plane.
     This function assumes that `gmsh` has been initialized, and does not handle its
     finalization.
 """
-function import_mesh(Ω::Inti.Domain; dim=3)
-    gmsh.isInitialized() == 1 || error("gmsh is not initialized. Try `gmsh.initialize` first.")
+function import_mesh(Ω::Inti.Domain; dim = 3)
+    gmsh.isInitialized() == 1 ||
+        error("gmsh is not initialized. Try `gmsh.initialize` first.")
     msh = Inti.LagrangeMesh{3,Float64}()
     _import_mesh!(msh, Ω)
     if dim == 3
@@ -250,7 +251,8 @@ equivalent of those.
 """
 function _type_tag_to_etype(tag)
     T = SVector{3,Float64} # point type
-    name, dim, order, num_nodes, ref_nodes, num_primary_nodes = gmsh.model.mesh.getElementProperties(tag)
+    name, dim, order, num_nodes, ref_nodes, num_primary_nodes =
+        gmsh.model.mesh.getElementProperties(tag)
     num_nodes = Int(num_nodes) #convert to Int64
     if occursin("Point", name)
         etype = SVector{3,Float64}
