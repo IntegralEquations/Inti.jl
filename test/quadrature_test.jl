@@ -3,20 +3,19 @@ using LinearAlgebra
 using Gmsh
 using Inti
 
-IntiGmshExt = Inti.get_gmsh_extension()
-
 @testset "Gmsh backend" begin
     @testset "Area/volume" begin
         @testset "Cube" begin
             # generate a mesh
             (lx, ly, lz) = widths = (1.0, 1.0, 2.0)
             gmsh.initialize()
+            gmsh.option.setNumber("General.Verbosity", 2)
             Inti.clear_entities!()
             gmsh.model.occ.addBox(0, 0, 0, lx, ly, lz)
             gmsh.model.occ.synchronize()
             gmsh.model.mesh.generate(3)
-            Ω = IntiGmshExt.import_domain(; dim = 3)
-            M = IntiGmshExt.import_mesh(Ω; dim = 3)
+            Ω = Inti.gmsh_import_domain(; dim = 3)
+            M = Inti.gmsh_import_mesh(Ω; dim = 3)
             gmsh.finalize()
 
             Γ = Inti.external_boundary(Ω)
@@ -33,13 +32,14 @@ IntiGmshExt = Inti.get_gmsh_extension()
             r = 0.5
             Inti.clear_entities!()
             gmsh.initialize()
+            gmsh.option.setNumber("General.Verbosity", 2)
             # meshsize
             gmsh.option.setNumber("Mesh.MeshSizeMax", 0.1)
             gmsh.model.occ.addSphere(0, 0, 0, r)
             gmsh.model.occ.synchronize()
             gmsh.model.mesh.generate(3)
-            Ω = IntiGmshExt.import_domain(; dim = 3)
-            M = IntiGmshExt.import_mesh(Ω; dim = 3)
+            Ω = Inti.gmsh_import_domain(; dim = 3)
+            M = Inti.gmsh_import_mesh(Ω; dim = 3)
             gmsh.finalize()
             Γ = Inti.external_boundary(Ω)
             quad = Inti.Quadrature(view(M, Γ); qorder = 4) # NystromMesh of surface Γ
@@ -53,12 +53,13 @@ IntiGmshExt = Inti.get_gmsh_extension()
             r = rx = ry = 0.5
             Inti.clear_entities!()
             gmsh.initialize()
+            gmsh.option.setNumber("General.Verbosity", 2)
             Inti.clear_entities!()
             gmsh.model.occ.addDisk(0, 0, 0, rx, ry)
             gmsh.model.occ.synchronize()
             gmsh.model.mesh.generate(2)
-            Ω = IntiGmshExt.import_domain(; dim = 2)
-            M = IntiGmshExt.import_mesh(Ω; dim = 2)
+            Ω = Inti.gmsh_import_domain(; dim = 2)
+            M = Inti.gmsh_import_mesh(Ω; dim = 2)
             gmsh.finalize()
             Γ = Inti.external_boundary(Ω)
             quad = Inti.Quadrature(view(M, Ω); qorder = 2)
