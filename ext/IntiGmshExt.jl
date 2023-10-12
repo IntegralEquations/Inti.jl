@@ -41,19 +41,10 @@ Inti.geometric_dimension(e::GmshEntity) = e.dim
 Inti.tag(e::GmshEntity) = e.tag
 Inti.boundary(e::GmshEntity) = e.boundary
 
-"""
-    import_domain([model;dim=3])
-
-Construct a [`Domain`](@ref Inti.Domain) from the `gmsh` `model` with all entities of
-dimension `dim`; by defaul the current `gmsh` model is used.
-
-!!! note
-    This function assumes that `gmsh` has been initialized, and
-    does not handle its finalization.
-"""
-function import_domain(model = gmsh.model.getCurrent(); dim = 3)
+function Inti.gmsh_import_domain(model = gmsh.model.getCurrent(); dim = 3, verbosity = 2)
     gmsh.isInitialized() == 1 ||
         error("gmsh is not initialized. Try `gmsh.initialize` first.")
+    gmsh.option.setNumber("General.Verbosity", verbosity)
     Ω = Inti.Domain() # Create empty domain
     _import_domain!(Ω, model; dim)
     return Ω
@@ -62,7 +53,7 @@ end
 """
     _import_domain!(Ω::Domain,[model;dim=3])
 
-Like [`import_domain`](@ref), but appends entities to `Ω` instead of
+Like [`Inti.gmsh_import_domain`](@ref), but appends entities to `Ω` instead of
 creating a new domain.
 
 !!! note
@@ -122,7 +113,7 @@ function read_geo(fname; dim = 3)
     catch
         @error "could not open $fname"
     end
-    import_domain!(Ω; dim)
+   gmsh_import_domain!(Ω; dim)
     return Ω
 end
 
@@ -145,21 +136,12 @@ function model_summary(model = gmsh.model.getCurrent())
     return println()
 end
 
-"""
-    import_mesh(Ω;[dim=3])
-
-Create a `LagrangeMesh` for the entities in `Ω`. Passing `dim=2` will create a
-two-dimensional mesh by projecting the original mesh onto the `x,y` plane.
-
-!!! danger
-    This function assumes that `gmsh` has been initialized, and does not handle its
-    finalization.
-"""
-function import_mesh(Ω::Inti.Domain; dim = 3)
+function Inti.gmsh_import_mesh(Ω::Inti.Domain; dim = 3, verbosity = 2)
     gmsh.isInitialized() == 1 ||
         error("gmsh is not initialized. Try `gmsh.initialize` first.")
+    gmsh.option.setNumber("General.Verbosity", verbosity)
     msh = Inti.LagrangeMesh{3,Float64}()
-    _import_mesh!(msh, Ω)
+    _gmsh_import_mesh(msh, Ω)
     if dim == 3
         return msh
     elseif dim == 2
@@ -170,16 +152,16 @@ function import_mesh(Ω::Inti.Domain; dim = 3)
 end
 
 """
-    _import_mesh!(msh,Ω)
+    _gmsh_import_mesh(msh,Ω)
 
-Similar to [`import_mesh`](@ref), but append information to `msh` instead of
+Similar to [`Inti.gmsh_import_mesh`](@ref), but append information to `msh` instead of
 creating a new mesh.
 
 !!! danger
     This function assumes that `gmsh` has been initialized, and does not handle its
     finalization.
 """
-function _import_mesh!(msh::Inti.LagrangeMesh, Ω::Inti.Domain)
+function _gmsh_import_mesh(msh::Inti.LagrangeMesh, Ω::Inti.Domain)
     _, coord, _ = gmsh.model.mesh.getNodes()
     gmsh_nodes = collect(reinterpret(SVector{3,Float64}, coord))
     shift = length(msh.nodes) # gmsh node tags need to be shifted

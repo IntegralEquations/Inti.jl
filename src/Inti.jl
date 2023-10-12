@@ -26,8 +26,7 @@ include("quadrature.jl")
 include("kernels.jl")
 include("nystrom.jl")
 
-# # integral operators
-# include("integral_potentials.jl")
-# include("integral_operators.jl")
+# some zero-argument methods for the Inti's gmsh api
+include("gmsh_api.jl")
 
 end

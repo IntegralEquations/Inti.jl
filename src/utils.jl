@@ -117,38 +117,3 @@ function _normal(jac::SMatrix{N,M}) where {N,M}
         notimplemented()
     end
 end
-
-# helper functions to retrieve extensions
-"""
-    get_gmsh_extension()
-
-Get the Gmsh extension, if available.
-"""
-function get_gmsh_extension()
-    ext = Base.get_extension(Inti, :IntiGmshExt)
-    isnothing(ext) && error("Gmsh extension not available. Try `using Gmsh` first.")
-    return ext
-end
-
-"""
-    get_makie_extension()
-
-Get the Makie extension, if available.
-"""
-function get_makie_extension()
-    ext = Base.get_extension(Inti, :IntiMakieExt)
-    isnothing(ext) &&
-        error("Makie extension not available. Try e.g. `using CairoMakie` first.")
-    return ext
-end
-
-"""
-    get_vtk_extension()
-
-Get the VTK extension, if available.
-"""
-function get_vtk_extension()
-    ext = Base.get_extension(Inti, :IntiVTKExt)
-    isnothing(ext) && error("VTK extension not available. Try e.g. `using WriteVTK` first.")
-    return ext
-end
