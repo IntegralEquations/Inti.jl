@@ -82,7 +82,7 @@ function _vtk_cells end
 
 function _vtk_cells(tags, E::DataType)
     vtk_cell_type, ind = etype_to_vtk_cell_type[E]
-    return [MeshCell(vtk_cell_type, tags[ind, i]) for i in 1:size(tags, 2)]
+    return [MeshCell(vtk_cell_type, tags[ind, i]) for i in axes(tags, 2)]
 end
 function _vtk_cells(mesh::Inti.LagrangeMesh, Ω::Inti.Domain)
     cells = MeshCell[]
@@ -138,15 +138,15 @@ See VTK specification [Fig. 2] on
 - VTK_WEDGE (=13)
 - VTK_PYRAMID (=14)
 """
-const etype_to_vtk_cell_type = Dict(SVector{3,Float64} => (VTKCellTypes.VTK_VERTEX,
-                                                           collect(1:1)),
-                                    Inti.LagrangeLine{2,SVector{3,Float64}} => (VTKCellTypes.VTK_LINE,
-                                                                                collect(1:2)),
-                                    Inti.LagrangeTriangle{3,SVector{2,Float64}} => (VTKCellTypes.VTK_TRIANGLE,
-                                                                                    collect(1:3)),
-                                    Inti.LagrangeTriangle{3,SVector{3,Float64}} => (VTKCellTypes.VTK_TRIANGLE,
-                                                                                    collect(1:3)),
-                                    Inti.LagrangeTetrahedron{4,SVector{3,Float64}} => (VTKCellTypes.VTK_TETRA,
-                                                                                       collect(1:4)))
+const etype_to_vtk_cell_type = Dict(
+    SVector{3,Float64} => (VTKCellTypes.VTK_VERTEX, collect(1:1)),
+    Inti.LagrangeLine{2,SVector{3,Float64}} => (VTKCellTypes.VTK_LINE, collect(1:2)),
+    Inti.LagrangeTriangle{3,SVector{2,Float64}} =>
+        (VTKCellTypes.VTK_TRIANGLE, collect(1:3)),
+    Inti.LagrangeTriangle{3,SVector{3,Float64}} =>
+        (VTKCellTypes.VTK_TRIANGLE, collect(1:3)),
+    Inti.LagrangeTetrahedron{4,SVector{3,Float64}} =>
+        (VTKCellTypes.VTK_TETRA, collect(1:4)),
+)
 
 end # module IntiVTKExt

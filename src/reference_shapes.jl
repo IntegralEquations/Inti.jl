@@ -24,8 +24,13 @@ function Base.in(x, ::ReferenceSimplex{N}) where {N}
     end
     return true
 end
-vertices(::ReferenceSimplex{N}) where {N} = svector(i -> i == 1 ? zero(SVector{N, Int64}) : standard_basis_vector(i-1, Val(N)), N+1)
-center(::ReferenceSimplex{N}) where {N} = svector(i -> 1 / (N + 1), N )
+function vertices(::ReferenceSimplex{N}) where {N}
+    return svector(
+        i -> i == 1 ? zero(SVector{N,Int64}) : standard_basis_vector(i - 1, Val(N)),
+        N + 1,
+    )
+end
+center(::ReferenceSimplex{N}) where {N} = svector(i -> 1 / (N + 1), N)
 
 """
     struct ReferenceTriangle
@@ -51,7 +56,9 @@ the lower corner at the origin and the upper corner at `(1,1,…,1)`.
 struct ReferenceHyperCube{N} <: ReferenceShape end
 geometric_dimension(::ReferenceHyperCube{N}) where {N} = N
 ambient_dimension(::ReferenceHyperCube{N}) where {N} = N
-vertices(::ReferenceHyperCube{N}) where {N} = ntuple(i -> SVector(ntuple(j -> (i >> j) & 1, N)), 2^N)
+function vertices(::ReferenceHyperCube{N}) where {N}
+    return ntuple(i -> SVector(ntuple(j -> (i >> j) & 1, N)), 2^N)
+end
 Base.in(x, ::ReferenceHyperCube{N}) where {N} = all(0 .≤ x .≤ 1)
 center(::ReferenceHyperCube{N}) where {N} = svector(i -> 0.5, N)
 

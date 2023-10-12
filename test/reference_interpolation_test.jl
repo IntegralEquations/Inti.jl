@@ -15,13 +15,10 @@ using LinearAlgebra
         @test p(1) ≈ 1
         @test p(0.1) ≈ 0.1^2
         ## line in 3d
-        vtx = SVector(
-            SVector(0.0, 0.0, 0.0),
-            SVector(1.0, 1.0, 1.0)
-        )
+        vtx = SVector(SVector(0.0, 0.0, 0.0), SVector(1.0, 1.0, 1.0))
         l = Inti.LagrangeLine(vtx)
         @test Inti.domain(l) == Inti.ReferenceLine()
-        @test l(0.1) ≈ SVector(0.1,0.1,0.1)
+        @test l(0.1) ≈ SVector(0.1, 0.1, 0.1)
         ## line in 2d
         a = SVector(0.0, 0.0)
         b = SVector(1.0, 1.0)
@@ -30,21 +27,13 @@ using LinearAlgebra
     end
     @testset "LagrangeTriangle" begin
         # triangle in 2d
-        vtx = SVector(
-            SVector(0.0, 0.0),
-            SVector(0.0, 1.0),
-            SVector(-1.0, 0)
-        )
+        vtx = SVector(SVector(0.0, 0.0), SVector(0.0, 1.0), SVector(-1.0, 0))
         t = Inti.LagrangeTriangle(vtx)
         @test Inti.return_type(t) == SVector{2,Float64}
         @test Inti.domain_dimension(t) == 2
         @test Inti.range_dimension(t) == 2
         # triangle in 3d
-        vtx = SVector(
-            SVector(0.0, 0.0, 0.0),
-            SVector(0.0, 1.0, 0.0),
-            SVector(-1.0, 0, 0.0)
-        )
+        vtx = SVector(SVector(0.0, 0.0, 0.0), SVector(0.0, 1.0, 0.0), SVector(-1.0, 0, 0.0))
         t = Inti.LagrangeTriangle(vtx)
         @test Inti.range_dimension(t) == 3
         @test Inti.domain_dimension(t) == 2
