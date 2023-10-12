@@ -1,6 +1,6 @@
 module IntiVTKExt
 
-using WriteVTK
+import WriteVTK
 import Inti
 using StaticArrays
 
@@ -9,7 +9,7 @@ function __init__()
 end
 
 """
-    mesh_file(mesh::LagrangeMesh[, Ω::Domain], name::String)
+    vtk_grid(mesh::LagrangeMesh[, Ω::Domain], name::String)
 
 Creates a `VTK` file (.vtu) with name `name` containing the mesh information.
 It is possible to export only a `Domain` (i.e. only a part of the mesh).
@@ -20,14 +20,14 @@ We refer to its documentation for more information.
 Warning: the output is not an actual file (on disk).
 To save it, simply write:
 
-    mesh_file(mesh, "my_mesh") |> vtk_save
+    vtk_grid(mesh, "my_mesh") |> vtk_save
 
 (Noting that you will need to be `using WriteVTK` to do so)
 
 To add some data (scalar or vector values at the mesh nodes or mesh cells)
 for visualization purposes, you can do for instance:
 
-    vtkfile = mesh_file(mesh, name)
+    vtkfile = vtk_grid(mesh, name)
     vtkfile["my_point_data", VTKPointData()] = pdata
     vtkfile["my_cell_data", VTKCellData()] = cdata
     vtk_save(vtkfile)
@@ -37,7 +37,7 @@ It is possible also to export a partition `Ωs::Vector{Domain}` using
 
     vtmfile = vtk_multiblock(name)
     for (Ω, pdata) in zip(Ωs, pdatas)
-        vtkfile = mesh_file(mesh, Ω, name)
+        vtkfile = vtk_grid(mesh, Ω, name)
         vtkfile["my_point_data", VTKPointData()] = pdata
     end
     vtk_save(vtmfile)
@@ -46,15 +46,15 @@ To save a sequence of solutions (time steps, iterations), simply append
 the number of the element to the file name.
 Paraview will recognize the sequence automatically.
 """
-function mesh_file(mesh::Inti.LagrangeMesh, name::String)
+function WriteVTK.vtk_grid(name::String, mesh::Inti.LagrangeMesh)
     points = _vtk_points(mesh)
     cells = _vtk_cells(mesh)
-    return vtk_grid(name * ".vtu", points, cells)
+    return WriteVTK.vtk_grid(name * ".vtu", points, cells)
 end
-function mesh_file(mesh::Inti.LagrangeMesh, Ω::Inti.Domain, name::String)
+function WriteVTK.vtk_grid(name::String, mesh::Inti.LagrangeMesh, Ω::Inti.Domain)
     points = _vtk_points(mesh)
     cells = _vtk_cells(mesh, Ω)
-    return vtk_grid(name * ".vtu", points, cells)
+    return WriteVTK.vtk_grid(name * ".vtu", points, cells)
 end
 
 """
@@ -82,10 +82,10 @@ function _vtk_cells end
 
 function _vtk_cells(tags, E::DataType)
     vtk_cell_type, ind = etype_to_vtk_cell_type[E]
-    return [MeshCell(vtk_cell_type, tags[ind, i]) for i in axes(tags, 2)]
+    return [WriteVTK.MeshCell(vtk_cell_type, tags[ind, i]) for i in axes(tags, 2)]
 end
 function _vtk_cells(mesh::Inti.LagrangeMesh, Ω::Inti.Domain)
-    cells = MeshCell[]
+    cells = WriteVTK.MeshCell[]
     # Loop on `ElementaryEntity`
     for ω in Ω
         # Loop on `AbstractElement`
@@ -98,7 +98,7 @@ function _vtk_cells(mesh::Inti.LagrangeMesh, Ω::Inti.Domain)
     return cells
 end
 function _vtk_cells(mesh::Inti.LagrangeMesh)
-    cells = MeshCell[]
+    cells = WriteVTK.MeshCell[]
     # Loop on `AbstractElement`
     for (E, tags) in Inti.elements(mesh)
         # Export only the cells of the largest geometrical dimension
@@ -139,14 +139,15 @@ See VTK specification [Fig. 2] on
 - VTK_PYRAMID (=14)
 """
 const etype_to_vtk_cell_type = Dict(
-    SVector{3,Float64} => (VTKCellTypes.VTK_VERTEX, collect(1:1)),
-    Inti.LagrangeLine{2,SVector{3,Float64}} => (VTKCellTypes.VTK_LINE, collect(1:2)),
+    SVector{3,Float64} => (WriteVTK.VTKCellTypes.VTK_VERTEX, collect(1:1)),
+    Inti.LagrangeLine{2,SVector{3,Float64}} =>
+        (WriteVTK.VTKCellTypes.VTK_LINE, collect(1:2)),
     Inti.LagrangeTriangle{3,SVector{2,Float64}} =>
-        (VTKCellTypes.VTK_TRIANGLE, collect(1:3)),
+        (WriteVTK.VTKCellTypes.VTK_TRIANGLE, collect(1:3)),
     Inti.LagrangeTriangle{3,SVector{3,Float64}} =>
-        (VTKCellTypes.VTK_TRIANGLE, collect(1:3)),
+        (WriteVTK.VTKCellTypes.VTK_TRIANGLE, collect(1:3)),
     Inti.LagrangeTetrahedron{4,SVector{3,Float64}} =>
-        (VTKCellTypes.VTK_TETRA, collect(1:4)),
+        (WriteVTK.VTKCellTypes.VTK_TETRA, collect(1:4)),
 )
 
 end # module IntiVTKExt

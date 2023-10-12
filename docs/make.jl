@@ -5,15 +5,13 @@ using Documenter
 using Gmsh
 using WriteVTK
 using CairoMakie
+using HMatrices
 
 DocMeta.setdocmeta!(Inti, :DocTestSetup, :(using Inti); recursive=true)
 
 makedocs(;
     modules=[
         Inti,
-        Inti.get_gmsh_extension(),
-        Inti.get_vtk_extension(),
-        Inti.get_makie_extension(),
     ],
     authors="Luiz M. Faria",
     repo="",
