@@ -57,7 +57,7 @@ function bdim_correction(
     else
         error(msg)
     end
-    dict_near = nearest_point_to_element(target, source; tol)
+    dict_near = etype_to_nearest_points(target, source; tol)
     # find first an appropriate set of source points to center the monopoles
     qmax = sum(size(mat, 1) for mat in values(source.etype2qtags)) # max number of qnodes per el
     ns   = ceil(Int, parameters.sources_oversample_factor * qmax)
@@ -138,13 +138,13 @@ function bdim_correction(
 end
 
 """
-    nearest_point_to_element(X,Y::Quadrature; tol)
+    etype_to_nearest_points(X,Y::Quadrature; tol)
 
 For each element `el` in `Y.mesh`, return a list with the indices of all points
 in `X` for which `el` is the nearest element. Ignore indices for which the
 distance exceeds `tol`.
 """
-function nearest_point_to_element(X, Y::Quadrature; tol = Inf)
+function etype_to_nearest_points(X, Y::Quadrature; tol = Inf)
     if X === Y
         # when both surfaces are the same, the "near points" of an element are
         # simply its own quadrature points
@@ -153,12 +153,12 @@ function nearest_point_to_element(X, Y::Quadrature; tol = Inf)
             dict[E] = map(i -> collect(i), eachcol(idx_dofs))
         end
     else
-        dict = _nearest_point_to_element(collect(qcoords(X)), Y, tol)
+        dict = _etype_to_nearest_points(collect(qcoords(X)), Y, tol)
     end
     return dict
 end
 
-function _nearest_point_to_element(X, Y::Quadrature, tol = Inf)
+function _etype_to_nearest_points(X, Y::Quadrature, tol = Inf)
     y = [coords(q) for q in Y]
     kdtree = KDTree(y)
     dict = Dict(j => Int[] for j in 1:length(y))
