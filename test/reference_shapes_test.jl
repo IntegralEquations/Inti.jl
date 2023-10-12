@@ -12,7 +12,7 @@ using StaticArrays
     @test x ∈ l
     x = SVector(1.1)
     @test !in(x, l)
-    @test Inti.center(l) == SVector(1/2)
+    @test Inti.center(l) == SVector(1 / 2)
     @test Inti.vertices(l) == (SVector(0), SVector(1))
 end
 @testset "Triangle" begin
@@ -25,7 +25,7 @@ end
     @test x ∈ t
     x = SVector(1.1, 0.0)
     @test !in(x, t)
-    @test Inti.center(t) == SVector(1/3, 1/3)
+    @test Inti.center(t) == SVector(1 / 3, 1 / 3)
     @test Inti.vertices(t) == SVector([0, 0], [1, 0], [0, 1])
 end
 @testset "Tetrahedron" begin
@@ -38,7 +38,7 @@ end
     @test x ∈ t
     x = SVector(1.1, 0.0, 0.0)
     @test !in(x, t)
-    @test Inti.center(t) == SVector(1/4, 1/4, 1/4)
+    @test Inti.center(t) == SVector(1 / 4, 1 / 4, 1 / 4)
     @test Inti.vertices(t) == SVector([0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1])
 end
 @testset "NSimplex" begin
@@ -51,6 +51,7 @@ end
     @test x ∈ t
     x = SVector(1.1, 0.0, 0.0, 0.0)
     @test !in(x, t)
-    @test Inti.center(t) == SVector(1/5, 1/5, 1/5, 1/5)
-    @test Inti.vertices(t) == SVector([0, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1])
+    @test Inti.center(t) == SVector(1 / 5, 1 / 5, 1 / 5, 1 / 5)
+    @test Inti.vertices(t) ==
+          SVector([0, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1])
 end

@@ -104,7 +104,7 @@ end
 
 kernel(iop::IntegralOperator) = iop.kernel
 
-function IntegralOperator(k, X, Y::Quadrature=X)
+function IntegralOperator(k, X, Y::Quadrature = X)
     T = return_type(k)
     msg = """IntegralOperator of nonbits being created"""
     isbitstype(T) || (@warn msg)
@@ -119,7 +119,7 @@ function Base.getindex(iop::IntegralOperator, i::Integer, j::Integer)
 end
 
 function Base.Matrix(iop::IntegralOperator{T}) where {T}
-    m,n = size(iop)
+    m, n = size(iop)
     K = kernel(iop)
     out = Matrix{T}(undef, m, n)
     _iop_to_matrix!(out, K, iop.target, iop.source)
@@ -135,22 +135,26 @@ end
 end
 
 # convenience constructors
-single_layer_operator(op::AbstractPDE, X, Y=X) = IntegralOperator(SingleLayerKernel(op), X, Y)
-double_layer_operator(op::AbstractPDE, X, Y=X) = IntegralOperator(DoubleLayerKernel(op), X, Y)
+function single_layer_operator(op::AbstractPDE, X, Y = X)
+    return IntegralOperator(SingleLayerKernel(op), X, Y)
+end
+function double_layer_operator(op::AbstractPDE, X, Y = X)
+    return IntegralOperator(DoubleLayerKernel(op), X, Y)
+end
 
-function adjoint_double_layer_operator(op::AbstractPDE, X, Y=X)
+function adjoint_double_layer_operator(op::AbstractPDE, X, Y = X)
     return IntegralOperator(AdjointDoubleLayerKernel(op), X, Y)
 end
-function hypersingular_operator(op::AbstractPDE, X, Y=X)
+function hypersingular_operator(op::AbstractPDE, X, Y = X)
     return IntegralOperator(HyperSingularKernel(op), X, Y)
 end
 
 # Applying Laplace's double-layer to a constant will yield either 1 or -1,
 # depending on whether the target point is inside or outside the obstacle.
 # Assumes `quad` is the quadrature of a closed curve/surface
-function isinside(x::SVector, quad::Quadrature, s=1)
+function isinside(x::SVector, quad::Quadrature, s = 1)
     N = ambient_dimension(quad)
-    pde = Laplace(; dim=N)
+    pde = Laplace(; dim = N)
     K = DoubleLayerKernel(pde)
     u = sum(qnodes(quad)) do source
         return K(x, source) * weight(source)

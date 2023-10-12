@@ -46,7 +46,7 @@ pde(k::AbstractPDEKernel) = k.pde
 parameters(k::AbstractPDEKernel) = parameters(pde(k))
 
 # convenient constructor
-function (K::Type{<:AbstractPDEKernel})(op, T::DataType=default_kernel_eltype(op))
+function (K::Type{<:AbstractPDEKernel})(op, T::DataType = default_kernel_eltype(op))
     return K{T,typeof(op)}(op)
 end
 
@@ -109,7 +109,7 @@ Laplace equation in `N` dimension: Δu = 0.
 """
 struct Laplace{N} <: AbstractPDE{N} end
 
-Laplace(; dim=3) = Laplace{dim}()
+Laplace(; dim = 3) = Laplace{dim}()
 
 function Base.show(io::IO, pde::Laplace)
     return print(io, "Δu = 0")
@@ -120,9 +120,11 @@ default_density_eltype(::Laplace) = Float64
 
 parameters(::Laplace) = nothing
 
-function (SL::SingleLayerKernel{T,Laplace{N}})(target, source,
-                                               r=coords(target) - coords(source))::T where {N,
-                                                                                            T}
+function (SL::SingleLayerKernel{T,Laplace{N}})(
+    target,
+    source,
+    r = coords(target) - coords(source),
+)::T where {N,T}
     d = norm(r)
     filter = !(d == 0)
     if N == 2
@@ -134,9 +136,11 @@ function (SL::SingleLayerKernel{T,Laplace{N}})(target, source,
     end
 end
 
-function (DL::DoubleLayerKernel{T,Laplace{N}})(target, source,
-                                               r=coords(target) - coords(source))::T where {N,
-                                                                                            T}
+function (DL::DoubleLayerKernel{T,Laplace{N}})(
+    target,
+    source,
+    r = coords(target) - coords(source),
+)::T where {N,T}
     ny = normal(source)
     d = norm(r)
     filter = !(d == 0)
@@ -149,9 +153,11 @@ function (DL::DoubleLayerKernel{T,Laplace{N}})(target, source,
     end
 end
 
-function (ADL::AdjointDoubleLayerKernel{T,Laplace{N}})(target, source,
-                                                       r=coords(target) - coords(source))::T where {N,
-                                                                                                    T}
+function (ADL::AdjointDoubleLayerKernel{T,Laplace{N}})(
+    target,
+    source,
+    r = coords(target) - coords(source),
+)::T where {N,T}
     nx = normal(target)
     d = norm(r)
     filter = !(d == 0)
@@ -162,9 +168,11 @@ function (ADL::AdjointDoubleLayerKernel{T,Laplace{N}})(target, source,
     end
 end
 
-function (HS::HyperSingularKernel{T,Laplace{N}})(target, source,
-                                                 r=coords(target) - coords(source))::T where {N,
-                                                                                              T}
+function (HS::HyperSingularKernel{T,Laplace{N}})(
+    target,
+    source,
+    r = coords(target) - coords(source),
+)::T where {N,T}
     nx = normal(target)
     ny = normal(source)
     d = norm(r)
@@ -191,7 +199,7 @@ struct Helmholtz{N,K} <: AbstractPDE{N}
     k::K
 end
 
-Helmholtz(; k, dim=3) = Helmholtz{dim,typeof(k)}(k)
+Helmholtz(; k, dim = 3) = Helmholtz{dim,typeof(k)}(k)
 
 function Base.show(io::IO, ::Helmholtz)
     # k = parameters(pde)
@@ -260,14 +268,19 @@ function (HS::HyperSingularKernel{T,S})(target, source)::T where {T,S<:Helmholtz
     if N == 2
         RRT = r * transpose(r) # r ⊗ rᵗ
         # TODO: rewrite the operation below in a more clear/efficient way
-        val = transpose(nx) * ((-im * k^2 / 4 / d^2 * hankelh1(2, k * d) * RRT +
-                                im * k / 4 / d * hankelh1(1, k * d) * I) * ny)
+        val =
+            transpose(nx) * (
+                (
+                    -im * k^2 / 4 / d^2 * hankelh1(2, k * d) * RRT +
+                    im * k / 4 / d * hankelh1(1, k * d) * I
+                ) * ny
+            )
         return filter * val
     elseif N == 3
         RRT = r * transpose(r) # r ⊗ rᵗ
         term1 = 1 / (4π) / d^2 * exp(im * k * d) * (-im * k + 1 / d) * I
-        term2 = RRT / d * exp(im * k * d) / (4 * π * d^4) *
-                (3 * (d * im * k - 1) + d^2 * k^2)
+        term2 =
+            RRT / d * exp(im * k * d) / (4 * π * d^4) * (3 * (d * im * k - 1) + d^2 * k^2)
         val = transpose(nx) * (term1 + term2) * ny
         return filter * val
     end

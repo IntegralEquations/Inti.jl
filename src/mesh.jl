@@ -16,7 +16,7 @@ ambient_dimension(::AbstractMesh{N}) where {N} = N
 function Base.show(io::IO, msh::AbstractMesh)
     print(io, "$(typeof(msh)) containing:")
     for E in element_types(msh)
-        iter = elements(msh,E)
+        iter = elements(msh, E)
         print(io, "\n\t $(length(iter)) elements of type ", E)
     end
     return io
@@ -41,7 +41,7 @@ end
 
 Return an iterator for all elements of type `E` on a mesh `msh`.
 """
-elements(msh::AbstractMesh,E::DataType) = ElementIterator{E,typeof(msh)}(msh)
+elements(msh::AbstractMesh, E::DataType) = ElementIterator{E,typeof(msh)}(msh)
 
 """
     struct LagrangeMesh{N,T} <: AbstractMesh{N,T}
@@ -66,7 +66,11 @@ end
 
 # empty constructor
 function LagrangeMesh{N,T}() where {N,T}
-    return LagrangeMesh{N,T}(SVector{N,T}[], Dict{DataType,Matrix{Int}}(), Dict{AbstractEntity,Dict{DataType,Vector{Int}}}())
+    return LagrangeMesh{N,T}(
+        SVector{N,T}[],
+        Dict{DataType,Matrix{Int}}(),
+        Dict{AbstractEntity,Dict{DataType,Vector{Int}}}(),
+    )
 end
 
 """
@@ -112,7 +116,7 @@ function Base.getindex(iter::ElementIterator{E,<:LagrangeMesh}, i::Int) where {E
     return el
 end
 
-function Base.iterate(iter::ElementIterator{<:LagrangeElement,<:LagrangeMesh}, state=1)
+function Base.iterate(iter::ElementIterator{<:LagrangeElement,<:LagrangeMesh}, state = 1)
     state > length(iter) && (return nothing)
     return iter[state], state + 1
 end
@@ -138,11 +142,7 @@ function _convert_to_2d(mesh::LagrangeMesh{3,T}) where {T}
         new_ent2tags[ent] = new_dict
     end
     # construct new 2d mesh
-    return LagrangeMesh{2,T}(
-                [x[1:2] for x in mesh.nodes],
-                new_etype2mat,
-                new_ent2tags
-            )
+    return LagrangeMesh{2,T}([x[1:2] for x in mesh.nodes], new_etype2mat, new_ent2tags)
 end
 
 function _convert_to_2d(::Type{LagrangeElement{R,N,SVector{3,T}}}) where {R,N,T}
@@ -190,16 +190,19 @@ function Base.length(iter::ElementIterator{E,<:SubMesh}) where {E<:LagrangeEleme
     return length(idxs)
 end
 
-function Base.getindex(iter::ElementIterator{E,<:SubMesh}, i::Int) where {E<:LagrangeElement}
+function Base.getindex(
+    iter::ElementIterator{E,<:SubMesh},
+    i::Int,
+) where {E<:LagrangeElement}
     submsh = iter.mesh
     p_msh  = submsh.parent # parent mesh
     idxs   = submsh.etype2etags[E]::Vector{Int}
-    iglob = idxs[i] # global index of element in parent mesh
-    iter = elements(p_msh, E) # iterator over parent mesh
+    iglob  = idxs[i] # global index of element in parent mesh
+    iter   = elements(p_msh, E) # iterator over parent mesh
     return iter[iglob]
 end
 
-function Base.iterate(iter::ElementIterator{<:LagrangeElement,<:SubMesh}, state=1)
+function Base.iterate(iter::ElementIterator{<:LagrangeElement,<:SubMesh}, state = 1)
     state > length(iter) && (return nothing)
     return iter[state], state + 1
 end
