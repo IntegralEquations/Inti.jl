@@ -113,7 +113,7 @@ function read_geo(fname; dim = 3)
     catch
         @error "could not open $fname"
     end
-   gmsh_import_domain!(Ω; dim)
+    gmsh_import_domain!(Ω; dim)
     return Ω
 end
 
