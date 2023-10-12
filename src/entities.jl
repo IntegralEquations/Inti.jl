@@ -11,7 +11,7 @@ abstract type AbstractEntity end
 The `(dim,tag)` pair used as a key to identify geometrical entities.
 """
 function key(e::AbstractEntity)
-    interface_method(e)
+    return interface_method(e)
 end
 
 """
@@ -20,7 +20,7 @@ end
 Integer tag used to idetify geometrical entities.
 """
 function tag(e::AbstractEntity)
-    interface_method(e)
+    return interface_method(e)
 end
 
 """
@@ -29,7 +29,7 @@ end
 A vector of entities of dimension `dim-1` that form the boundary of `e`.
 """
 function boundary(e::AbstractEntity)
-    interface_method(e)
+    return interface_method(e)
 end
 
 """

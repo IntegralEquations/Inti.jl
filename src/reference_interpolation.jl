@@ -36,9 +36,15 @@ domain(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = D()
 return_type(::ReferenceInterpolant{D,T}) where {D,T} = T
 return_type(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = T
 domain_dimension(t::ReferenceInterpolant{D,T}) where {D,T} = domain(t) |> center |> length
-domain_dimension(t::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = domain(t) |> center |> length
-range_dimension(el::ReferenceInterpolant{R,T}) where {R,T} = domain(el) |> center |> el |> length
-range_dimension(el::Type{<:ReferenceInterpolant{R,T}}) where {R,T} = domain(el) |> center |> el |> length
+function domain_dimension(t::Type{<:ReferenceInterpolant{D,T}}) where {D,T}
+    return domain(t) |> center |> length
+end
+function range_dimension(el::ReferenceInterpolant{R,T}) where {R,T}
+    return domain(el) |> center |> el |> length
+end
+function range_dimension(el::Type{<:ReferenceInterpolant{R,T}}) where {R,T}
+    return domain(el) |> center |> el |> length
+end
 
 """
     struct LagrangeElement{D,Np,T} <: ReferenceInterpolant{D,T}
@@ -79,7 +85,7 @@ function LagrangeElement{D}(vals::SVector{Np,T}) where {D,Np,T}
 end
 
 # a more convenient syntax
-LagrangeElement{D}(x1,xs...) where {D} = LagrangeElement{D}(SVector(x1,xs...))
+LagrangeElement{D}(x1, xs...) where {D} = LagrangeElement{D}(SVector(x1, xs...))
 
 # construct based on a function
 function LagrangeElement{D}(f::Function) where {D}
@@ -140,7 +146,8 @@ end
 
 function (el::LagrangeLine{3})(u)
     v = vals(el)
-    return v[1] + (4 * v[3] - 3 * v[1] - v[2]) * u[1] +
+    return v[1] +
+           (4 * v[3] - 3 * v[1] - v[2]) * u[1] +
            2 * (v[2] + v[1] - 2 * v[3]) * u[1]^2
 end
 
@@ -167,39 +174,41 @@ end
 
 # P2 for ReferenceTriangle
 function reference_nodes(::LagrangeTriangle{6})
-    return SVector(SVector(0.0, 0.0),
-                   SVector(1.0, 0.0),
-                   SVector(0.0, 1.0),
-                   SVector(0.5, 0.0),
-                   SVector(0.5, 0.5),
-                   SVector(0.0, 0.5))
+    return SVector(
+        SVector(0.0, 0.0),
+        SVector(1.0, 0.0),
+        SVector(0.0, 1.0),
+        SVector(0.5, 0.0),
+        SVector(0.5, 0.5),
+        SVector(0.0, 0.5),
+    )
 end
 
 function (el::LagrangeTriangle{6})(u)
     v = vals(el)
-    return (1 + u[2] * (-3 + 2u[2]) + u[1] * (-3 + 2u[1] + 4u[2])) * v[1] + u[1] *
+    return (1 + u[2] * (-3 + 2u[2]) + u[1] * (-3 + 2u[1] + 4u[2])) * v[1] +
+           u[1] *
            (-v[2] + u[1] * (2v[2] - 4v[4]) + 4v[4] + u[2] * (-4v[4] + 4v[5] - 4v[6])) +
            u[2] * (-v[3] + u[2] * (2v[3] - 4v[6]) + 4v[6])
 end
 
 function jacobian(el::LagrangeTriangle{6}, u)
     v = vals(el)
-    return hcat((-3 + 4u[1] + 4u[2]) * v[1] - v[2] +
-                u[1] * (4v[2] - 8v[4]) +
-                4v[4] +
-                u[2] * (-4v[4] + 4v[5] - 4v[6]),
-                (-3 + 4u[1] + 4u[2]) * v[1] - v[3] +
-                u[2] * (4v[3] - 8v[6]) +
-                u[1] * (-4v[4] + 4v[5] - 4v[6]) +
-                4v[6])
+    return hcat(
+        (-3 + 4u[1] + 4u[2]) * v[1] - v[2] +
+        u[1] * (4v[2] - 8v[4]) +
+        4v[4] +
+        u[2] * (-4v[4] + 4v[5] - 4v[6]),
+        (-3 + 4u[1] + 4u[2]) * v[1] - v[3] +
+        u[2] * (4v[3] - 8v[6]) +
+        u[1] * (-4v[4] + 4v[5] - 4v[6]) +
+        4v[6],
+    )
 end
 
 # P1 for ReferenceSquare
 function reference_nodes(::Type{LagrangeSquare{4}})
-    return SVector(SVector(0, 0),
-                   SVector(1, 0),
-                   SVector(1, 1),
-                   SVector(0, 1))
+    return SVector(SVector(0, 0), SVector(1, 0), SVector(1, 1), SVector(0, 1))
 end
 
 function (el::LagrangeElement{ReferenceSquare,4})(u)
@@ -212,16 +221,15 @@ end
 
 function jacobian(el::LagrangeElement{ReferenceSquare,4}, u)
     v = vals(el)
-    return hcat(((v[2] - v[1]) + (v[3] + v[1] - v[2] - v[4]) * u[2]),
-                ((v[4] - v[1]) + (v[3] + v[1] - v[2] - v[4]) * u[1]))
+    return hcat(
+        ((v[2] - v[1]) + (v[3] + v[1] - v[2] - v[4]) * u[2]),
+        ((v[4] - v[1]) + (v[3] + v[1] - v[2] - v[4]) * u[1]),
+    )
 end
 
 # P1 for ReferenceTetrahedron
 function reference_nodes(::LagrangeTetrahedron{4})
-    return SVector(SVector(0, 0, 0),
-                   SVector(1, 0, 0),
-                   SVector(0, 1, 0),
-                   SVector(0, 0, 1))
+    return SVector(SVector(0, 0, 0), SVector(1, 0, 0), SVector(0, 1, 0), SVector(0, 0, 1))
 end
 
 function (el::LagrangeElement{ReferenceTetrahedron,4})(u)

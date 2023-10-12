@@ -21,7 +21,6 @@ coords(q::QuadratureNode) = q.coords
 # `IntegralOperators`.
 coords(x::Union{SVector,NTuple}) = SVector(x)
 
-
 normal(q::QuadratureNode) = q.normal
 weight(q::QuadratureNode) = q.weight
 
@@ -62,10 +61,12 @@ For co-dimension 1 elements, the normal vector is computed and stored in the
 """
 function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
     # initialize mesh with empty fields
-    quad = Quadrature{N,T}(msh,
-                            etype2qrule,
-                            QuadratureNode{N,T}[],
-                            Dict{DataType,Matrix{Int}}())
+    quad = Quadrature{N,T}(
+        msh,
+        etype2qrule,
+        QuadratureNode{N,T}[],
+        Dict{DataType,Matrix{Int}}(),
+    )
     # loop element types and generate quadrature for each
     for E in element_types(msh)
         els   = elements(msh, E)
@@ -77,11 +78,16 @@ function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
 end
 
 function Quadrature(msh::AbstractMesh; qorder)
-    etype2qrule = Dict(E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(msh))
+    etype2qrule =
+        Dict(E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(msh))
     return Quadrature(msh, etype2qrule)
 end
 
-@noinline function _build_quadrature!(quad, els::ElementIterator{E}, qrule::ReferenceQuadrature) where {E}
+@noinline function _build_quadrature!(
+    quad,
+    els::ElementIterator{E},
+    qrule::ReferenceQuadrature,
+) where {E}
     N = ambient_dimension(quad)
     x̂, ŵ = qrule() # nodes and weights on reference element
     num_nodes = length(ŵ)
@@ -125,9 +131,9 @@ function _qrule_for_reference_shape(ref, order)
         qy = qz = qx
         return TensorProductQuadrature(qx, qy, qz)
     elseif ref isa ReferenceTriangle || ref === :triangle
-        return Gauss(; domain=ref, order=order)
+        return Gauss(; domain = ref, order = order)
     elseif ref isa ReferenceTetrahedron || ref === :tetrahedron
-        return Gauss(; domain=ref, order=order)
+        return Gauss(; domain = ref, order = order)
     else
         error("no appropriate quadrature rule found.")
     end
