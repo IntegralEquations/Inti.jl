@@ -23,7 +23,7 @@ may depend on quantities other than the [`coords`](@ref) of the quadrature node
 
 See also: [`QuadratureNode`](@ref)
 """
-function NystromDensity(f::Function,X::Quadrature{N,T}) where {N,T}
+function NystromDensity(f::Function, X::Quadrature{N,T}) where {N,T}
     vals = [f(dof) for dof in X]
     V = eltype(vals)
     return NystromDensity{N,T,V}(vals, X)
