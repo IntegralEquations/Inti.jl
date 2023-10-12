@@ -21,7 +21,13 @@ coords(q::QuadratureNode) = q.coords
 # `IntegralOperators`.
 coords(x::Union{SVector,NTuple}) = SVector(x)
 
+"""
+    normal(q::QuadratureNode)
+
+Return the normal vector of `q`, if it exists.
+"""
 normal(q::QuadratureNode) = q.normal
+
 weight(q::QuadratureNode) = q.weight
 
 """
