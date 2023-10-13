@@ -47,7 +47,7 @@ integral
 """
 struct IntegralPotential
     kernel::AbstractKernel
-    quadrature::AbstractMesh
+    quadrature::Quadrature
 end
 
 function Base.getindex(pot::IntegralPotential, σ::AbstractVector)
@@ -156,7 +156,7 @@ function isinside(x::SVector, quad::Quadrature, s = 1)
     N = ambient_dimension(quad)
     pde = Laplace(; dim = N)
     K = DoubleLayerKernel(pde)
-    u = sum(qnodes(quad)) do source
+    u = sum(quad.qnodes) do source
         return K(x, source) * weight(source)
     end
     return s * u + 0.5 < 0

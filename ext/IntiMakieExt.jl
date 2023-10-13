@@ -10,7 +10,7 @@ end
 
 function tomakie_dim1(msh::Inti.AbstractMesh{N,T}) where {N,T}
     coords = Makie.Point{N,T}[]
-    NAN    = svector(i -> NaN * one(T), N)
+    NAN    = Inti.svector(i -> NaN * one(T), N)
     for E in Inti.element_types(msh)
         iter = Inti.elements(msh, E)
         D    = Inti.domain(E)
