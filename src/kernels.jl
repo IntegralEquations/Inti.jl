@@ -109,7 +109,7 @@ Laplace equation in `N` dimension: Δu = 0.
 """
 struct Laplace{N} <: AbstractPDE{N} end
 
-Laplace(; dim = 3) = Laplace{dim}()
+Laplace(; dim) = Laplace{dim}()
 
 function Base.show(io::IO, pde::Laplace)
     return print(io, "Δu = 0")
@@ -199,7 +199,7 @@ struct Helmholtz{N,K} <: AbstractPDE{N}
     k::K
 end
 
-Helmholtz(; k, dim = 3) = Helmholtz{dim,typeof(k)}(k)
+Helmholtz(; k, dim) = Helmholtz{dim,typeof(k)}(k)
 
 function Base.show(io::IO, ::Helmholtz)
     # k = parameters(pde)
