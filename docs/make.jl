@@ -20,11 +20,13 @@ makedocs(;
         prettyurls=get(ENV, "CI", "false") == "true",
         canonical="https://IntegralEquations.github.io/Inti.jl",
         edit_link="main",
-        assets=String[],
     ),
     pages=[
         "Home" => "index.md",
         "Meshing" => "geo_and_meshes.md",
+        "Examples" =>[
+            "examples/helmholtz_soundsoft_scattering_circle.md"
+        ],
         "References" => "references.md",
     ],
     pagesonly = true,

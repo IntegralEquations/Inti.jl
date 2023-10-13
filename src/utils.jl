@@ -117,3 +117,39 @@ function _normal(jac::SMatrix{N,M}) where {N,M}
         notimplemented()
     end
 end
+
+"""
+    uniform_points_circle(N,r,c)
+
+Return `N` points uniformly distributed on a circle of radius `r` centered at `c`.
+"""
+function uniform_points_circle(N, r, c)
+    pts = SVector{2,Float64}[]
+    for i in 0:(N-1)
+        x = r * SVector(cos(2π * i / N), sin(2π * i / N)) + c
+        push!(pts, x)
+    end
+    return pts
+end
+
+# https://stackoverflow.com/questions/9600801/evenly-distributing-n-points-on-a-sphere
+"""
+    fibonnaci_points_sphere(N,r,c)
+
+Return `N` points distributed (roughly) in a uniform manner on the sphere of
+radius `r` centered at `c`.
+"""
+function fibonnaci_points_sphere(N, r, center)
+    pts = Vector{SVector{3,Float64}}(undef, N)
+    phi = π * (3 - sqrt(5)) # golden angle in radians
+    for i in 1:N
+        ytmp = 1 - ((i - 1) / (N - 1)) * 2
+        radius = sqrt(1 - ytmp^2)
+        theta = phi * i
+        x = cos(theta) * radius * r + center[1]
+        y = ytmp * r + center[2]
+        z = sin(theta) * radius * r + center[3]
+        pts[i] = SVector(x, y, z)
+    end
+    return pts
+end
