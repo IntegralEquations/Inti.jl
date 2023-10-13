@@ -84,8 +84,17 @@ nodes(msh::LagrangeMesh) = msh.nodes
 elements(msh::LagrangeMesh) = msh.etype2mat
 ent2tags(msh::LagrangeMesh) = msh.ent2tags
 
+entities(msh::LagrangeMesh) = keys(msh.ent2tags)
+
 """
-    dom2elt(m::LagrangeMesh,Ω,E)
+    domain(msh::LagrangeMesh)
+
+Set of all entities covered by the mesh.
+"""
+domain(msh::LagrangeMesh)   = Domain(entities(msh))
+
+"""
+    dom2elt(m::LagrangeMesh,Ω,E)::Vector{Int}
 
 Compute the element indices `idxs` of the elements of type `E` composing `Ω`, so
 that `elements(m)[idxs]` gives all the elements of type `E` meshing `Ω`.
@@ -181,6 +190,9 @@ ambient_dimension(::SubMesh{N}) where {N} = N
 
 geometric_dimension(msh::SubMesh) = geometric_dimension(msh.domain)
 
+nodes(msh::SubMesh) = nodes(msh.parent)
+domain(msh::SubMesh) = msh.domain
+
 element_types(msh::SubMesh) = keys(msh.etype2etags)
 
 # ElementIterator for submesh
@@ -205,4 +217,57 @@ end
 function Base.iterate(iter::ElementIterator{<:LagrangeElement,<:SubMesh}, state = 1)
     state > length(iter) && (return nothing)
     return iter[state], state + 1
+end
+
+
+triangle_connectivity(msh::SubMesh)      = _triangle_connectivity(msh.parent, msh.domain)
+triangle_connectivity(msh::LagrangeMesh) = _triangle_connectivity(msh, domain(msh))
+function _triangle_connectivity(msh::Inti.LagrangeMesh{N,T},Ω::Inti.Domain) where {N,T}
+    connec = Int[]
+    for E in Inti.element_types(msh)
+        el_idxs = Inti.dom2elt(msh, Ω, E)::Vector{Int}
+        isempty(el_idxs) && continue
+        tags = msh.etype2mat[E]::Matrix{Int}
+        if E <: Inti.LagrangeTriangle
+            # extract the first three tags
+            for n in el_idxs
+                push!(connec,tags[1,n])
+                push!(connec,tags[2,n])
+                push!(connec,tags[3,n])
+            end
+        elseif E <: Inti.LagrangeSquare
+            for n in el_idxs
+                # lower triangle
+                push!(connec,tags[1,n])
+                push!(connec,tags[2,n])
+                push!(connec,tags[3,n])
+                # upper triangle
+                push!(connec,tags[3,n])
+                push!(connec,tags[4,n])
+                push!(connec,tags[1,n])
+            end
+        elseif E <: Inti.LagrangeTetrahedron
+            for n in el_idxs
+                # four faces
+                push!(connec,tags[1,n])
+                push!(connec,tags[2,n])
+                push!(connec,tags[3,n])
+                #
+                push!(connec,tags[1,n])
+                push!(connec,tags[2,n])
+                push!(connec,tags[4,n])
+                #
+                push!(connec,tags[1,n])
+                push!(connec,tags[3,n])
+                push!(connec,tags[4,n])
+                #
+                push!(connec,tags[2,n])
+                push!(connec,tags[3,n])
+                push!(connec,tags[4,n])
+            end
+        else
+            error("element type $E not supported")
+        end
+    end
+    return connec
 end
