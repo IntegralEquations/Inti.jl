@@ -229,15 +229,14 @@ end
 
 function Inti.gmsh_read_geo(fname; dim = 3, verbosity = 2)
     gmsh.isInitialized() == 1 ||
-    error("gmsh is not initialized. Try `gmsh.initialize` first.")
+        error("gmsh is not initialized. Try `gmsh.initialize` first.")
     try
         gmsh.open(fname)
     catch
         @error "could not open $fname"
     end
-    return Inti.gmsh_import_domain(;dim, verbosity)
+    return Inti.gmsh_import_domain(; dim, verbosity)
 end
-
 
 """
     gmsh_read_msh(fname::String; dim=3)
@@ -249,9 +248,9 @@ entities in `Ω` of dimension `dim`.
     This function assumes that `gmsh` has been initialized, and does not handle its
     finalization.
 """
-function Inti.gmsh_read_msh(fname; dim=3)
+function Inti.gmsh_read_msh(fname; dim = 3)
     gmsh.isInitialized() == 1 ||
-    error("gmsh is not initialized. Try `gmsh.initialize` first.")
+        error("gmsh is not initialized. Try `gmsh.initialize` first.")
     try
         gmsh.open(fname)
     catch
