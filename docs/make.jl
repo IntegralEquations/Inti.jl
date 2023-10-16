@@ -52,5 +52,5 @@ makedocs(;
 deploydocs(;
     repo = "github.com/IntegralEquations/Inti.jl",
     devbranch = "main",
-    push_preview = true,
+    push_preview = false,
 )
