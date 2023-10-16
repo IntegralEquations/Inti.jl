@@ -56,7 +56,7 @@ jobs:
       - uses: julia-actions/cache@v1
         with:
           cache-registries: "true"
-          cache-compiled: "true"
+          cache-compiled: "false"
       - name: Configure doc environment
         run: |
           julia --project=docs/ -e '
