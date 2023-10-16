@@ -45,9 +45,12 @@ pde(k::AbstractPDEKernel) = k.pde
 
 parameters(k::AbstractPDEKernel) = parameters(pde(k))
 
-# convenient constructor
-function (K::Type{<:AbstractPDEKernel})(op, T::DataType = default_kernel_eltype(op))
-    return K{T,typeof(op)}(op)
+# convenient constructor for e.g. SingleLayerKernel(pde,Float64) or DoubleLayerKernel(pde,ComplexF64)
+function (::Type{K})(
+    pde::Op,
+    ::Type{T} = default_kernel_eltype(pde),
+) where {T,Op,K<:AbstractPDEKernel}
+    return K{T,Op}(pde)
 end
 
 """
