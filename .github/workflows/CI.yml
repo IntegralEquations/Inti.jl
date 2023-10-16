@@ -44,7 +44,7 @@ jobs:
           files: lcov.info
   docs:
     name: Documentation
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions:
       contents: write
       statuses: write
@@ -53,10 +53,6 @@ jobs:
       - uses: julia-actions/setup-julia@v1
         with:
           version: '1'
-      - uses: julia-actions/cache@v1
-        with:
-          cache-registries: "true"
-          cache-compiled: "true"
       - name: Configure doc environment
         run: |
           julia --project=docs/ -e '
