@@ -22,7 +22,6 @@ jobs:
           - '1.9'
           - 'nightly'
         os:
-          - self-hosted
           - ubuntu-latest
         arch:
           - x64
@@ -45,7 +44,7 @@ jobs:
           files: lcov.info
   docs:
     name: Documentation
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions:
       contents: write
       statuses: write
