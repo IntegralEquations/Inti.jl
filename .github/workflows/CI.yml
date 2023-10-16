@@ -22,6 +22,7 @@ jobs:
           - '1.9'
           - 'nightly'
         os:
+          - self-hosted
           - ubuntu-latest
         arch:
           - x64
