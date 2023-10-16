@@ -42,16 +42,17 @@ function bdim_correction(
 )
     max_cond = -Inf # maximum condition numbered encoutered in coeffs matrix
     T        = eltype(S)
+    N        = ambient_dimension(source)
     @assert eltype(D) == T "eltype of S and D must match"
     m, n = length(target), length(source)
     msg = "unrecognized value for kw `location`: received $location.
     Valid options are `:onsurface`, `:inside`, `:outside`, or the numeric value of the multiplier"
-    σ = if location === :onsurface
+    σ::Float64 = if location === :onsurface
         -0.5
     elseif location === :inside
-        -1
+        -1.0
     elseif location === :outside
-        0
+        0.0
     elseif location isa Number
         location
     else
@@ -66,16 +67,15 @@ function bdim_correction(
     high_corner = reduce((p, q) -> max.(coords(p), coords(q)), source)
     xc = (low_corner + high_corner) / 2
     R = parameters.sources_radius_multiplier * norm(high_corner - low_corner) / 2
-    if ambient_dimension(source) == 2
-        xs = uniform_points_circle(ns, R, xc)
-    elseif ambient_dimension(source) == 3
-        # xs = lebedev_points_sphere(ns, r, xc)
-        xs = fibonnaci_points_sphere(ns, R, xc)
+    xs = if N === 2
+        uniform_points_circle(ns, R, xc)
+    elseif N === 3
+        fibonnaci_points_sphere(ns, R, xc)
     else
-        notimplemented()
+        error("only 2D and 3D supported")
     end
     # compute traces of monopoles on the source mesh
-    G = SingleLayerKernel(pde, T)
+    G   = SingleLayerKernel(pde, T)
     γ₁G = AdjointDoubleLayerKernel(pde, T)
     γ₀B = Matrix{T}(undef, length(source), ns)
     γ₁B = Matrix{T}(undef, length(source), ns)
@@ -86,13 +86,18 @@ function bdim_correction(
         end
     end
     # integrate the monopoles/dipoles over Y with target on X. This is the
-    # slowest step, and passing a custom S,D can accelerate this computation
-    Θ = S * γ₁B - D * γ₀B
+    # slowest step, and passing a custom S,D can accelerate this computation.
+    Θ = zeros(T, m, ns)
+    # Compute Θ <-- S * γ₁B - D * γ₀B + σ * B(x) usig in-place matvec
     for k in 1:ns
-        for i in 1:length(target)
-            if derivative
+        @views mul!(Θ[:, k], S, γ₁B[:, k])
+        @views mul!(Θ[:, k], D, γ₀B[:, k], -1, 1)
+        if derivative
+            for i in 1:lenght(target)
                 Θ[i, k] += σ * γ₁G(target[i], xs[k])
-            else
+            end
+        else
+            for i in 1:length(target)
                 Θ[i, k] += σ * G(target[i], xs[k])
             end
         end
@@ -107,6 +112,8 @@ function bdim_correction(
         @assert length(near_list) == ne
         # preallocate a local matrix to store interpolant values
         M = Matrix{T}(undef, 2nq, ns)
+        # preallocate a local matrix to store weights
+        W = Vector{T}(undef, 2 * nq)
         for n in 1:ne # loop over elements of type E
             # if there is nothing near, skip immediately to next element
             isempty(near_list[n]) && continue
@@ -117,11 +124,15 @@ function bdim_correction(
             M1 = @view γ₁B[jglob, :]
             copy!(view(M, 1:nq, :), M0)
             copy!(view(M, (nq+1):(2nq), :), M1)
-            F = qr!(M)
+            F = qr!(transpose(M))
             max_cond = max(cond(F.R), max_cond)
             for i in near_list[n]
-                Θi = @view Θ[i:i, :]
-                W = (Θi / F.R) * adjoint(F.Q)
+                Θi = @view Θ[i, :]
+                # if isdefined(Main, :Infiltrator)
+                #     Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+                # end
+                # W = (Θi / F.R) * adjoint(F.Q) # Θi * (Q*R)⁻¹ = Θi * R⁻¹ * Q⁻¹
+                W = ldiv!(W, F, Θi)
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
