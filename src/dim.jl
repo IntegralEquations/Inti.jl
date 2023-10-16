@@ -93,7 +93,7 @@ function bdim_correction(
         @views mul!(Θ[:, k], S, γ₁B[:, k])
         @views mul!(Θ[:, k], D, γ₀B[:, k], -1, 1)
         if derivative
-            for i in 1:lenght(target)
+            for i in 1:length(target)
                 Θ[i, k] += σ * γ₁G(target[i], xs[k])
             end
         else
