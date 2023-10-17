@@ -7,14 +7,22 @@ using WriteVTK
 using CairoMakie
 using HMatrices
 
+# some settings are only active on a CI build
+on_CI = get(ENV, "CI", "false") == "true"
+
+# draft mode is used to quickly test the documentation's text locally
+draft = true
+
+on_CI && (draft = false) # if on CI, never draft
+
 # Generate examples using Literate
 const examples_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples")
 const generated_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples", "generated")
 example = "mock_example.jl"
-for example in ["mock_example.jl"]
+for example in ["mock_example.jl", "sphere_scattering.jl"]
     src = joinpath(examples_dir, example)
     Literate.markdown(src, generated_dir; mdstrings = true)
-    Literate.notebook(src, generated_dir; mdstrings = true)
+    draft || Literate.notebook(src, generated_dir; mdstrings = true)
 end
 
 ## setup documentation config
@@ -27,8 +35,7 @@ for extension in [:IntiGmshExt, :IntiMakieExt, :IntiVTKExt, :IntiHMatricesExt]
     push!(modules, ext)
 end
 
-# some settings are only active on a CI build
-on_CI = get(ENV, "CI", "false") == "true"
+
 
 makedocs(;
     modules = modules,
@@ -42,8 +49,9 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         "Meshing" => "geo_and_meshes.md",
-        "Examples" =>[
-            "examples/helmholtz_soundsoft_scattering_circle.md"
+        "Examples" => [
+            "examples/generated/mock_example.md"
+            "examples/generated/sphere_scattering.md"
         ],
         "References" => "references.md",
     ],
