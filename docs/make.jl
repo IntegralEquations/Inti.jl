@@ -42,11 +42,14 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         "Meshing" => "geo_and_meshes.md",
-        "Examples" => ["examples/generated/mock_example.md"],
+        "Examples" =>[
+            "examples/helmholtz_soundsoft_scattering_circle.md"
+        ],
         "References" => "references.md",
     ],
     warnonly = on_CI ? false : Documenter.except(:linkcheck_remotes),
     pagesonly = true,
+    draft = draft,
 )
 
 deploydocs(;
