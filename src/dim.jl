@@ -124,7 +124,7 @@ function bdim_correction(
         end
         M_  = Matrix{eltype(T)}(undef, 2 * nq * σ, ns * σ)
         W_  = Matrix{eltype(T)}(undef, 2 * nq * σ, σ)
-        W   = Matrix{T}(undef, 2 * nq, 1)
+        W   = T <: Number ? W_ : Matrix{T}(undef, 2 * nq, 1)
         Θi_ = Matrix{eltype(T)}(undef, σ, ns * σ)
         # for each element, we will solve Mᵀ W = Θiᵀ, where W is a vector of
         # size 2nq, and Θi is a row vector of length(ns)
@@ -145,7 +145,7 @@ function bdim_correction(
                 Θi  = @view Θ[i:i, :]
                 Θi_ = _copyto!(Θi_, Θi)
                 W_  = ldiv!(W_, F_, transpose(Θi_))
-                W   = _copyto!(W, W_)
+                W   = T <: Number ? W_ : _copyto!(W, W_)
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
