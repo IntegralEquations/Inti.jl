@@ -14,6 +14,8 @@ using Aqua
 
 @safetestset "Quadrature" include("quadrature_test.jl")
 
+@safetestset "Density interpolation method" include("dim_test.jl")
+
 @safetestset "Gmsh import" include("gmsh_test.jl")
 
 @safetestset "VTK export" include("vtkIO_test.jl")

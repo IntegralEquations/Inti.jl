@@ -117,3 +117,78 @@ function _normal(jac::SMatrix{N,M}) where {N,M}
         notimplemented()
     end
 end
+
+"""
+    uniform_points_circle(N,r,c)
+
+Return `N` points uniformly distributed on a circle of radius `r` centered at `c`.
+"""
+function uniform_points_circle(N, r, c)
+    pts = SVector{2,Float64}[]
+    for i in 0:(N-1)
+        x = r * SVector(cos(2π * i / N), sin(2π * i / N)) + c
+        push!(pts, x)
+    end
+    return pts
+end
+
+# https://stackoverflow.com/questions/9600801/evenly-distributing-n-points-on-a-sphere
+"""
+    fibonnaci_points_sphere(N,r,c)
+
+Return `N` points distributed (roughly) in a uniform manner on the sphere of
+radius `r` centered at `c`.
+"""
+function fibonnaci_points_sphere(N, r, center)
+    pts = Vector{SVector{3,Float64}}(undef, N)
+    phi = π * (3 - sqrt(5)) # golden angle in radians
+    for i in 1:N
+        ytmp = 1 - ((i - 1) / (N - 1)) * 2
+        radius = sqrt(1 - ytmp^2)
+        theta = phi * i
+        x = cos(theta) * radius * r + center[1]
+        y = ytmp * r + center[2]
+        z = sin(theta) * radius * r + center[3]
+        pts[i] = SVector(x, y, z)
+    end
+    return pts
+end
+
+"""
+    _copyto!(target,source)
+
+Defaults to `Base.copyto!`, but includes some specialized methods to copy from a
+`Matrix` of `SMatrix` to a `Matrix` of `Number`s and viceversa.
+"""
+function _copyto!(dest::AbstractMatrix{<:Number}, src::AbstractMatrix{<:SMatrix})
+    S = eltype(src)
+    sblock = size(S)
+    ss = size(src) .* sblock # matrix size when viewed as matrix over T
+    @assert size(dest) == ss
+    for i in 1:ss[1], j in 1:ss[2]
+        bi, ind_i = divrem(i - 1, sblock[1]) .+ (1, 1)
+        bj, ind_j = divrem(j - 1, sblock[2]) .+ (1, 1)
+        dest[i, j] = src[bi, bj][ind_i, ind_j]
+    end
+    return dest
+end
+function _copyto!(dest::AbstractMatrix{<:SMatrix}, src::AbstractMatrix{<:Number})
+    T = eltype(dest)
+    sblock = size(T)
+    nblock = div.(size(src), sblock)
+    for i in 1:nblock[1]
+        istart = (i - 1) * sblock[1] + 1
+        iend = i * sblock[1]
+        for j in 1:nblock[2]
+            jstart = (j - 1) * sblock[2] + 1
+            jend = j * sblock[2]
+            dest[i, j] = T(view(src, istart:iend, jstart:jend))
+        end
+    end
+    return dest
+end
+
+# defaults to Base.copyto!
+function _copyto!(dest, src)
+    return copyto!(dest, src)
+end
