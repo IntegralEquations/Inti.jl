@@ -13,7 +13,8 @@ t = :exterior
 σ = t == :interior ? 1 / 2 : -1 / 2
 N = 2
 # pde = Inti.Laplace(; dim=N)
-pde = Inti.Helmholtz(; dim = N, k = 2π)
+# pde = Inti.Helmholtz(; dim = N, k = 2π)
+pde = Inti.Stokes(; dim = N, μ = 1.2)
 @info "Greens identity ($t) $(N)d $pde"
 Inti.clear_entities!()
 center = Inti.SVector(0.1, 0.3)
