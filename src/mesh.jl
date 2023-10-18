@@ -219,7 +219,18 @@ function Base.iterate(iter::ElementIterator{<:LagrangeElement,<:SubMesh}, state 
     return iter[state], state + 1
 end
 
+"""
+    triangle_connectivity(msh::AbstractMesh)
 
+Return a vector of integers `connec` providing a triangulation of the elements
+in the `mesh`. The `connec` vector should be read in groups of three to get the
+triangles.
+
+For elements of `LagrangeTriangle` type, the first three nodes are returned. For
+elements of `LagrangeSquare` type, the triangulation is done by splitting the
+element in two triangles. For elements of `LagrangeTetrahedron` type, the four
+faces are returned. This method will error if the element type is not supported.
+"""
 triangle_connectivity(msh::SubMesh)      = _triangle_connectivity(msh.parent, msh.domain)
 triangle_connectivity(msh::LagrangeMesh) = _triangle_connectivity(msh, domain(msh))
 function _triangle_connectivity(msh::Inti.LagrangeMesh{N,T},Ω::Inti.Domain) where {N,T}
