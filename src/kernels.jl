@@ -45,9 +45,12 @@ pde(k::AbstractPDEKernel) = k.pde
 
 parameters(k::AbstractPDEKernel) = parameters(pde(k))
 
-# convenient constructor
-function (K::Type{<:AbstractPDEKernel})(op, T::DataType = default_kernel_eltype(op))
-    return K{T,typeof(op)}(op)
+# convenient constructor for e.g. SingleLayerKernel(pde,Float64) or DoubleLayerKernel(pde,ComplexF64)
+function (::Type{K})(
+    pde::Op,
+    ::Type{T} = default_kernel_eltype(pde),
+) where {T,Op,K<:AbstractPDEKernel}
+    return K{T,Op}(pde)
 end
 
 """
@@ -109,7 +112,7 @@ Laplace equation in `N` dimension: Δu = 0.
 """
 struct Laplace{N} <: AbstractPDE{N} end
 
-Laplace(; dim = 3) = Laplace{dim}()
+Laplace(; dim) = Laplace{dim}()
 
 function Base.show(io::IO, pde::Laplace)
     return print(io, "Δu = 0")
@@ -199,7 +202,7 @@ struct Helmholtz{N,K} <: AbstractPDE{N}
     k::K
 end
 
-Helmholtz(; k, dim = 3) = Helmholtz{dim,typeof(k)}(k)
+Helmholtz(; k, dim) = Helmholtz{dim,typeof(k)}(k)
 
 function Base.show(io::IO, ::Helmholtz)
     # k = parameters(pde)
@@ -285,3 +288,69 @@ function (HS::HyperSingularKernel{T,S})(target, source)::T where {T,S<:Helmholtz
         return filter * val
     end
 end
+
+############################ STOKES ############################3
+struct Stokes{N,T} <: AbstractPDE{N}
+    μ::T
+end
+Stokes(; μ, dim = 3) = Stokes{dim}(μ)
+Stokes{N}(μ::T) where {N,T} = Stokes{N,T}(μ)
+
+function Base.show(io::IO, pde::Stokes)
+    return println(io, "μΔu -∇p = 0, ∇⋅u = 0")
+end
+
+parameters(s::Stokes) = s.μ
+
+default_kernel_eltype(::Stokes{N}) where {N} = SMatrix{N,N,Float64,N * N}
+default_density_eltype(::Stokes{N}) where {N} = SVector{N,Float64}
+
+# Single Layer
+function (SL::SingleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
+    μ = parameters(SL)
+    x = coords(target)
+    y = coords(source)
+    r = x - y
+    d = norm(r)
+    filter = !(d == 0)
+    if N == 2
+        γ = -log(d)
+    elseif N == 3
+        γ = 1 / d
+    end
+    return filter * (1 / (4π * (N - 1) * μ) * (γ * I + r * transpose(r) / d^N))
+end
+
+# Double Layer Kernel
+function (DL::DoubleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
+    μ = parameters(DL)
+    x = coords(target)
+    y = coords(source)
+    ny = normal(source)
+    r = x - y
+    d = norm(r)
+    filter = !(d == 0)
+    if N == 2
+        return filter * (1 / π * dot(r, ny) / d^4 * r * transpose(r))
+    elseif N == 3
+        return filter * (3 / (4π) * dot(r, ny) / d^5 * r * transpose(r))
+    end
+end
+
+# Double Layer Kernel
+function (ADL::AdjointDoubleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
+    μ = parameters(ADL)
+    x = coords(target)
+    nx = normal(target)
+    y = coords(source)
+    r = x - y
+    d = norm(r)
+    filter = !(d == 0)
+    if N == 2
+        return filter * (-1 / π * dot(r, nx) / d^4 * r * transpose(r))
+    elseif N == 3
+        return filter * (-3 / (4π) * dot(r, nx) / d^5 * r * transpose(r))
+    end
+end
+
+# TODO: Stokes hypersingular kernel

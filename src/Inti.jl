@@ -3,7 +3,10 @@ module Inti
 const PROJECT_ROOT = pkgdir(Inti)
 
 using LinearAlgebra
+using NearestNeighbors
+using SparseArrays
 using StaticArrays
+using LinearMaps
 using SpecialFunctions
 using Printf
 
@@ -25,6 +28,7 @@ include("quadrature.jl")
 # Nyström methods
 include("kernels.jl")
 include("nystrom.jl")
+include("dim.jl")
 
 # some zero-argument methods for the Inti's gmsh api
 include("gmsh_api.jl")

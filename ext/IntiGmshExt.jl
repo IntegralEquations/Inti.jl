@@ -55,10 +55,6 @@ end
 
 Like [`Inti.gmsh_import_domain`](@ref), but appends entities to `Ω` instead of
 creating a new domain.
-
-!!! note
-    This function assumes that `gmsh` has been initialized, and does not handle its
-    finalization.
 """
 function _import_domain!(Ω::Inti.Domain, model = gmsh.model.getCurrent(); dim = 3)
     old_model = gmsh.model.getCurrent()
@@ -94,27 +90,6 @@ function _fill_entity_boundary!(ent, model)
         push!(ent.boundary, bnd)
     end
     return ent
-end
-
-"""
-    read_geo(fname::String;dim=3)
-
-Read a `.geo` file and generate a [`Domain`](@ref Inti.Domain) with all entities of
-dimension `dim`.
-
-!!! danger
-    This function assumes that `gmsh` has been initialized, and does not handle its
-    finalization.
-"""
-function read_geo(fname; dim = 3)
-    Ω = Domain() # Create empty domain
-    try
-        gmsh.open(fname)
-    catch
-        @error "could not open $fname"
-    end
-    gmsh_import_domain!(Ω; dim)
-    return Ω
 end
 
 """
@@ -250,6 +225,40 @@ function _type_tag_to_etype(tag)
         error("unable to parse gmsh element of family $name")
     end
     return etype
+end
+
+function Inti.gmsh_read_geo(fname; dim = 3, verbosity = 2)
+    gmsh.isInitialized() == 1 ||
+        error("gmsh is not initialized. Try `gmsh.initialize` first.")
+    try
+        gmsh.open(fname)
+    catch
+        @error "could not open $fname"
+    end
+    return Inti.gmsh_import_domain(; dim, verbosity)
+end
+
+"""
+    gmsh_read_msh(fname::String; dim=3)
+
+Read `fname` and create a `Domain` and a `GenericMesh` structure with all
+entities in `Ω` of dimension `dim`.
+
+!!! danger
+    This function assumes that `gmsh` has been initialized, and does not handle its
+    finalization.
+"""
+function Inti.gmsh_read_msh(fname; dim = 3)
+    gmsh.isInitialized() == 1 ||
+        error("gmsh is not initialized. Try `gmsh.initialize` first.")
+    try
+        gmsh.open(fname)
+    catch
+        @error "could not open $fname"
+    end
+    Ω = Inti.gmsh_import_domain(; dim)
+    msh = Inti.gmsh_import_mesh(Ω; dim)
+    return Ω, msh
 end
 
 end # module
