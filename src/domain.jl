@@ -93,3 +93,5 @@ Iterating over a domain means iterating over its entities.
 Base.iterate(Ω::Domain, state = 1) = iterate(entities(Ω), state)
 
 Base.isempty(Ω::Domain) = isempty(entities(Ω))
+
+Base.in(ent::AbstractEntity, Ω::Domain) = in(ent, entities(Ω))
