@@ -33,28 +33,28 @@ function bdim_correction(
     pde,
     target,
     source::Quadrature,
-    S,
-    D;
-    location = :onsurface,
+    Sop,
+    Dop;
+    target_location = :onsurface,
     parameters = DimParameters(),
     derivative = false,
     tol = Inf,
 )
-    max_cond = -Inf # maximum condition numbered encoutered in coeffs matrix
-    T        = eltype(S)
-    N        = ambient_dimension(source)
-    @assert eltype(D) == T "eltype of S and D must match"
+    max_cond = -Inf
+    T = eltype(Sop)
+    N = ambient_dimension(source)
+    @assert eltype(Dop) == T "eltype of S and D must match"
     m, n = length(target), length(source)
-    msg = "unrecognized value for kw `location`: received $location.
+    msg = "unrecognized value for kw `location`: received $target_location.
     Valid options are `:onsurface`, `:inside`, `:outside`, or the numeric value of the multiplier"
-    σ::Float64 = if location === :onsurface
+    μ::Float64 = if target_location === :onsurface
         -0.5
-    elseif location === :inside
+    elseif target_location === :inside
         -1.0
-    elseif location === :outside
+    elseif target_location === :outside
         0.0
-    elseif location isa Number
-        location
+    elseif target_location isa Number
+        target_location
     else
         error(msg)
     end
@@ -90,15 +90,15 @@ function bdim_correction(
     Θ = zeros(T, m, ns)
     # Compute Θ <-- S * γ₁B - D * γ₀B + σ * B(x) usig in-place matvec
     for k in 1:ns
-        @views mul!(Θ[:, k], S, γ₁B[:, k])
-        @views mul!(Θ[:, k], D, γ₀B[:, k], -1, 1)
+        @views mul!(Θ[:, k], Sop, γ₁B[:, k])
+        @views mul!(Θ[:, k], Dop, γ₀B[:, k], -1, 1)
         if derivative
             for i in 1:length(target)
-                Θ[i, k] += σ * γ₁G(target[i], xs[k])
+                Θ[i, k] += μ * γ₁G(target[i], xs[k])
             end
         else
             for i in 1:length(target)
-                Θ[i, k] += σ * G(target[i], xs[k])
+                Θ[i, k] += μ * G(target[i], xs[k])
             end
         end
     end
@@ -110,34 +110,47 @@ function bdim_correction(
         near_list = dict_near[E]
         nq, ne = size(qtags)
         @assert length(near_list) == ne
-        # preallocate a local matrix to store interpolant values
-        M = Matrix{T}(undef, 2nq, ns)
-        # preallocate a local matrix to store weights
-        W = Vector{T}(undef, 2 * nq)
-        for n in 1:ne # loop over elements of type E
+        # preallocate a local matrix to store interpolant values resulting
+        # weights. To benefit from Lapack, we must convert everything to
+        # matrices of scalars, so when `T` is an `SMatrix` we are careful to
+        # convert between the `Matrix{<:SMatrix}` and `Matrix{<:Number}` formats
+        # by viewing the elements of type `T` as `σ × σ` matrices of
+        # `eltype(T)`.
+        σ   = if T <: Number
+            1
+        else
+            @assert allequal(size(T))
+            size(T, 1)
+        end
+        M_  = Matrix{eltype(T)}(undef, 2 * nq * σ, ns * σ)
+        W_  = Matrix{eltype(T)}(undef, 2 * nq * σ, σ)
+        W   = Matrix{T}(undef, 2 * nq, 1)
+        Θi_ = Matrix{eltype(T)}(undef, σ, ns * σ)
+        # for each element, we will solve Mᵀ W = Θiᵀ, where W is a vector of
+        # size 2nq, and Θi is a row vector of length(ns)
+        for n in 1:ne
             # if there is nothing near, skip immediately to next element
             isempty(near_list[n]) && continue
-            # the weights for points in near_list[n] must be corrected when
-            # integrating over the current element
+            # copy the monopole/dipole weights for the current element
             jglob = @view qtags[:, n]
             M0 = @view γ₀B[jglob, :]
             M1 = @view γ₁B[jglob, :]
-            copy!(view(M, 1:nq, :), M0)
-            copy!(view(M, (nq+1):(2nq), :), M1)
-            F = qr!(transpose(M))
-            max_cond = max(cond(F.R), max_cond)
+            _copyto!(view(M_, 1:(nq*σ), :), M0)
+            _copyto!(view(M_, (nq*σ+1):2*nq*σ, :), M1)
+            F_ = qr!(transpose(M_))
+            @debug begin
+                max_cond = max(cond(M_), max_cond)
+            end
             for i in near_list[n]
-                Θi = @view Θ[i, :]
-                # if isdefined(Main, :Infiltrator)
-                #     Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-                # end
-                # W = (Θi / F.R) * adjoint(F.Q) # Θi * (Q*R)⁻¹ = Θi * R⁻¹ * Q⁻¹
-                W = ldiv!(W, F, Θi)
+                Θi  = @view Θ[i:i, :]
+                Θi_ = _copyto!(Θi_, Θi)
+                W_  = ldiv!(W_, F_, transpose(Θi_))
+                W   = _copyto!(W, W_)
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
                     push!(Ss, -W[nq+k]) # single layer corresponds to α=0,β=-1
-                    push!(Ds, W[k]) # double layer corresponds to α=1,β=0
+                    push!(Ds, W[k])       # double layer corresponds to α=1,β=0
                 end
             end
         end
