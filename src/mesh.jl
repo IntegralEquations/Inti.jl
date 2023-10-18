@@ -91,7 +91,7 @@ entities(msh::LagrangeMesh) = keys(msh.ent2tags)
 
 Set of all entities covered by the mesh.
 """
-domain(msh::LagrangeMesh)   = Domain(entities(msh))
+domain(msh::LagrangeMesh) = Domain(entities(msh))
 
 """
     dom2elt(m::LagrangeMesh,Ω,E)::Vector{Int}
@@ -231,9 +231,9 @@ elements of `LagrangeSquare` type, the triangulation is done by splitting the
 element in two triangles. For elements of `LagrangeTetrahedron` type, the four
 faces are returned. This method will error if the element type is not supported.
 """
-triangle_connectivity(msh::SubMesh)      = _triangle_connectivity(msh.parent, msh.domain)
+triangle_connectivity(msh::SubMesh) = _triangle_connectivity(msh.parent, msh.domain)
 triangle_connectivity(msh::LagrangeMesh) = _triangle_connectivity(msh, domain(msh))
-function _triangle_connectivity(msh::Inti.LagrangeMesh{N,T},Ω::Inti.Domain) where {N,T}
+function _triangle_connectivity(msh::Inti.LagrangeMesh{N,T}, Ω::Inti.Domain) where {N,T}
     connec = Int[]
     for E in Inti.element_types(msh)
         el_idxs = Inti.dom2elt(msh, Ω, E)::Vector{Int}
@@ -242,39 +242,39 @@ function _triangle_connectivity(msh::Inti.LagrangeMesh{N,T},Ω::Inti.Domain) whe
         if E <: Inti.LagrangeTriangle
             # extract the first three tags
             for n in el_idxs
-                push!(connec,tags[1,n])
-                push!(connec,tags[2,n])
-                push!(connec,tags[3,n])
+                push!(connec, tags[1, n])
+                push!(connec, tags[2, n])
+                push!(connec, tags[3, n])
             end
         elseif E <: Inti.LagrangeSquare
             for n in el_idxs
                 # lower triangle
-                push!(connec,tags[1,n])
-                push!(connec,tags[2,n])
-                push!(connec,tags[3,n])
+                push!(connec, tags[1, n])
+                push!(connec, tags[2, n])
+                push!(connec, tags[3, n])
                 # upper triangle
-                push!(connec,tags[3,n])
-                push!(connec,tags[4,n])
-                push!(connec,tags[1,n])
+                push!(connec, tags[3, n])
+                push!(connec, tags[4, n])
+                push!(connec, tags[1, n])
             end
         elseif E <: Inti.LagrangeTetrahedron
             for n in el_idxs
                 # four faces
-                push!(connec,tags[1,n])
-                push!(connec,tags[2,n])
-                push!(connec,tags[3,n])
+                push!(connec, tags[1, n])
+                push!(connec, tags[2, n])
+                push!(connec, tags[3, n])
                 #
-                push!(connec,tags[1,n])
-                push!(connec,tags[2,n])
-                push!(connec,tags[4,n])
+                push!(connec, tags[1, n])
+                push!(connec, tags[2, n])
+                push!(connec, tags[4, n])
                 #
-                push!(connec,tags[1,n])
-                push!(connec,tags[3,n])
-                push!(connec,tags[4,n])
+                push!(connec, tags[1, n])
+                push!(connec, tags[3, n])
+                push!(connec, tags[4, n])
                 #
-                push!(connec,tags[2,n])
-                push!(connec,tags[3,n])
-                push!(connec,tags[4,n])
+                push!(connec, tags[2, n])
+                push!(connec, tags[3, n])
+                push!(connec, tags[4, n])
             end
         else
             error("element type $E not supported")

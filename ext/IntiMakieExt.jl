@@ -35,7 +35,7 @@ end
 
 function Makie.convert_arguments(P::Type{<:Makie.Poly}, msh::Inti.AbstractMesh)
     connec = Inti.triangle_connectivity(msh)
-    return Makie.convert_arguments(P,Inti.nodes(msh), connec)
+    return Makie.convert_arguments(P, Inti.nodes(msh), connec)
 end
 
 end # module
