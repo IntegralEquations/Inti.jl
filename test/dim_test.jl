@@ -16,7 +16,7 @@ for N in (2, 3)
     if N == 2
         Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = 0.1)
     else
-        Ω, msh = gmsh_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = 0.4)
+        Ω, msh = gmsh_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = 0.2)
     end
     Γ    = Inti.external_boundary(Ω)
     quad = Inti.Quadrature(view(msh, Γ); qorder = 3)
