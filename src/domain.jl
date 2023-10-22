@@ -75,6 +75,15 @@ function external_boundary(Ω::Domain)
     return setdiff(skeleton(Ω), internal_boundary(Ω))
 end
 
+"""
+    boundary(Ω::Domain)
+
+Return the external boundaries of a domain.
+
+See also: [`external_boundary`](@ref), [`internal_boundary`](@ref), [`skeleton`](@ref).
+"""
+boundary(Ω::Domain) = external_boundary(Ω)
+
 function Base.setdiff(Ω1::Domain, Ω2::Domain)
     return Domain(setdiff(entities(Ω1), entities(Ω2)))
 end

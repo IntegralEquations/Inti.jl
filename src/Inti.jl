@@ -10,6 +10,11 @@ using LinearMaps
 using SpecialFunctions
 using Printf
 
+# PolynomialSolutions module. TODO: decide if we register this module as a
+# package (in which case we may want to rename it), or just keep it here as a
+# submodule.
+include("PolynomialSolutions.jl")
+
 # helper functions
 include("utils.jl")
 

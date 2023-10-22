@@ -157,14 +157,17 @@ end
 function _convert_to_2d(::Type{LagrangeElement{R,N,SVector{3,T}}}) where {R,N,T}
     return LagrangeElement{R,N,SVector{2,T}}
 end
+_convert_to_2d(::Type{SVector{3,T}}) where {T} = SVector{2,T}
 
 """
     struct SubMesh{N,T} <: AbstractMesh{N,T}
 
-Create a view of a `parent` `LagrangeMesh` over a given `domain`.
+View into a `parent` mesh over a given `domain`.
 
 A submesh implements the interface for `AbstractMesh`; therefore you can iterate
 over elements of the submesh just like you would with a mesh.
+
+Construct `SubMesh`s using `view(parent,Ω::Domain)`.
 """
 struct SubMesh{N,T} <: AbstractMesh{N,T}
     parent::LagrangeMesh{N,T}
