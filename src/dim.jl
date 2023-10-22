@@ -162,46 +162,178 @@ function bdim_correction(
 end
 
 """
-    etype_to_nearest_points(X,Y::Quadrature; tol)
-
-For each element `el` in `Y.mesh`, return a list with the indices of all points
-in `X` for which `el` is the nearest element. Ignore indices for which the
-distance exceeds `tol`.
+    vdim_correction(pde,X,Y,Γ,S,D,V[;order])
 """
-function etype_to_nearest_points(X, Y::Quadrature; tol = Inf)
-    if X === Y
-        # when both surfaces are the same, the "near points" of an element are
-        # simply its own quadrature points
-        dict = Dict{DataType,Vector{Vector{Int}}}()
-        for (E, idx_dofs) in Y.etype2qtags
-            dict[E] = map(i -> collect(i), eachcol(idx_dofs))
-        end
-    else
-        dict = _etype_to_nearest_points(collect(qcoords(X)), Y, tol)
-    end
-    return dict
-end
-
-function _etype_to_nearest_points(X, Y::Quadrature, tol = Inf)
-    y = [coords(q) for q in Y]
-    kdtree = KDTree(y)
-    dict = Dict(j => Int[] for j in 1:length(y))
-    for i in eachindex(X)
-        qtag, d = nn(kdtree, X[i])
-        d > tol || push!(dict[qtag], i)
-    end
-    # dict[j] now contains indices in X for which the j quadrature node in Y is
-    # the closest. Next we reverse the map
-    etype2nearlist = Dict{DataType,Vector{Vector{Int}}}()
-    for (E, tags) in Y.etype2qtags
-        nq, ne = size(tags)
-        etype2nearlist[E] = nearlist = [Int[] for _ in 1:ne]
-        for j in 1:ne # loop over each element of type E
-            for q in 1:nq # loop over qnodes in the element
-                qtag = tags[q, j]
-                append!(nearlist[j], dict[qtag])
+function vdim_correction(pde, X, Y, Γ, S, D, V; order)
+    @assert X === Y
+    N = ambient_dimension(pde)
+    σ = -1
+    @assert ambient_dimension(Y) == N "vdim only works for volume potentials"
+    # basis = _basis_vdim(pde, order)
+    p, P, γ₁P = polynomial_solutions_vdim(pde, order)
+    B, R = _vdim_auxiliary_quantities(p, P, γ₁P, X, Y, Γ, σ, S, D, V)
+    # compute sparse correction
+    Is = Int[]
+    Js = Int[]
+    Vs = Float64[]
+    nbasis = length(p)
+    max_cond = -Inf
+    for (E, qtags) in Y.etype2qtags
+        nq, nel = size(qtags)
+        @debug "nq,nbasis = $nq,$nbasis"
+        for n in 1:nel
+            # indices of nodes in element `n`
+            j_idxs = qtags[:, n]
+            i_idxs = j_idxs # FIXME: assumes that X === Y
+            L = B[j_idxs, :] # vandermond matrix
+            max_cond = max(max_cond, cond(L))
+            for i in i_idxs
+                wei = R[i:i, :] / L
+                append!(Js, j_idxs)
+                append!(Is, fill(i, length(j_idxs)))
+                append!(Vs, wei)
             end
         end
     end
-    return etype2nearlist
+    @debug "maximum condition encountered: $max_cond"
+    δV = sparse(Is, Js, Vs)
+    return δV
+end
+
+function _vdim_auxiliary_quantities(
+    p,
+    P,
+    γ₁P,
+    X,
+    Y::Quadrature,
+    Γ::Quadrature,
+    σ,
+    Sop,
+    Dop,
+    Vop,
+)
+    num_basis = length(p)
+    num_targets = length(X)
+    b = [f(q) for q in Y, f in p]
+    γ₀B = [f(q) for q in Γ, f in P]
+    γ₁B = [f(q) for q in Γ, f in γ₁P]
+    Θ = zeros(eltype(Vop), num_targets, num_basis)
+    # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) usig in-place matvec
+    for n in 1:num_basis
+        @views mul!(Θ[:, n], Sop, γ₁B[:, n])
+        @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
+        @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
+        for i in 1:num_targets
+            Θ[i, n] += σ * P[n](X[i])
+        end
+    end
+    return b, Θ
+end
+
+"""
+    polynomial_solutions_vdim(pde, order)
+
+For every monomial term `pₙ` of degree `order`, compute a polynomial `Pₙ` such
+that `ℒ[Pₙ] = pₙ`, where `ℒ` is the differential operator associated with `pde`.
+This function returns `{pₙ,Pₙ,γ₁Pₙ}`, where `γ₁Pₙ` is the generalized Neumann
+trace of `Pₙ`.
+"""
+function polynomial_solutions_vdim(pde::AbstractPDE, order::Integer)
+    N = ambient_dimension(pde)
+    # create empty arrays to store the monomials, solutions, and traces. For the
+    # neumann trace, we try to infer the concrete return type instead of simply
+    # having a vector of `Function`.
+    monomials = Vector{PolynomialSolutions.Polynomial{N,Float64}}()
+    solutions = Vector{PolynomialSolutions.Polynomial{N,Float64}}()
+    T = return_type(neumann_trace, typeof(pde), eltype(solutions))
+    neumann_traces = Vector{T}()
+    # iterate over N-tuples going from 0 to order
+    for I in Iterators.product(ntuple(i -> 0:order, N)...)
+        sum(I) > order && continue
+        # define the monomial basis functions, and the corresponding solutions.
+        # TODO: adapt this to vectorial case
+        p   = PolynomialSolutions.Polynomial(I => 1.0)
+        P   = polynomial_solution(pde, p)
+        γ₁P = neumann_trace(pde, P)
+        push!(monomials, p)
+        push!(solutions, P)
+        push!(neumann_traces, γ₁P)
+    end
+    return monomials, solutions, neumann_traces
+end
+
+# Laplace particular solutions
+function polynomial_solution(::Laplace, p::PolynomialSolutions.Polynomial)
+    P = PolynomialSolutions.solve_laplace(p)
+    return PolynomialSolutions.convert_coefs(P, Float64)
+end
+
+function neumann_trace(::Laplace, P::PolynomialSolutions.Polynomial{N,T}) where {N,T}
+    ∇P = PolynomialSolutions.gradient(P)
+    return (q) -> dot(normal(q), ∇P(q))
+end
+
+function (∇P::NTuple{N,<:PolynomialSolutions.Polynomial})(x) where {N}
+    return ntuple(n -> ∇P[n](x), N)
+end
+
+function _basis_vdim(::Laplace{3}, order)
+    Q = Polynomial((1, 0) => 1.0)
+    P = solve_laplace(Q)
+    # define the monomial basis functions, and the corresponding solutions
+    # P0
+    r_000 = (dof) -> 1.0
+    p_000 = (dof) -> begin
+        x = coords(dof)
+        1 / 6 * (x[1]^2 + x[2]^2 + x[3]^2)
+    end
+    dp_000 = (dof) -> begin
+        x = coords(dof)
+        n = normal(dof)
+        1 / 3 * dot(x, n)
+    end
+    R, P, dP = (r_000,), (p_000,), (dp_000,)
+    order == 0 && return R, P, dP
+    # P1
+    r_100 = (dof) -> coords(dof)[1]
+    p_100 = (dof) -> begin
+        x = coords(dof)
+        1 / 6 * x[1]^3
+    end
+    dp_100 = (dof) -> begin
+        x = coords(dof)
+        n = normal(dof)
+        1 / 2 * x[1]^2 * n[1]
+    end
+    r_010 = (dof) -> coords(dof)[2]
+    p_010 = (dof) -> begin
+        x = coords(dof)
+        1 / 6 * x[2]^3
+    end
+    dp_010 = (dof) -> begin
+        x = coords(dof)
+        n = normal(dof)
+        1 / 2 * x[2]^2 * n[2]
+    end
+    r_001 = (dof) -> coords(dof)[3]
+    p_001 = (dof) -> begin
+        x = coords(dof)
+        1 / 6 * x[3]^3
+    end
+    dp_001 = (dof) -> begin
+        x = coords(dof)
+        n = normal(dof)
+        1 / 2 * x[3]^2 * n[3]
+    end
+    R, P, dP = (R..., r_100, r_010, r_001),
+    (P..., p_100, p_010, p_001),
+    (dP..., dp_100, dp_010, dp_001)
+    order == 1 && return R, P, dP
+    return notimplemented()
+    # P2
+end
+
+function (P::PolynomialSolutions.Polynomial)(q::QuadratureNode)
+    x = q.coords
+    return P(x)
 end
