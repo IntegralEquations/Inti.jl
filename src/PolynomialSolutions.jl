@@ -1,5 +1,15 @@
 module PolynomialSolutions
 
+# NTuples with at least one element. Used to avoid unbound type parameter issues
+# with `Aqua.jl` (see
+# https://discourse.julialang.org/t/is-this-test-detect-unbound-args-result-valid-or-a-bug/96987)
+"""
+    const Np1Tuple{N,T}
+
+Tuple containing `N+1` elements of type `T`.
+"""
+const Np1Tuple{N,T} = Tuple{T,Vararg{T,N}}
+
 """
     struct Polynomial{N,T}
 
@@ -42,7 +52,7 @@ end
 Polynomial{N,T}() where {N,T} = Polynomial{N,T}(Dict{NTuple{N,Int},T}())
 
 # construct a polynomial from a tuple of pairs
-Polynomial(t::NTuple{<:Any,Pair{NTuple{N,Int},T}}) where {N,T} = Polynomial{N,T}(Dict(t))
+Polynomial(t::Np1Tuple{<:Any,Pair{NTuple{N,Int},T}}) where {N,T} = Polynomial{N+1,T}(Dict(t))
 
 # construct a polynomial from a vector of pairs
 Polynomial(v::Vector{Pair{NTuple{N,Int},T}}) where {N,T} = Polynomial{N,T}(Dict(v))
@@ -225,15 +235,16 @@ function laplacian(p::Polynomial{N,T}) where {N,T}
     return Polynomial{N,T}(order2coeff)
 end
 
-function divergence(P::NTuple{N,Polynomial{N,T}}) where {N,T}
+function divergence(P::Np1Tuple{N,Polynomial{N,T}}) where {N,T}
     return sum(derivative(P[i], i) for i in 1:N)
 end
 
-function curl(P::NTuple{N,Polynomial{N,T}}) where {N,T}
+function curl(P::Np1Tuple{N,Polynomial{N,T}}) where {N,T}
+    Np1 = N + 1
     ∇P = gradient.(P)
-    if N == 2
+    if Np1 == 2
         curlP = (Polynomial{N,T}(), Polynomial{N,T}(), ∇P[2][1] - ∇P[1][2])
-    elseif N == 3
+    elseif Np1 == 3
         curlP = (∇P[3][2] - ∇P[2][3], ∇P[1][3] - ∇P[3][1], ∇P[2][1] - ∇P[1][2])
     else
         print("Curl not implemented for N = $N")
@@ -492,7 +503,7 @@ julia> P = solve_stokes(Q;μ=Rational(1))
 ((-1//8xy + 1//16xy² + 1//48x³, 3//16x² + 1//16y² - 1//48y³ - 1//16x²y), -1//2y - 3//8x² - 1//8y²)
 ```
 """
-function solve_stokes(Q::NTuple{N,Polynomial{N,T}}; μ=1 // 1) where {N,T}
+function solve_stokes(Q::Np1Tuple{N,Polynomial{N,T}}; μ=1 // 1) where {N,T}
     # u = Δg - ∇ (∇ ⋅ g), p = -μ Δ (∇ ⋅ g), where g solves μΔΔg = Q
     g = 1 / μ .* map(q -> solve_bilaplace(q), Q)
     h = -divergence(g)
@@ -517,7 +528,7 @@ julia> P = solve_elastodynamics(Q;μ=1)
 (-6//1y + x²y, -3//1x)
 ```
 """
-function solve_elastodynamics(Q::NTuple{N,Polynomial{N,T}}; ρ=1 // 1, μ=1 // 1, ν=1 // 4,
+function solve_elastodynamics(Q::Np1Tuple{N,Polynomial{N,T}}; ρ=1 // 1, μ=1 // 1, ν=1 // 4,
                               ω=1 // 1) where {N,T}
     k₁² = ω^2 / (2 * μ * (1 - ν) / (ρ * (1 - 2ν)))
     k₂² = ω^2 * ρ / μ
@@ -525,6 +536,7 @@ function solve_elastodynamics(Q::NTuple{N,Polynomial{N,T}}; ρ=1 // 1, μ=1 // 1
     u = -2 * (1 - ν) .* (laplacian.(g) .+ k₁² .* g) .+ gradient(divergence(g))
     return u
 end
+solve_elastodynamics(;kwargs...) = error()
 
 """
     solve_elastostatic(Q::NTuple{N,Polynomial{N,T}};μ=1,ν=1)
@@ -541,7 +553,7 @@ julia> P = solve_elastostatic(Q;ν=1//2)
 (-1//8xy + 1//480x⁵ + 1//32x³y² + 1//24xy⁴, 3//16x² + 1//16y² - 1//120y⁵ - 1//96x⁴y - 1//32x²y³)
 ```
 """
-function solve_elastostatic(Q::NTuple{N,Polynomial{N,T}}; μ=1, ν=0) where {N,T}
+function solve_elastostatic(Q::Np1Tuple{N,Polynomial{N,T}}; μ=1, ν=0) where {N,T}
     g = 1 / (2 * μ * (1 - ν)) .* map(q -> solve_bilaplace(q), Q)
     u = 2(1 - ν) .* laplacian.(g) .- gradient(divergence(g))
     return u
