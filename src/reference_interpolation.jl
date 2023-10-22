@@ -206,6 +206,80 @@ function jacobian(el::LagrangeTriangle{6}, u)
     )
 end
 
+# P3 for ReferenceTriangle
+# source: https://www.math.uci.edu/~chenlong/iFEM/doc/html/dofP3doc.html
+function reference_nodes(::LagrangeTriangle{10})
+    return SVector(
+        SVector(0.0,0.0),
+        SVector(1.0,0.0),
+        SVector(0.0,1.0),
+        SVector(1/3,0.0),
+        SVector(2/3,0.0),
+        SVector(2/3,1/3),
+        SVector(1/3,2/3),
+        SVector(0.0,2/3),
+        SVector(0.0,1/3),
+        SVector(1/3,1/3)
+    )
+end
+
+function (el::LagrangeTriangle{10})(u)
+    λ₁ = 1 - u[1] - u[2]
+    λ₂ = u[1]
+    λ₃ = u[2]
+    ϕ₁ = 0.5 * (3λ₁ - 1) * (3λ₁ - 2) * λ₁
+    ϕ₂ = 0.5 * (3λ₂ - 1) * (3λ₂ - 2) * λ₂
+    ϕ₃ = 0.5 * (3λ₃ - 1) * (3λ₃ - 2) * λ₃
+    ϕ₄ = 4.5 * λ₁ * λ₂ * (3λ₁ - 1)
+    ϕ₅ = 4.5 * λ₁ * λ₂ * (3λ₂ - 1)
+    ϕ₆ = 4.5 * λ₃ * λ₂ * (3λ₂ - 1)
+    ϕ₇ = 4.5 * λ₃ * λ₂ * (3λ₃ - 1)
+    ϕ₈ = 4.5 * λ₁ * λ₃ * (3λ₃ - 1)
+    ϕ₉ = 4.5 * λ₁ * λ₃ * (3λ₁ - 1)
+    ϕ₁₀ = 27 * λ₁ * λ₂ * λ₃
+    v = vals(el)
+    return v[1] * ϕ₁ +
+           v[2] * ϕ₂ +
+           v[3] * ϕ₃ +
+           v[4] * ϕ₄ +
+           v[5] * ϕ₅ +
+           v[6] * ϕ₆ +
+           v[7] * ϕ₇ +
+           v[8] * ϕ₈ +
+           v[9] * ϕ₉ +
+           v[10] * ϕ₁₀
+end
+
+function jacobian(el::LagrangeTriangle{10,T}, u) where {T}
+    λ₁ = 1 - u[1] - u[2]
+    λ₂ = u[1]
+    λ₃ = u[2]
+    ∇λ₁ = SMatrix{1,2,eltype(T),2}(-1.0, -1.0)
+    ∇λ₂ = SMatrix{1,2,eltype(T),2}(1.0, 0.0)
+    ∇λ₃ = SMatrix{1,2,eltype(T),2}(0.0, 1.0)
+    ∇ϕ₁ = (13.5 * λ₁ * λ₁ - 9λ₁ + 1) * ∇λ₁
+    ∇ϕ₂ = (13.5 * λ₂ * λ₂ - 9λ₂ + 1) * ∇λ₂
+    ∇ϕ₃ = (13.5 * λ₃ * λ₃ - 9λ₃ + 1) * ∇λ₃
+    ∇ϕ₄ = 4.5 * ((3 * λ₁ * λ₁ - λ₁) * ∇λ₂ + λ₂ * (6λ₁ - 1) * ∇λ₁)
+    ∇ϕ₅ = 4.5 * ((3 * λ₂ * λ₂ - λ₂) * ∇λ₁ + λ₁ * (6λ₂ - 1) * ∇λ₂)
+    ∇ϕ₆ = 4.5 * ((3 * λ₂ * λ₂ - λ₂) * ∇λ₃ + λ₃ * (6λ₂ - 1) * ∇λ₂)
+    ∇ϕ₇ = 4.5 * ((3 * λ₃ * λ₃ - λ₃) * ∇λ₂ + λ₂ * (6λ₃ - 1) * ∇λ₃)
+    ∇ϕ₈ = 4.5 * ((3 * λ₃ * λ₃ - λ₃) * ∇λ₁ + λ₁ * (6λ₃ - 1) * ∇λ₃)
+    ∇ϕ₉ = 4.5 * ((3 * λ₁ * λ₁ - λ₁) * ∇λ₃ + λ₃ * (6λ₁ - 1) * ∇λ₁)
+    ∇ϕ₁₀ = 27 * (λ₁ * λ₂ * ∇λ₃ + λ₁ * λ₃ * ∇λ₂ + λ₃ * λ₂ * ∇λ₁)
+    v = vals(el)
+    return v[1] * ∇ϕ₁ +
+           v[2] * ∇ϕ₂ +
+           v[3] * ∇ϕ₃ +
+           v[4] * ∇ϕ₄ +
+           v[5] * ∇ϕ₅ +
+           v[6] * ∇ϕ₆ +
+           v[7] * ∇ϕ₇ +
+           v[8] * ∇ϕ₈ +
+           v[9] * ∇ϕ₉ +
+           v[10] * ∇ϕ₁₀
+end
+
 # P1 for ReferenceSquare
 function reference_nodes(::Type{LagrangeSquare{4}})
     return SVector(SVector(0, 0), SVector(1, 0), SVector(1, 1), SVector(0, 1))
