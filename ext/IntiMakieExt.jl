@@ -38,4 +38,19 @@ function Makie.convert_arguments(P::Type{<:Makie.Poly}, msh::Inti.AbstractMesh)
     return Makie.convert_arguments(P, Inti.nodes(msh), connec)
 end
 
+function Makie.convert_arguments(P::Type{<:Makie.Arrows},msh::Inti.AbstractMesh{N,T}) where {N,T}
+    coords  = Makie.Point{N,T}[]
+    normals = Makie.Point{N,T}[]
+    for E in Inti.element_types(msh)
+        dom = Inti.domain(E)
+        x̂  = Inti.center(dom)
+        for el in Inti.elements(msh,E)
+            push!(coords, el(x̂))
+            jac = Inti.jacobian(el,x̂)
+            push!(normals, Inti._normal(jac))
+        end
+    end
+    Makie.convert_arguments(P,coords,normals)
+end
+
 end # module
