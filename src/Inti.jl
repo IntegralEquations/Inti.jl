@@ -11,7 +11,6 @@ using Printf
 
 # helper functions
 include("utils.jl")
-include("blockmatrix.jl")
 
 # basic interpolation and integration
 include("reference_shapes.jl")

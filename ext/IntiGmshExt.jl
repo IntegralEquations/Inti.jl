@@ -81,8 +81,8 @@ function _fill_entity_boundary!(ent, model)
     oriented = false
     dim_tags = gmsh.model.getBoundary((Inti.geometric_dimension(ent), gmshtag(ent)), combine, oriented)
     for (d, t) in dim_tags
-        if haskey(Inti.ENTITIES,(d,t))
-            bnd = Inti.ENTITIES[(d,t)]
+        if haskey(Inti.ENTITIES, (d, t))
+            bnd = Inti.ENTITIES[(d, t)]
         else
             bnd = GmshEntity(d, t, model)
             _fill_entity_boundary!(bnd, model)

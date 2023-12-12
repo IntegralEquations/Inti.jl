@@ -65,8 +65,8 @@ function bdim_correction(
     γ₁G = AdjointDoubleLayerKernel(pde, T)
     γ₀B = Matrix{T}(undef, length(source), ns)
     γ₁B = Matrix{T}(undef, length(source), ns)
-    μ_ = _green_multiplier(target[1], source)
-    μ  = argmin(x->norm(μ_-x), (-1,-0.5,0,0.5,1))
+    μ_  = _green_multiplier(target[1], source)
+    μ   = argmin(x -> norm(μ_ - x), (-1, -0.5, 0, 0.5, 1))
     for k in 1:ns
         for j in 1:length(source)
             γ₀B[j, k] = G(source[j], xs[k])

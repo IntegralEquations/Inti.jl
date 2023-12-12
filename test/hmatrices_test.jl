@@ -19,8 +19,8 @@ include("test_utils.jl")
         @testset "PDE = $pde" begin
             for K in (Inti.SingleLayerKernel(pde), Inti.DoubleLayerKernel(pde))
                 iop = Inti.IntegralOperator(K, Γ_quad)
-                H   = HMatrices.assemble_hmatrix(iop; atol = 1e-8)
-                x   = rand(eltype(iop), size(iop, 2))
+                H = HMatrices.assemble_hmatrix(iop; atol = 1e-8)
+                x = rand(eltype(iop), size(iop, 2))
                 yapprox = H * x
                 # test on a given index set
                 idx_test = rand(1:size(iop, 1), 10)

@@ -68,48 +68,14 @@ function Base.getindex(iop::IntegralOperator, i::Integer, j::Integer)
 end
 
 """
-    assemble_dense_matrix(iop::IntegralOperator; threads = true)
-
-Create a dense matrix representation of an `IntegralOperator`. Depending on the
-element type of `iop`, this function will return a `Matrix` or a [`BlockMatrix`](@ref).
-
-See also: [`assemble_matrix`](@ref), [`assemble_block_matrix`](@ref)
-"""
-function assemble_dense_matrix(iop::IntegralOperator{<:SMatrix}; kwargs...)
-    return assemble_block_matrix(iop; kwargs...)
-end
-assemble_dense_matrix(iop::IntegralOperator; kwargs...) = assemble_matrix(iop; kwargs...)
-
-"""
     assemble_matrix(iop::IntegralOperator; threads = true)
 
 Assemble the dense matrix representation of an `IntegralOperator`.
 """
 function assemble_matrix(iop::IntegralOperator; threads = true)
-    T = eltype(iop)
+    T    = eltype(iop)
     m, n = size(iop)
     out  = Matrix{T}(undef, m, n)
-    K    = kernel(iop)
-    # function barrier
-    _assemble_matrix!(out, K, iop.target, iop.source, threads)
-    return out
-end
-
-"""
-    assemble_block_matrix(iop::IntegralOperator; threads = true)
-
-Create a [`BlockMatrix`](@ref) representation of an `IntegralOperator`.
-
-This function is useful when the kernel of the integral operator returns an
-`SMatrix`, as it creates a BLAS-compatible representation of the
-underlying dense matrix.
-"""
-function assemble_block_matrix(iop::IntegralOperator; threads = true)
-    T = eltype(iop)
-    @assert T <: SMatrix """block matrix assembly only supported for integral
-    operators with entries of `SMatrix` type (got $(T))"""
-    m, n = size(iop)
-    out  = BlockMatrix(T, undef, m, n)
     K    = kernel(iop)
     # function barrier
     _assemble_matrix!(out, K, iop.target, iop.source, threads)
