@@ -35,7 +35,6 @@ function bdim_correction(
     source::Quadrature,
     Sop,
     Dop;
-    target_location = :onsurface,
     parameters = DimParameters(),
     derivative = false,
     tol = Inf,
@@ -45,19 +44,6 @@ function bdim_correction(
     N = ambient_dimension(source)
     @assert eltype(Dop) == T "eltype of S and D must match"
     m, n = length(target), length(source)
-    msg = "unrecognized value for kw `location`: received $target_location.
-    Valid options are `:onsurface`, `:inside`, `:outside`, or the numeric value of the multiplier"
-    μ::Float64 = if target_location === :onsurface
-        -0.5
-    elseif target_location === :inside
-        -1.0
-    elseif target_location === :outside
-        0.0
-    elseif target_location isa Number
-        target_location
-    else
-        error(msg)
-    end
     dict_near = etype_to_nearest_points(target, source; tol)
     # find first an appropriate set of source points to center the monopoles
     qmax = sum(size(mat, 1) for mat in values(source.etype2qtags)) # max number of qnodes per el
@@ -79,6 +65,8 @@ function bdim_correction(
     γ₁G = AdjointDoubleLayerKernel(pde, T)
     γ₀B = Matrix{T}(undef, length(source), ns)
     γ₁B = Matrix{T}(undef, length(source), ns)
+    μ_ = _green_multiplier(target[1], source)
+    μ  = argmin(x->norm(μ_-x), (-1,-0.5,0,0.5,1))
     for k in 1:ns
         for j in 1:length(source)
             γ₀B[j, k] = G(source[j], xs[k])
@@ -243,8 +231,8 @@ function polynomial_solutions_vdim(pde::AbstractPDE, order::Integer)
     # create empty arrays to store the monomials, solutions, and traces. For the
     # neumann trace, we try to infer the concrete return type instead of simply
     # having a vector of `Function`.
-    monomials = Vector{PolynomialSolutions.Polynomial{N,Float64}}()
-    solutions = Vector{PolynomialSolutions.Polynomial{N,Float64}}()
+    monomials = Vector{ElementaryPDESolutions.Polynomial{N,Float64}}()
+    solutions = Vector{ElementaryPDESolutions.Polynomial{N,Float64}}()
     T = return_type(neumann_trace, typeof(pde), eltype(solutions))
     neumann_traces = Vector{T}()
     # iterate over N-tuples going from 0 to order
@@ -252,7 +240,7 @@ function polynomial_solutions_vdim(pde::AbstractPDE, order::Integer)
         sum(I) > order && continue
         # define the monomial basis functions, and the corresponding solutions.
         # TODO: adapt this to vectorial case
-        p   = PolynomialSolutions.Polynomial(I => 1.0)
+        p   = ElementaryPDESolutions.Polynomial(I => 1.0)
         P   = polynomial_solution(pde, p)
         γ₁P = neumann_trace(pde, P)
         push!(monomials, p)
@@ -263,17 +251,17 @@ function polynomial_solutions_vdim(pde::AbstractPDE, order::Integer)
 end
 
 # Laplace particular solutions
-function polynomial_solution(::Laplace, p::PolynomialSolutions.Polynomial)
-    P = PolynomialSolutions.solve_laplace(p)
-    return PolynomialSolutions.convert_coefs(P, Float64)
+function polynomial_solution(::Laplace, p::ElementaryPDESolutions.Polynomial)
+    P = ElementaryPDESolutions.solve_laplace(p)
+    return ElementaryPDESolutions.convert_coefs(P, Float64)
 end
 
-function neumann_trace(::Laplace, P::PolynomialSolutions.Polynomial{N,T}) where {N,T}
-    ∇P = PolynomialSolutions.gradient(P)
+function neumann_trace(::Laplace, P::ElementaryPDESolutions.Polynomial{N,T}) where {N,T}
+    ∇P = ElementaryPDESolutions.gradient(P)
     return (q) -> dot(normal(q), ∇P(q))
 end
 
-function (∇P::NTuple{N,<:PolynomialSolutions.Polynomial})(x) where {N}
+function (∇P::NTuple{N,<:ElementaryPDESolutions.Polynomial})(x) where {N}
     return ntuple(n -> ∇P[n](x), N)
 end
 
@@ -333,7 +321,7 @@ function _basis_vdim(::Laplace{3}, order)
     # P2
 end
 
-function (P::PolynomialSolutions.Polynomial)(q::QuadratureNode)
+function (P::ElementaryPDESolutions.Polynomial)(q::QuadratureNode)
     x = q.coords
     return P(x)
 end

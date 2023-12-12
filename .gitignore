@@ -2,8 +2,6 @@
 *.jl.cov
 *.jl.mem
 /Manifest.toml
-/docs/Manifest.toml
 /docs/build/
-/test/Manifest.toml
 .vscode
 /docs/src/generated/*.md

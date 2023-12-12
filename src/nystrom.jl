@@ -1,40 +1,4 @@
 """
-    struct NystromDensity{N,T,V} <: AbstractVector{V}
-
-Values of type `V` on a `Quadrature` in `N` dimensions.
-"""
-struct NystromDensity{N,T,V} <: AbstractVector{V}
-    values::Vector{V}
-    quadrature::Quadrature{N,T}
-end
-
-Base.size(σ::NystromDensity) = size(σ.values)
-Base.getindex(σ::NystromDensity, args...) = getindex(σ.values, args...)
-Base.setindex!(σ::NystromDensity, args...) = setindex!(σ.values, args...)
-
-"""
-    NystromDensity(f::Function, Q::Quadrature)
-
-Return a `NystromDensity` with values `f(q)` at the quadrature nodes of `Q`.
-
-Note that the argument passsed to `f` is a [`QuadratureNode`](@ref), so that `f`
-may depend on quantities other than the [`coords`](@ref) of the quadrature node
-(such as the [`normal`](@ref) vector).
-
-See also: [`QuadratureNode`](@ref)
-"""
-function NystromDensity(f::Function, Q::Quadrature{N,T}) where {N,T}
-    vals = [f(dof) for dof in Q]
-    V = eltype(vals)
-    return NystromDensity{N,T,V}(vals, Q)
-end
-
-function NystromDensity(pde::AbstractPDE,Q::Quadrature)
-    T = default_density_eltype(pde)
-    NystromDensity(i->zero(T),Q)
-end
-
-"""
     struct IntegralPotential
 
 Represent a potential given by a `kernel` and a `quadrature` over which
@@ -71,26 +35,6 @@ end
 end
 
 """
-    single_layer_potential(pde::AbstractPDE, quad::Quadrature)
-
-Build an [`IntegralPotential`](@ref) corresponding to the single-layer potential
-over `quad` associated to a given PDE.
-"""
-function single_layer_potential(op::AbstractPDE, quad)
-    return IntegralPotential(SingleLayerKernel(op), quad)
-end
-
-"""
-    double_layer_potential(pde::AbstractPDE, quad::Quadrature)
-
-Build an [`IntegralPotential`](@ref) corresponding to the double-layer potential
-over `quad` associated to a given PDE.
-"""
-function double_layer_potential(op::AbstractPDE, quad)
-    return IntegralPotential(DoubleLayerKernel(op), quad)
-end
-
-"""
     struct IntegralOperator{T} <: AbstractMatrix{T}
 
 A discrete linear integral operator given by
@@ -103,7 +47,7 @@ struct IntegralOperator{T} <: AbstractMatrix{T}
     kernel::AbstractKernel
     # since the target can be as simple as a vector of points, leave it untyped
     target
-    # the source, on the other hand, has to be a quadrature
+    # the source, on the other hand, has to be a quadrature for our Nystrom method
     source::Quadrature
 end
 
@@ -123,15 +67,57 @@ function Base.getindex(iop::IntegralOperator, i::Integer, j::Integer)
     return k(iop.target[i], iop.source[j]) * weight(iop.source[j])
 end
 
-function Base.Matrix(iop::IntegralOperator{T}) where {T}
+"""
+    assemble_dense_matrix(iop::IntegralOperator; threads = true)
+
+Create a dense matrix representation of an `IntegralOperator`. Depending on the
+element type of `iop`, this function will return a `Matrix` or a [`BlockMatrix`](@ref).
+
+See also: [`assemble_matrix`](@ref), [`assemble_block_matrix`](@ref)
+"""
+function assemble_dense_matrix(iop::IntegralOperator{<:SMatrix}; kwargs...)
+    return assemble_block_matrix(iop; kwargs...)
+end
+assemble_dense_matrix(iop::IntegralOperator; kwargs...) = assemble_matrix(iop; kwargs...)
+
+"""
+    assemble_matrix(iop::IntegralOperator; threads = true)
+
+Assemble the dense matrix representation of an `IntegralOperator`.
+"""
+function assemble_matrix(iop::IntegralOperator; threads = true)
+    T = eltype(iop)
     m, n = size(iop)
-    K = kernel(iop)
-    out = Matrix{T}(undef, m, n)
-    _iop_to_matrix!(out, K, iop.target, iop.source)
+    out  = Matrix{T}(undef, m, n)
+    K    = kernel(iop)
+    # function barrier
+    _assemble_matrix!(out, K, iop.target, iop.source, threads)
     return out
 end
-@noinline function _iop_to_matrix!(out, K, X, Y::Quadrature)
-    Threads.@threads for j in 1:length(Y)
+
+"""
+    assemble_block_matrix(iop::IntegralOperator; threads = true)
+
+Create a [`BlockMatrix`](@ref) representation of an `IntegralOperator`.
+
+This function is useful when the kernel of the integral operator returns an
+`SMatrix`, as it creates a BLAS-compatible representation of the
+underlying dense matrix.
+"""
+function assemble_block_matrix(iop::IntegralOperator; threads = true)
+    T = eltype(iop)
+    @assert T <: SMatrix """block matrix assembly only supported for integral
+    operators with entries of `SMatrix` type (got $(T))"""
+    m, n = size(iop)
+    out  = BlockMatrix(T, undef, m, n)
+    K    = kernel(iop)
+    # function barrier
+    _assemble_matrix!(out, K, iop.target, iop.source, threads)
+    return out
+end
+
+@noinline function _assemble_matrix!(out, K, X, Y::Quadrature, threads)
+    @usethreads threads for j in 1:length(Y)
         for i in 1:length(X)
             out[i, j] = K(X[i], Y[j]) * weight(Y[j])
         end
@@ -139,31 +125,26 @@ end
     return out
 end
 
-# convenience constructors
-function single_layer_operator(op::AbstractPDE, X, Y = X)
-    return IntegralOperator(SingleLayerKernel(op), X, Y)
+# helper function to help determine the constant σ in the Green identity:
+# S[γ₁u](x) - D[γ₀u](x) + σ*u(x) = 0
+# This can be used as a predicate to determine whether a point is inside a
+# domain or not
+function _green_multiplier(x::SVector, Q::Quadrature{N}) where {N}
+    pde = Laplace(; dim = N)
+    K = DoubleLayerKernel(pde)
+    σ = sum(Q.qnodes) do q
+        return K(x, q) * weight(q)
+    end
+    return σ[1]
 end
-function double_layer_operator(op::AbstractPDE, X, Y = X)
-    return IntegralOperator(DoubleLayerKernel(op), X, Y)
-end
-
-function adjoint_double_layer_operator(op::AbstractPDE, X, Y = X)
-    return IntegralOperator(AdjointDoubleLayerKernel(op), X, Y)
-end
-function hypersingular_operator(op::AbstractPDE, X, Y = X)
-    return IntegralOperator(HyperSingularKernel(op), X, Y)
-end
+_green_multiplier(x::Tuple, Q::Quadrature) = _green_multiplier(SVector(x), Q)
+_green_multiplier(x::QuadratureNode, Q::Quadrature) = _green_multiplier(coords(x), Q)
 
 # Applying Laplace's double-layer to a constant will yield either 1 or -1,
 # depending on whether the target point is inside or outside the obstacle.
 # Assumes `quad` is the quadrature of a closed curve/surface
 function isinside(x::SVector, quad::Quadrature, s = 1)
-    N = ambient_dimension(quad)
-    pde = Laplace(; dim = N)
-    K = DoubleLayerKernel(pde)
-    u = sum(quad.qnodes) do source
-        return K(x, source) * weight(source)
-    end
+    u = _green_multiplier(x, quad)
     return s * u + 0.5 < 0
     # u < 0
 end

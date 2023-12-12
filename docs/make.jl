@@ -21,7 +21,7 @@ end
 DocMeta.setdocmeta!(Inti, :DocTestSetup, :(using Inti); recursive = true)
 
 modules = [Inti]
-for extension in [:IntiGmshExt, :IntiMakieExt, :IntiVTKExt, :IntiHMatricesExt]
+for extension in [:IntiGmshExt, :IntiHMatricesExt]
     ext = Base.get_extension(Inti, extension)
     isnothing(ext) && "error loading $ext"
     push!(modules, ext)
@@ -41,8 +41,8 @@ makedocs(;
     ),
     pages = [
         "Home" => "index.md",
-        "Meshing" => "geo_and_meshes.md",
-        "Examples" => ["examples/generated/mock_example.md"],
+        # "Meshing" => "geo_and_meshes.md",
+        # "Examples" => ["examples/generated/mock_example.md"],
         "References" => "references.md",
     ],
     warnonly = on_CI ? false : Documenter.except(:linkcheck_remotes),
