@@ -99,12 +99,13 @@ function Quadrature(submesh::SubMesh{N,T}, etype2qrule::Dict) where {N,T}
     return quad
 end
 function Quadrature(msh::LagrangeMesh, Ω::Domain, args...; kwargs...)
-    return Quadrature(view(msh,Ω), args...; kwargs...)
+    return Quadrature(view(msh, Ω), args...; kwargs...)
 end
 
 function Quadrature(submsh::SubMesh; qorder)
-    etype2qrule =
-        Dict(E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(submsh))
+    etype2qrule = Dict(
+        E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(submsh)
+    )
     return Quadrature(submsh, etype2qrule)
 end
 

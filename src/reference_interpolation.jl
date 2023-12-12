@@ -210,16 +210,16 @@ end
 # source: https://www.math.uci.edu/~chenlong/iFEM/doc/html/dofP3doc.html
 function reference_nodes(::LagrangeTriangle{10})
     return SVector(
-        SVector(0.0,0.0),
-        SVector(1.0,0.0),
-        SVector(0.0,1.0),
-        SVector(1/3,0.0),
-        SVector(2/3,0.0),
-        SVector(2/3,1/3),
-        SVector(1/3,2/3),
-        SVector(0.0,2/3),
-        SVector(0.0,1/3),
-        SVector(1/3,1/3)
+        SVector(0.0, 0.0),
+        SVector(1.0, 0.0),
+        SVector(0.0, 1.0),
+        SVector(1 / 3, 0.0),
+        SVector(2 / 3, 0.0),
+        SVector(2 / 3, 1 / 3),
+        SVector(1 / 3, 2 / 3),
+        SVector(0.0, 2 / 3),
+        SVector(0.0, 1 / 3),
+        SVector(1 / 3, 1 / 3),
     )
 end
 

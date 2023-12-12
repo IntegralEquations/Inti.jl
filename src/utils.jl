@@ -202,5 +202,5 @@ macro usethreads(multithreaded, expr::Expr)
             $expr
         end
     end
-    esc(ex)
+    return esc(ex)
 end
