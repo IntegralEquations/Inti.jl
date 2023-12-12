@@ -61,9 +61,9 @@ for h in hh
     γ₁u_norm = norm(norm.(γ₁u, Inf), Inf)
     # single and double layer
     S = Inti.IntegralOperator(G, Q)
-    S0 = Inti.assemble_dense_matrix(S)
+    S0 = Inti.assemble_matrix(S)
     D = Inti.IntegralOperator(dG, Q)
-    D0 = Inti.assemble_dense_matrix(D)
+    D0 = Inti.assemble_matrix(D)
     e0 = norm(S0 * γ₁u - D0 * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
     δS, δD = Inti.bdim_correction(pde, Q, Q, S0, D0)
     Smat, Dmat = S0 + δS, D0 + δD

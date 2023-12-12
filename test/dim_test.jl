@@ -57,9 +57,9 @@ for N in (2, 3)
                 pde isa Inti.Stokes && continue # TODO: implement hypersingular for Stokes?
 
                 K = Inti.IntegralOperator(Inti.AdjointDoubleLayerKernel(pde), quad)
-                Kmat = Inti.assemble_dense_matrix(K)
+                Kmat = Inti.assemble_matrix(K)
                 H = Inti.IntegralOperator(Inti.HyperSingularKernel(pde), quad)
-                Hmat = Inti.assemble_dense_matrix(H)
+                Hmat = Inti.assemble_matrix(H)
                 e0 = norm(Kmat * γ₁u - Hmat * γ₀u - σ * γ₁u, Inf)
                 δK, δH =
                     Inti.bdim_correction(pde, quad, quad, Kmat, Hmat; derivative = true)
