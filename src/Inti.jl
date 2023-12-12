@@ -6,17 +6,14 @@ using LinearAlgebra
 using NearestNeighbors
 using SparseArrays
 using StaticArrays
-using LinearMaps
 using SpecialFunctions
 using Printf
 
-# PolynomialSolutions module. TODO: decide if we register this module as a
-# package (in which case we may want to rename it), or just keep it here as a
-# submodule.
-include("PolynomialSolutions.jl")
+import ElementaryPDESolutions
 
 # helper functions
 include("utils.jl")
+include("blockmatrix.jl")
 
 # basic interpolation and integration
 include("reference_shapes.jl")
@@ -35,7 +32,7 @@ include("kernels.jl")
 include("nystrom.jl")
 include("dim.jl")
 
-# some zero-argument methods for the Inti's gmsh api
+# some zero-argument methods for the Inti's gmsh extension
 include("gmsh_api.jl")
 
 end
