@@ -3,11 +3,11 @@ docsdir = joinpath(@__DIR__,"../..") #src
 Pkg.activate(docsdir) #src
 
 md"""
-# Mock example
+# [Helmholtz scattering](@id helmholtz_scattering)
 """
 
-#md # [![ipynb](https://img.shields.io/badge/download-ipynb-blue)](mock_example.ipynb)
-#md # [![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](@__NBVIEWER_ROOT_URL__/examples/generated/mock_example.ipynb)
+#md # [![ipynb](https://img.shields.io/badge/download-ipynb-blue)](helmholtz_scattering.ipynb)
+#md # [![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](@__NBVIEWER_ROOT_URL__/examples/generated/helmholtz_scattering.ipynb)
 
 md"""
 
