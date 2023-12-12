@@ -9,8 +9,6 @@ using StaticArrays
 using SpecialFunctions
 using Printf
 
-import ElementaryPDESolutions
-
 # helper functions
 include("utils.jl")
 include("blockmatrix.jl")
