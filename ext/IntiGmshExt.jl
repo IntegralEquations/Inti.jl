@@ -236,16 +236,6 @@ function Inti.gmsh_read_geo(fname; dim = 3)
     return Ω
 end
 
-"""
-    gmsh_read_msh(fname::String; dim=3)
-
-Read `fname` and create a `Domain` and a `GenericMesh` structure with all
-entities in `Ω` of dimension `dim`.
-
-!!! danger
-    This function assumes that `gmsh` has been initialized, and does not handle its
-    finalization.
-"""
 function Inti.gmsh_read_msh(fname; dim = 3)
     initialized = gmsh.isInitialized() == 1
     try

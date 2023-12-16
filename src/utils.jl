@@ -204,3 +204,7 @@ macro usethreads(multithreaded, expr::Expr)
     end
     return esc(ex)
 end
+
+# some useful type aliases
+const Point2D = SVector{2,Float64}
+const Point3D = SVector{3,Float64}

@@ -7,4 +7,5 @@
 /test/Manifest.toml
 .vscode
 /docs/src/examples/generated/
+/sandbox/*
 

@@ -31,7 +31,8 @@ for example in ["helmholtz_scattering.jl"]
     @time begin
         src = joinpath(examples_dir, example)
         Literate.markdown(src, generated_dir; mdstrings = true)
-        draft || Literate.notebook(src, generated_dir; mdstrings = true, preprocess = insert_setup)
+        # if on CI, also generate the notebook
+        ON_CI && Literate.notebook(src, generated_dir; mdstrings = true, preprocess = insert_setup)
     end
 end
 
@@ -53,6 +54,7 @@ makedocs(;
     format = Documenter.HTML(;
         prettyurls = ON_CI,
         canonical = "https://IntegralEquations.github.io/Inti.jl",
+        # size_threshold = 2*2^20, # 2 MiB
     ),
     pages = [
         "Home" => "index.md",

@@ -20,7 +20,7 @@ entities(Ω::Domain) = Ω.entities
 function Base.show(io::IO, d::Domain)
     ents = entities(d)
     n = length(entities(d))
-    n == 1 ? print(io, "Domain with $n entity:\n") : print(io, "Domain with $n entities:")
+    n == 1 ? print(io, "Domain with $n entity:") : print(io, "Domain with $n entities:")
     for ent in ents
         print(io, "\n\t $(ent)")
     end
