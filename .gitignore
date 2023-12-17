@@ -6,4 +6,6 @@
 /docs/build/
 /test/Manifest.toml
 .vscode
-/docs/src/generated/*.md
+/docs/src/examples/generated/
+/sandbox/*
+

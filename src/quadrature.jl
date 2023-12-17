@@ -11,24 +11,36 @@ struct QuadratureNode{N,T<:Real}
 end
 
 """
-    coords(q::QuadratureNode)
+    coords(q)
 
 Return the spatial coordinates of `q`.
 """
-coords(q::QuadratureNode) = q.coords
-
-# useful for using either a quadrature node or a just a simple point in
-# `IntegralOperators`.
-coords(x::Union{SVector,NTuple}) = SVector(x)
+function coords(x::T) where {T}
+    if hasfield(T, :coords)
+        return getfield(x, :coords)
+    else
+        error("type $T has no method nor field named `coords`.")
+    end
+end
 
 """
-    normal(q::QuadratureNode)
+    normal(q)
 
 Return the normal vector of `q`, if it exists.
 """
-normal(q::QuadratureNode) = q.normal
+function normal(x::T) where {T}
+    if hasfield(T, :normal)
+        return getfield(x, :normal)
+    else
+        error("type $T has no method nor field named `normal`.")
+    end
+end
 
 weight(q::QuadratureNode) = q.weight
+
+# useful for using either a quadrature node or a just a simple point in
+# `IntegralOperators`.
+coords(x::Union{SVector,Tuple}) = SVector(x)
 
 """
     struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
@@ -37,7 +49,7 @@ A collection of [`QuadratureNode`](@ref)s used to integrate over an
 [`AbstractMesh`](@ref).
 """
 struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
-    mesh::AbstractMesh{N,T}
+    submesh::SubMesh{N,T}
     etype2qrule::Dict{DataType,ReferenceQuadrature}
     qnodes::Vector{QuadratureNode{N,T}}
     etype2qtags::Dict{DataType,Matrix{Int}}
@@ -47,46 +59,54 @@ end
 Base.size(quad::Quadrature) = size(quad.qnodes)
 Base.getindex(quad::Quadrature, i) = quad.qnodes[i]
 
-ambient_dimension(quad::Quadrature) = ambient_dimension(quad.mesh)
+ambient_dimension(quad::Quadrature{N}) where {N} = N
 
 function Base.show(io::IO, quad::Quadrature)
     return print(io, " Quadrature with $(length(quad.qnodes)) quadrature nodes")
 end
 
 """
-    Quadrature(msh::AbstractMesh,etype2qrule::Dict)
-    Quadrature(msh::AbstractMesh;qorder)
+    Quadrature(msh::LagrangeMesh, Ω::Domain, etype2qrule::Dict)
+    Quadrature(msh::LagrangeMesh, Ω::Domain; qorder)
 
-Construct a `Quadrature` of `msh`, where for each element type `E` of `msh` the
-reference quadrature `q = etype2qrule[E]` is used. If an `order` keyword is
-passed, a default quadrature of the desired order is used for each element type
-usig [`_qrule_for_reference_shape`](@ref).
+Construct a `Quadrature` of `Ω` using the elements in `msh`, where for each
+element type `E` in `msh` the reference quadrature `q = etype2qrule[E]` is used.
+If an `order` keyword is passed, a default quadrature of the desired order is
+used for each element type usig [`_qrule_for_reference_shape`](@ref).
 
-For co-dimension 1 elements, the normal vector is computed and stored in the
-`QuadratureNode`s.
+Alternatively, a [`SubMesh`](@ref) can be passed as a first argument in lieu of
+the `msh` and `Ω` arguments. In this case, the quadrature is constructed using
+the `domain` of the `submesh`.
+
+For co-dimension one entities in `Ω`, the normal vector is computed and stored
+in the `QuadratureNode`s.
 """
-function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
+function Quadrature(submesh::SubMesh{N,T}, etype2qrule::Dict) where {N,T}
     # initialize mesh with empty fields
     quad = Quadrature{N,T}(
-        msh,
+        submesh,
         etype2qrule,
         QuadratureNode{N,T}[],
         Dict{DataType,Matrix{Int}}(),
     )
     # loop element types and generate quadrature for each
-    for E in element_types(msh)
-        els   = elements(msh, E)
+    for E in element_types(submesh)
+        els   = elements(submesh, E)
         qrule = etype2qrule[E]
         # dispatch to type-stable method
         _build_quadrature!(quad, els, qrule)
     end
     return quad
 end
+function Quadrature(msh::LagrangeMesh, Ω::Domain, args...; kwargs...)
+    return Quadrature(view(msh, Ω), args...; kwargs...)
+end
 
-function Quadrature(msh::AbstractMesh; qorder)
-    etype2qrule =
-        Dict(E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(msh))
-    return Quadrature(msh, etype2qrule)
+function Quadrature(submsh::SubMesh; qorder)
+    etype2qrule = Dict(
+        E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(submsh)
+    )
+    return Quadrature(submsh, etype2qrule)
 end
 
 @noinline function _build_quadrature!(
@@ -116,6 +136,30 @@ end
     @assert !haskey(quad.etype2qtags, E)
     quad.etype2qtags[E] = reshape(collect(istart:iend), num_nodes, :)
     return quad
+end
+
+"""
+    domain(Q::Quadrature)
+
+The [`Domain`](@ref) over which `Q` performs integration.
+"""
+domain(Q::Quadrature) = Q.submesh.domain
+
+"""
+    dom2qtags(Q::Quadrature, dom::Domain)
+
+Given a domain, return the indices of the quadratures nodes in `Q` associated to
+its quadrature.
+"""
+function dom2qtags(Q::Quadrature, dom::Domain)
+    msh = Q.mesh
+    tags = Int[]
+    for E in element_types(Q)
+        idxs  = dom2elt(msh, dom, E)
+        qtags = @view Q.etype2qtags[E][:, idxs]
+        append!(tags, qtags)
+    end
+    return tags
 end
 
 """
@@ -156,4 +200,50 @@ if you need to access the coordinate or normal vector at que quadrature node.
 """
 function integrate(f, msh::Quadrature)
     return sum(q -> f(q) * q.weight, msh.qnodes)
+end
+
+"""
+    etype_to_nearest_points(X,Y::Quadrature; tol)
+
+For each element `el` in `Y.mesh`, return a list with the indices of all points
+in `X` for which `el` is the nearest element. Ignore indices for which the
+distance exceeds `tol`.
+"""
+function etype_to_nearest_points(X, Y::Quadrature; tol = Inf)
+    if X === Y
+        # when both surfaces are the same, the "near points" of an element are
+        # simply its own quadrature points
+        dict = Dict{DataType,Vector{Vector{Int}}}()
+        for (E, idx_dofs) in Y.etype2qtags
+            dict[E] = map(i -> collect(i), eachcol(idx_dofs))
+        end
+    else
+        pts = [coords(x) for x in X]
+        dict = _etype_to_nearest_points(pts, Y, tol)
+    end
+    return dict
+end
+
+function _etype_to_nearest_points(X, Y::Quadrature, tol = Inf)
+    y = [coords(q) for q in Y]
+    kdtree = KDTree(y)
+    dict = Dict(j => Int[] for j in 1:length(y))
+    for i in eachindex(X)
+        qtag, d = nn(kdtree, X[i])
+        d > tol || push!(dict[qtag], i)
+    end
+    # dict[j] now contains indices in X for which the j quadrature node in Y is
+    # the closest. Next we reverse the map
+    etype2nearlist = Dict{DataType,Vector{Vector{Int}}}()
+    for (E, tags) in Y.etype2qtags
+        nq, ne = size(tags)
+        etype2nearlist[E] = nearlist = [Int[] for _ in 1:ne]
+        for j in 1:ne # loop over each element of type E
+            for q in 1:nq # loop over qnodes in the element
+                qtag = tags[q, j]
+                append!(nearlist[j], dict[qtag])
+            end
+        end
+    end
+    return etype2nearlist
 end

@@ -18,6 +18,4 @@ using Aqua
 
 @safetestset "Gmsh import" include("gmsh_test.jl")
 
-@safetestset "VTK export" include("vtkIO_test.jl")
-
 @safetestset "HMatrices extension" include("hmatrices_test.jl")

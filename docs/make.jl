@@ -3,54 +3,72 @@ using Documenter
 using Literate
 # packages needed for extensions
 using Gmsh
-using WriteVTK
-using CairoMakie
 using HMatrices
+
+draft = false
+
+const ON_CI = get(ENV, "CI", "false") == "true"
+const GIT_HEAD = chomp(read(`git rev-parse HEAD`, String))
+const SETUP = """
+#nb import Pkg
+#nb Pkg.activate(temp=true)
+#nb Pkg.add(url="https://github.com/IntegralEquations/Inti.jl", rev="$GIT_HEAD")
+#nb foreach(Pkg.add, DEPENDENCIES)
+"""
+
+ON_CI && (draft = false) # always full build on CI
+
+function insert_setup(content)
+    ON_CI || return content
+    replace(content, "#nb ## __NOTEBOOK_SETUP__" => SETUP)
+end
 
 # Generate examples using Literate
 const examples_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples")
 const generated_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples", "generated")
-example = "mock_example.jl"
-for example in ["mock_example.jl"]
-    src = joinpath(examples_dir, example)
-    Literate.markdown(src, generated_dir; mdstrings = true)
-    Literate.notebook(src, generated_dir; mdstrings = true)
+for example in ["helmholtz_scattering.jl"]
+    println("\n*** Generating $example example")
+    @time begin
+        src = joinpath(examples_dir, example)
+        Literate.markdown(src, generated_dir; mdstrings = true)
+        # if on CI, also generate the notebook
+        ON_CI && Literate.notebook(src, generated_dir; mdstrings = true, preprocess = insert_setup)
+    end
 end
 
-## setup documentation config
+println("\n*** Generating documentation")
+
 DocMeta.setdocmeta!(Inti, :DocTestSetup, :(using Inti); recursive = true)
 
 modules = [Inti]
-for extension in [:IntiGmshExt, :IntiMakieExt, :IntiVTKExt, :IntiHMatricesExt]
+for extension in [:IntiGmshExt, :IntiHMatricesExt]
     ext = Base.get_extension(Inti, extension)
     isnothing(ext) && "error loading $ext"
     push!(modules, ext)
 end
-
-# some settings are only active on a CI build
-on_CI = get(ENV, "CI", "false") == "true"
 
 makedocs(;
     modules = modules,
     repo = "",
     sitename = "Inti.jl",
     format = Documenter.HTML(;
-        prettyurls = on_CI,
+        prettyurls = ON_CI,
         canonical = "https://IntegralEquations.github.io/Inti.jl",
-        edit_link = "main",
+        # size_threshold = 2*2^20, # 2 MiB
     ),
     pages = [
         "Home" => "index.md",
-        "Meshing" => "geo_and_meshes.md",
-        "Examples" => ["examples/generated/mock_example.md"],
+        # "Meshing" => "geo_and_meshes.md",
+        "Examples" => ["examples/generated/helmholtz_scattering.md"],
         "References" => "references.md",
     ],
-    warnonly = on_CI ? false : Documenter.except(:linkcheck_remotes),
+    warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),
     pagesonly = true,
+    draft,
 )
 
 deploydocs(;
     repo = "github.com/IntegralEquations/Inti.jl",
     devbranch = "main",
-    push_preview = false,
+    push_preview = true,
 )

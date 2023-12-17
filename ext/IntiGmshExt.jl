@@ -81,12 +81,12 @@ function _fill_entity_boundary!(ent, model)
     oriented = false
     dim_tags = gmsh.model.getBoundary((Inti.geometric_dimension(ent), gmshtag(ent)), combine, oriented)
     for (d, t) in dim_tags
-        # if haskey(ENTITIES,(d,t))
-        #     bnd = ENTITIES[(d,t)]
-        # else
-        bnd = GmshEntity(d, t, model)
-        _fill_entity_boundary!(bnd, model)
-        # end
+        if haskey(Inti.ENTITIES, (d, t))
+            bnd = Inti.ENTITIES[(d, t)]
+        else
+            bnd = GmshEntity(d, t, model)
+            _fill_entity_boundary!(bnd, model)
+        end
         push!(ent.boundary, bnd)
     end
     return ent
@@ -111,10 +111,9 @@ function model_summary(model = gmsh.model.getCurrent())
     return println()
 end
 
-function Inti.gmsh_import_mesh(Ω::Inti.Domain; dim = 3, verbosity = 2)
+function Inti.gmsh_import_mesh(Ω::Inti.Domain; dim = 3)
     gmsh.isInitialized() == 1 ||
         error("gmsh is not initialized. Try `gmsh.initialize` first.")
-    gmsh.option.setNumber("General.Verbosity", verbosity)
     msh = Inti.LagrangeMesh{3,Float64}()
     _gmsh_import_mesh(msh, Ω)
     if dim == 3
@@ -227,37 +226,27 @@ function _type_tag_to_etype(tag)
     return etype
 end
 
-function Inti.gmsh_read_geo(fname; dim = 3, verbosity = 2)
-    gmsh.isInitialized() == 1 ||
-        error("gmsh is not initialized. Try `gmsh.initialize` first.")
-    try
-        gmsh.open(fname)
-    catch
-        @error "could not open $fname"
-    end
-    return Inti.gmsh_import_domain(; dim, verbosity)
-end
-
-"""
-    gmsh_read_msh(fname::String; dim=3)
-
-Read `fname` and create a `Domain` and a `GenericMesh` structure with all
-entities in `Ω` of dimension `dim`.
-
-!!! danger
-    This function assumes that `gmsh` has been initialized, and does not handle its
-    finalization.
-"""
-function Inti.gmsh_read_msh(fname; dim = 3)
-    gmsh.isInitialized() == 1 ||
-        error("gmsh is not initialized. Try `gmsh.initialize` first.")
+function Inti.gmsh_read_geo(fname; dim = 3)
     try
         gmsh.open(fname)
     catch
         @error "could not open $fname"
     end
     Ω = Inti.gmsh_import_domain(; dim)
+    return Ω
+end
+
+function Inti.gmsh_read_msh(fname; dim = 3)
+    initialized = gmsh.isInitialized() == 1
+    try
+        initialized || gmsh.initialize()
+        gmsh.open(fname)
+    catch
+        @error "could not open $fname"
+    end
+    Ω = Inti.gmsh_import_domain(; dim)
     msh = Inti.gmsh_import_mesh(Ω; dim)
+    initialized || gmsh.finalize()
     return Ω, msh
 end
 

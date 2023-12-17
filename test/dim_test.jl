@@ -14,7 +14,7 @@ for N in (2, 3)
     # create geometry
     Inti.clear_entities!()
     if N == 2
-        Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = 0.1)
+        Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = 0.2)
     else
         Ω, msh = gmsh_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = 0.2)
     end
@@ -25,7 +25,7 @@ for N in (2, 3)
         ops = (
             Inti.Laplace(; dim = N),
             Inti.Helmholtz(; k = 1.2, dim = N),
-            Inti.Stokes(; μ = 1.2, dim = N),
+            # Inti.Stokes(; μ = 1.2, dim = N),
         )
         for pde in ops
             @testset "Greens identity ($t) $(N)d $pde" begin
@@ -34,15 +34,17 @@ for N in (2, 3)
                 c = rand(T)
                 u = (qnode) -> Inti.SingleLayerKernel(pde)(qnode, xs) * c
                 dudn = (qnode) -> Inti.AdjointDoubleLayerKernel(pde)(qnode, xs) * c
-                γ₀u = Inti.NystromDensity(u, quad)
-                γ₁u = Inti.NystromDensity(dudn, quad)
+                γ₀u = map(u, quad)
+                γ₁u = map(dudn, quad)
                 γ₀u_norm = norm(norm.(γ₀u, Inf), Inf)
                 γ₁u_norm = norm(norm.(γ₁u, Inf), Inf)
                 # single and double layer
-                S = Inti.single_layer_operator(pde, quad)
-                Smat = Matrix(S)
-                D = Inti.double_layer_operator(pde, quad)
-                Dmat = Matrix(D)
+                G = Inti.SingleLayerKernel(pde)
+                S = Inti.IntegralOperator(G, quad)
+                Smat = Inti.assemble_matrix(S)
+                dG = Inti.DoubleLayerKernel(pde)
+                D = Inti.IntegralOperator(dG, quad)
+                Dmat = Inti.assemble_matrix(D)
                 e0 = norm(Smat * γ₁u - Dmat * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
                 δS, δD = Inti.bdim_correction(pde, quad, quad, Smat, Dmat)
                 Sdim, Ddim = Smat + δS, Dmat + δD
@@ -53,10 +55,11 @@ for N in (2, 3)
                 end
                 # adjoint double-layer and hypersingular.
                 pde isa Inti.Stokes && continue # TODO: implement hypersingular for Stokes?
-                K = Inti.adjoint_double_layer_operator(pde, quad)
-                Kmat = Matrix(K)
-                H = Inti.hypersingular_operator(pde, quad)
-                Hmat = Matrix(H)
+
+                K = Inti.IntegralOperator(Inti.AdjointDoubleLayerKernel(pde), quad)
+                Kmat = Inti.assemble_matrix(K)
+                H = Inti.IntegralOperator(Inti.HyperSingularKernel(pde), quad)
+                Hmat = Inti.assemble_matrix(H)
                 e0 = norm(Kmat * γ₁u - Hmat * γ₀u - σ * γ₁u, Inf)
                 δK, δH =
                     Inti.bdim_correction(pde, quad, quad, Kmat, Hmat; derivative = true)

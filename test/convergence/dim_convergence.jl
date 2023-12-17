@@ -9,15 +9,15 @@ Random.seed!(1)
 
 atol = 0
 rtol = 1e-8
-t = :exterior
+t = :interior
 σ = t == :interior ? 1 / 2 : -1 / 2
 N = 2
 # pde = Inti.Laplace(; dim=N)
-# pde = Inti.Helmholtz(; dim = N, k = 2π)
-pde = Inti.Stokes(; dim = N, μ = 1.2)
+pde = Inti.Helmholtz(; dim = N, k = 2π)
+# pde = Inti.Stokes(; dim = N, μ = 1.2)
 @info "Greens identity ($t) $(N)d $pde"
 Inti.clear_entities!()
-center = Inti.SVector(0.1, 0.3)
+center = Inti.svector(i -> 0.1, N)
 radius = 1
 n = 3
 qorder = n - 1
@@ -51,17 +51,19 @@ for h in hh
     end
     T = Inti.default_density_eltype(pde)
     c = rand(T)
-    u = (qnode) -> Inti.SingleLayerKernel(pde)(qnode, xs) * c
-    dudn = (qnode) -> Inti.AdjointDoubleLayerKernel(pde)(qnode, xs) * c
-    γ₀u = Inti.NystromDensity(u, Q)
-    γ₁u = Inti.NystromDensity(dudn, Q)
+    G = Inti.SingleLayerKernel(pde)
+    dG = Inti.DoubleLayerKernel(pde)
+    u = (qnode) -> G(xs, qnode) * c
+    dudn = (qnode) -> transpose(dG(xs, qnode)) * c
+    γ₀u = map(u, Q)
+    γ₁u = map(dudn, Q)
     γ₀u_norm = norm(norm.(γ₀u, Inf), Inf)
     γ₁u_norm = norm(norm.(γ₁u, Inf), Inf)
     # single and double layer
-    S = Inti.single_layer_operator(pde, Q)
-    S0 = Matrix(S)
-    D = Inti.double_layer_operator(pde, Q)
-    D0 = Matrix(D)
+    S = Inti.IntegralOperator(G, Q)
+    S0 = Inti.assemble_matrix(S)
+    D = Inti.IntegralOperator(dG, Q)
+    D0 = Inti.assemble_matrix(D)
     e0 = norm(S0 * γ₁u - D0 * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
     δS, δD = Inti.bdim_correction(pde, Q, Q, S0, D0)
     Smat, Dmat = S0 + δS, D0 + δD

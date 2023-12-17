@@ -6,7 +6,6 @@ using LinearAlgebra
 using NearestNeighbors
 using SparseArrays
 using StaticArrays
-using LinearMaps
 using SpecialFunctions
 using Printf
 
@@ -30,7 +29,7 @@ include("kernels.jl")
 include("nystrom.jl")
 include("dim.jl")
 
-# some zero-argument methods for the Inti's gmsh api
+# some zero-argument methods for the Inti's gmsh extension
 include("gmsh_api.jl")
 
 end
