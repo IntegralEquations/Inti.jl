@@ -192,3 +192,19 @@ end
 function _copyto!(dest, src)
     return copyto!(dest, src)
 end
+
+# https://discourse.julialang.org/t/putting-threads-threads-or-any-macro-in-an-if-statement/41406/7
+macro usethreads(multithreaded, expr::Expr)
+    ex = quote
+        if $multithreaded
+            Threads.@threads $expr
+        else
+            $expr
+        end
+    end
+    return esc(ex)
+end
+
+# some useful type aliases
+const Point2D = SVector{2,Float64}
+const Point3D = SVector{3,Float64}

@@ -19,11 +19,11 @@ using Inti
             gmsh.finalize()
 
             Γ = Inti.external_boundary(Ω)
-            Γ_quad = Inti.Quadrature(view(M, Γ); qorder = 1)
+            Γ_quad = Inti.Quadrature(M, Γ; qorder = 1)
             A = 2 * (lx * ly + lx * lz + ly * lz)
             @test A ≈ Inti.integrate(x -> 1, Γ_quad)
             # generate a Nystrom mesh for volume
-            Ω_quad = Inti.Quadrature(view(M, Ω); qorder = 1)
+            Ω_quad = Inti.Quadrature(M, Ω; qorder = 1)
             V = prod(widths)
             # sum only weights corresponding to tetras
             @test V ≈ Inti.integrate(x -> 1, Ω_quad)
@@ -42,10 +42,10 @@ using Inti
             M = Inti.gmsh_import_mesh(Ω; dim = 3)
             gmsh.finalize()
             Γ = Inti.external_boundary(Ω)
-            quad = Inti.Quadrature(view(M, Γ); qorder = 4) # NystromMesh of surface Γ
+            quad = Inti.Quadrature(M, Γ; qorder = 4) # NystromMesh of surface Γ
             area = Inti.integrate(x -> 1, quad)
             @test isapprox(area, 4 * π * r^2, atol = 5e-2)
-            quad = Inti.Quadrature(view(M, Ω); qorder = 4) # Nystrom mesh of volume Ω
+            quad = Inti.Quadrature(M, Ω; qorder = 4) # Nystrom mesh of volume Ω
             volume = Inti.integrate(x -> 1, quad)
             @test isapprox(volume, 4 / 3 * π * r^3, atol = 1e-2)
         end
@@ -62,12 +62,12 @@ using Inti
             M = Inti.gmsh_import_mesh(Ω; dim = 2)
             gmsh.finalize()
             Γ = Inti.external_boundary(Ω)
-            quad = Inti.Quadrature(view(M, Ω); qorder = 2)
+            quad = Inti.Quadrature(M, Ω; qorder = 2)
             A = π * r^2
             # test area
             @test isapprox(A, Inti.integrate(x -> 1, quad); atol = 1e-2)
             # test perimeter
-            quad = Inti.Quadrature(view(M, Γ); qorder = 2)
+            quad = Inti.Quadrature(M, Γ; qorder = 2)
             P = 2π * r
             @test isapprox(P, Inti.integrate(x -> 1, quad); atol = 1e-2)
         end
