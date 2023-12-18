@@ -9,6 +9,8 @@ using StaticArrays
 using SpecialFunctions
 using Printf
 
+using ElementaryPDESolutions
+
 # helper functions
 include("utils.jl")
 
