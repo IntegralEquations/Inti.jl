@@ -343,6 +343,19 @@ fig
 # we would first need to create a mesh for the places where we want to visualize
 # the solution. In the 3D example that follows, we will use the `Gmsh` API to
 # create a *view* (in the sense of *Gmsh*) of the solution on a punctured plane.
+# For now, we create a Gmsh *view*; it can be visualized by running `gmsh.fltk.run()`
+# or by saving with `gmsh.view.write(vg, "2d_scatter.pos")`.
+
+data = Vector{Float64}(undef, length(xx)*length(yy)*4)
+data[1:4:end] = map(pt-> pt[1], Iterators.product(xx,yy))
+data[2:4:end] = map(pt-> pt[2], Iterators.product(xx,yy))
+data[3:4:end] .= 0
+data[4:4:end] = vals
+gmsh.initialize()
+vg = gmsh.view.add("grid")
+gmsh.view.addListData(vg, "SP", length(xx)*length(yy), vec(vals))
+gmsh.view.write(vg, "2d_scatter.pos")
+gmsh.finalize()
 
 # ## [Three-dimensional scattering](@id helmholtz-scattering-3d)
 #
@@ -497,4 +510,53 @@ end
 
 # We see that the approximation is quite accurate. We can now export the
 # solution to *Gmsh* for visualization. To do so, we will first create a Gmsh
-# view ...
+# view of our solution data evaluated on a meshed planar slice of ℝ³.
+
+meshsize = 0.05
+order = 2
+radius = 1
+center = (0, 0, 0)
+gmsh.initialize()
+gmsh.model.add("slice-sphere-mesh")
+gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+
+# Set up a rectangular outer boundary with a circular hole as the rectangle
+# intersects the sphere; use gmsh CSG to construct the set difference, and mesh
+px = -2.0; py = -2.0; pz = 0.0
+dx = 4.0; dy = 4.0
+p1 = gmsh.model.occ.addPoint(px, py, pz)
+p2 = gmsh.model.occ.addPoint(px + dx, py, pz) 
+p3 = gmsh.model.occ.addPoint(px + dx, py + dy, pz)
+p4 = gmsh.model.occ.addPoint(px, py + dy, pz)
+l1 = gmsh.model.occ.addLine(p1, p2)
+l2 = gmsh.model.occ.addLine(p2, p3)
+l3 = gmsh.model.occ.addLine(p3, p4)
+l4 = gmsh.model.occ.addLine(p4, p1)
+curve_rtag = gmsh.model.occ.addCurveLoop([l1, l2, l3, l4])
+sphere_ctag = gmsh.model.occ.addSphere(center[1], center[2], center[3], radius)
+ptag = gmsh.model.occ.addPlaneSurface([curve_rtag])
+outDimTags, outDimTagsMap = gmsh.model.occ.cut([(2, ptag)], [(3, sphere_ctag)])
+gmsh.model.occ.synchronize()
+gmsh.model.mesh.generate(2)
+gmsh.model.mesh.setOrder(order)
+Ωₑ =  Inti.gmsh_import_domain(;dim=2)
+eval_msh = Inti.gmsh_import_mesh(Ωₑ;dim=3)
+name = joinpath(@__DIR__, "slice-sphere.msh")
+gmsh.write(name)
+
+# Evaluate the solution on the Quadrature nodes of the mesh:
+Q_eval_msh  = Inti.Quadrature(eval_msh, Ωₑ; qorder = 2)
+u_eval_msh = map(Q_eval_msh) do q
+    x = q.coords
+    uₛ(x) + uᵢ(x) |> real
+end
+nothing #hide
+
+# Add a gmsh view of the solution and save it:
+s1 = gmsh.view.add("Solution Slice")
+vtags, xyz = gmsh.model.mesh.getElementsByType(9)
+gmsh.view.addHomogeneousModelData(s1, 0, "slice-sphere-mesh", "ElementNodeData", vtags, u_eval_msh)
+gmsh.view.write(s1, "3d_nodedata.pos")
+# To visualize in gmsh's FLTK GUI, execute here `gmsh.fltk.run()`. For now, just finish up.
+gmsh.finalize()
