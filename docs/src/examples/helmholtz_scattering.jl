@@ -545,18 +545,20 @@ eval_msh = Inti.gmsh_import_mesh(Ωₑ;dim=3)
 name = joinpath(@__DIR__, "slice-sphere.msh")
 gmsh.write(name)
 
-# Evaluate the solution on the Quadrature nodes of the mesh:
-Q_eval_msh  = Inti.Quadrature(eval_msh, Ωₑ; qorder = 2)
-u_eval_msh = map(Q_eval_msh) do q
-    x = q.coords
+# Evaluate the solution on the nodes (`order = 2` corresponds to element
+# type `9` or a 6-node triangle) of the 2D mesh:
+ntags, xyz, _ = gmsh.model.mesh.getNodes()
+etags, vtags = gmsh.model.mesh.getElementsByType(9)
+nodes = eachcol(reshape(xyz, 3, :))[vtags]
+u_eval_msh = map(nodes) do q
+    x = Inti.Point3D(q)
     uₛ(x) + uᵢ(x) |> real
 end
 nothing #hide
 
 # Add a gmsh view of the solution and save it:
 s1 = gmsh.view.add("Solution Slice")
-vtags, xyz = gmsh.model.mesh.getElementsByType(9)
-gmsh.view.addHomogeneousModelData(s1, 0, "slice-sphere-mesh", "ElementNodeData", vtags, u_eval_msh)
+gmsh.view.addHomogeneousModelData(s1, 0, "slice-sphere-mesh", "ElementNodeData", etags, u_eval_msh)
 gmsh.view.write(s1, "3d_nodedata.pos")
 # To visualize in gmsh's FLTK GUI, execute here `gmsh.fltk.run()`. For now, just finish up.
 gmsh.finalize()
