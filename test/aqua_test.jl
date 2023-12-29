@@ -12,6 +12,6 @@ using Aqua
         stale_deps = true,
         deps_compat = (; broken = true), # ElementaryPDESolutions not registered
         piracies = (; broken = true), # piracy related to ElementaryPDESolutions
-        persistent_tasks = (; broken = true), # not sure why yet
+        persistent_tasks = (; broken = false), # fixed?
     )
 end
