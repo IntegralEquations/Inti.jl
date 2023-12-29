@@ -1,6 +1,6 @@
 using Markdown                       #src
 import Pkg                           #src
-docsdir = joinpath(@__DIR__,"../..") #src
+docsdir = joinpath(@__DIR__, "../..") #src
 Pkg.activate(docsdir)                #src
 
 # # [Helmholtz scattering](@id helmholtz_scattering)
@@ -12,8 +12,7 @@ Pkg.activate(docsdir)                #src
 #       - Creating a geometry using the *Gmsh* API
 #       - Assembling integral operators and integral potentials
 #       - Setting up a sound-soft problem in both 2 and 3 spatial dimensions
-#       - Compressing integral operators using [`HMatrices.jl`](https://github.com/WaveProp/HMatrices.jl)
-#       - Solving a boundary integral equation
+#       - Using *GMRES* to solve the linear system
 #       - Exporting the solution to *Gmsh* for visualization
 
 # In this tutorial we will show how to solve an acoustic scattering problem in
@@ -98,9 +97,16 @@ Pkg.activate(docsdir)                #src
 # follows that ``u_s = -u_i`` on ``\Gamma``.
 #
 # We are now have the necessary background to solve this problem in both 2 and 3
-# spatial dimensions. Let's load `Inti.jl`
+# spatial dimensions. Let's load `Inti.jl` and setup some of the (global)
+# problem parameters:
 
 using Inti
+
+k = 8π
+λ = 2π / k
+meshsize   = λ / 5
+qorder     = 4 # quadrature order
+gorder     = 2 # order of geometrical approximation
 
 # ## [Two-dimensional scattering](@id helmholtz-scattering-2d)
 
@@ -109,9 +115,10 @@ using Inti
 # for creating `.msh` file containing the desired geometry and mesh, and then
 # import it into `Inti` using [`gmsh_read_msh`](@ref Inti.gmsh_read_msh). Here
 # is a function to mesh the circle:
+
 using Gmsh # this will trigger the loading of Inti's Gmsh extension
 
-function gmsh_circle(;name, meshsize, order=1, radius=1, center = (0,0))
+function gmsh_circle(; name, meshsize, order = 1, radius = 1, center = (0, 0))
     try
         gmsh.initialize()
         gmsh.model.add("circle-mesh")
@@ -127,15 +134,16 @@ function gmsh_circle(;name, meshsize, order=1, radius=1, center = (0,0))
     end
 end
 
-# Let us now use to create a `circle.msh` file:
-
+# Let us now use `gmsh_circle` to create a `circle.msh` file. As customary in
+# wave-scattering problems, we will choose a mesh size that is proportional to
+# wavelength:
 name = joinpath(@__DIR__, "circle.msh")
-gmsh_circle(;meshsize=0.1, order = 2, name)
+gmsh_circle(; meshsize, order = gorder, name)
 
 # We can now import the file and parse the mesh and domain information into
 # `Inti.jl` using the [`gmsh_read_msh`](@ref Inti.gmsh_read_msh) function:
 
-Ω,msh = Inti.gmsh_read_msh(name; dim=2)
+Ω, msh = Inti.gmsh_read_msh(name; dim = 2)
 @show Ω
 #-
 @show msh
@@ -155,8 +163,6 @@ gmsh_circle(;meshsize=0.1, order = 2, name)
 #       abstract mesh that you can use to iterate over the elements in the boundary
 #       of the disk.
 
-
-
 # To solve our boundary integral equation usign a Nyström method, we actually
 # need a quadrature of our curve/surface (and possibly the normal vectors at the
 # quadrature nodes). Once a mesh is available, creating a quadrature object can
@@ -165,31 +171,31 @@ gmsh_circle(;meshsize=0.1, order = 2, name)
 # for:
 
 Γ = Inti.boundary(Ω)
-Q = Inti.Quadrature(msh, Γ; qorder = 4)
+Q = Inti.Quadrature(msh, Γ; qorder)
 nothing #hide
 
 # The object `Q` now contains a quadrature (of order `4`) that can be used to
 # solve a boundary integral equation on `Γ`. As a sanity check, let's make sure
 # integrating the function `x->1` over `Q` gives an approximation to the perimeter:
 
-@assert abs(Inti.integrate(x->1,Q) - 2π) < 1e-5 #hide
-Inti.integrate(x->1,Q) - 2π
+@assert abs(Inti.integrate(x -> 1, Q) - 2π) < 1e-5 #hide
+Inti.integrate(x -> 1, Q) - 2π
 
 # With the [`Quadrature`](@ref Inti.Quadrature) constructed, we now can define
 # discrete approximation to the integral operators ``\mathrm{S}`` and
 # ``\mathrm{D}`` as follows:
 
-k = 4π
-pde   = Inti.Helmholtz(;k, dim=2)
-G     = Inti.SingleLayerKernel(pde)
-dGdny = Inti.DoubleLayerKernel(pde)
-Sop = Inti.IntegralOperator(G,Q,Q)
-Dop = Inti.IntegralOperator(dGdny,Q,Q)
+pde = Inti.Helmholtz(; k, dim = 2)
+S, D = Inti.single_double_layer(;
+    pde,
+    target = Q,
+    source = Q,
+    compression = (method = :none,),
+    correction = (method = :dim, maxdist = 5 * meshsize),
+)
 
-# Both `Sop` and `Dop` are of type [`IntegralOperator`](@ref
-# Inti.IntegralOperator), which is a subtype of `AbstractMatrix`. There are two
-# well-known difficulties related to the discretization of these
-# `IntegralOperator`s:
+# There are two well-known difficulties related to the discretization of
+# the boundary integral operators $S$ and $D$:
 # - The kernel of the integral operator is not smooth, and thus specialized
 # quadrature rules are required to accurately approximate the matrix entries for
 # which the target and source point lie *close* (relative to some scale) to each
@@ -204,29 +210,21 @@ Dop = Inti.IntegralOperator(dGdny,Q,Q)
 # will be to first construct a (possible compressed) naive representation of the
 # integral operator where singular and nearly-singular integrals are ignored,
 # followed by a the creation of a (sparse) correction intended to account for
-# such singular interactions.
+# such singular interactions. See [`single_double_layer`](@ref
+# Inti.single_double_layer) for more details on the various options available.
 
-# The first part of this example, being two-dimensional, does not require any
-# compression algorithm, so we will simply represent the operators `Sop` and
-# `Dop` as dense matrices:
-
-S_mat = Matrix(Sop)
-D_mat = Matrix(Dop)
-
-# Assembling our discrete approximatio to the combined-field operator is now
-# simply a matter of linear algebra:
+# We can now combine `S` and `D` to form the combined-field operator:
 using LinearAlgebra
-
-L = I/2 + D_mat - im*k*S_mat
+L = I / 2 + D - im * k * S
 
 # where `I` is the identity matrix. Assuming an incident field along the $x_1$
 # direction of the form $u_i =e^{ikx_1}$, the right-hand side of the equation
 # can be construted using:
 
-uᵢ = x -> exp(im*k*x[1]) # plane-wave incident field
+uᵢ = x -> exp(im * k * x[1]) # plane-wave incident field
 rhs = map(Q) do q
     x = q.coords
-    -uᵢ(x)
+    return -uᵢ(x)
 end
 
 # !!! note "Iterating over a quadrature"
@@ -241,14 +239,14 @@ end
 σ = L \ rhs
 
 # The variable `σ` contains the value of the approximate density at the
-# quadrature nodes, which can be used to reconstruct the solution using the
-# [`IntegralPotential`](@ref Inti.IntegralPotential):
+# quadrature nodes. To reconstruct a continuous approximation to the solution,
+# we can use [`single_double_layer_potential`](@ref) to obtain the single- and
+# double-layer potentials, and then combine them as follows:
 
-𝒮 = Inti.IntegralPotential(G,Q)
-𝒟 = Inti.IntegralPotential(dGdny,Q)
-uₛ = x -> 𝒟[σ](x) - im*k*𝒮[σ](x)
+𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+uₛ   = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
 
-# where `uₛ` is an anonymous/lambda function representing the approximate
+# The variable `uₛ` is an anonymous/lambda function representing the approximate
 # scattered field.
 
 # To assess the accuracy of the solution, we can compare it to the exact
@@ -256,18 +254,20 @@ uₛ = x -> 𝒟[σ](x) - im*k*𝒮[σ](x)
 
 using SpecialFunctions # for bessel functions
 
-function circle_helmholtz_soundsoft(pt;radius=1,k,θin)
+function circle_helmholtz_soundsoft(pt; radius = 1, k, θin)
     x = pt[1]
     y = pt[2]
-    r = sqrt(x^2+y^2)
-    θ = atan(y,x)
+    r = sqrt(x^2 + y^2)
+    θ = atan(y, x)
     u = 0.0
     r < radius && return u
-    c(n) = -exp(im*n*(π/2-θin))*besselj(n,k*radius)/besselh(n,k*radius)
-    u    = c(0)*besselh(0,k*r)
-    n = 1;
+    c(n) = -exp(im * n * (π / 2 - θin)) * besselj(n, k * radius) / besselh(n, k * radius)
+    u    = c(0) * besselh(0, k * r)
+    n    = 1
     while (abs(c(n)) > 1e-12)
-        u += c(n)*besselh(n,k*r)*exp(im*n*θ) + c(-n)*besselh(-n,k*r)*exp(-im*n*θ)
+        u +=
+            c(n) * besselh(n, k * r) * exp(im * n * θ) +
+            c(-n) * besselh(-n, k * r) * exp(-im * n * θ)
         n += 1
     end
     return u
@@ -275,68 +275,37 @@ end
 
 # Here is the maximum error on some points located on a circle of radius `2`:
 
-uₑ = x -> circle_helmholtz_soundsoft(x,k=k,radius=1,θin=0) # exact solution
+uₑ = x -> circle_helmholtz_soundsoft(x; k, radius = 1, θin = 0) # exact solution
 er = maximum(0:0.01:2π) do θ
     R = 2
-    x = (R*cos(θ),R*sin(θ))
-    abs(uₛ(x) - uₑ(x))
+    x = (R * cos(θ), R * sin(θ))
+    return abs(uₛ(x) - uₑ(x))
 end
-@info "error without correction = $er"
+@assert er < 1e-3 #hide
+@info "maximum error = $er"
 
-# We see that the error is quite large, and somewhat not satisfactory! The main
-# issue here is that the quadrature `Q` was designed to integrate smooth
-# functions over `Γ`, and it is not expected to be accurate enough in the
-# presence of singular and nearly-singular kernels (ubiquitous in BIEs). To
-# remedy this, we need to compute a *correction* for the integral operators
-# $\mathrm{S}$ and $\mathrm{D}$. In this example, we will use the [general
-# purpose density interpolation
-# method](https://www.sciencedirect.com/science/article/pii/S0045782521000396?casa_token=fG6da2Kb12EAAAAA:_BJ1-uC5gIeEBA08K_ip2nyDVwz9UF3TTBAg--a-vLKfGWljhIMrcJDWUudou3fr19VPEx9ftw),
-# implemented in the [`bdim_correction`](@ref Inti.bdim_correction) function,
-# for computing a sparse correction to the integral operators above (see the
-# docstring of the function for more details):
-
-δS, δD = Inti.bdim_correction(pde, Q, Q, S_mat, D_mat)
-nothing #hide
-
-# This will construct a sparse matrix `δS` and `δD` that can be used to correct
-# `S_mat` and `D_mat`. Assembling a corrected version of the combined-field BIE
-# is done through:
-
-L = I/2 + (D_mat + δD) - im*k*(S_mat + δS)
-nothing #hide
-
-# We can now solve the linear system again, and assemble a corrected version of
-# the scattered field:
-
-σ = L \ rhs
-uₛ = x -> 𝒟[σ](x) - im*k*𝒮[σ](x)
-
-# Let us check the error again:
-er = maximum(0:0.01:2π) do θ
-    R = 2
-    x = (R*cos(θ),R*sin(θ))
-    abs(uₛ(x) - uₑ(x))
-end
-@assert er < 1e-5 #hide
-@info "error with correction = $er"
-
-# As we can see, the error is much smaller! This example was intended to
-# illustrate the importance properly handling the singularities: correcting for
-# the nearly-singular integrals is essential, and should always be done in
-# practice.
-
-# To visualize the solution in this simple (2d) example, we could simply use
-# `Makie`:
+# As we can see, the error is quite small! To visualize the solution in this
+# simple (2d) example, we could simply use `Makie`:
 
 using CairoMakie
-xx = yy = range(-4,stop=4,length=200)
-vals = map(pt-> norm(pt) > 1 ? real(uₛ(pt) + uᵢ(pt)) : NaN, Iterators.product(xx,yy))
-fig,ax,hm = heatmap(xx,yy,vals;
-                    colormap=:inferno, interpolate=true,
-                    axis=(aspect=DataAspect(),xgridvisible = false, ygridvisible = false),
-                    )
-lines!(ax,[cos(θ) for θ in 0:0.01:2π], [sin(θ) for θ in 0:0.01:2π], color=:black, linewidth=4)
-Colorbar(fig[1,2], hm)
+xx = yy = range(-4; stop = 4, length = 200)
+vals = map(pt -> norm(pt) > 1 ? real(uₛ(pt) + uᵢ(pt)) : NaN, Iterators.product(xx, yy))
+fig, ax, hm = heatmap(
+    xx,
+    yy,
+    vals;
+    colormap = :inferno,
+    interpolate = true,
+    axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
+)
+lines!(
+    ax,
+    [cos(θ) for θ in 0:0.01:2π],
+    [sin(θ) for θ in 0:0.01:2π];
+    color = :black,
+    linewidth = 4,
+)
+Colorbar(fig[1, 2], hm)
 fig
 
 # More complex problems, however, may require a mesh-based visualization, where
@@ -346,19 +315,16 @@ fig
 
 # ## [Three-dimensional scattering](@id helmholtz-scattering-3d)
 #
-# We now consider the same problem in 3D, being a bit more terse in the
-# explanation since many of the steps are similar. The main difficulty we will
-# try to address here is related to the computational complexity associated to
-# three-dimensional problems, where one needs to be careful not to assemble
-# and/or factor huge dense matrices! Instead of representing `Sop` and `Dop` as
-# dense matrices, and solving the system using `\` (which dispatches to to an
-# `LU` factorization in our case) we will:
-# - use hierarchical matrices to compress the integral operators
-# - rely on an iterative solver to solve the linear system
+# We now consider the same problem in 3D. Unlike the 2D case, assembling dense
+# matrix representations of the integral operators quickly becomes unfeasiable
+# as the problem size increases. `Inti` adds support for compressing the
+# underlying linear operators by wrapping external libraries. In this example,
+# we will rely on [`HMatrices.jl`](https://github.com/WaveProp/HMatrices.jl) to
+# handle the compression.
 
 # The following function will create a mesh of a sphere using the `Gmsh` API:
 
-function gmsh_sphere(;name, meshsize, order=1, radius=1, center = (0,0,0))
+function gmsh_sphere(; name, meshsize, order = 1, radius = 1, center = (0, 0, 0))
     try
         gmsh.initialize()
         gmsh.model.add("sphere-mesh")
@@ -378,10 +344,10 @@ end
 # create a surface quadrature:
 
 name = joinpath(@__DIR__, "sphere.msh")
-gmsh_sphere(;meshsize=0.1, order = 2, name)
-Ω,msh = Inti.gmsh_read_msh(name; dim=3)
+gmsh_sphere(; meshsize, order = gorder, name)
+Ω, msh = Inti.gmsh_read_msh(name; dim = 3)
 Γ = Inti.boundary(Ω)
-Q  = Inti.Quadrature(msh, Γ; qorder = 4)
+Q = Inti.Quadrature(msh, Γ; qorder = 4)
 
 # !!! tip "Writing/reading a mesh from disk"
 #       Writing and reading a mesh to/from disk can be time consuming. You can
@@ -389,32 +355,26 @@ Q  = Inti.Quadrature(msh, Γ; qorder = 4)
 #       and [`gmsh_import_domain`](@ref Inti.gmsh_import_domain) functions on an
 #       active `gmsh` model without writing it to disk.
 
-# We can now assemble the integral operators as before, being careful to use
-# `dim=3` when defining the Helmholtz PDE:
-
-pde = Inti.Helmholtz(;k, dim=3)
-G  = Inti.SingleLayerKernel(pde)
-dGdny = Inti.DoubleLayerKernel(pde)
-
-Sop = Inti.IntegralOperator(G,Q,Q)
-Dop = Inti.IntegralOperator(dGdny,Q,Q)
+# We can now assemble the integral operators as before, but indicate that we
+# wish to compress them using hierarchical matrices:
+using HMatrices
+pde = Inti.Helmholtz(; k, dim = 3)
+S, D = Inti.single_double_layer(;
+    pde,
+    target = Q,
+    source = Q,
+    compression = (method = :hmatrix, tol = 1e-6),
+    correction = (method = :dim, maxdist = 5 * meshsize),
+)
 
 # Here is how much memory it would take to store the dense representation of
 # these matrices:
 
-mem = 2*length(Sop)*16/1e9 # 16 bytes per complex number, 1e9 bytes per GB, two matrices
-println("memory required to store Sop and Dop: $(mem) GB")
+mem = 2 * length(S) * 16 / 1e9 # 16 bytes per complex number, 1e9 bytes per GB, two matrices
+println("memory required to store S and D: $(mem) GB")
 
 # Even for this simple example, the dense representation of the integral
-# operators as matrix is already quite expensive. We will thus use hierarchical
-# matrix representation to compress things a bit:
-
-import HMatrices
-S_hmat = HMatrices.assemble_hmatrix(Sop;atol=1e-6)
-
-#-
-
-D_hmat = HMatrices.assemble_hmatrix(Dop;atol=1e-6)
+# operators as matrix is already quite expensive!
 
 # !!! note "Compression methods"
 #       It is worth mentioning that hierchical matrices are not the only way to
@@ -426,58 +386,57 @@ D_hmat = HMatrices.assemble_hmatrix(Dop;atol=1e-6)
 #       Hierarchical matrices also tend to give a faster matrix-vector product
 #       after the (offline) assembly stage.
 
-# As in the 2D case, we need to correct `S_hmat` and `D_hmat` to account for the
-# singular and nearly-singular integrals. We will again use the density
-# interpolation method here:
-
-δS, δD = Inti.bdim_correction(pde, Q, Q, S_hmat, D_hmat)
-nothing #hide
-
 # We will use the generalized minimal residual (GMRES) iterative solver, for the
 # linear system. This requires us to define a linear operator `L`, approximating
 # the combined-field operator, that supports the matrix-vector product. In what
 # follows we use `LinearMaps` to *lazily* assemble `L`:
 
 using LinearMaps
-L = I/2 + (LinearMap(D_hmat) + LinearMap(δD)) - im*k*(LinearMap(S_hmat) + LinearMap(δS))
+L = I / 2 + LinearMap(D) - im * k * LinearMap(S)
 
-# We can now solve the linear system using GMRES solver (implemented in
-# `IterativeSolvers`):
+# Note that wrapping `S` and `D` in `LinearMap` allows for combining them in a
+# *lazy* fashion. Alternatively, you can use e.g. `axpy!` to add two
+# hierarchical matrices.
+
+# We can now solve the linear system using GMRES solver:
 
 using IterativeSolvers
 rhs = map(Q) do q
     x = q.coords
-    -uᵢ(x)
+    return -uᵢ(x)
 end
-σ, hist = gmres(L, rhs; log=true, abstol=1e-6)
+σ, hist =
+    gmres(L, rhs; log = true, abstol = 1e-6, verbose = false, restart = 100, maxiter = 100)
 @show hist
 
 # As before, let us represent the solution using `IntegralPotential`s:
 
-𝒮 = Inti.IntegralPotential(G,Q)
-𝒟 = Inti.IntegralPotential(dGdny,Q)
-uₛ = x -> 𝒟[σ](x) - im*k*𝒮[σ](x)
+𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+uₛ = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
 
 # To check the result, we compare against the exact solution obtained through a
 # series:
 using GSL
-sphbesselj(l,r) = sqrt(π/(2r)) * besselj(l+1/2,r)
-sphbesselh(l,r) = sqrt(π/(2r)) * besselh(l+1/2,r)
-sphharmonic(l,m,θ,ϕ) = GSL.sf_legendre_sphPlm(l,abs(m),cos(θ))*exp(im*m*ϕ)
-function sphere_helmholtz_soundsoft(xobs;radius=1,k=1,θin=0,ϕin=0)
+sphbesselj(l, r) = sqrt(π / (2r)) * besselj(l + 1 / 2, r)
+sphbesselh(l, r) = sqrt(π / (2r)) * besselh(l + 1 / 2, r)
+sphharmonic(l, m, θ, ϕ) = GSL.sf_legendre_sphPlm(l, abs(m), cos(θ)) * exp(im * m * ϕ)
+function sphere_helmholtz_soundsoft(xobs; radius = 1, k = 1, θin = 0, ϕin = 0)
     x = xobs[1]
     y = xobs[2]
     z = xobs[3]
-    r = sqrt(x^2+y^2+z^2)
-    θ = acos(z/r)
-    ϕ = atan(y,x)
+    r = sqrt(x^2 + y^2 + z^2)
+    θ = acos(z / r)
+    ϕ = atan(y, x)
     u = 0.0
     r < radius && return u
-    c(l,m) = -4π*im^l*sphharmonic(l,-m,θin,ϕin)*sphbesselj(l,k*radius)/sphbesselh(l,k*radius)
+    function c(l, m)
+        return -4π * im^l * sphharmonic(l, -m, θin, ϕin) * sphbesselj(l, k * radius) /
+               sphbesselh(l, k * radius)
+    end
     l = 0
-    for l=0:60
-        for m=-l:l
-            u += c(l,m)*sphbesselh(l,k*r)*sphharmonic(l,m,θ,ϕ)
+    for l in 0:60
+        for m in -l:l
+            u += c(l, m) * sphbesselh(l, k * r) * sphharmonic(l, m, θ, ϕ)
         end
         l += 1
     end
@@ -486,15 +445,66 @@ end
 
 # We will compute the error on some point on the sphere of radius `2`:
 
-uₑ = (x) -> sphere_helmholtz_soundsoft(x;radius=1,k=k,θin=π/2,ϕin=0)
+uₑ = (x) -> sphere_helmholtz_soundsoft(x; radius = 1, k = k, θin = π / 2, ϕin = 0)
 er = maximum(1:100) do _
     x̂ = rand(Inti.Point3D) |> normalize # an SVector of unit norm
-    x = 2*x̂
-    abs(uₛ(x) - uₑ(x))
+    x = 2 * x̂
+    return abs(uₛ(x) - uₑ(x))
 end
-@assert er < 1e-5 #hide
+@assert er < 1e-3 #hide
 @info "error with correction = $er"
 
-# We see that the approximation is quite accurate. We can now export the
-# solution to *Gmsh* for visualization. To do so, we will first create a Gmsh
-# view ...
+# We see that, once again, the approximation is quite accurate. To visualize the
+# solution, we will use `Gmsh` to create mesh of a punctured plane:
+
+##
+gmsh.initialize()
+gmsh.model.add("slice-sphere-mesh")
+gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+
+# Set up a rectangular outer boundary with a circular hole as the rectangle
+# intersects the sphere; use gmsh CSG to construct the set difference, and mesh
+
+xl = -2.0; yl = -2.0; zl = 0.0
+dx = 4.0; dy = 4.0
+sphere_ctag = gmsh.model.occ.addSphere(0, 0, 0, 1)
+ptag = gmsh.model.occ.addRectangle(xl,yl,zl,dx,dy)
+outDimTags, outDimTagsMap = gmsh.model.occ.cut([(2, ptag)], [(3, sphere_ctag)])
+gmsh.model.occ.synchronize()
+gmsh.model.mesh.generate(2)
+order = 2
+gmsh.model.mesh.setOrder(order)
+# Evaluate the solution on the nodes (`order = 2` corresponds to element
+# type `9` or a 6-node triangle) of the 2D mesh:
+ntags, xyz, _ = gmsh.model.mesh.getNodes()
+etags, vtags = gmsh.model.mesh.getElementsByType(9)
+nodes = reinterpret(Inti.Point3D,xyz)[vtags]
+
+# Since evaluating the integral representation of the solution at many points is
+# expensive, we will use a compression method to accelerate the evaluation. In
+# the example below, we use the fast-multipole method:
+using FMM3D
+S,D = Inti.single_double_layer(;
+    pde,
+    target = nodes,
+    source = Q,
+    compression = (method = :hmatrix, tol=1e-4),
+    correction = (method = :dim, maxdist = 5 * meshsize),
+)
+
+ui_eval_msh = uᵢ.(nodes)
+us_eval_msh = D*σ - im*k*S*σ
+u_eval_msh = ui_eval_msh + us_eval_msh
+nothing #hide
+
+# Add a gmsh view of the solution and save it:
+s1 = gmsh.view.add("Solution slice (real part)")
+gmsh.view.addHomogeneousModelData(s1, 0, "slice-sphere-mesh", "ElementNodeData", etags, real(u_eval_msh))
+s2 = gmsh.view.add("Solution slice (imaginary part)")
+gmsh.view.addHomogeneousModelData(s2, 0, "slice-sphere-mesh", "ElementNodeData", etags, imag(u_eval_msh))
+gmsh.view.write(s1, "3d_nodedata.pos")
+gmsh.view.write(s2, "3d_nodedata.pos")
+# uncomment the following line to view the solution in gmsh
+# gmsh.fltk.run()
+gmsh.finalize()
