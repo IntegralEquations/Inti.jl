@@ -13,10 +13,13 @@ integral
 \\int_{\\Gamma} K(\boldsymbol{x},\boldsymbol{y})\\sigma(y) ds_y, x \\not \\in \\Gamma
 ```
 
+Assuming `𝒮` is an integral potential and `σ` is a vector of values defined on
+`quadrature`, calling `𝒮[σ]` creates an anonymous function that can be
+evaluated at any point `x`.
 """
-struct IntegralPotential
-    kernel::AbstractKernel
-    quadrature::Quadrature
+struct IntegralPotential{K,Q<:Quadrature}
+    kernel::K
+    quadrature::Q
 end
 
 function Base.getindex(pot::IntegralPotential, σ::AbstractVector)
@@ -43,12 +46,12 @@ I[u](x) = \\int_{\\Gamma\\_s} K(x,y)u(y) ds_y, x \\in \\Gamma_{t}
 ```
 where ``\\Gamma_s`` and ``\\Gamma_t`` are the source and target domains, respectively.
 """
-struct IntegralOperator{T} <: AbstractMatrix{T}
-    kernel::AbstractKernel
+struct IntegralOperator{V,K,T,S<:Quadrature} <: AbstractMatrix{V}
+    kernel::K
     # since the target can be as simple as a vector of points, leave it untyped
-    target
+    target::T
     # the source, on the other hand, has to be a quadrature for our Nystrom method
-    source::Quadrature
+    source::S
 end
 
 kernel(iop::IntegralOperator) = iop.kernel
@@ -57,7 +60,7 @@ function IntegralOperator(k, X, Y::Quadrature = X)
     T = return_type(k)
     msg = """IntegralOperator of nonbits being created"""
     isbitstype(T) || (@warn msg)
-    return IntegralOperator{T}(k, X, Y)
+    return IntegralOperator{T,typeof(k),typeof(X),typeof(Y)}(k, X, Y)
 end
 
 Base.size(iop::IntegralOperator) = (length(iop.target), length(iop.source))
@@ -91,10 +94,21 @@ end
     return out
 end
 
-# helper function to help determine the constant σ in the Green identity:
-# S[γ₁u](x) - D[γ₀u](x) + σ*u(x) = 0
-# This can be used as a predicate to determine whether a point is inside a
-# domain or not
+function assemble_fmm(args...; kwargs...)
+    return error("Inti.assemble_fmm not found. Did you forget to import FMM3D?")
+end
+
+function assemble_hmatrix(args...; kwargs...)
+    return error("Inti.assemble_hmatrix not found. Did you forget to import HMatrices?")
+end
+
+"""
+    _green_multiplier(x, quad)
+
+Helper function to help determine the constant σ in the Green identity S[γ₁u](x)
+- D[γ₀u](x) + σ*u(x) = 0. This can be used as a predicate to determine whether a
+point is inside a domain or not.
+"""
 function _green_multiplier(x::SVector, Q::Quadrature{N}) where {N}
     pde = Laplace(; dim = N)
     K = DoubleLayerKernel(pde)

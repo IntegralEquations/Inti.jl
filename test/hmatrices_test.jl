@@ -14,12 +14,13 @@ include("test_utils.jl")
     Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = 0.05)
     Γ = Inti.external_boundary(Ω)
     Γ_quad = Inti.Quadrature(view(msh, Γ); qorder = 3)
+    W = [q.weight for q in Γ_quad]
     # test various PDEs and integral operators
     for pde in (Inti.Laplace(; dim = 2), Inti.Helmholtz(; k = 1.2, dim = 2))
         @testset "PDE = $pde" begin
             for K in (Inti.SingleLayerKernel(pde), Inti.DoubleLayerKernel(pde))
                 iop = Inti.IntegralOperator(K, Γ_quad)
-                H = HMatrices.assemble_hmatrix(iop; atol = 1e-8)
+                H = Inti.assemble_hmatrix(iop; atol = 1e-8)
                 x = rand(eltype(iop), size(iop, 2))
                 yapprox = H * x
                 # test on a given index set
