@@ -105,8 +105,8 @@ end
 """
     _green_multiplier(x, quad)
 
-Helper function to help determine the constant σ in the Green identity S[γ₁u](x)
-- D[γ₀u](x) + σ*u(x) = 0. This can be used as a predicate to determine whether a
+Helper function to help determine the constant σ in the Green identity S\\[γ₁u\\](x)
+- D\\[γ₀u\\](x) + σ*u(x) = 0. This can be used as a predicate to determine whether a
 point is inside a domain or not.
 """
 function _green_multiplier(x::SVector, Q::Quadrature{N}) where {N}
