@@ -240,7 +240,7 @@ end
 
 # The variable `σ` contains the value of the approximate density at the
 # quadrature nodes. To reconstruct a continuous approximation to the solution,
-# we can use [`single_double_layer_potential`](@ref) to obtain the single- and
+# we can use [`single_double_layer_potential`](@ref Inti.single_double_layer_potential) to obtain the single- and
 # double-layer potentials, and then combine them as follows:
 
 𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
