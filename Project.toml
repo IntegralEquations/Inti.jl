@@ -11,14 +11,17 @@ SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [weakdeps]
+FMM3D = "1e13804c-f9b7-11ea-0ef0-29f3b1745df8"
 Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
 HMatrices = "8646bddf-ab1c-4fa7-9c51-ba187d647618"
 
 [extensions]
+IntiFMM3DExt = "FMM3D"
 IntiGmshExt = "Gmsh"
 IntiHMatricesExt = "HMatrices"
 
 [compat]
+FMM3D = "1"
 Gmsh = "0.3"
 HMatrices = "0.2"
 LinearAlgebra = "1"
