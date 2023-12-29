@@ -18,7 +18,7 @@ function vdim_correction(
     T = eltype(Vop)
     @assert eltype(Dop) == eltype(Sop) == T "eltype of Sop, Dop, and Vop must match"
     # figure out if we are dealing with a scalar or vector PDE
-    σ   = if T <: Number
+    σ = if T <: Number
         1
     else
         @assert allequal(size(T))
@@ -30,9 +30,10 @@ function vdim_correction(
     # maximum number of quadrature nodes per element
     qmax = sum(size(mat, 1) for mat in values(source.etype2qtags))
     # TODO: relate order to qmax?
-    isnothing(interpolation_order) && (interpolation_order = maximum(order, values(source.etype2qrule)))
+    isnothing(interpolation_order) &&
+        (interpolation_order = maximum(order, values(source.etype2qrule)))
     p, P, γ₁P = polynomial_solutions_vdim(pde, interpolation_order)
-    μ   = if isnothing(green_multiplier)
+    μ = if isnothing(green_multiplier)
         μ_ = _green_multiplier(target[1], boundary)
         # snap to the nearest "generic" value of μ
         argmin(x -> norm(μ_ - x), (-1, -0.5, 0, 0.5, 1))
@@ -89,7 +90,7 @@ function _vdim_auxiliary_quantities(
 )
     num_basis = length(p)
     num_targets = length(X)
-    b   = [f(q) for q in Y, f in p]
+    b = [f(q) for q in Y, f in p]
     γ₀B = [f(q) for q in Γ, f in P]
     γ₁B = [f(q) for q in Γ, f in γ₁P]
     Θ = zeros(eltype(Vop), num_targets, num_basis)

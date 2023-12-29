@@ -73,7 +73,7 @@ function bdim_correction(
         error("only 2D and 3D supported")
     end
     # figure out if we are dealing with a scalar or vector PDE
-    σ   = if T <: Number
+    σ = if T <: Number
         1
     else
         @assert allequal(size(T))
