@@ -19,7 +19,7 @@ jobs:
         with:
           version: '1'
       - name: Install dependencies
-        run: julia --project=docs/ -e 'using Pkg; Pkg.develop(url="https://github.com/IntegralEquations/ElementaryPDESolutions.jl"); Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+        run: julia --project=docs/ -e 'using Pkg; Pkg.develop(url="https://github.com/IntegralEquations/ElementaryPDESolutions.jl"); Pkg.develop(url="https://github.com/flatironinstitute/FMM3D",subdir="julia"); Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
