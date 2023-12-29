@@ -222,7 +222,7 @@ function Base.iterate(iter::ElementIterator{<:LagrangeElement,<:SubMesh}, state 
     return iter[state], state + 1
 end
 
-function Base.getindex(msh::LagrangeMesh,Ω::Domain)
+function Base.getindex(msh::LagrangeMesh, Ω::Domain)
     nodes = empty(msh.nodes)
     etype2mat = empty(msh.etype2mat)
     ent2tags = empty(msh.ent2tags)
@@ -230,14 +230,14 @@ function Base.getindex(msh::LagrangeMesh,Ω::Domain)
     glob2loc = Dict{Int,Int}()
     for E in element_types(msh)
         connect = msh.etype2mat[E]::Matrix{Int}
-        np,_ = size(connect)
+        np, _ = size(connect)
         mat = Int[]
         for ent in entities(Ω)
             etags = Int[]
             haskey(msh.ent2tags[ent], E) || continue
-            for (iloc,i) in enumerate(msh.ent2tags[ent][E])
-                push!(etags,iloc)
-                for j in view(connect,:,i)
+            for (iloc, i) in enumerate(msh.ent2tags[ent][E])
+                push!(etags, iloc)
+                for j in view(connect, :, i)
                     if !haskey(glob2loc, j) # new node
                         push!(nodes, msh.nodes[j])
                         glob2loc[j] = length(nodes)
