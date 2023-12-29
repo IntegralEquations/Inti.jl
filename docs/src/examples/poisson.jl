@@ -30,7 +30,8 @@ using Inti
 # Seeking for a solution $u$ of the form ...
 
 meshsize = 0.1
-qorder = 2
+qorder = 5
+interpolation_order = qorder
 
 # ## Meshing
 
@@ -41,6 +42,8 @@ using Gmsh # this will trigger the loading of Inti's Gmsh extension
 function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
     try
         gmsh.initialize()
+        # set verbosity to 0
+        gmsh.option.setNumber("General.Terminal", 0)
         gmsh.model.add("circle-mesh")
         gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
         gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
@@ -55,18 +58,17 @@ function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
 end
 
 name = joinpath(@__DIR__, "disk.msh")
-gmsh_disk(; meshsize, order = 1, name)
+gmsh_disk(; meshsize, order = 2, name)
 
 Ω, msh = Inti.gmsh_read_msh(name; dim = 2)
-@show Ω
-#-
 Γ = Inti.boundary(Ω)
-@show Γ
-#-
-@show msh
 
 Ωₕ = view(msh, Ω)
 Γₕ = view(msh, Γ)
+# s
+Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder);
+dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
+# Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
 Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder)
 Γₕ_quad = Inti.Quadrature(Γₕ; qorder)
 
@@ -88,19 +90,20 @@ using HMatrices
 pde = Inti.Laplace(; dim = 2)
 
 ## Boundary operators
+using HMatrices
 S_b2b, D_b2b = Inti.single_double_layer(;
     pde,
     target = Γₕ_quad,
     source = Γₕ_quad,
-    compression = (method = :none,),
+    compression = (method = :none, tol = 1e-8),
     correction = (method = :dim,),
 )
 S_b2d, D_b2d = Inti.single_double_layer(;
     pde,
     target = Ωₕ_quad,
     source = Γₕ_quad,
-    compression = (method = :none,),
-    correction = (method = :dim, maxdist = 5*meshsize),
+    compression = (method = :none, tol = 1e-8),
+    correction = (method = :dim, maxdist = 5 * meshsize),
 )
 
 ## Volume potentials
@@ -108,15 +111,15 @@ V_d2d = Inti.volume_potential(;
     pde,
     target = Ωₕ_quad,
     source = Ωₕ_quad,
-    compression = (method = :none,),
-    correction = (method = :dim,),
+    compression = (method = :hmatrix, tol = 1e-12),
+    correction = (method = :dim, interpolation_order),
 )
 V_d2b = Inti.volume_potential(;
     pde,
     target = Γₕ_quad,
     source = Ωₕ_quad,
-    compression = (method = :none,),
-    correction = (method = :dim, maxdist = 5*meshsize),
+    compression = (method = :hmatrix, tol = 1e-12),
+    correction = (method = :dim, maxdist = 5 * meshsize, interpolation_order),
 )
 
 # We can now solve a BIE for the unknown density $\sigma$:
@@ -130,17 +133,19 @@ g̃ = V_d2b * f + g
 
 using LinearAlgebra
 L = -I / 2 + D_b2b
-σ = L \ g̃
+F = lu(L)
+σ = F \ g̃
 
 # To check the solution, lets evaluate it at the quadrature nodes of $\Omega$
 # and
-uₕ_quad = -V_d2d * f + D_b2d * σ
-uₑ_quad = map(q->uₑ(q.coords),Ωₕ_quad)
+uₕ_quad = -(V_d2d * f) + D_b2d * σ
+uₑ_quad = map(q -> uₑ(q.coords), Ωₕ_quad)
 er = uₕ_quad - uₑ_quad
 @show norm(er, Inf)
 
 # ## Visualize the solution error using Gmsh
 gmsh.initialize()
+gmsh.option.setNumber("General.Terminal", 0)
 gmsh.open(name)
 v1 = gmsh.view.add("Solution error")
 # gmsh.view.addModelData(v1, 0, "disk", ElementData, tags)
