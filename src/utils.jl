@@ -208,3 +208,26 @@ end
 # some useful type aliases
 const Point2D = SVector{2,Float64}
 const Point3D = SVector{3,Float64}
+
+function _normalize_compression(compression)
+    methods = (:hmatrix, :fmm, :none)
+    # check that method is valid
+    compression.method ∈ (:hmatrix, :fmm, :none) || error(
+        "Unknown compression.method $(compression.method). Available options: $methods",
+    )
+    # set default tolerance if not provided
+    compression = merge((tol = 1e-8,), compression)
+    return compression
+end
+
+function _normalize_correction(correction)
+    methods = (:dim, :none)
+    # check that method is valid
+    correction.method ∈ (:dim, :none) ||
+        error("Unknown correction.method $(correction.method). Available options: $methods")
+    #
+    if correction.method == :dim
+        correction = merge((maxdist = Inf, interpolation_order = nothing), correction)
+    end
+    return correction
+end

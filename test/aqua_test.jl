@@ -10,7 +10,8 @@ using Aqua
         undefined_exports = true,
         project_extras = true,
         stale_deps = true,
-        deps_compat = true,
-        piracies = (; broken = false),
+        deps_compat = (; broken = true), # ElementaryPDESolutions not registered
+        piracies = (; broken = true), # piracy related to ElementaryPDESolutions
+        persistent_tasks = (; broken = false), # fixed?
     )
 end

@@ -119,6 +119,12 @@ const LagrangeSquare = LagrangeElement{ReferenceSquare}
 """
 const LagrangeCube = LagrangeElement{ReferenceCube}
 
+vertices(el::LagrangeLine)        = el.vals[1:2]
+vertices(el::LagrangeTriangle)    = el.vals[1:3]
+vertices(el::LagrangeSquare)      = el.vals[1:4]
+vertices(el::LagrangeTetrahedron) = el.vals[1:4]
+vertices(el::LagrangeCube)        = el.vals[1:8]
+
 #=
 Hardcode some basic elements.
 TODO: Eventually this could/should be automated.

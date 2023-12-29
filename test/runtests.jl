@@ -19,3 +19,6 @@ using Aqua
 @safetestset "Gmsh import" include("gmsh_test.jl")
 
 @safetestset "HMatrices extension" include("hmatrices_test.jl")
+
+# TODO: ask for FMM3D to be registered
+# @safetestset "FMM3D extension" include("fmm3d_test.jl")
