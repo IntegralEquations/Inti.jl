@@ -222,66 +222,32 @@ function Base.iterate(iter::ElementIterator{<:LagrangeElement,<:SubMesh}, state 
     return iter[state], state + 1
 end
 
-"""
-    triangle_connectivity(msh::AbstractMesh)
-
-Return a vector of integers `connec` providing a triangulation of the elements
-in the `mesh`. The `connec` vector should be read in groups of three to get the
-triangles.
-
-For elements of `LagrangeTriangle` type, the first three nodes are returned. For
-elements of `LagrangeSquare` type, the triangulation is done by splitting the
-element in two triangles. For elements of `LagrangeTetrahedron` type, the four
-faces are returned. This method will error if the element type is not supported.
-"""
-triangle_connectivity(msh::SubMesh) = _triangle_connectivity(msh.parent, msh.domain)
-triangle_connectivity(msh::LagrangeMesh) = _triangle_connectivity(msh, domain(msh))
-function _triangle_connectivity(msh::Inti.LagrangeMesh{N,T}, Ω::Inti.Domain) where {N,T}
-    connec = Int[]
-    for E in Inti.element_types(msh)
-        el_idxs = Inti.dom2elt(msh, Ω, E)::Vector{Int}
-        isempty(el_idxs) && continue
-        tags = msh.etype2mat[E]::Matrix{Int}
-        if E <: Inti.LagrangeTriangle
-            # extract the first three tags
-            for n in el_idxs
-                push!(connec, tags[1, n])
-                push!(connec, tags[2, n])
-                push!(connec, tags[3, n])
+function Base.getindex(msh::LagrangeMesh, Ω::Domain)
+    nodes = empty(msh.nodes)
+    etype2mat = empty(msh.etype2mat)
+    ent2tags = empty(msh.ent2tags)
+    foreach(ent -> ent2tags[ent] = Dict{DataType,Vector{Int}}(), entities(Ω))
+    glob2loc = Dict{Int,Int}()
+    for E in element_types(msh)
+        connect = msh.etype2mat[E]::Matrix{Int}
+        np, _ = size(connect)
+        mat = Int[]
+        for ent in entities(Ω)
+            etags = Int[]
+            haskey(msh.ent2tags[ent], E) || continue
+            for (iloc, i) in enumerate(msh.ent2tags[ent][E])
+                push!(etags, iloc)
+                for j in view(connect, :, i)
+                    if !haskey(glob2loc, j) # new node
+                        push!(nodes, msh.nodes[j])
+                        glob2loc[j] = length(nodes)
+                    end
+                    push!(mat, glob2loc[j]) # push local index of node
+                end
             end
-        elseif E <: Inti.LagrangeSquare
-            for n in el_idxs
-                # lower triangle
-                push!(connec, tags[1, n])
-                push!(connec, tags[2, n])
-                push!(connec, tags[3, n])
-                # upper triangle
-                push!(connec, tags[3, n])
-                push!(connec, tags[4, n])
-                push!(connec, tags[1, n])
-            end
-        elseif E <: Inti.LagrangeTetrahedron
-            for n in el_idxs
-                # four faces
-                push!(connec, tags[1, n])
-                push!(connec, tags[2, n])
-                push!(connec, tags[3, n])
-                #
-                push!(connec, tags[1, n])
-                push!(connec, tags[2, n])
-                push!(connec, tags[4, n])
-                #
-                push!(connec, tags[1, n])
-                push!(connec, tags[3, n])
-                push!(connec, tags[4, n])
-                #
-                push!(connec, tags[2, n])
-                push!(connec, tags[3, n])
-                push!(connec, tags[4, n])
-            end
-        else
-            error("element type $E not supported")
+            push!(ent2tags[ent], E => etags)
         end
+        isempty(mat) || (etype2mat[E] = reshape(mat, np, :))
     end
-    return connec
+    return LagrangeMesh(nodes, etype2mat, ent2tags)
 end

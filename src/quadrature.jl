@@ -203,13 +203,13 @@ function integrate(f, msh::Quadrature)
 end
 
 """
-    etype_to_nearest_points(X,Y::Quadrature; tol)
+    etype_to_nearest_points(X,Y::Quadrature; maxdist)
 
 For each element `el` in `Y.mesh`, return a list with the indices of all points
 in `X` for which `el` is the nearest element. Ignore indices for which the
-distance exceeds `tol`.
+distance exceeds `maxdist`.
 """
-function etype_to_nearest_points(X, Y::Quadrature; tol = Inf)
+function etype_to_nearest_points(X, Y::Quadrature; maxdist = Inf)
     if X === Y
         # when both surfaces are the same, the "near points" of an element are
         # simply its own quadrature points
@@ -219,18 +219,18 @@ function etype_to_nearest_points(X, Y::Quadrature; tol = Inf)
         end
     else
         pts = [coords(x) for x in X]
-        dict = _etype_to_nearest_points(pts, Y, tol)
+        dict = _etype_to_nearest_points(pts, Y, maxdist)
     end
     return dict
 end
 
-function _etype_to_nearest_points(X, Y::Quadrature, tol = Inf)
+function _etype_to_nearest_points(X, Y::Quadrature, maxdist = Inf)
     y = [coords(q) for q in Y]
     kdtree = KDTree(y)
     dict = Dict(j => Int[] for j in 1:length(y))
     for i in eachindex(X)
         qtag, d = nn(kdtree, X[i])
-        d > tol || push!(dict[qtag], i)
+        d > maxdist || push!(dict[qtag], i)
     end
     # dict[j] now contains indices in X for which the j quadrature node in Y is
     # the closest. Next we reverse the map

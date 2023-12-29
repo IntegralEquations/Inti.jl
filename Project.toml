@@ -3,7 +3,9 @@ uuid = "fb74042b-437e-4c5b-88cf-d4e2beb394d5"
 version = "0.1.0"
 
 [deps]
+ElementaryPDESolutions = "88a69b33-da0f-4502-8c8c-d680cf4d883b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LinearMaps = "7a12625a-238d-50fd-b39a-03d52299707e"
 NearestNeighbors = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
@@ -11,17 +13,21 @@ SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [weakdeps]
+FMM3D = "1e13804c-f9b7-11ea-0ef0-29f3b1745df8"
 Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
 HMatrices = "8646bddf-ab1c-4fa7-9c51-ba187d647618"
 
 [extensions]
+IntiFMM3DExt = "FMM3D"
 IntiGmshExt = "Gmsh"
 IntiHMatricesExt = "HMatrices"
 
 [compat]
+FMM3D = "1"
 Gmsh = "0.3"
 HMatrices = "0.2"
 LinearAlgebra = "1"
+LinearMaps = "3"
 NearestNeighbors = "0.4"
 Printf = "1"
 SparseArrays = "1"

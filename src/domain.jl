@@ -104,3 +104,4 @@ Base.iterate(Ω::Domain, state = 1) = iterate(entities(Ω), state)
 Base.isempty(Ω::Domain) = isempty(entities(Ω))
 
 Base.in(ent::AbstractEntity, Ω::Domain) = in(ent, entities(Ω))
+Base.in(Ω1::Domain, Ω2::Domain) = all(ent ∈ Ω2 for ent in entities(Ω1))
