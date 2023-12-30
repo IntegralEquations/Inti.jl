@@ -8,7 +8,10 @@ function __init__()
     @info "Loading Inti.jl FMM3D extension"
 end
 
-function Inti.assemble_fmm(iop::Inti.IntegralOperator{VT,KT,TT,ST}; atol = sqrt(eps())) where {VT,KT,TT,ST<:Inti.Quadrature{3,Float64}}
+function Inti.assemble_fmm(
+    iop::Inti.IntegralOperator{VT,KT,TT,ST};
+    atol = sqrt(eps()),
+) where {VT,KT,TT,ST<:Inti.Quadrature{3,Float64}}
     # unpack the necessary fields in the appropriate format
     m, n = size(iop)
     targets = Matrix{Float64}(undef, 3, m)

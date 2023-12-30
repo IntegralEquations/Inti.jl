@@ -139,7 +139,7 @@ L = -I / 2 + D_b2b
 
 using IterativeSolvers
 σ, hist =
-    gmres(L, rhs; log = true, abstol = 1e-6, verbose = false, restart = 100, maxiter = 100)
+    gmres(L, rhs; log = true, abstol = 1e-10, verbose = false, restart = 100, maxiter = 100)
 @show hist
 
 # To check the solution, lets evaluate it at the quadrature nodes of $\Omega$

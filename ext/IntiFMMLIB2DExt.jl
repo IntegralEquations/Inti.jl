@@ -8,7 +8,10 @@ function __init__()
     @info "Loading Inti.jl FMMLIB2D extension"
 end
 
-function Inti.assemble_fmm(iop::Inti.IntegralOperator{VT,KT,TT,ST}; atol = sqrt(eps())) where {VT,KT,TT,ST<:Inti.Quadrature{2,Float64}}
+function Inti.assemble_fmm(
+    iop::Inti.IntegralOperator{VT,KT,TT,ST};
+    atol = sqrt(eps()),
+) where {VT,KT,TT,ST<:Inti.Quadrature{2,Float64}}
     # unpack the necessary fields in the appropriate format
     m, n = size(iop)
     sources = Matrix{Float64}(undef, 2, n)
@@ -31,10 +34,15 @@ function Inti.assemble_fmm(iop::Inti.IntegralOperator{VT,KT,TT,ST}; atol = sqrt(
             @. charges = -1 / (2 * π) * weights * x
             # FMMLIB2D does no checking for if targets are also sources
             if iop.source == iop.target
-                out = FMMLIB2D.rfmm2d(source=sources, charge=charges, tol=atol)
+                out = FMMLIB2D.rfmm2d(; source = sources, charge = charges, tol = atol)
                 return copyto!(y, out.pot)
             else
-                out = FMMLIB2D.rfmm2d(source=sources, charge=charges, target=targets, tol=atol)
+                out = FMMLIB2D.rfmm2d(;
+                    source = sources,
+                    charge = charges,
+                    target = targets,
+                    tol = atol,
+                )
                 return copyto!(y, out.pottarg)
             end
         end
@@ -55,10 +63,21 @@ function Inti.assemble_fmm(iop::Inti.IntegralOperator{VT,KT,TT,ST}; atol = sqrt(
             end
             # FMMLIB2D does no checking for if targets are also sources
             if iop.source == iop.target
-                out = FMMLIB2D.rfmm2d(source=sources, dipstr=dipstr, dipvec=dipvecs, tol=atol)
+                out = FMMLIB2D.rfmm2d(;
+                    source = sources,
+                    dipstr = dipstr,
+                    dipvec = dipvecs,
+                    tol = atol,
+                )
                 return copyto!(y, out.pot)
             else
-                out = FMMLIB2D.rfmm2d(source=sources, target=targets, dipstr=dipstr, dipvec=dipvecs, tol=atol)
+                out = FMMLIB2D.rfmm2d(;
+                    source = sources,
+                    target = targets,
+                    dipstr = dipstr,
+                    dipvec = dipvecs,
+                    tol = atol,
+                )
                 return copyto!(y, out.pottarg)
             end
         end
@@ -71,10 +90,21 @@ function Inti.assemble_fmm(iop::Inti.IntegralOperator{VT,KT,TT,ST}; atol = sqrt(
             @. charges = weights * x
             # FMMLIB2D does no checking for if targets are also sources
             if iop.source == iop.target
-                out = FMMLIB2D.hfmm2d(zk=zk, source=sources, charge=charges, tol=atol)
+                out = FMMLIB2D.hfmm2d(;
+                    zk = zk,
+                    source = sources,
+                    charge = charges,
+                    tol = atol,
+                )
                 return copyto!(y, out.pot)
             else
-                out = FMMLIB2D.hfmm2d(zk=zk, source=sources, charge=charges, target=targets, tol=atol)
+                out = FMMLIB2D.hfmm2d(;
+                    zk = zk,
+                    source = sources,
+                    charge = charges,
+                    target = targets,
+                    tol = atol,
+                )
                 return copyto!(y, out.pottarg)
             end
         end
@@ -92,10 +122,23 @@ function Inti.assemble_fmm(iop::Inti.IntegralOperator{VT,KT,TT,ST}; atol = sqrt(
             end
             # FMMLIB2D does no checking for if targets are also sources
             if iop.source == iop.target
-                out = FMMLIB2D.hfmm2d(zk=zk, source=sources, dipstr=x, dipvec=dipvecs, tol=atol)
+                out = FMMLIB2D.hfmm2d(;
+                    zk = zk,
+                    source = sources,
+                    dipstr = x,
+                    dipvec = dipvecs,
+                    tol = atol,
+                )
                 return copyto!(y, out.pot)
             else
-                out = FMMLIB2D.hfmm2d(zk=zk, source=sources, target=targets, dipstr=x, dipvec=dipvecs, tol=atol)
+                out = FMMLIB2D.hfmm2d(;
+                    zk = zk,
+                    source = sources,
+                    target = targets,
+                    dipstr = x,
+                    dipvec = dipvecs,
+                    tol = atol,
+                )
                 return copyto!(y, out.pottarg)
             end
         end
