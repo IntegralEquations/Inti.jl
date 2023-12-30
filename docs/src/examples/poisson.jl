@@ -14,6 +14,7 @@ Pkg.activate(docsdir)                #src
 
 using Inti
 
+
 # ## Problem definition
 
 # In this example we will solve the Poisson equation in a domain $\Omega$ with
@@ -65,10 +66,9 @@ gmsh_disk(; meshsize, order = 2, name)
 
 Ωₕ = view(msh, Ω)
 Γₕ = view(msh, Γ)
-# s
+# Use VDIM with the Vioreanu-Rokhlin quadrature rule
 Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder);
 dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
-# Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
 Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder)
 Γₕ_quad = Inti.Quadrature(Γₕ; qorder)
 
@@ -85,24 +85,23 @@ uₑ = (x) -> cos(x[1]) * sin(x[2])
 fₑ = (x) -> -2 * uₑ(x)
 
 # ## Boundary and integral operators
-using HMatrices
+using FMMLIB2D
 
 pde = Inti.Laplace(; dim = 2)
 
 ## Boundary operators
-using HMatrices
 S_b2b, D_b2b = Inti.single_double_layer(;
     pde,
     target = Γₕ_quad,
     source = Γₕ_quad,
-    compression = (method = :none, tol = 1e-8),
+    compression = (method = :fmm, tol = 1e-12),
     correction = (method = :dim,),
 )
 S_b2d, D_b2d = Inti.single_double_layer(;
     pde,
     target = Ωₕ_quad,
     source = Γₕ_quad,
-    compression = (method = :none, tol = 1e-8),
+    compression = (method = :fmm, tol = 1e-12),
     correction = (method = :dim, maxdist = 5 * meshsize),
 )
 
@@ -111,14 +110,14 @@ V_d2d = Inti.volume_potential(;
     pde,
     target = Ωₕ_quad,
     source = Ωₕ_quad,
-    compression = (method = :hmatrix, tol = 1e-12),
+    compression = (method = :fmm, tol = 1e-12),
     correction = (method = :dim, interpolation_order),
 )
 V_d2b = Inti.volume_potential(;
     pde,
     target = Γₕ_quad,
     source = Ωₕ_quad,
-    compression = (method = :hmatrix, tol = 1e-12),
+    compression = (method = :fmm, tol = 1e-12),
     correction = (method = :dim, maxdist = 5 * meshsize, interpolation_order),
 )
 
@@ -129,12 +128,19 @@ end
 g = map(Γₕ_quad) do q
     return uₑ(q.coords)
 end
-g̃ = V_d2b * f + g
+rhs = V_d2b * f + g
 
 using LinearAlgebra
 L = -I / 2 + D_b2b
-F = lu(L)
-σ = F \ g̃
+
+# If `compression=none` is used above for constructing `D_b2b`, we could alternately use dense linear algebra:
+#F = lu(L)
+#σ = F \ rhs
+
+using IterativeSolvers
+σ, hist =
+    gmres(L, rhs; log = true, abstol = 1e-6, verbose = false, restart = 100, maxiter = 100)
+@show hist
 
 # To check the solution, lets evaluate it at the quadrature nodes of $\Omega$
 # and
