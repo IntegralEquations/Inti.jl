@@ -99,7 +99,7 @@ end
 
 Set up a 2D or 3D FMM for evaluating the discretized integral operator `iop`. In
 2D the FMMLIB2D library is used while in 3D FMM3D is used.
-    
+
 Caution: FMMLIB2D does *no* checking for if targets and sources coincide; the
 method handles this if `iop.source == iop.target` but otherwise is user's
 responsibility or garbage will be returned.
