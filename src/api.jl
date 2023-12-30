@@ -17,7 +17,7 @@ compressed. The available options are:
   - `(method =:hmatrix, tol)`: the resulting operators are compressed using
     hierarchical matrices with an absolute tolerance `tol` (defaults to  `1e-8`).
   - `(method = :fmm, tol)`: the resulting operators are compressed using the fast multipole method
-    with a tolerance `tol` (defaults to `1e-8`).
+    with an absolute tolerance `tol` (defaults to `1e-8`).
 
 ## Correction
 
@@ -108,7 +108,7 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
     elseif compression.method == :hmatrix
         Vmat = assemble_hmatrix(V; atol = compression.tol)
     elseif compression.method == :fmm
-        Vmat = assemble_fmm(V; tol = compression.tol)
+        Vmat = assemble_fmm(V; atol = compression.tol)
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
