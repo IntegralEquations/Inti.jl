@@ -9,9 +9,12 @@ function __init__()
 end
 
 function Inti.assemble_fmm(
-    iop::Inti.IntegralOperator{VT,KT,TT,ST};
+    pde::Inti.AbstractPDE{3},
+    iop::Inti.IntegralOperator;
     atol = sqrt(eps()),
-) where {VT,KT,TT,ST<:Inti.Quadrature{3,Float64}}
+)
+    @assert typeof(iop.source) <: Inti.Quadrature{3,Float64} "Source Quadrature dimension must match PDE"
+    @assert typeof(iop.kernel.pde) == typeof(pde)
     # unpack the necessary fields in the appropriate format
     m, n = size(iop)
     targets = Matrix{Float64}(undef, 3, m)
