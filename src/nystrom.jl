@@ -95,20 +95,45 @@ end
 end
 
 """
-    assemble_fmm(pde, iop; atol)
+    assemble_fmm(iop; atol)
 
 Set up a 2D or 3D FMM for evaluating the discretized integral operator `iop`
-associated with the `pde`. In 2D the FMMLIB2D library is used while in 3D FMM3D
-is used.
+associated with the `pde`. In 2D the `FMMLIB2D` library is used while in 3D
+`FMM3D` is used.
 
-Caution: FMMLIB2D does *no* checking for if targets and sources coincide; the
-method handles this if `iop.source == iop.target` but otherwise is user's
-responsibility or garbage will be returned.
+!!! warning "FMMLIB2D"
+    FMMLIB2D does *no* checking for if the targets and sources coincide, and
+    will return `Inf` values if `iop.target !== iop.source`, but there is a
+    point `x ∈ iop.target` such that `x ∈ iop.source`.
 """
-function assemble_fmm(args...; kwargs...)
-    return error("Inti.assemble_fmm not found. Did you forget to import FMM3D / FMMLIB2D ?")
+function assemble_fmm(iop::IntegralOperator, args...; kwargs...)
+    N = ambient_dimension(iop.source)
+    if N == 2
+        return _assemble_fmm2d(iop, args...; kwargs...)
+    elseif N == 3
+        return _assemble_fmm3d(iop, args...; kwargs...)
+    else
+        return error("Only 2D and 3D FMMs are supported")
+    end
 end
 
+function _assemble_fmm2d(args...; kwargs...)
+    return error("_assemble_fmm2d not found. Did you forget to import FMMLIB2D ?")
+end
+
+function _assemble_fmm3d(args...; kwargs...)
+    return error("_assemble_fmm3d not found. Did you forget to import FMM3D ?")
+end
+
+"""
+    assemble_hmatrix(iop[; atol, rank, rtol, eta])
+
+Assemble an H-matrix representation of the discretized integral operator `iop`
+using the `HMatrices.jl` library.
+
+See the `assemble_hmatrix` function from `HMatrices.jl` for more details on the
+keyword arguments.
+"""
 function assemble_hmatrix(args...; kwargs...)
     return error("Inti.assemble_hmatrix not found. Did you forget to import HMatrices?")
 end

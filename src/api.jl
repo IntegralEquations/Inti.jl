@@ -48,8 +48,8 @@ function single_double_layer(; pde, target, source, compression, correction)
         Smat = assemble_matrix(Sop)
         Dmat = assemble_matrix(Dop)
     elseif compression.method == :fmm
-        Smat = assemble_fmm(pde, Sop; atol = compression.tol)::LinearMap
-        Dmat = assemble_fmm(pde, Dop; atol = compression.tol)::LinearMap
+        Smat = assemble_fmm(Sop; atol = compression.tol)::LinearMap
+        Dmat = assemble_fmm(Dop; atol = compression.tol)::LinearMap
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
@@ -108,7 +108,7 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
     elseif compression.method == :hmatrix
         Vmat = assemble_hmatrix(V; atol = compression.tol)
     elseif compression.method == :fmm
-        Vmat = assemble_fmm(pde, V; atol = compression.tol)
+        Vmat = assemble_fmm(V; atol = compression.tol)
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end

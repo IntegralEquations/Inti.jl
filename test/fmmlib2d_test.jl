@@ -1,4 +1,3 @@
-
 using Test
 using Inti
 using FMMLIB2D
@@ -23,7 +22,7 @@ for pde in (Inti.Laplace(; dim = 2), Inti.Helmholtz(; dim = 2, k = 1.2))
         for K in (Inti.DoubleLayerKernel(pde), Inti.SingleLayerKernel(pde))
             for Γ_quad in (Γ₁_quad, Γ₂_quad)
                 iop = Inti.IntegralOperator(K, Γ₁_quad, Γ_quad)
-                iop_fmm = Inti.assemble_fmm(pde, iop; atol = 1e-8)
+                iop_fmm = Inti.assemble_fmm(iop; atol = 1e-8)
                 x = rand(eltype(iop), size(iop, 2))
                 yapprox = iop_fmm * x
                 # test on a given index set

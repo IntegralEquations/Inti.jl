@@ -237,4 +237,4 @@ end
 
 Two points `x` and `y` are considerd the same if `norm(x-y) ≤ SAME_POINT_TOLERANCE`.
 """
-const SAME_POINT_TOLERANCE = 1e-12
+const SAME_POINT_TOLERANCE = 1e-14
