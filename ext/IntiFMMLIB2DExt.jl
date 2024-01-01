@@ -8,26 +8,20 @@ function __init__()
     @info "Loading Inti.jl FMMLIB2D extension"
 end
 
-function Inti.assemble_fmm(
-    pde::Inti.AbstractPDE{2},
-    iop::Inti.IntegralOperator;
-    atol = sqrt(eps()),
-)
-    @assert typeof(iop.source) <: Inti.Quadrature{2,Float64} "Source Quadrature dimension must match PDE"
-    @assert typeof(iop.kernel.pde) == typeof(pde)
+function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
     # unpack the necessary fields in the appropriate format
     m, n = size(iop)
     sources = Matrix{Float64}(undef, 2, n)
     for j in 1:n
         sources[:, j] = Inti.coords(iop.source[j])
     end
-    if iop.source != iop.target
-        targets = Matrix{Float64}(undef, 2, m)
-        for i in 1:m
-            targets[:, i] = Inti.coords(iop.target[i])
-        end
+    targets = Matrix{Float64}(undef, 2, m)
+    for i in 1:m
+        targets[:, i] = Inti.coords(iop.target[i])
     end
     weights = [q.weight for q in iop.source]
+    same_surface =
+        m == n ? isapprox(targets, sources; atol = Inti.SAME_POINT_TOLERANCE) : false
     K = iop.kernel
     # Laplace
     if K isa Inti.SingleLayerKernel{Float64,Inti.Laplace{2}}
@@ -36,7 +30,7 @@ function Inti.assemble_fmm(
             # multiply by weights and constant
             @. charges = -1 / (2 * π) * weights * x
             # FMMLIB2D does no checking for if targets are also sources
-            if iop.source == iop.target
+            if same_surface
                 out = FMMLIB2D.rfmm2d(; source = sources, charge = charges, tol = atol)
                 return copyto!(y, out.pot)
             else
@@ -65,7 +59,7 @@ function Inti.assemble_fmm(
                 dipstr[j] = x[j]
             end
             # FMMLIB2D does no checking for if targets are also sources
-            if iop.source == iop.target
+            if same_surface
                 out = FMMLIB2D.rfmm2d(;
                     source = sources,
                     dipstr = dipstr,
@@ -92,7 +86,7 @@ function Inti.assemble_fmm(
             # multiply by weights and constant
             @. charges = weights * x
             # FMMLIB2D does no checking for if targets are also sources
-            if iop.source == iop.target
+            if same_surface
                 out = FMMLIB2D.hfmm2d(;
                     zk = zk,
                     source = sources,
@@ -124,7 +118,7 @@ function Inti.assemble_fmm(
                 dipvecs[:, j] = view(normals, :, j) * weights[j]
             end
             # FMMLIB2D does no checking for if targets are also sources
-            if iop.source == iop.target
+            if same_surface
                 out = FMMLIB2D.hfmm2d(;
                     zk = zk,
                     source = sources,

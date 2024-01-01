@@ -8,13 +8,7 @@ function __init__()
     @info "Loading Inti.jl FMM3D extension"
 end
 
-function Inti.assemble_fmm(
-    pde::Inti.AbstractPDE{3},
-    iop::Inti.IntegralOperator;
-    atol = sqrt(eps()),
-)
-    @assert typeof(iop.source) <: Inti.Quadrature{3,Float64} "Source Quadrature dimension must match PDE"
-    @assert typeof(iop.kernel.pde) == typeof(pde)
+function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
     # unpack the necessary fields in the appropriate format
     m, n = size(iop)
     targets = Matrix{Float64}(undef, 3, m)

@@ -20,5 +20,7 @@ using Aqua
 
 @safetestset "HMatrices extension" include("hmatrices_test.jl")
 
+@safetestset "FMMLIB2D extension" include("fmmlib2d_test.jl")
+
 # TODO: ask for FMM3D to be registered
 # @safetestset "FMM3D extension" include("fmm3d_test.jl")
