@@ -24,12 +24,12 @@ function gmsh_circle(; name, meshsize, order = 1, radius = 1, center = (0, 0))
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">gmsh_circle (generic function with 1 method)</code></pre><p>Let us now use <code>gmsh_circle</code> to create a <code>circle.msh</code> file. As customary in wave-scattering problems, we will choose a mesh size that is proportional to wavelength:</p><pre><code class="language-julia hljs">name = joinpath(@__DIR__, &quot;circle.msh&quot;)
 gmsh_circle(; meshsize, order = gorder, name)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : Meshing curve 1 (Ellipse)
-Info    : Done meshing 1D (Wall 0.000201935s, CPU 0.000159s)
+Info    : Done meshing 1D (Wall 0.000206027s, CPU 0.000155s)
 Info    : 126 nodes 127 elements
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
 Info    : [ 50%] Meshing surface 1 order 2
-Info    : Done meshing order 2 (Wall 0.00114853s, CPU 0.000827s)
+Info    : Done meshing order 2 (Wall 0.00112433s, CPU 0.000782s)
 Info    : Writing &#39;/home/lfaria/runner-integral-equations/_work/Inti.jl/Inti.jl/docs/build/examples/generated/circle.msh&#39;...
 Info    : Done writing &#39;/home/lfaria/runner-integral-equations/_work/Inti.jl/Inti.jl/docs/build/examples/generated/circle.msh&#39;</code></pre><p>We can now import the file and parse the mesh and domain information into <code>Inti.jl</code> using the <a href="../../../references/#Inti.gmsh_read_msh"><code>gmsh_read_msh</code></a> function:</p><pre><code class="language-julia hljs">Ω, msh = Inti.gmsh_read_msh(name; dim = 2)
 @show Ω</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Domain with 1 entity:
@@ -268,7 +268,7 @@ er = maximum(1:100) do _
     x = 2 * x̂
     return abs(uₛ(x) - uₑ(x))
 end
-@info &quot;error with correction = $er&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: error with correction = 1.9641170210048896e-5</code></pre><p>We see that, once again, the approximation is quite accurate. To visualize the solution, we will use <code>Gmsh</code> to create mesh of a punctured plane:</p><pre><code class="language-julia hljs">#
+@info &quot;error with correction = $er&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: error with correction = 1.8527436919038808e-5</code></pre><p>We see that, once again, the approximation is quite accurate. To visualize the solution, we will use <code>Gmsh</code> to create mesh of a punctured plane:</p><pre><code class="language-julia hljs">#
 gmsh.initialize()
 gmsh.model.add(&quot;slice-sphere-mesh&quot;)
 gmsh.option.setNumber(&quot;Mesh.MeshSizeMax&quot;, meshsize)
@@ -286,10 +286,10 @@ Info    : [ 20%] Meshing curve 2 (Line)
 Info    : [ 40%] Meshing curve 3 (Line)
 Info    : [ 60%] Meshing curve 4 (Line)
 Info    : [ 80%] Meshing curve 5 (Circle)
-Info    : Done meshing 1D (Wall 0.000739738s, CPU 0.000576s)
+Info    : Done meshing 1D (Wall 0.000713229s, CPU 0.000728s)
 Info    : Meshing 2D...
 Info    : Meshing surface 2 (Plane, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.213413s, CPU 0.210088s)
+Info    : Done meshing 2D (Wall 0.210185s, CPU 0.210166s)
 Info    : 6268 nodes 12541 elements
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
@@ -299,7 +299,7 @@ Info    : [ 50%] Meshing curve 4 order 2
 Info    : [ 70%] Meshing curve 5 order 2
 Info    : [ 90%] Meshing surface 2 order 2
 Info    : Surface mesh: worst distortion = 0.98174 (0 elements in ]0, 0.2]); worst gamma = 0.681166
-Info    : Done meshing order 2 (Wall 0.0483928s, CPU 0.048317s)</code></pre><p>Evaluate the solution on the nodes (<code>order = 2</code> corresponds to element type <code>9</code> or a 6-node triangle) of the 2D mesh:</p><pre><code class="language-julia hljs">ntags, xyz, _ = gmsh.model.mesh.getNodes()
+Info    : Done meshing order 2 (Wall 0.0476483s, CPU 0.047649s)</code></pre><p>Evaluate the solution on the nodes (<code>order = 2</code> corresponds to element type <code>9</code> or a 6-node triangle) of the 2D mesh:</p><pre><code class="language-julia hljs">ntags, xyz, _ = gmsh.model.mesh.getNodes()
 etags, vtags = gmsh.model.mesh.getElementsByType(9)
 nodes = reinterpret(Inti.Point3D,xyz)[vtags]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">72540-element Vector{StaticArraysCore.SVector{3, Float64}}:
  [-1.1393270603180303, 0.4622210518743996, 0.0]
@@ -321,8 +321,7 @@ nodes = reinterpret(Inti.Point3D,xyz)[vtags]</code></pre><pre class="documenter-
  [-1.8716612063394664, 0.6222137482654954, 0.0]
  [-1.8332912020335945, 0.6148478169411147, 0.0]
  [-1.8532991325994008, 0.6287045755226429, 0.0]
- [-1.8516532757736601, 0.6083569896839671, 0.0]</code></pre><p>Since evaluating the integral representation of the solution at many points is expensive, we will use a compression method to accelerate the evaluation. In the example below, we use the fast-multipole method:</p><pre><code class="language-julia hljs">using FMM3D
-S,D = Inti.single_double_layer(;
+ [-1.8516532757736601, 0.6083569896839671, 0.0]</code></pre><p>Since evaluating the integral representation of the solution at many points is expensive, we will use a compression method to accelerate the evaluation. In the example below, we use the fast-multipole method:</p><pre><code class="language-julia hljs">S,D = Inti.single_double_layer(;
     pde,
     target = nodes,
     source = Q,
@@ -342,4 +341,4 @@ Warning : Discarding interpolation matrices when saving in .pos format
 Info    : Done writing &#39;3d_nodedata.pos&#39;
 Info    : Writing &#39;3d_nodedata.pos&#39;...
 Warning : Discarding interpolation matrices when saving in .pos format
-Info    : Done writing &#39;3d_nodedata.pos&#39;</code></pre><p>uncomment the following line to view the solution in gmsh gmsh.fltk.run()</p><pre><code class="language-julia hljs">gmsh.finalize()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../../">« Home</a><a class="docs-footer-nextpage" href="../../../references/">References »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.2.1 on <span class="colophon-date" title="Friday 29 December 2023 15:09">Friday 29 December 2023</span>. Using Julia version 1.10.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+Info    : Done writing &#39;3d_nodedata.pos&#39;</code></pre><p>uncomment the following line to view the solution in gmsh gmsh.fltk.run()</p><pre><code class="language-julia hljs">gmsh.finalize()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../../">« Home</a><a class="docs-footer-nextpage" href="../../../references/">References »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.2.1 on <span class="colophon-date" title="Tuesday 2 January 2024 08:46">Tuesday 2 January 2024</span>. Using Julia version 1.10.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

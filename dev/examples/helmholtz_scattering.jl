@@ -484,7 +484,6 @@ nodes = reinterpret(Inti.Point3D,xyz)[vtags]
 # Since evaluating the integral representation of the solution at many points is
 # expensive, we will use a compression method to accelerate the evaluation. In
 # the example below, we use the fast-multipole method:
-using FMM3D
 S,D = Inti.single_double_layer(;
     pde,
     target = nodes,
