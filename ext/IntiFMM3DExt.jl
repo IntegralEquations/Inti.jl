@@ -8,7 +8,7 @@ function __init__()
     @info "Loading Inti.jl FMM3D extension"
 end
 
-function Inti.assemble_fmm(iop::Inti.IntegralOperator; atol = sqrt(eps()))
+function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
     # unpack the necessary fields in the appropriate format
     m, n = size(iop)
     targets = Matrix{Float64}(undef, 3, m)

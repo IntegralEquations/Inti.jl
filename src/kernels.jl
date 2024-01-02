@@ -129,7 +129,7 @@ function (SL::SingleLayerKernel{T,Laplace{N}})(
     r = coords(target) - coords(source),
 )::T where {N,T}
     d = norm(r)
-    filter = !(d == 0)
+    filter = !(d ≤ SAME_POINT_TOLERANCE)
     if N == 2
         return filter * (-1 / (2π) * log(d))
     elseif N == 3
@@ -146,7 +146,7 @@ function (DL::DoubleLayerKernel{T,Laplace{N}})(
 )::T where {N,T}
     ny = normal(source)
     d = norm(r)
-    filter = !(d == 0)
+    filter = !(d ≤ SAME_POINT_TOLERANCE)
     if N == 2
         return filter * (1 / (2π) / (d^2) * dot(r, ny))
     elseif N == 3
@@ -163,7 +163,7 @@ function (ADL::AdjointDoubleLayerKernel{T,Laplace{N}})(
 )::T where {N,T}
     nx = normal(target)
     d = norm(r)
-    filter = !(d == 0)
+    filter = !(d ≤ SAME_POINT_TOLERANCE)
     if N == 2
         return filter * (-1 / (2π) / (d^2) * dot(r, nx))
     elseif N == 3
@@ -179,13 +179,14 @@ function (HS::HyperSingularKernel{T,Laplace{N}})(
     nx = normal(target)
     ny = normal(source)
     d = norm(r)
-    d == 0 && (return zero(T))
+    filter = !(d ≤ SAME_POINT_TOLERANCE)
     if N == 2
-        return 1 / (2π) / (d^2) * transpose(nx) * ((I - 2 * r * transpose(r) / d^2) * ny)
+        return filter *
+               (1 / (2π) / (d^2) * transpose(nx) * ((I - 2 * r * transpose(r) / d^2) * ny))
     elseif N == 3
         ID = SMatrix{3,3,Float64,9}(1, 0, 0, 0, 1, 0, 0, 0, 1)
         RRT = r * transpose(r) # r ⊗ rᵗ
-        return 1 / (4π) / (d^3) * transpose(nx) * ((ID - 3 * RRT / d^2) * ny)
+        return filter * (1 / (4π) / (d^3) * transpose(nx) * ((ID - 3 * RRT / d^2) * ny))
     end
 end
 
@@ -220,7 +221,7 @@ function (SL::SingleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T
     k = parameters(SL)
     r = x - y
     d = norm(r)
-    filter = !(d == 0)
+    filter = !(d ≤ SAME_POINT_TOLERANCE)
     if N == 2
         return filter * (im / 4 * hankelh1(0, k * d))
     elseif N == 3
@@ -234,7 +235,7 @@ function (DL::DoubleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T
     k = parameters(DL)
     r = x - y
     d = norm(r)
-    filter = !(d == 0)
+    filter = !(d ≤ SAME_POINT_TOLERANCE)
     if N == 2
         val = im * k / 4 / d * hankelh1(1, k * d) .* dot(r, ny)
         return filter * val
@@ -250,7 +251,7 @@ function (ADL::AdjointDoubleLayerKernel{T,<:Helmholtz{N}})(target, source)::T wh
     k = parameters(ADL)
     r = x - y
     d = norm(r)
-    filter = !(d == 0)
+    filter = !(d ≤ SAME_POINT_TOLERANCE)
     if N == 2
         val = -im * k / 4 / d * hankelh1(1, k * d) .* dot(r, nx)
         return filter * val
@@ -267,7 +268,7 @@ function (HS::HyperSingularKernel{T,S})(target, source)::T where {T,S<:Helmholtz
     k = parameters(pde(HS))
     r = x - y
     d = norm(r)
-    filter = !(d == 0)
+    filter = !(d ≤ SAME_POINT_TOLERANCE)
     if N == 2
         RRT = r * transpose(r) # r ⊗ rᵗ
         # TODO: rewrite the operation below in a more clear/efficient way
@@ -312,7 +313,7 @@ function (SL::SingleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
     y = coords(source)
     r = x - y
     d = norm(r)
-    filter = !(d == 0)
+    filter = !(d ≤ SAME_POINT_TOLERANCE)
     if N == 2
         γ = -log(d)
     elseif N == 3
@@ -329,7 +330,7 @@ function (DL::DoubleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
     ny = normal(source)
     r = x - y
     d = norm(r)
-    filter = !(d == 0)
+    filter = !(d ≤ SAME_POINT_TOLERANCE)
     if N == 2
         return filter * (1 / π * dot(r, ny) / d^4 * r * transpose(r))
     elseif N == 3
@@ -345,7 +346,7 @@ function (ADL::AdjointDoubleLayerKernel{T,<:Stokes{N}})(target, source)::T where
     y = coords(source)
     r = x - y
     d = norm(r)
-    filter = !(d == 0)
+    filter = !(d ≤ SAME_POINT_TOLERANCE)
     if N == 2
         return filter * (-1 / π * dot(r, nx) / d^4 * r * transpose(r))
     elseif N == 3

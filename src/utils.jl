@@ -231,3 +231,10 @@ function _normalize_correction(correction)
     end
     return correction
 end
+
+"""
+    SAME_POINTS_TOLERANCE
+
+Two points `x` and `y` are considerd the same if `norm(x-y) ≤ SAME_POINT_TOLERANCE`.
+"""
+const SAME_POINT_TOLERANCE = 1e-14
