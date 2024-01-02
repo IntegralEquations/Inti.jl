@@ -34,8 +34,8 @@ The following optional keyword arguments are available:
   that no correction is needed. This is used to determine a threshold for
   nearly-singular corrections when `X` and `Y` are different surfaces. When `X
   === Y`, this is not needed.
-- `green_multiplier`: the value of `μ` in the Green identity `S[γ₁u](x) -
-  D[γ₀u](x) + μ*u(x) = 0` for `x ∈ X`. When a scalar value is passed, it is
+- `green_multiplier`: the value of `μ` in the Green identity `S\\[γ₁u\\](x) -
+  D\\[γ₀u\\](x) + μ*u(x) = 0` for `x ∈ X`. When a scalar value is passed, it is
   taken to be the same for all values of `x`. If `nothing`, the value is inferred
   using `_green_multiplier` and the quadrature `Y` (assumes `X` is either inside,
   on, or outside `Y`).
