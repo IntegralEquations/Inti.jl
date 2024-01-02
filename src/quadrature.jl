@@ -49,7 +49,7 @@ A collection of [`QuadratureNode`](@ref)s used to integrate over an
 [`AbstractMesh`](@ref).
 """
 struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
-    submesh::SubMesh{N,T}
+    mesh::AbstractMesh{N,T}
     etype2qrule::Dict{DataType,ReferenceQuadrature}
     qnodes::Vector{QuadratureNode{N,T}}
     etype2qtags::Dict{DataType,Matrix{Int}}
@@ -66,47 +66,40 @@ function Base.show(io::IO, quad::Quadrature)
 end
 
 """
-    Quadrature(msh::LagrangeMesh, Ω::Domain, etype2qrule::Dict)
-    Quadrature(msh::LagrangeMesh, Ω::Domain; qorder)
+    Quadrature(msh::AbstractMesh, etype2qrule::Dict)
+    Quadrature(msh::AbstractMesh; qorder)
 
-Construct a `Quadrature` of `Ω` using the elements in `msh`, where for each
-element type `E` in `msh` the reference quadrature `q = etype2qrule[E]` is used.
-If an `order` keyword is passed, a default quadrature of the desired order is
-used for each element type usig [`_qrule_for_reference_shape`](@ref).
+Construct a `Quadrature` for `msh`, where for each element type `E` in `msh` the
+reference quadrature `q = etype2qrule[E]` is used. If an `order` keyword is
+passed, a default quadrature of the desired order is used for each element type
+usig [`_qrule_for_reference_shape`](@ref).
 
-Alternatively, a [`SubMesh`](@ref) can be passed as a first argument in lieu of
-the `msh` and `Ω` arguments. In this case, the quadrature is constructed using
-the `domain` of the `submesh`.
-
-For co-dimension one entities in `Ω`, the normal vector is computed and stored
-in the `QuadratureNode`s.
+For co-dimension one elements, the normal vector is also computed and stored in
+the [`QuadratureNode`](@ref)s.
 """
-function Quadrature(submesh::SubMesh{N,T}, etype2qrule::Dict) where {N,T}
+function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
     # initialize mesh with empty fields
     quad = Quadrature{N,T}(
-        submesh,
+        msh,
         etype2qrule,
         QuadratureNode{N,T}[],
         Dict{DataType,Matrix{Int}}(),
     )
     # loop element types and generate quadrature for each
-    for E in element_types(submesh)
-        els   = elements(submesh, E)
+    for E in element_types(msh)
+        els   = elements(msh, E)
         qrule = etype2qrule[E]
         # dispatch to type-stable method
         _build_quadrature!(quad, els, qrule)
     end
     return quad
 end
-function Quadrature(msh::LagrangeMesh, Ω::Domain, args...; kwargs...)
-    return Quadrature(view(msh, Ω), args...; kwargs...)
-end
 
-function Quadrature(submsh::SubMesh; qorder)
+function Quadrature(msh::AbstractMesh; qorder)
     etype2qrule = Dict(
-        E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(submsh)
+        E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(msh)
     )
-    return Quadrature(submsh, etype2qrule)
+    return Quadrature(msh, etype2qrule)
 end
 
 @noinline function _build_quadrature!(
@@ -143,7 +136,7 @@ end
 
 The [`Domain`](@ref) over which `Q` performs integration.
 """
-domain(Q::Quadrature) = Q.submesh.domain
+domain(Q::Quadrature) = domain(Q.mesh)
 
 """
     dom2qtags(Q::Quadrature, dom::Domain)
