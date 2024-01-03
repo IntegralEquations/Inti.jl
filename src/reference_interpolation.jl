@@ -95,6 +95,41 @@ function LagrangeElement{D}(f::Function) where {D}
 end
 
 """
+    order(el::LagrangeElement)
+
+The order of the element's interpolating polynomial (e.g. a `LagrangeLine` with
+`2` nodes defines a linear polynomial, and thus has order `1`).
+"""
+function order(::Type{<:LagrangeElement{D,Np}})::Int where {D,Np}
+    if D == ReferenceLine
+        return Np - 1
+    elseif D == ReferenceTriangle
+        K = (-3 + sqrt(1 + 8 * Np)) / 2
+        isinteger(K) || error("Np must be triangular number")
+        return Int(K)
+    elseif D == ReferenceTetrahedron
+        if Np == 4
+            return 1
+        elseif Np == 10
+            return 2
+        else
+            # TODO: general case of tetrahedron
+            notimplemented()
+        end
+    elseif D == ReferenceSquare
+        K = sqrt(Np) - 1
+        isinteger(K) || error("Np must be square number")
+        return Int(K)
+    elseif D == ReferenceCube
+        K = Np^(1 / 3) - 1
+        isinteger(K) || error("Np must be cubic number")
+        return Int(K)
+    else
+        notimplemented()
+    end
+end
+
+"""
     const LagrangeLine = LagrangeElement{ReferenceLine}
 """
 const LagrangeLine = LagrangeElement{ReferenceLine}
@@ -131,7 +166,7 @@ TODO: Eventually this could/should be automated.
 =#
 
 # P1 for ReferenceLine
-function reference_nodes(::Type{LagrangeLine{2}})
+function reference_nodes(::Type{<:LagrangeLine{2}})
     return SVector(SVector(0.0), SVector(1.0))
 end
 
@@ -146,7 +181,7 @@ function jacobian(el::LagrangeLine{2}, u)
 end
 
 # P2 for ReferenceLine
-function reference_nodes(::Type{LagrangeLine{3}})
+function reference_nodes(::Type{<:LagrangeLine{3}})
     return SVector(SVector(0.0), SVector(1.0), SVector(0.5))
 end
 
@@ -163,7 +198,7 @@ function jacobian(el::LagrangeLine{3}, u)
 end
 
 # P1 for ReferenceTriangle
-function reference_nodes(::Type{LagrangeTriangle{3}})
+function reference_nodes(::Type{<:LagrangeTriangle{3}})
     return SVector(SVector(0.0, 0.0), SVector(1.0, 0.0), SVector(0.0, 1.0))
 end
 
@@ -179,7 +214,7 @@ function jacobian(el::LagrangeTriangle{3}, u)
 end
 
 # P2 for ReferenceTriangle
-function reference_nodes(::LagrangeTriangle{6})
+function reference_nodes(::Type{<:LagrangeTriangle{6}})
     return SVector(
         SVector(0.0, 0.0),
         SVector(1.0, 0.0),
@@ -287,7 +322,7 @@ function jacobian(el::LagrangeTriangle{10,T}, u) where {T}
 end
 
 # P1 for ReferenceSquare
-function reference_nodes(::Type{LagrangeSquare{4}})
+function reference_nodes(::Type{<:LagrangeSquare{4}})
     return SVector(SVector(0, 0), SVector(1, 0), SVector(1, 1), SVector(0, 1))
 end
 
@@ -328,7 +363,7 @@ end
 
 The polynomial degree `el`.
 """
-function degree(::Type{LagrangeElement{D,Np}})::Int where {D,Np}
+function degree(::Type{<:LagrangeElement{D,Np}})::Int where {D,Np}
     if D == ReferenceLine
         return Np - 1
     elseif D == ReferenceTriangle
@@ -345,3 +380,14 @@ function degree(::Type{LagrangeElement{D,Np}})::Int where {D,Np}
     end
 end
 degree(el::LagrangeElement) = typeof(el) |> degree
+
+"""
+    lagrange_basis(E::Type{<:LagrangeElement})
+
+Return the Lagrange basis `B` for the element `E`. Evaluating `B(x)` yields the
+value of each basis function at `x`.
+"""
+function lagrange_basis(::Type{LagrangeElement{D,N,T}}) where {D,N,T}
+    vals = svector(i -> svector(j -> i == j, N), N)
+    return LagrangeElement{D}(vals)
+end

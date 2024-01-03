@@ -96,9 +96,8 @@ function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
 end
 
 function Quadrature(msh::AbstractMesh; qorder)
-    etype2qrule = Dict(
-        E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(msh)
-    )
+    etype2qrule =
+        Dict(E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(msh))
     return Quadrature(msh, etype2qrule)
 end
 
@@ -239,4 +238,30 @@ function _etype_to_nearest_points(X, Y::Quadrature, maxdist = Inf)
         end
     end
     return etype2nearlist
+end
+
+"""
+    quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
+
+Given a vector `qvals` of scalar values at the quadrature nodes of `Q`, return a
+vector `ivals` of scalar values at the interpolation nodes of `Q.mesh`.
+"""
+function quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
+    msh = Q.mesh
+    inodes = nodes(msh)
+    ivals = zeros(eltype(qvals), length(inodes))
+    areas = zeros(length(inodes)) # area of neighboring triangles
+    for (E, mat) in elements(msh)
+        qrule = Q.etype2qrule[E]
+        V = mapreduce(lagrange_basis(E), hcat, qcoords(qrule)) |> Matrix
+        ni, nel = size(mat) # number of interpolation nodes by number of elements
+        for n in 1:nel
+            qtags = Q.etype2qtags[E][:, n]
+            itags = mat[:, n]
+            area = sum(q -> weight(q), view(Q.qnodes, qtags))
+            ivals[itags] .+= area .* (transpose(V) \ qvals[qtags])
+            areas[itags] .+= area
+        end
+    end
+    return ivals ./ areas
 end
