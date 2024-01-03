@@ -42,16 +42,24 @@ using Inti
             gmsh.model.occ.addSphere(0, 0, 0, r)
             gmsh.model.occ.synchronize()
             gmsh.model.mesh.generate(3)
+            gmsh.model.mesh.setOrder(1)
             Ω = Inti.gmsh_import_domain(; dim = 3)
             M = Inti.gmsh_import_mesh(Ω; dim = 3)
             gmsh.finalize()
+            f = x -> x[1] + x[2] - 2 * x[3] + 1
             Γ = Inti.external_boundary(Ω)
             quad = Inti.Quadrature(M[Γ]; qorder = 4) # NystromMesh of surface Γ
             area = Inti.integrate(x -> 1, quad)
             @test isapprox(area, 4 * π * r^2, atol = 5e-2)
+            exact = map(f, M[Γ].nodes)
+            approx = Inti.quadrature_to_node_vals(quad, map(q -> f(q.coords), quad))
+            @test exact ≈ approx
             quad = Inti.Quadrature(M[Ω]; qorder = 4) # Nystrom mesh of volume Ω
             volume = Inti.integrate(x -> 1, quad)
             @test isapprox(volume, 4 / 3 * π * r^3, atol = 1e-2)
+            exact = map(f, M[Ω].nodes)
+            approx = Inti.quadrature_to_node_vals(quad, map(q -> f(q.coords), quad))
+            @test exact ≈ approx
         end
         @testset "Circle" begin
             r = rx = ry = 0.5
@@ -65,13 +73,20 @@ using Inti
             Ω = Inti.gmsh_import_domain(; dim = 2)
             M = Inti.gmsh_import_mesh(Ω; dim = 2)
             gmsh.finalize()
+            f = x -> x[1] + x[2] - 3
             Γ = Inti.external_boundary(Ω)
             quad = Inti.Quadrature(M[Ω]; qorder = 2)
             A = π * r^2
             # test area
             @test isapprox(A, Inti.integrate(x -> 1, quad); atol = 1e-2)
+            exact = map(f, M[Ω].nodes)
+            approx = Inti.quadrature_to_node_vals(quad, map(q -> f(q.coords), quad))
+            @test exact ≈ approx
             # test perimeter
             quad = Inti.Quadrature(M[Γ]; qorder = 2)
+            exact = map(f, quad.mesh.nodes)
+            approx = Inti.quadrature_to_node_vals(quad, map(q -> f(q.coords), quad))
+            @test exact ≈ approx
             P = 2π * r
             @test isapprox(P, Inti.integrate(x -> 1, quad); atol = 1e-2)
         end

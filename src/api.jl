@@ -117,16 +117,9 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
         return Vmat
     elseif correction.method == :dim
         maxdist = correction.maxdist
-        if haskey(correction, :boundary)
-            boundary = correction.boundary
-        else
-            Ω = domain(source)
-            Γ = external_boundary(Ω)
-            msh = source.submesh.parent # parent mesh, hopefully containing the boundary
-            Γ ∈ domain(msh) || error("Boundary not found in parent mesh")
-            qmax = maximum(order, values(source.etype2qrule))
-            boundary = Quadrature(msh, Γ; qorder = 2 * qmax)
-        end
+        haskey(correction, :boundary) ||
+            error("Missing correction.boundary field for :dim method on a volume potential")
+        boundary = correction.boundary
         S, D =
             single_double_layer(; pde, target, source = boundary, compression, correction)
         interpolation_order = correction.interpolation_order
