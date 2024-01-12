@@ -61,7 +61,7 @@ struct LagrangeMesh{N,T} <: AbstractMesh{N,T}
     # for each element type (key), return the connectivity matrix
     etype2mat::Dict{DataType,Matrix{Int}}
     # mapping from entity to a dict containing (etype=>tags)
-    ent2tags::Dict{AbstractEntity,Dict{DataType,Vector{Int}}}
+    ent2etags::Dict{EntityKey,Dict{DataType,Vector{Int}}}
 end
 
 # empty constructor
@@ -69,7 +69,7 @@ function LagrangeMesh{N,T}() where {N,T}
     return LagrangeMesh{N,T}(
         SVector{N,T}[],
         Dict{DataType,Matrix{Int}}(),
-        Dict{AbstractEntity,Dict{DataType,Vector{Int}}}(),
+        Dict{EntityKey,Dict{DataType,Vector{Int}}}(),
     )
 end
 
@@ -81,10 +81,18 @@ Return the element types present in the `msh`.
 element_types(msh::LagrangeMesh) = keys(msh.etype2mat)
 
 nodes(msh::LagrangeMesh) = msh.nodes
-elements(msh::LagrangeMesh) = msh.etype2mat
-ent2tags(msh::LagrangeMesh) = msh.ent2tags
+ent2etags(msh::LagrangeMesh) = msh.ent2etags
+etype2mat(msh::LagrangeMesh) = msh.etype2mat
 
-entities(msh::LagrangeMesh) = keys(msh.ent2tags)
+function ent2nodetags(msh::LagrangeMesh, ent::EntityKey)
+    tags = Int[]
+    for (E, t) in msh.ent2etags[ent]
+        append!(tags, view(msh.etype2mat[E], :, t))
+    end
+    return tags
+end
+
+entities(msh::LagrangeMesh) = keys(msh.ent2etags)
 
 """
     domain(msh::LagrangeMesh)
@@ -96,13 +104,12 @@ domain(msh::LagrangeMesh) = Domain(entities(msh))
 """
     dom2elt(m::LagrangeMesh,Ω,E)::Vector{Int}
 
-Compute the element indices `idxs` of the elements of type `E` composing `Ω`, so
-that `elements(m)[idxs]` gives all the elements of type `E` meshing `Ω`.
+Compute the element indices `idxs` of the elements of type `E` composing `Ω`.
 """
 function dom2elt(m::LagrangeMesh, Ω::Domain, E::DataType)
     idxs = Int[]
     for ent in entities(Ω)
-        tags = get(m.ent2tags[ent], E, Int[])
+        tags = get(m.ent2etags[ent], E, Int[])
         append!(idxs, tags)
     end
     return idxs
@@ -135,23 +142,23 @@ end
 # because some meshers like gmsh always create three-dimensional objects, so we
 # must convert after importing the mesh
 function _convert_to_2d(mesh::LagrangeMesh{3,T}) where {T}
-    # create new dictionaries for elements and ent2tagsdict with 2d elements as keys
+    # create new dictionaries for elements and ent2etagsdict with 2d elements as keys
     new_etype2mat = empty(mesh.etype2mat)
-    new_ent2tags  = empty(mesh.ent2tags)
+    new_ent2etags = empty(mesh.ent2etags)
     for (E, tags) in mesh.etype2mat
         E2d = _convert_to_2d(E)
         new_etype2mat[E2d] = tags
     end
-    for (ent, dict) in mesh.ent2tags
+    for (ent, dict) in mesh.ent2etags
         new_dict = empty(dict)
         for (E, tags) in dict
             E2d = _convert_to_2d(E)
             new_dict[E2d] = tags
         end
-        new_ent2tags[ent] = new_dict
+        new_ent2etags[ent] = new_dict
     end
     # construct new 2d mesh
-    return LagrangeMesh{2,T}([x[1:2] for x in mesh.nodes], new_etype2mat, new_ent2tags)
+    return LagrangeMesh{2,T}([x[1:2] for x in mesh.nodes], new_etype2mat, new_ent2etags)
 end
 
 function _convert_to_2d(::Type{LagrangeElement{R,N,SVector{3,T}}}) where {R,N,T}
@@ -187,16 +194,45 @@ struct SubMesh{N,T} <: AbstractMesh{N,T}
     end
 end
 Base.view(m::LagrangeMesh, Ω::Domain) = SubMesh(m, Ω)
-Base.view(m::LagrangeMesh, ent::AbstractEntity) = SubMesh(m, Domain(ent))
+Base.view(m::LagrangeMesh, ent::EntityKey) = SubMesh(m, Domain(ent))
+
+Base.collect(msh::SubMesh) = msh.parent[msh.domain]
 
 ambient_dimension(::SubMesh{N}) where {N} = N
 
-geometric_dimension(msh::SubMesh) = geometric_dimension(msh.domain)
+geometric_dimension(msh::AbstractMesh) = geometric_dimension(domain(msh))
 
-nodes(msh::SubMesh) = nodes(msh.parent)
 domain(msh::SubMesh) = msh.domain
+entities(msh::SubMesh) = entities(domain(msh))
 
 element_types(msh::SubMesh) = keys(msh.etype2etags)
+
+ent2nodetags(msh::SubMesh, ent::EntityKey) = ent2nodetags(msh.parent, ent)
+
+"""
+    nodetags(msh::SubMesh)
+
+Return the tags of the nodes in the parent mesh belonging to the submesh.
+"""
+function nodetags(msh::SubMesh)
+    tags = Int[]
+    for ent in entities(msh)
+        append!(tags, ent2nodetags(msh, ent))
+    end
+    return unique!(tags)
+end
+nodetags(msh::LagrangeMesh) = collect(1:length(msh.nodes))
+
+"""
+    nodes(msh::SubMesh)
+
+A view of the nodes of the parent mesh belonging to the submesh. The ordering is
+given by the [`nodetags`](@ref) function.
+"""
+function nodes(msh::SubMesh)
+    tags = nodetags(msh)
+    return view(msh.parent.nodes, tags)
+end
 
 # ElementIterator for submesh
 function Base.length(iter::ElementIterator{E,<:SubMesh}) where {E<:LagrangeElement}
@@ -225,8 +261,8 @@ end
 function Base.getindex(msh::LagrangeMesh, Ω::Domain)
     nodes = empty(msh.nodes)
     etype2mat = empty(msh.etype2mat)
-    ent2tags = empty(msh.ent2tags)
-    foreach(ent -> ent2tags[ent] = Dict{DataType,Vector{Int}}(), entities(Ω))
+    ent2etags = empty(msh.ent2etags)
+    foreach(ent -> ent2etags[ent] = Dict{DataType,Vector{Int}}(), entities(Ω))
     glob2loc = Dict{Int,Int}()
     for E in element_types(msh)
         connect = msh.etype2mat[E]::Matrix{Int}
@@ -234,8 +270,8 @@ function Base.getindex(msh::LagrangeMesh, Ω::Domain)
         mat = Int[]
         for ent in entities(Ω)
             etags = Int[]
-            haskey(msh.ent2tags[ent], E) || continue
-            for (iloc, i) in enumerate(msh.ent2tags[ent][E])
+            haskey(msh.ent2etags[ent], E) || continue
+            for (iloc, i) in enumerate(msh.ent2etags[ent][E])
                 push!(etags, iloc)
                 for j in view(connect, :, i)
                     if !haskey(glob2loc, j) # new node
@@ -245,9 +281,9 @@ function Base.getindex(msh::LagrangeMesh, Ω::Domain)
                     push!(mat, glob2loc[j]) # push local index of node
                 end
             end
-            push!(ent2tags[ent], E => etags)
+            push!(ent2etags[ent], E => etags)
         end
         isempty(mat) || (etype2mat[E] = reshape(mat, np, :))
     end
-    return LagrangeMesh(nodes, etype2mat, ent2tags)
+    return LagrangeMesh(nodes, etype2mat, ent2etags)
 end

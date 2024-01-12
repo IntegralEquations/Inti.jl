@@ -1,7 +1,7 @@
-using Markdown                       #src
-import Pkg                           #src
+using Markdown                        #src
+import Pkg                            #src
 docsdir = joinpath(@__DIR__, "../..") #src
-Pkg.activate(docsdir)                #src
+Pkg.activate(docsdir)                 #src
 
 # # [Poisson solver](@id poisson)
 
@@ -11,9 +11,9 @@ Pkg.activate(docsdir)                #src
 # !!! note "Important points covered in this example"
 #       - Solving a volumetric problem
 #       - Using the method of manufactured solutions
+#       - ...
 
 using Inti
-
 
 # ## Problem definition
 
@@ -30,7 +30,7 @@ using Inti
 #
 # Seeking for a solution $u$ of the form ...
 
-meshsize = 0.1
+meshsize = 0.05
 qorder = 5
 interpolation_order = qorder
 
@@ -61,14 +61,14 @@ end
 name = joinpath(@__DIR__, "disk.msh")
 gmsh_disk(; meshsize, order = 2, name)
 
-Ω, msh = Inti.gmsh_read_msh(name; dim = 2)
+Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 2)
 Γ = Inti.boundary(Ω)
 
 Ωₕ = view(msh, Ω)
 Γₕ = view(msh, Γ)
 # Use VDIM with the Vioreanu-Rokhlin quadrature rule
-Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder);
-dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
+# Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder);
+# dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
 Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder)
 Γₕ_quad = Inti.Quadrature(Γₕ; qorder)
 
@@ -78,11 +78,22 @@ dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
 # will use the method of manufactured solutions. For simplicity, we will take as
 # an exact solution
 
-uₑ = (x) -> cos(x[1]) * sin(x[2])
+uₑ = (x) -> cos(2*x[1]) * sin(2*x[2])
 
 # which yields
 
-fₑ = (x) -> -2 * uₑ(x)
+fₑ = (x) -> -8 * uₑ(x)
+
+# Here is what the solution looks like:
+# qvals = map(Ωₕ_quad) do q
+#     return uₑ(q.coords)
+# end
+
+# ivals = Inti.quadrature_to_node_vals(Ωₕ_quad, qvals)
+
+# er = ivals - uₑ.(Ωₕ_quad.mesh.nodes)
+# norm(er,Inf)
+# Inti.write_gmsh_view(Ωₕ, uₑ.(Ωₕ.nodes))
 
 # ## Boundary and integral operators
 using FMMLIB2D
@@ -111,7 +122,7 @@ V_d2d = Inti.volume_potential(;
     target = Ωₕ_quad,
     source = Ωₕ_quad,
     compression = (method = :fmm, tol = 1e-12),
-    correction = (method = :dim, interpolation_order),
+    correction = (method = :dim, interpolation_order)
 )
 V_d2b = Inti.volume_potential(;
     pde,
@@ -133,7 +144,7 @@ rhs = V_d2b * f + g
 using LinearAlgebra
 L = -I / 2 + D_b2b
 
-# If `compression=none` is used above for constructing `D_b2b`, we could alternately use dense linear algebra:
+# If `compression=none` or `compresion=hmatrix` is used above for constructing `D_b2b`, we could alternately use dense linear algebra:
 #F = lu(L)
 #σ = F \ rhs
 
@@ -142,17 +153,21 @@ using IterativeSolvers
     gmres(L, rhs; log = true, abstol = 1e-10, verbose = false, restart = 100, maxiter = 100)
 @show hist
 
-# To check the solution, lets evaluate it at the quadrature nodes of $\Omega$
-# and
+# To check the solution, lets evaluate it at the nodes $\Omega$
 uₕ_quad = -(V_d2d * f) + D_b2d * σ
 uₑ_quad = map(q -> uₑ(q.coords), Ωₕ_quad)
-er = uₕ_quad - uₑ_quad
+er = abs.(uₕ_quad - uₑ_quad)
 @show norm(er, Inf)
 
 # ## Visualize the solution error using Gmsh
+# er_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, er)
+sol_nodes = uₑ.(Inti.nodes(Ωₕ))
+solₕ_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, uₑ_quad)
+er_nodes = abs.(sol_nodes - solₕ_nodes)
+
 gmsh.initialize()
-gmsh.option.setNumber("General.Terminal", 0)
-gmsh.open(name)
-v1 = gmsh.view.add("Solution error")
-# gmsh.view.addModelData(v1, 0, "disk", ElementData, tags)
+Inti.write_gmsh_model(msh)
+Inti.write_gmsh_view!(Ωₕ, er_nodes; name="error")
+# Inti.write_gmsh_view!(Ωₕ, sol_nodes; name="solution")
+gmsh.fltk.run()
 gmsh.finalize()

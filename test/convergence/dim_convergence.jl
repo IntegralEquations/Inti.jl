@@ -39,7 +39,7 @@ for h in hh
     gmsh.model.occ.synchronize()
     gmsh.model.mesh.generate(2)
     Ω = Inti.gmsh_import_domain(; dim = 2)
-    M = Inti.gmsh_import_mesh(Ω; dim = 2)
+    M = Inti.import_mesh_from_gmsh_model(Ω; dim = 2)
     gmsh.finalize()
     Γ = Inti.external_boundary(Ω)
     Q = Inti.Quadrature(view(M, Γ); qorder)

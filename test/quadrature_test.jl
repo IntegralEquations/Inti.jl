@@ -8,14 +8,14 @@ using Inti
         @testset "Cube" begin
             # generate a mesh
             (lx, ly, lz) = widths = (1.0, 1.0, 2.0)
+            Inti.clear_entities!()
             gmsh.initialize()
             gmsh.option.setNumber("General.Verbosity", 2)
             Inti.clear_entities!()
             gmsh.model.occ.addBox(0, 0, 0, lx, ly, lz)
             gmsh.model.occ.synchronize()
             gmsh.model.mesh.generate(3)
-            Ω = Inti.gmsh_import_domain(; dim = 3)
-            M = Inti.gmsh_import_mesh(Ω; dim = 3)
+            Ω, M = Inti.import_mesh_from_gmsh_model(; dim = 3)
             gmsh.finalize()
             # lazy
             Γ = Inti.external_boundary(Ω)
@@ -43,8 +43,7 @@ using Inti
             gmsh.model.occ.synchronize()
             gmsh.model.mesh.generate(3)
             gmsh.model.mesh.setOrder(1)
-            Ω = Inti.gmsh_import_domain(; dim = 3)
-            M = Inti.gmsh_import_mesh(Ω; dim = 3)
+            Ω, M = Inti.import_mesh_from_gmsh_model(; dim = 3)
             gmsh.finalize()
             f = x -> x[1] + x[2] - 2 * x[3] + 1
             Γ = Inti.external_boundary(Ω)
@@ -70,8 +69,7 @@ using Inti
             gmsh.model.occ.addDisk(0, 0, 0, rx, ry)
             gmsh.model.occ.synchronize()
             gmsh.model.mesh.generate(2)
-            Ω = Inti.gmsh_import_domain(; dim = 2)
-            M = Inti.gmsh_import_mesh(Ω; dim = 2)
+            Ω, M = Inti.import_mesh_from_gmsh_model(; dim = 2)
             gmsh.finalize()
             f = x -> x[1] + x[2] - 3
             Γ = Inti.external_boundary(Ω)

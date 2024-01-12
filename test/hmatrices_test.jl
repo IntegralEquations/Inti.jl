@@ -11,6 +11,7 @@ include("test_utils.jl")
 
 @testset "2D" begin
     # create a boundary and area meshes and quadrature only once
+    Inti.clear_entities!()
     Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = 0.05)
     Γ = Inti.external_boundary(Ω)
     Γ_quad = Inti.Quadrature(view(msh, Γ); qorder = 3)
