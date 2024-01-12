@@ -247,11 +247,12 @@ Given a vector `qvals` of scalar values at the quadrature nodes of `Q`, return a
 vector `ivals` of scalar values at the interpolation nodes of `Q.mesh`.
 """
 function quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
-    msh = Q.mesh
+    msh = Q.mesh isa SubMesh ? collect(Q.mesh) : Q.mesh
     inodes = nodes(msh)
     ivals = zeros(eltype(qvals), length(inodes))
     areas = zeros(length(inodes)) # area of neighboring triangles
-    for (E, mat) in elements(msh)
+    for (E, mat) in etype2mat(msh)
+        @info E
         qrule = Q.etype2qrule[E]
         V = mapreduce(lagrange_basis(E), hcat, qcoords(qrule)) |> Matrix
         ni, nel = size(mat) # number of interpolation nodes by number of elements

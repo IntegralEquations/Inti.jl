@@ -1,14 +1,31 @@
 """
     struct Domain
 
-Represents a physical domain as a union of [`AbstractEntity`](@ref) objects.
+A set of [`EntityKey`](@ref)s with the same geometric dimension used to
+represent a physical domain.
 """
 struct Domain
-    entities::Set{AbstractEntity}
+    entities::Set{EntityKey}
+    function Domain(ents::Set{EntityKey})
+        @assert allequal(geometric_dimension(ent) for ent in ents) "entities in a domain have different dimensions"
+        return new(ents)
+    end
 end
 
-Domain() = Domain(Set{AbstractEntity}())
-Domain(ent::AbstractEntity) = Domain(Set(ent))
+Domain() = Domain(Set{EntityKey}())
+
+"""
+    Domain([f::Function,] ents)
+
+Create a domain from a set of [`EntityKey`](@ref)s. Optionally, a filter
+function `f` can be passed to filter the entities.
+
+Note that all entities in a domain must have the same geometric dimension.
+"""
+function Domain(f::Function, ents)
+    return Domain(filter(f, ents))
+end
+Domain(ents) = Domain(Set(ents))
 
 """
     entities(Ω::Domain)
@@ -18,19 +35,14 @@ Return all entities making up a domain.
 entities(Ω::Domain) = Ω.entities
 
 function Base.show(io::IO, d::Domain)
-    ents = entities(d)
+    keys = entities(d)
     n = length(entities(d))
     n == 1 ? print(io, "Domain with $n entity:") : print(io, "Domain with $n entities:")
-    for ent in ents
-        print(io, "\n\t $(ent)")
+    for k in keys
+        ent = global_get_entity(k)
+        print(io, "\n $(k) --> $ent")
     end
     return io
-end
-
-function ambient_dimension(Ω::Domain)
-    l, u = extrema(ambient_dimension(ent) for ent in entities(Ω))
-    @assert l == u "ambient dimension of entities in a domain not equal"
-    return u
 end
 
 """
@@ -39,7 +51,7 @@ end
 Return all the boundaries of the domain, i.e. the domain's skeleton.
 """
 function skeleton(Ω::Domain)
-    ents = Set{AbstractEntity}()
+    ents = Set{EntityKey}()
     for ent in entities(Ω)
         union!(ents, boundary(ent))
     end
@@ -53,8 +65,8 @@ Return the internal boundaries of a `Domain`. These are entities in
 `skeleton(Ω)` which appear at least twice as a boundary of entities in `Ω`.
 """
 function internal_boundary(Ω::Domain)
-    seen     = Set{AbstractEntity}()
-    repeated = Set{AbstractEntity}()
+    seen     = Set{EntityKey}()
+    repeated = Set{EntityKey}()
     for ω in entities(Ω)
         for γ in boundary(ω)
             in(γ, seen) ? push!(repeated, γ) : push!(seen, γ)
@@ -103,5 +115,5 @@ Base.iterate(Ω::Domain, state = 1) = iterate(entities(Ω), state)
 
 Base.isempty(Ω::Domain) = isempty(entities(Ω))
 
-Base.in(ent::AbstractEntity, Ω::Domain) = in(ent, entities(Ω))
+Base.in(ent::EntityKey, Ω::Domain) = in(ent, entities(Ω))
 Base.in(Ω1::Domain, Ω2::Domain) = all(ent ∈ Ω2 for ent in entities(Ω1))

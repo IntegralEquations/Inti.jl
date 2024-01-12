@@ -15,7 +15,7 @@ using WriteVTK
     gmsh.model.mesh.generate(3)
     ents = gmsh.model.getEntities()
     Ω = Inti.gmsh_import_domain(; dim = 3)
-    M = Inti.gmsh_import_mesh(Ω; dim = 3)
+    M = Inti.import_mesh_from_gmsh_model(Ω; dim = 3)
     fname = joinpath(Inti.PROJECT_ROOT, "test", "ball")
     vtk = vtk_grid(fname, M)
     vtk_save(vtk)
