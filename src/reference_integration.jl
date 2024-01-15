@@ -244,6 +244,22 @@ function order(q::VioreanuRokhlin{ReferenceTetrahedron,N}) where {N}
     return TETRAHEDRON_VR_NPTS_TO_ORDER[N]
 end
 
+function interpolation_order(q::VioreanuRokhlin{ReferenceTriangle,N}) where {N}
+    return TRIANGLE_VR_QORDER_TO_IORDER[N]
+end
+
+function interpolation_order(q::VioreanuRokhlin{ReferenceTetrahedron,N}) where {N}
+    return TETRAHEDRON_VR_QORDER_TO_IORDER[N]
+end
+
+function Triangle_VR_interpolation_order_to_quadrature_order(i::Integer)
+    return TRIANGLE_VR_IORDER_TO_QORDER[i]
+end
+
+function Tetrahedron_VR_interpolation_order_to_quadrature_order(i::Integer)
+    return TETRAHEDRON_VR_IORDER_TO_QORDER[i]
+end
+
 @generated function (q::VioreanuRokhlin{D,N})() where {D,N}
     x, w = _get_vioreanurokhlin_qcoords_and_qweights(D, N)
     return :($x, $w)
