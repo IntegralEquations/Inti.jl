@@ -123,7 +123,8 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
             Ω = domain(source)
             Γ = external_boundary(Ω)
             par_msh = source.mesh.parent # parent mesh, hopefully containing the boundary
-            all(ent -> ent ∈ entities(par_msh), entities(Γ)) || error("Boundary not found in parent mesh")
+            all(ent -> ent ∈ entities(par_msh), entities(Γ)) ||
+                error("Boundary not found in parent mesh")
             qmax = maximum(order, values(source.etype2qrule))
             boundary = Quadrature(view(par_msh, Γ); qorder = 2 * qmax)
         else
