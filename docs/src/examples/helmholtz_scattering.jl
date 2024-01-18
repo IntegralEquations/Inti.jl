@@ -1,7 +1,7 @@
-using Markdown                       #src
-import Pkg                           #src
+using Markdown                        #src
+import Pkg                            #src
 docsdir = joinpath(@__DIR__, "../..") #src
-Pkg.activate(docsdir)                #src
+Pkg.activate(docsdir)                 #src
 
 # # [Helmholtz scattering](@id helmholtz_scattering)
 
@@ -107,14 +107,14 @@ k = 8π
 meshsize   = λ / 5
 qorder     = 4 # quadrature order
 gorder     = 2 # order of geometrical approximation
+nothing #hide
 
 # ## [Two-dimensional scattering](@id helmholtz-scattering-2d)
 
 # We use [Gmsh
 # API](https://gmsh.info/doc/texinfo/gmsh.html#Gmsh-application-programming-interface)
-# for creating `.msh` file containing the desired geometry and mesh, and then
-# import it into `Inti` using [`gmsh_read_msh`](@ref Inti.gmsh_read_msh). Here
-# is a function to mesh the circle:
+# for creating `.msh` file containing the desired geometry and mesh. Here is a
+# function to mesh the circle:
 
 using Gmsh # this will trigger the loading of Inti's Gmsh extension
 
@@ -141,9 +141,9 @@ name = joinpath(@__DIR__, "circle.msh")
 gmsh_circle(; meshsize, order = gorder, name)
 
 # We can now import the file and parse the mesh and domain information into
-# `Inti.jl` using the [`gmsh_read_msh`](@ref Inti.gmsh_read_msh) function:
+# `Inti.jl` using the [`import_mesh_from_gmsh_file`](@ref Inti.import_mesh_from_gmsh_file) function:
 
-Ω, msh = Inti.gmsh_read_msh(name; dim = 2)
+Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 2)
 @show Ω
 #-
 @show msh
@@ -157,12 +157,6 @@ gmsh_circle(; meshsize, order = gorder, name)
 
 Γ = Inti.boundary(Ω)
 
-# !!! tip "Views of a mesh"
-#       In `Inti.jl`, you can use domain to create a view of a mesh containing *only
-#       the elements in the domain*. For example `view(msh,Γ)` will return an
-#       abstract mesh that you can use to iterate over the elements in the boundary
-#       of the disk.
-
 # To solve our boundary integral equation usign a Nyström method, we actually
 # need a quadrature of our curve/surface (and possibly the normal vectors at the
 # quadrature nodes). Once a mesh is available, creating a quadrature object can
@@ -171,8 +165,17 @@ gmsh_circle(; meshsize, order = gorder, name)
 # for:
 
 Γ = Inti.boundary(Ω)
-Q = Inti.Quadrature(msh, Γ; qorder)
+Γ_msh = view(msh,Γ)
+Q = Inti.Quadrature(Γ_msh; qorder)
 nothing #hide
+
+# !!! tip "Views of a mesh"
+#       In `Inti.jl`, you can use domain to create a *view* of a mesh containing *only
+#       the elements in the domain*. For example `view(msh,Γ)` will return an
+#       `SubMesh` type that you can use to iterate over the elements in the boundary
+#       of the disk without actually creating a new mesh. You can use `msh[Γ]`,
+#       or `collect(view(msh,Γ))` to create a new mesh containing *only* the
+#       elements and nodes in `Γ`.
 
 # The object `Q` now contains a quadrature (of order `4`) that can be used to
 # solve a boundary integral equation on `Γ`. As a sanity check, let's make sure
@@ -197,13 +200,13 @@ S, D = Inti.single_double_layer(;
 # There are two well-known difficulties related to the discretization of
 # the boundary integral operators $S$ and $D$:
 # - The kernel of the integral operator is not smooth, and thus specialized
-# quadrature rules are required to accurately approximate the matrix entries for
-# which the target and source point lie *close* (relative to some scale) to each
-# other.
+#   quadrature rules are required to accurately approximate the matrix entries for
+#   which the target and source point lie *close* (relative to some scale) to each
+#   other.
 # - The underlying matrix is dense, and thus the storage and computational cost
-# of the operator is prohibitive for large problems unless acceleration
-# techniques such as *Fast Multipole Methods* or *Hierarchical Matrices* are
-# employed.
+#   of the operator is prohibitive for large problems unless acceleration
+#   techniques such as *Fast Multipole Methods* or *Hierarchical Matrices* are
+#   employed.
 
 # `Inti.jl` tries to provide a modular and transparent interface for dealing
 # with both of these difficulties, where the general approach for solving a BIE
@@ -322,40 +325,59 @@ fig
 # we will rely on [`HMatrices.jl`](https://github.com/WaveProp/HMatrices.jl) to
 # handle the compression.
 
-# The following function will create a mesh of a sphere using the `Gmsh` API:
+# The visualization is also more involved, and we will
+# use instead the `Gmsh` API to create a view of the solution on a punctured
+# plane. Let us begin by creating our domain containing both the sphere and the
+# puctured plane where we will visualize the solution:
 
-function gmsh_sphere(; name, meshsize, order = 1, radius = 1, center = (0, 0, 0))
-    try
-        gmsh.initialize()
-        gmsh.model.add("sphere-mesh")
-        gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-        gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
-        gmsh.model.occ.addSphere(center[1], center[2], center[3], radius)
-        gmsh.model.occ.synchronize()
-        gmsh.model.mesh.generate(2)
-        gmsh.model.mesh.setOrder(order)
-        gmsh.write(name)
-    finally
-        gmsh.finalize()
-    end
+function gmsh_sphere(; meshsize, order = gorder, radius = 1, visualize = false, name)
+    gmsh.initialize()
+    gmsh.model.add("sphere-scattering")
+    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+    sphere_tag = gmsh.model.occ.addSphere(0, 0, 0, radius)
+    xl,yl,zl = -2*radius,-2*radius,0
+    Δx, Δy = 4*radius, 4*radius
+    rectangle_tag = gmsh.model.occ.addRectangle(xl, yl, zl, Δx, Δy)
+    outDimTags, _ = gmsh.model.occ.cut([(2, rectangle_tag)], [(3, sphere_tag)], -1, true, false)
+    gmsh.model.occ.synchronize()
+    gmsh.model.addPhysicalGroup(3, [sphere_tag], -1, "omega")
+    gmsh.model.addPhysicalGroup(2, [dt[2] for dt in outDimTags], -1, "sigma")
+    gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(order)
+    visualize && gmsh.fltk.run()
+    gmsh.option.setNumber("Mesh.SaveAll", 1) # otherwise only the physical groups are saved
+    gmsh.write(name)
+    gmsh.finalize()
 end
 
-# As before, lets write a file with our mesh, and import it into `Inti.jl`, and
-# create a surface quadrature:
+# As before, lets write a file with our mesh, and import it into `Inti.jl`:
 
 name = joinpath(@__DIR__, "sphere.msh")
-gmsh_sphere(; meshsize, order = gorder, name)
-Ω, msh = Inti.gmsh_read_msh(name; dim = 3)
+gmsh_sphere(; meshsize, order = gorder, name, visualize=false)
+Inti.clear_entities!()
+Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 3)
 Γ = Inti.boundary(Ω)
-Q = Inti.Quadrature(msh, Γ; qorder = 4)
+
+# Note that for this example we relied instead on the labels to the entities in
+# order to extract the relevant domains `Ω` and `Σ`. We can now create a
+# quadrature as before
+
+Γ_msh = view(msh,Γ)
+Q = Inti.Quadrature(Γ_msh; qorder = 4)
+
+# !!! tip
+#       If you pass `visualize=true` to `gmsh_sphere`, it will open a window
+#       with the current mode. This is done by calling `gmsh.fltk.run()`. Note
+#       that the main julia thread will be blocked until the window is closed.
 
 # !!! tip "Writing/reading a mesh from disk"
 #       Writing and reading a mesh to/from disk can be time consuming. You can
-#       avoid doing so by using [`gmsh_import_mesh!`](@ref Inti.gmsh_import_mesh)
-#       and [`gmsh_import_domain`](@ref Inti.gmsh_import_domain) functions on an
+#       avoid doing so by using [`import_mesh_from_gmsh_file`](@ref Inti.import_mesh_from_gmsh_file)
+#       and [`import_mesh_from_gmsh_model`](@ref Inti.import_mesh_from_gmsh_model) functions on an
 #       active `gmsh` model without writing it to disk.
 
-# We can now assemble the integral operators as before, but indicate that we
+# We can now assemble the integral operators, indicating that we
 # wish to compress them using hierarchical matrices:
 using HMatrices
 pde = Inti.Helmholtz(; k, dim = 3)
@@ -364,7 +386,7 @@ S, D = Inti.single_double_layer(;
     target = Q,
     source = Q,
     compression = (method = :hmatrix, tol = 1e-6),
-    correction = (method = :dim, maxdist = 5 * meshsize),
+    correction = (method = :dim,),
 )
 
 # Here is how much memory it would take to store the dense representation of
@@ -454,56 +476,39 @@ end
 @assert er < 1e-3 #hide
 @info "error with correction = $er"
 
-# We see that, once again, the approximation is quite accurate. To visualize the
-# solution, we will use `Gmsh` to create mesh of a punctured plane:
-
-##
-gmsh.initialize()
-gmsh.model.add("slice-sphere-mesh")
-gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
-
-# Set up a rectangular outer boundary with a circular hole as the rectangle
-# intersects the sphere; use gmsh CSG to construct the set difference, and mesh
-
-xl = -2.0; yl = -2.0; zl = 0.0
-dx = 4.0; dy = 4.0
-sphere_ctag = gmsh.model.occ.addSphere(0, 0, 0, 1)
-ptag = gmsh.model.occ.addRectangle(xl,yl,zl,dx,dy)
-outDimTags, outDimTagsMap = gmsh.model.occ.cut([(2, ptag)], [(3, sphere_ctag)])
-gmsh.model.occ.synchronize()
-gmsh.model.mesh.generate(2)
-order = 2
-gmsh.model.mesh.setOrder(order)
-# Evaluate the solution on the nodes (`order = 2` corresponds to element
-# type `9` or a 6-node triangle) of the 2D mesh:
-ntags, xyz, _ = gmsh.model.mesh.getNodes()
-etags, vtags = gmsh.model.mesh.getElementsByType(9)
-nodes = reinterpret(Inti.Point3D,xyz)[vtags]
-
+# We see that, once again, the approximation is quite accurate. Let us now
+# visualize the solution on the punctured plane (which we labeled as "sigma").
 # Since evaluating the integral representation of the solution at many points is
-# expensive, we will use a compression method to accelerate the evaluation. In
-# the example below, we use the fast-multipole method:
+# expensive, we will use a compression method to accelerate the evaluation as
+# well. In the example below, we use the fast-multipole method:
+
+using FMM3D
+
+Σ = Inti.Domain(e -> "sigma" ∈ Inti.labels(e), Inti.entities(msh))
+Σ_msh = view(msh,Σ)
+target = Inti.nodes(Σ_msh)
+
 S,D = Inti.single_double_layer(;
     pde,
-    target = nodes,
+    target,
     source = Q,
-    compression = (method = :hmatrix, tol=1e-4),
-    correction = (method = :dim, maxdist = 5 * meshsize),
+    compression = (method = :fmm, tol=1e-4),
+    correction = (method = :none, maxdist = 5 * meshsize),
 )
 
-ui_eval_msh = uᵢ.(nodes)
+ui_eval_msh = uᵢ.(target)
 us_eval_msh = D*σ - im*k*S*σ
 u_eval_msh = ui_eval_msh + us_eval_msh
 nothing #hide
 
-# Add a gmsh view of the solution and save it:
-s1 = gmsh.view.add("Solution slice (real part)")
-gmsh.view.addHomogeneousModelData(s1, 0, "slice-sphere-mesh", "ElementNodeData", etags, real(u_eval_msh))
-s2 = gmsh.view.add("Solution slice (imaginary part)")
-gmsh.view.addHomogeneousModelData(s2, 0, "slice-sphere-mesh", "ElementNodeData", etags, imag(u_eval_msh))
-gmsh.view.write(s1, "3d_nodedata.pos")
-gmsh.view.write(s2, "3d_nodedata.pos")
-# uncomment the following line to view the solution in gmsh
-# gmsh.fltk.run()
+# Finalize, we use gmsh to visualize the scattered field:
+gmsh.initialize()
+Inti.write_gmsh_model(msh)
+Inti.write_gmsh_view!(Σ_msh, real(u_eval_msh); name="sigma real")
+# Inti.write_gmsh_view!(Σ_msh, imag(us_eval_msh); name="sigma imag")
+Inti.write_gmsh_view!(Γ_msh, x -> 0, name = "gamma real")
+# Inti.write_gmsh_view!(Γ_msh, x -> -imag(uᵢ(x)), name = "gamma imag")
+# Launch the GUI to see the results:
+"-nopopup" in ARGS || gmsh.fltk.run()
 gmsh.finalize()
+# Add a gmsh view of the solution and save it:

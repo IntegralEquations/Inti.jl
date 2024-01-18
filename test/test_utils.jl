@@ -12,9 +12,7 @@ function gmsh_disk(; center, rx, ry, meshsize)
         gmsh.model.occ.addDisk(center[1], center[2], 0, rx, ry)
         gmsh.model.occ.synchronize()
         gmsh.model.mesh.generate(2)
-        Ω   = Inti.gmsh_import_domain(; dim = 2)
-        msh = Inti.gmsh_import_mesh(Ω; dim = 2)
-        return Ω, msh
+        return Inti.import_mesh_from_gmsh_model(; dim = 2)
     finally
         gmsh.finalize()
     end
@@ -31,9 +29,7 @@ function gmsh_ball(; center, radius, meshsize)
         gmsh.model.occ.addSphere(center[1], center[2], center[3], radius)
         gmsh.model.occ.synchronize()
         gmsh.model.mesh.generate(3)
-        Ω   = Inti.gmsh_import_domain(; dim = 3)
-        msh = Inti.gmsh_import_mesh(Ω; dim = 3)
-        return Ω, msh
+        return Inti.import_mesh_from_gmsh_model(; dim = 3)
     finally
         gmsh.finalize()
     end

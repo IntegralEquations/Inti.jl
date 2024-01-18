@@ -119,13 +119,16 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
         maxdist = correction.maxdist
         if haskey(correction, :boundary)
             boundary = correction.boundary
-        else
+        elseif source.mesh isa SubMesh # attempt to find the boundary in the parent mesh
             Ω = domain(source)
             Γ = external_boundary(Ω)
-            msh = source.submesh.parent # parent mesh, hopefully containing the boundary
-            Γ ∈ domain(msh) || error("Boundary not found in parent mesh")
+            par_msh = source.mesh.parent # parent mesh, hopefully containing the boundary
+            all(ent -> ent ∈ entities(par_msh), entities(Γ)) ||
+                error("Boundary not found in parent mesh")
             qmax = maximum(order, values(source.etype2qrule))
-            boundary = Quadrature(msh, Γ; qorder = 2 * qmax)
+            boundary = Quadrature(view(par_msh, Γ); qorder = 2 * qmax)
+        else
+            error("Missing correction.boundary field for :dim method on a volume potential")
         end
         S, D =
             single_double_layer(; pde, target, source = boundary, compression, correction)

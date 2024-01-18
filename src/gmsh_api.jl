@@ -1,48 +1,26 @@
 """
-   gmsh_import_domain([model;dim=3,verbosity=2])
+    import_mesh_from_gmsh_model(;[dim=3]) --> Ω, msh
 
-Construct a [`Domain`](@ref Inti.Domain) from the `gmsh` `model` with all entities of
-dimension `dim`; by defaul the current `gmsh` model is used.
+Create a [`Domain`](@ref) and a [`LagrangeMesh`](@ref) from the current `gmsh`
+model. Passing `dim=2` will create a two-dimensional mesh by projecting the
+original mesh onto the `x,y` plane.
 
-!!! warning
-    This function assumes that `gmsh` has been initialized, and does not handle
-    its finalization.
+This function assumes that the *Gmsh* API has been initialized through
+`gmsh.initialize`.
 """
-function gmsh_import_domain end
-
-"""
-    gmsh_import_mesh(Ω;[dim=3,verbosity=2])
-
-Create a [`LagrangeMesh`](@ref) for the entities in `Ω`. Passing `dim=2` will
-create a two-dimensional mesh by projecting the original mesh onto the `x,y`
-plane.
-
-!!! warning
-    This function assumes that `gmsh` has been initialized, and does not handle
-    its finalization.
-"""
-function gmsh_import_mesh end
+function import_mesh_from_gmsh_model end
 
 """
-    gmsh_read_geo(fname::String;dim=3)
+    import_mesh_from_gmsh_file(fname::String; dim=3)
 
-Read a `.geo` file and generate a [`Domain`](@ref Inti.Domain) with all entities
-of dimension `dim`.
+Open `fname` and create a [`LagrangeMesh`](@ref) from the `gmsh` model in it.
 
-!!! warning
-    This function assumes that `gmsh` has been initialized, and does not handle
-    its finalization.
+See also: [`import_mesh_from_gmsh_model`](@ref).
 """
-function gmsh_read_geo end
+function import_mesh_from_gmsh_file end
 
-"""
-    gmsh_read_msh(fname::String; dim=3)
+function write_gmsh_model end
 
-Read `fname` and create a `Domain` and a `GenericMesh` structure with all
-entities in `Ω` of dimension `dim`.
+function write_gmsh_view! end
 
-!!! warning
-    This function assumes that `gmsh` has been initialized, and does not handle its
-    finalization.
-"""
-function gmsh_read_msh end
+function write_gmsh_view end
