@@ -1,156 +1,110 @@
 """
-    abstract type AbstractEntity
+    EntityKey
 
-Entity of geometrical nature. Identifiable throught its `(dim,tag)` key.
-"""
-abstract type AbstractEntity end
+Used to represent the key of a [`GeometricEntity`](@ref), comprised of a `dim`
+and a `tag` field, where `dim` is the geometrical dimension of the entity, and
+`tag` is a unique integer identifying the entity.
 
+The sign of the `tag` field is used to distinguish the orientation of the
+entity, and is ignored when comparing two [`EntityKey`](@ref)s for equality.
 """
-    key(e::AbstractEntity)
-
-The `(dim,tag)` pair used as a key to identify geometrical entities.
-"""
-function key(e::AbstractEntity)
-    return interface_method(e)
+struct EntityKey
+    dim::Int
+    tag::Int
 end
 
-"""
-    tag(::AbstractEntity)
+geometric_dimension(k::EntityKey) = k.dim
+tag(k::EntityKey) = k.tag
 
-Integer tag used to idetify geometrical entities.
+Base.hash(ent::EntityKey, h::UInt) = hash((ent.dim, abs(ent.tag)), h)
+Base.:(==)(e1::EntityKey, e2::EntityKey) = e1.dim == e2.dim && abs(e1.tag) == abs(e2.tag)
+
+boundary(e::EntityKey) = boundary(global_get_entity(e))
+labels(e::EntityKey) = labels(global_get_entity(e))
+
 """
-function tag(e::AbstractEntity)
-    return interface_method(e)
+    struct GeometricEntity
+
+Used to represent geometrical objects such as lines, surfaces, and volumes.
+
+Geometrical entities are stored in a global [`ENTITIES`](@ref) dictionary
+mapping [`EntityKey`](@ref) to the corresponding `GeometricEntity`.
+
+A `GeometricEntity `may also have a `push_forward` field associated with it,
+which provides a map from a reference domain to the entity itself.
+"""
+@kwdef struct GeometricEntity
+    # TODO: the (dim,tag) fields are probably redundant since they are already
+    # present in the `key` of `ENTITIES`
+    dim::Integer
+    tag::Integer
+    boundary::Vector{EntityKey} = EntityKey[]
+    labels::Vector{String} = String[]
+    push_forward = nothing
+    function GeometricEntity(d::Integer, tag::Integer, boundary, labels, par)
+        msg = "an elementary entities in the boundary has the wrong dimension"
+        for b in boundary
+            @assert geometric_dimension(b) == d - 1 msg
+        end
+        ent = new(d, tag, boundary, labels, par)
+        # every entity gets added to a global variable ENTITIES so that we can
+        # ensure the (d,t) pair is a UUID for an entity, and to easily retrieve
+        # different entities.
+        global_add_entity!(ent)
+        return ent
+    end
 end
 
-"""
-    boundary(e::AbstractEntity)
+geometric_dimension(e::GeometricEntity) = e.dim
+tag(e::GeometricEntity) = e.tag
+boundary(e::GeometricEntity) = e.boundary
+labels(e::GeometricEntity) = e.labels
+push_forward(e::GeometricEntity) = e.push_forward
 
-A vector of entities of dimension `dim-1` that form the boundary of `e`.
-"""
-function boundary(e::AbstractEntity)
-    return interface_method(e)
-end
-
-"""
-    ==(e1::AbstractEntity,e2::AbstractEntity)
-
-Two entities are considered equal
-`geometric_dimension(e1)==geometric_dimension(e2)` and `tag(e1)=tag(e2)`.
-
-Notice that this implies `dim` and `tag` of an entity should uniquely define it,
-and therefore global variables like [`TAGS`](@ref) are needed to make sure newly
-created [`AbstractEntity`](@ref) have a new `(dim,tag)` identifier.
-"""
-function Base.:(==)(e1::AbstractEntity, e2::AbstractEntity)
-    d1, t1 = geometric_dimension(e1), tag(e1)
-    d2, t2 = geometric_dimension(e2), tag(e2)
-    d1 == d2 || (return false)
-    t1 == t2 || (return false)
-    return true
-end
-Base.hash(ent::AbstractEntity, h::UInt) = hash((geometric_dimension(ent), tag(ent)), h)
-
-function Base.show(io::IO, ent::AbstractEntity)
+function Base.show(io::IO, ent::GeometricEntity)
     T = typeof(ent)
     d = geometric_dimension(ent)
     t = tag(ent)
-    return print(io, "$T with (dim,tag)=($d,$t)")
+    l = labels(ent)
+    return print(io, "$T with (dim,tag)=($d,$t) and labels $l")
 end
 
-#####################################################################
-
-# Variables and functions to globally keep track of entities
-
-#####################################################################
-
-"""
-    const TAGS::Dict{Int,Vector{Int}}
-
-Global dictionary storing the used entity tags (the value) for a given dimension
-(the key).
-"""
-const TAGS = Dict{Int,Vector{Int}}()
+function Base.show(io::IO, k::EntityKey)
+    return print(io, "EntityKey($(k.dim),$(k.tag))")
+end
 
 """
     const ENTITIES
 
-Global dictionary storing the used entity tags (the value) for a given dimension
-(the key).
+Dictionary mapping [`EntityKey`](@ref) to [`GeometricEntity`](@ref). Contains
+all entities created in a given session.
 """
-const ENTITIES = Dict{Tuple{Int,Int},AbstractEntity}()
+const ENTITIES = Dict{EntityKey,GeometricEntity}()
 
-"""
-    global_add_entity!(ent::AbstractEntity)
+clear_entities!() = empty!(ENTITIES)
 
-Add `ent` to the global dictionary [`ENTITIES`](@ref) and update [`TAGS`](@ref)
-with its `(dim,tag)` key. This function should be called by the inner
-constructor of *every* [`AbstractEntity`](@ref).
-"""
-function global_add_entity!(ent::AbstractEntity)
+function global_add_entity!(ent::GeometricEntity)
     d, t = geometric_dimension(ent), tag(ent)
-    _add_tag!(d, t) # add this tag to global list to make sure it is not used again
-    msg = "overwriting ENTITIES: value in key ($d,$t) will be replaced"
-    haskey(ENTITIES, (d, t)) && (@warn msg)
-    ENTITIES[(d, t)] = ent
-    return d, t
+    k = EntityKey(d, t)
+    msg = "overwriting an existing entity with the same (dim,tag)=($d,$t)"
+    haskey(ENTITIES, k) && (@warn msg)
+    return ENTITIES[k] = ent
+end
+
+function global_get_entity(k::EntityKey)
+    return ENTITIES[k]
 end
 
 """
     new_tag(dim)
 
-Generate a unique tag for an `AbstractEntity` of dimension `dim`.
-
-The implementation consists of adding one to the maximum value of `TAGS[dim]`
-
-# See also: [`TAGS`](@ref).
+Return a new tag for an entity of dimension `dim` so that `EntityKey(dim, tag)`
+is not already in `ENTITIES`.
 """
-function new_tag(dim::Integer)
-    if !haskey(TAGS, dim)
-        return 1
-    else
-        tnew = maximum(TAGS[dim]) + 1
-        return tnew
+function new_tag(dim::Int)
+    tag = 1
+    while haskey(ENTITIES, EntityKey(dim, tag))
+        tag += 1
     end
-end
-
-function _add_tag!(dim, tag)
-    if is_new_tag(dim, tag)
-        # now add key
-        if haskey(TAGS, dim)
-            push!(TAGS[dim], tag)
-        else
-            TAGS[dim] = [tag]
-        end
-    else
-        # print warning but don't add duplicate tag
-        msg = "entity of dimension $dim and tag $tag already exists in TAGS.
-       Creating a possibly duplicate entity."
-        @warn msg
-    end
-    return TAGS
-end
-
-function is_new_tag(dim, tag)
-    if haskey(TAGS, dim)
-        existing_tags = TAGS[dim]
-        if in(tag, existing_tags)
-            return false
-        end
-    end
-    return true
-end
-
-"""
-    clear_entities!()
-
-Empty the global variables used to keep track of the various entities
-created.
-
-# See also: [`ENTITIES`](@ref), [`TAGS`](@ref)
-"""
-function clear_entities!()
-    empty!(TAGS)
-    empty!(ENTITIES)
-    return nothing
+    return tag
 end

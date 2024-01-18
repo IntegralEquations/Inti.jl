@@ -18,7 +18,7 @@ gmsh.option.setNumber("Mesh.MeshSizeMax", 0.2)
 gmsh.model.mesh.generate(3)
 ents = gmsh.model.getEntities()
 Ω   = Inti.gmsh_import_domain(;dim=3)
-msh = Inti.gmsh_import_mesh(Ω;dim=3)
+msh = Inti.import_mesh_from_gmsh_model(Ω;dim=3)
 gmsh.finalize()
 ```
 
@@ -53,7 +53,7 @@ Two-dimensional meshes are very similar:
     gmsh.model.occ.synchronize()
     gmsh.model.mesh.generate(2)
     Ω   = Inti.gmsh_import_domain(;dim=2)
-    msh = Inti.gmsh_import_mesh(Ω;dim=2)
+    msh = Inti.import_mesh_from_gmsh_model(Ω;dim=2)
     gmsh.finalize()
     color = [cos(20*x[1]) for x in Inti.nodes(msh)]
     fig,ax,p = poly(view(msh,Ω);strokewidth=1,color)
