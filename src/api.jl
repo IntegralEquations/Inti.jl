@@ -1,11 +1,15 @@
 """
-    single_double_layer(; pde, target, source::Quadrature, compression, correction)
+    single_double_layer(; pde, target, source::Quadrature, compression,
+    correction, derivative = false)
 
-Construct a discrete approximation to the single- and double-layer integral operators for `pde`,
-mapping values defined on the quadrature nodes of `source` to values defined on
-the nodes of `target`.
+Construct a discrete approximation to the single- and double-layer integral
+operators for `pde`, mapping values defined on the quadrature nodes of `source`
+to values defined on the nodes of `target`. If `derivative = true`, return
+instead the adjoint double-layer and hypersingular operators (which are the
+derivative of the single- and double-layer, respectively).
 
-You  must choose a `compression` method and a `correction` method, as described below.
+You  must choose a `compression` method and a `correction` method, as described
+below.
 
 ## Compression
 
@@ -33,11 +37,18 @@ integrals should be computed. The available options are:
     source and target points above which no correction is performed
     (defaults to `Inf`).
 """
-function single_double_layer(; pde, target, source, compression, correction)
+function single_double_layer(;
+    pde,
+    target,
+    source,
+    compression,
+    correction,
+    derivative = false,
+)
     compression = _normalize_compression(compression)
     correction  = _normalize_correction(correction)
-    G           = SingleLayerKernel(pde)
-    dG          = DoubleLayerKernel(pde)
+    G           = derivative ? AdjointDoubleLayerKernel(pde) : SingleLayerKernel(pde)
+    dG          = derivative ? HyperSingularKernel(pde) : DoubleLayerKernel(pde)
     Sop         = IntegralOperator(G, target, source)
     Dop         = IntegralOperator(dG, target, source)
     # handle compression
@@ -58,8 +69,15 @@ function single_double_layer(; pde, target, source, compression, correction)
     if correction.method == :none
         return Smat, Dmat # shortcircuit case without correction
     elseif correction.method == :dim
-        δS, δD =
-            bdim_correction(pde, target, source, Smat, Dmat; maxdist = correction.maxdist)
+        δS, δD = bdim_correction(
+            pde,
+            target,
+            source,
+            Smat,
+            Dmat;
+            maxdist = correction.maxdist,
+            derivative,
+        )
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end
@@ -81,6 +99,31 @@ function single_double_layer(; pde, target, source, compression, correction)
         D = Dmat + LinearMap(δD)
     end
     return S, D
+end
+
+"""
+    adj_double_layer_hypersingular(; pde, target, source, compression,
+    correction)
+
+Similar to `single_double_layer`, but for the adjoint double-layer and
+hypersingular operators. See the documentation of [`single_double_layer`] for a
+description of the arguments.
+"""
+function adj_double_layer_hypersingular(;
+    pde,
+    target,
+    source = target,
+    compression,
+    correction,
+)
+    return single_double_layer(;
+        pde,
+        target,
+        source,
+        compression,
+        correction,
+        derivative = true,
+    )
 end
 
 """

@@ -46,8 +46,13 @@ for N in (2, 3)
                 D = Inti.IntegralOperator(dG, quad)
                 Dmat = Inti.assemble_matrix(D)
                 e0 = norm(Smat * γ₁u - Dmat * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
-                δS, δD = Inti.bdim_correction(pde, quad, quad, Smat, Dmat)
-                Sdim, Ddim = Smat + δS, Dmat + δD
+                Sdim, Ddim = Inti.single_double_layer(;
+                    pde,
+                    target      = quad,
+                    source      = quad,
+                    compression = (method = :none,),
+                    correction  = (method = :dim,),
+                )
                 e1 = norm(Sdim * γ₁u - Ddim * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
                 @testset "Single/double layer $(string(pde))" begin
                     @test norm(e0, Inf) > 10 * norm(e1, Inf)
@@ -61,9 +66,13 @@ for N in (2, 3)
                 H = Inti.IntegralOperator(Inti.HyperSingularKernel(pde), quad)
                 Hmat = Inti.assemble_matrix(H)
                 e0 = norm(Kmat * γ₁u - Hmat * γ₀u - σ * γ₁u, Inf)
-                δK, δH =
-                    Inti.bdim_correction(pde, quad, quad, Kmat, Hmat; derivative = true)
-                Kdim, Hdim = Kmat + δK, Hmat + δH
+                Kdim, Hdim = Inti.adj_double_layer_hypersingular(;
+                    pde = pde,
+                    target = quad,
+                    source = quad,
+                    compression = (method = :none,),
+                    correction = (method = :dim,),
+                )
                 e1 = norm(Kdim * γ₁u - Hdim * γ₀u - σ * γ₁u, Inf)
                 @testset "Adjoint double-layer/hypersingular $(string(pde))" begin
                     @test norm(e0, Inf) > 10 * norm(e1, Inf)
