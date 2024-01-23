@@ -111,18 +111,22 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
             normals[:, j] = Inti.normal(iop.source[j])
         end
         dipvecs = similar(normals, Float64)
+        dipstrs = Vector{ComplexF64}(undef, n)
         zk = ComplexF64(K.pde.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights and constant
             for j in 1:n
                 dipvecs[:, j] = view(normals, :, j) * weights[j]
             end
+            for j in 1:n
+                dipstrs[j] = x[j]
+            end
             # FMMLIB2D does no checking for if targets are also sources
             if same_surface
                 out = FMMLIB2D.hfmm2d(;
                     zk = zk,
                     source = sources,
-                    dipstr = x,
+                    dipstr = dipstrs,
                     dipvec = dipvecs,
                     tol = atol,
                 )
@@ -132,7 +136,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     zk = zk,
                     source = sources,
                     target = targets,
-                    dipstr = x,
+                    dipstr = dipstrs,
                     dipvec = dipvecs,
                     tol = atol,
                 )
