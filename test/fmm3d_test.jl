@@ -18,8 +18,12 @@ include("test_utils.jl")
 
 for pde in (Inti.Laplace(; dim = 3), Inti.Helmholtz(; dim = 3, k = 1.2))
     @testset "PDE: $pde" begin
-        pde = Inti.Laplace(; dim = 3)
-        for K in (Inti.DoubleLayerKernel(pde), Inti.SingleLayerKernel(pde))
+        for K in (
+            Inti.DoubleLayerKernel(pde),
+            Inti.SingleLayerKernel(pde),
+            Inti.AdjointDoubleLayerKernel(pde),
+            Inti.HyperSingularKernel(pde),
+        )
             for Γ_quad in (Γ₁_quad, Γ₂_quad)
                 iop = Inti.IntegralOperator(K, Γ₁_quad, Γ_quad)
                 iop_fmm = Inti.assemble_fmm(iop; atol = 1e-8)
