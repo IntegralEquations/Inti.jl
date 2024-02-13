@@ -505,9 +505,7 @@ nothing #hide
 gmsh.initialize()
 Inti.write_gmsh_model(msh)
 Inti.write_gmsh_view!(Σ_msh, real(u_eval_msh); name="sigma real")
-# Inti.write_gmsh_view!(Σ_msh, imag(us_eval_msh); name="sigma imag")
 Inti.write_gmsh_view!(Γ_msh, x -> 0, name = "gamma real")
-# Inti.write_gmsh_view!(Γ_msh, x -> -imag(uᵢ(x)), name = "gamma imag")
 # Launch the GUI to see the results:
 "-nopopup" in ARGS || gmsh.fltk.run()
 gmsh.finalize()
