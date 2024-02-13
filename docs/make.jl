@@ -26,7 +26,7 @@ end
 # Generate examples using Literate
 const examples_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples")
 const generated_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples", "generated")
-for example in ["helmholtz_scattering.jl"]
+for example in ["helmholtz_scattering.jl", "poisson.jl"]
     println("\n*** Generating $example example")
     @time begin
         src = joinpath(examples_dir, example)
@@ -59,7 +59,8 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         # "Meshing" => "geo_and_meshes.md",
-        "Examples" => ["examples/generated/helmholtz_scattering.md"],
+        "Helmholtz Example" => ["examples/generated/helmholtz_scattering.md"],
+        "Poisson Example" => ["examples/generated/poisson.md"],
         "References" => "references.md",
     ],
     warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),

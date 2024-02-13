@@ -43,7 +43,6 @@ using Gmsh # this will trigger the loading of Inti's Gmsh extension
 function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
     try
         gmsh.initialize()
-        # set verbosity to 0
         gmsh.option.setNumber("General.Terminal", 0)
         gmsh.model.add("circle-mesh")
         gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
