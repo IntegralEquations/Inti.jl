@@ -126,6 +126,24 @@ function _assemble_fmm3d(args...; kwargs...)
 end
 
 """
+    assemble_ifgf(iop; atol)
+
+Set up a 2D or 3D IFGF for evaluating the discretized integral operator `iop`
+associated with the `pde`.
+
+"""
+function assemble_ifgf(iop::IntegralOperator, args...; kwargs...)
+    N = ambient_dimension(iop.source)
+    @assert N == 2 || N == 3 "Only 2D and 3D IFGFs are supported by Inti"
+    @assert (iop.kernel.pde isa Laplace) || (iop.kernel.pde isa Helmholtz) "Unsupported IFGF requested"
+    return _assemble_ifgf(iop, args...; kwargs...)
+end
+
+function _assemble_ifgf(args...; kwargs...)
+    return error("_assemble_ifgf not found. Did you forget to import IFGF ?")
+end
+
+"""
     assemble_hmatrix(iop[; atol, rank, rtol, eta])
 
 Assemble an H-matrix representation of the discretized integral operator `iop`

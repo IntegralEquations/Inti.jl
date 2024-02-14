@@ -16,7 +16,7 @@ include("test_utils.jl")
 Γ₂ = Inti.external_boundary(Ω₂)
 Γ₂_quad = Inti.Quadrature(view(msh₂, Γ₂); qorder = 3)
 
-for pde in (Inti.Laplace(; dim = 3), Inti.Helmholtz(; dim = 3, k = 1.2))
+for pde in (Inti.Laplace(; dim = 3), Inti.Helmholtz(; dim = 3, k = 3.14))
     @testset "PDE: $pde" begin
         for K in (
             Inti.DoubleLayerKernel(pde),

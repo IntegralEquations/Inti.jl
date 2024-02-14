@@ -24,3 +24,6 @@ using Aqua
 
 # TODO: ask for FMM3D to be registered
 # @safetestset "FMM3D extension" include("fmm3d_test.jl")
+
+# TODO: Should IFGF be registered as a stand-alone package?
+# @safetestset "IFGF extension" include("ifgf_test.jl")
