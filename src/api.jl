@@ -22,6 +22,8 @@ compressed. The available options are:
     hierarchical matrices with an absolute tolerance `tol` (defaults to  `1e-8`).
   - `(method = :fmm, tol)`: the resulting operators are compressed using the fast multipole method
     with an absolute tolerance `tol` (defaults to `1e-8`).
+  - `(method = :ifgf, tol)`: the resulting operators are compressed using the interpolated factor Green function method
+    with an absolute tolerance `tol` (defaults to `1e-8`).
 
 ## Correction
 
@@ -61,6 +63,9 @@ function single_double_layer(;
     elseif compression.method == :fmm
         Smat = assemble_fmm(Sop; atol = compression.tol)::LinearMap
         Dmat = assemble_fmm(Dop; atol = compression.tol)::LinearMap
+    elseif compression.method == :ifgf
+        Smat = assemble_ifgf(Sop; atol = compression.tol)::LinearMap
+        Dmat = assemble_ifgf(Dop; atol = compression.tol)::LinearMap
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
@@ -94,7 +99,7 @@ function single_double_layer(;
             S = LinearMap(Smat) + LinearMap(δS)
             D = LinearMap(Dmat) + LinearMap(δD)
         end
-    elseif compression.method == :fmm
+    elseif compression.method == :fmm || compression.method == :ifgf
         S = Smat + LinearMap(δS)
         D = Dmat + LinearMap(δD)
     end
@@ -152,6 +157,8 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
         Vmat = assemble_hmatrix(V; atol = compression.tol)
     elseif compression.method == :fmm
         Vmat = assemble_fmm(V; atol = compression.tol)
+    elseif compression.method == :ifgf
+        Vmat = assemble_ifgf(V; atol = compression.tol)
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
@@ -193,7 +200,7 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
     # add correction
     if compression.method ∈ (:hmatrix, :none)
         V = axpy!(true, δV, Vmat)
-    elseif compression.method == :fmm
+    elseif compression.method == :fmm || compression.method == :ifgf
         V = Vmat + LinearMap(δV)
     end
     return V
