@@ -210,9 +210,9 @@ const Point2D = SVector{2,Float64}
 const Point3D = SVector{3,Float64}
 
 function _normalize_compression(compression)
-    methods = (:hmatrix, :fmm, :none)
+    methods = (:hmatrix, :fmm, :ifgf, :none)
     # check that method is valid
-    compression.method ∈ (:hmatrix, :fmm, :none) || error(
+    compression.method ∈ methods || error(
         "Unknown compression.method $(compression.method). Available options: $methods",
     )
     # set default tolerance if not provided
