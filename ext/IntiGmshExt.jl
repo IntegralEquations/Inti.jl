@@ -2,6 +2,7 @@ module IntiGmshExt
 
 using Gmsh
 import Inti
+using LinearAlgebra
 using StaticArrays
 
 function __init__()
@@ -225,7 +226,7 @@ function Inti.write_gmsh_view(msh::Inti.SubMesh, data; viewname = "")
 end
 
 function Inti.gmsh_curve(f, a, b; npts = 100, tag = 1)
-    isclosed = all(f(a) .≈ f(b))
+    isclosed = norm(f(a) .- f(b)) < 1e-8
     is2d = length(f(a)) == 2
     pt_tags = Int32[]
     nmax = isclosed ? npts - 2 : npts - 1
