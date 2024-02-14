@@ -224,4 +224,24 @@ function Inti.write_gmsh_view(msh::Inti.SubMesh, data; viewname = "")
     return nothing
 end
 
+function Inti.gmsh_curve(f, a, b; npts = 100, tag = 1)
+    isclosed = all(f(a) .≈ f(b))
+    is2d = length(f(a)) == 2
+    pt_tags = Int32[]
+    nmax = isclosed ? npts - 2 : npts - 1
+    for i in 0:nmax
+        s = i / (npts - 1)
+        coords = f(a + s * (b - a))
+        x, y = coords[1], coords[2]
+        z = is2d ? 0 : coords[3]
+        t = gmsh.model.occ.addPoint(x, y, z)
+        push!(pt_tags, t)
+    end
+    # close the curve by adding the first point again
+    isclosed && push!(pt_tags, pt_tags[1])
+    t = gmsh.model.occ.addSpline(pt_tags, tag)
+    gmsh.model.occ.synchronize()
+    return t
+end
+
 end # module
