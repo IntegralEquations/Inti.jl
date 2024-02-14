@@ -25,6 +25,7 @@ IntiGmshExt = "Gmsh"
 IntiHMatricesExt = "HMatrices"
 
 [compat]
+ElementaryPDESolutions = "0.2"
 FMM3D = "1"
 FMMLIB2D = "0.3"
 Gmsh = "0.3"

@@ -12,14 +12,14 @@ rtol = 1e-8
 t = :interior
 σ = t == :interior ? 1 / 2 : -1 / 2
 N = 2
-# pde = Inti.Laplace(; dim=N)
-pde = Inti.Helmholtz(; dim = N, k = 2π)
+pde = Inti.Laplace(; dim = N)
+# pde = Inti.Helmholtz(; dim = N, k = 2π)
 # pde = Inti.Stokes(; dim = N, μ = 1.2)
 @info "Greens identity ($t) $(N)d $pde"
 Inti.clear_entities!()
 center = Inti.svector(i -> 0.1, N)
 radius = 1
-n = 3
+n = 6
 qorder = n - 1
 hh = [1 / 2^i for i in 1:5]
 ee0 = Float64[]
@@ -35,11 +35,10 @@ for h in hh
     gmsh.option.setNumber("General.Verbosity", 2)
     gmsh.model.mesh.setOrder(2)
     Inti.clear_entities!()
-    gmsh.model.occ.addDisk(center[1], center[2], 0, radius, radius)
+    gmsh.model.occ.addDisk(center[1], center[2], 0, 2 * radius, radius)
     gmsh.model.occ.synchronize()
     gmsh.model.mesh.generate(2)
-    Ω = Inti.gmsh_import_domain(; dim = 2)
-    M = Inti.import_mesh_from_gmsh_model(Ω; dim = 2)
+    Ω, M = Inti.import_mesh_from_gmsh_model(; dim = 2)
     gmsh.finalize()
     Γ = Inti.external_boundary(Ω)
     Q = Inti.Quadrature(view(M, Γ); qorder)
@@ -60,14 +59,22 @@ for h in hh
     γ₀u_norm = norm(norm.(γ₀u, Inf), Inf)
     γ₁u_norm = norm(norm.(γ₁u, Inf), Inf)
     # single and double layer
-    S = Inti.IntegralOperator(G, Q)
-    S0 = Inti.assemble_matrix(S)
-    D = Inti.IntegralOperator(dG, Q)
-    D0 = Inti.assemble_matrix(D)
+    S0, D0 = Inti.single_double_layer(;
+        pde,
+        target = Q,
+        source = Q,
+        compression = (method = :none,),
+        correction = (method = :none,),
+    )
+    S1, D1 = Inti.single_double_layer(;
+        pde,
+        target = Q,
+        source = Q,
+        compression = (method = :none,),
+        correction = (method = :dim,),
+    )
     e0 = norm(S0 * γ₁u - D0 * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
-    δS, δD = Inti.bdim_correction(pde, Q, Q, S0, D0)
-    Smat, Dmat = S0 + δS, D0 + δD
-    e1 = norm(Smat * γ₁u - Dmat * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
+    e1 = norm(S1 * γ₁u - D1 * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
     push!(ee0, e0)
     push!(ee1, e1)
 end
