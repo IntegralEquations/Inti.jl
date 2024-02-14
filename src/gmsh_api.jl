@@ -19,6 +19,15 @@ See also: [`import_mesh_from_gmsh_model`](@ref).
 """
 function import_mesh_from_gmsh_file end
 
+"""
+    gmsh_curve(f::Function, a, b; npts=100, tag=-1)
+
+Create a curve in the current `gmsh` model given by `{f(t) : t ∈
+(a,b) }` where `f` is a function from `ℝ` to `ℝ^3`. The curve is approximated
+by C² b-splines passing through `npts` equispaced in parameter space.
+"""
+function gmsh_curve end
+
 function write_gmsh_model end
 
 function write_gmsh_view! end

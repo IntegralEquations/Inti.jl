@@ -12,7 +12,7 @@ rtol = 1e-8
 t = :interior
 σ = t == :interior ? 1 / 2 : -1 / 2
 N = 2
-pde = Inti.Laplace(; dim=N)
+pde = Inti.Laplace(; dim = N)
 # pde = Inti.Helmholtz(; dim = N, k = 2π)
 # pde = Inti.Stokes(; dim = N, μ = 1.2)
 @info "Greens identity ($t) $(N)d $pde"
@@ -35,10 +35,10 @@ for h in hh
     gmsh.option.setNumber("General.Verbosity", 2)
     gmsh.model.mesh.setOrder(2)
     Inti.clear_entities!()
-    gmsh.model.occ.addDisk(center[1], center[2], 0, 2*radius, radius)
+    gmsh.model.occ.addDisk(center[1], center[2], 0, 2 * radius, radius)
     gmsh.model.occ.synchronize()
     gmsh.model.mesh.generate(2)
-    Ω,M = Inti.import_mesh_from_gmsh_model(; dim = 2)
+    Ω, M = Inti.import_mesh_from_gmsh_model(; dim = 2)
     gmsh.finalize()
     Γ = Inti.external_boundary(Ω)
     Q = Inti.Quadrature(view(M, Γ); qorder)
