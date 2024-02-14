@@ -35,7 +35,7 @@ jobs:
           cache-registries: "true"
           cache-compiled: "true"
       - name: Install dependencies
-        run: julia --project -e 'using Pkg; Pkg.develop(url="https://github.com/IntegralEquations/ElementaryPDESolutions.jl"); Pkg.instantiate()'
+        run: julia --project -e 'using Pkg; Pkg.instantiate()'
       # - uses: julia-actions/julia-buildpkg@v1
       # - uses: julia-actions/julia-runtest@v1
       - name: Run tests
