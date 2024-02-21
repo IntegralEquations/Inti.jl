@@ -136,6 +136,9 @@ function assemble_ifgf(iop::IntegralOperator, args...; kwargs...)
     N = ambient_dimension(iop.source)
     @assert N == 2 || N == 3 "Only 2D and 3D IFGFs are supported by Inti"
     @assert (iop.kernel.pde isa Laplace) || (iop.kernel.pde isa Helmholtz) "Unsupported IFGF requested"
+    @assert !(
+        (N == 2) && (iop.kernel.pde isa Laplace) && (iop.kernel isa Inti.SingleLayerKernel)
+    ) "2D Laplace Single Layer Kernels are unsupported in IFGF"
     return _assemble_ifgf(iop, args...; kwargs...)
 end
 
