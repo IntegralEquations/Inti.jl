@@ -1,5 +1,6 @@
 [deps]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+FMM3D = "1e13804c-f9b7-11ea-0ef0-29f3b1745df8"
 FMMLIB2D = "1a804d9e-d798-534b-a6a9-4525c36f0718"
 Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
 HMatrices = "8646bddf-ab1c-4fa7-9c51-ba187d647618"
