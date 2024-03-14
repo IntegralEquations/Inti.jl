@@ -33,6 +33,7 @@ function vdim_correction(
     isnothing(interpolation_order) &&
         (interpolation_order = maximum(order, values(source.etype2qrule)))
     p, P, γ₁P = polynomial_solutions_vdim(pde, interpolation_order)
+    multiindices = [MultiIndex(first(keys(f.order2coeff))) for f in p]
     μ = if isnothing(green_multiplier)
         μ_ = _green_multiplier(target[1], boundary)
         # snap to the nearest "generic" value of μ
@@ -43,7 +44,7 @@ function vdim_correction(
         error("green_multiplier must be a scalar")
     end
     dict_near = etype_to_nearest_points(target, source; maxdist)
-    B, R, shifts, scales =
+    B, R =
         _vdim_auxiliary_quantities(p, P, γ₁P, target, source, boundary, μ, Sop, Dop, Vop)
     # compute sparse correction
     Is = Int[]
@@ -51,6 +52,7 @@ function vdim_correction(
     Vs = eltype(Vop)[]
     nbasis = length(p)
     for (E, qtags) in source.etype2qtags
+        els = elements(source.mesh, E)
         near_list = dict_near[E]
         nq, ne = size(qtags)
         @assert length(near_list) == ne
@@ -58,16 +60,29 @@ function vdim_correction(
             # indices of nodes in element `n`
             isempty(near_list[n]) && continue
             jglob = @view qtags[:, n]
+            # compute translation and scaling
+            c, r = translation_and_scaling(els[n])
             L = B[jglob, :] # vandermond matrix for current element
+            L̃ = [f((q.coords-c)/r) for q in view(source,jglob), f in p] # and its scaled version
+            # build transfer matrix s.t. c = S*̃c
+            S = change_of_basis(multiindices, c, r)
             @debug begin
                 max_cond = max(max_cond, cond(L))
             end
+            # if isdefined(Main, :Infiltrator)
+            #     Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+            # end
             for i in near_list[n]
-                wei = R[i:i, :] / L
+                wei = R[i:i, :] / L # weights for the current element and target i
+                wei_tilde = R[i:i, :]*(S*pinv(L̃))
+                # wei_tilde = (R[i:i, :]*S) / L̃
+                @show norm(wei-wei_tilde)
+                # wei = translate_and_rescale(wei_tilde, r, c)
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
                     push!(Vs, wei[k])
+                    # push!(Vs, wei_tilde[k])
                 end
             end
         end
@@ -75,6 +90,57 @@ function vdim_correction(
     @debug "maximum condition encountered: $max_cond"
     δV = sparse(Is, Js, Vs, m, n)
     return δV
+end
+
+function change_of_basis(multiindices, c, r)
+    nbasis = length(multiindices)
+    P = zeros(nbasis, nbasis)
+    for i in 1:nbasis
+        α = multiindices[i]
+        for j in 1:nbasis
+            β = multiindices[j]
+            β ≤ α || continue
+            P[i, j] = prod((-c).^((α - β).indices)) / r^abs(β)
+        end
+    end
+    return P
+end
+
+
+function translation_and_scaling(el::LagrangeTriangle)
+    vertices = el.vals[1:3]
+    l1 = norm(vertices[1] - vertices[2])
+    l2 = norm(vertices[2] - vertices[3])
+    l3 = norm(vertices[3] - vertices[1])
+    if ((l1^2 + l2^2 >= l3^2) && (l2^2 + l3^2 >= l1^2) && (l3^2 + l1^2 > l2^2))
+        acuteright = true
+    else
+        acuteright = false
+    end
+
+    if acuteright
+        # Compute the circumcenter and circumradius
+        Bp = vertices[2] - vertices[1]
+        Cp = vertices[3] - vertices[1]
+        Dp = 2 * (Bp[1] * Cp[2] - Bp[2] * Cp[1])
+        Upx = 1 / Dp * (Cp[2] * (Bp[1]^2 + Bp[1]^2) - Bp[2] * (Cp[1]^2 + Cp[2]^2))
+        Upy = 1 / Dp * (Bp[2] * (Cp[1]^2 + Cp[1]^2) - Cp[2] * (Bp[1]^2 + Bp[2]^2))
+        Up = SVector{2}(Upx, Upy)
+        r = norm(Up)
+        c = Up + vertices[1]
+    else
+        if (l1 >= l2) && (l1 >= l3)
+            c = (vertices[1] + vertices[2]) / 2
+            r = l1 / 2
+        elseif (l2 >= l1) && (l2 >= l3)
+            c = (vertices[2] + vertices[3]) / 2
+            r = l2 / 2
+        else
+            c = (vertices[1] + vertices[3]) / 2
+            r = l3 / 2
+        end
+    end
+    return c, r
 end
 
 function _vdim_auxiliary_quantities(
@@ -91,63 +157,10 @@ function _vdim_auxiliary_quantities(
 )
     num_basis = length(p)
     num_targets = length(X)
-    num_els = Int(length(Y) / num_basis)
-    N = ambient_dimension(Y)
+    b = [f(q) for q in Y, f in p]
     γ₀B = [f(q) for q in Γ, f in P]
     γ₁B = [f(q) for q in Γ, f in γ₁P]
     Θ = zeros(eltype(Vop), num_targets, num_basis)
-    b = zeros(eltype(Vop), num_els * num_basis, num_basis)
-    c = Array{eltype(Vop)}(undef, N, num_els)
-    r = Array{eltype(Vop)}(undef, num_els)
-    for E in element_types(Y.mesh)
-        E <: LagrangeElement{ReferenceSimplex{N}} || error(
-            "VDIM requires all source elements to be simplices in the appropriate dimension",
-        )
-        #for (idx, el) in pairs(IndexLinear(), elements(Y.mesh, E))
-        for (idx, el) in enumerate(elements(Y.mesh, E))
-            # Assume the vertices of the simplex are first three (low-order) nodes if `el` is a high-order element.
-            vertices = el.vals[1:3]
-            # TODO This will be wrong for a tetrahedron
-            l1 = norm(vertices[1] - vertices[2])
-            l2 = norm(vertices[2] - vertices[3])
-            l3 = norm(vertices[3] - vertices[1])
-
-            if ((l1^2 + l2^2 >= l3^2) && (l2^2 + l3^2 >= l1^2) && (l3^2 + l1^2 > l2^2))
-                acuteright = true
-            else
-                acuteright = false
-            end
-            if acuteright
-                # Compute the circumcenter and circumradius
-                Bp = vertices[2] - vertices[1]
-                Cp = vertices[3] - vertices[1]
-                Dp = 2 * (Bp[1] * Cp[2] - Bp[2] * Cp[1])
-                Upx = 1 / Dp * (Cp[2] * (Bp[1]^2 + Bp[1]^2) - Bp[2] * (Cp[1]^2 + Cp[2]^2))
-                Upy = 1 / Dp * (Bp[2] * (Cp[1]^2 + Cp[1]^2) - Cp[2] * (Bp[1]^2 + Bp[2]^2))
-                Up = SVector{2}(Upx, Upy)
-                r[idx] = norm(Up)
-                c[:, idx] = Up + vertices[1]
-            else
-                if (l1 >= l2) && (l1 >= l3)
-                    c[:, idx] = (vertices[1] + vertices[2]) / 2
-                    r[idx] = l1 / 2
-                elseif (l2 >= l1) && (l2 >= l3)
-                    c[:, idx] = (vertices[2] + vertices[3]) / 2
-                    r[idx] = l2 / 2
-                else
-                    c[:, idx] = (vertices[1] + vertices[3]) / 2
-                    r[idx] = l3 / 2
-                end
-            end
-            interp_nodes_scaletranslate = [
-                (q.coords - c[:, idx]) / r[idx] for q in Y[(1:num_basis).+(idx-1)*num_basis]
-            ]
-            b[(1:num_basis).+(idx-1)*num_basis, :] = [
-                f(Tuple(eltype(Vop)(x) for x in q)) for
-                q in interp_nodes_scaletranslate, f in p
-            ]
-        end
-    end
     # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
     for n in 1:num_basis
         @views mul!(Θ[:, n], Sop, γ₁B[:, n])
@@ -157,7 +170,7 @@ function _vdim_auxiliary_quantities(
             Θ[i, n] += σ * P[n](X[i])
         end
     end
-    return b, Θ, c, r
+    return b, Θ
 end
 
 """
