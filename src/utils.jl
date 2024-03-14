@@ -247,3 +247,26 @@ Things which should probably be implemented at some point.
 function notimplemented()
     return error("not (yet) implemented")
 end
+
+"""
+    MultiIndex{N}
+
+Wrapper around `NTuple{N,Int}` mimicking a multi-index in `ℤ₀ᴺ`.
+"""
+struct MultiIndex{N}
+    indices::NTuple{N,Int}
+end
+
+Base.:+(a::MultiIndex, b::MultiIndex) = MultiIndex(a.indices .+ b.indices)
+Base.:-(a::MultiIndex, b::MultiIndex) = MultiIndex(a.indices .- b.indices)
+
+Base.factorial(n::MultiIndex) = prod(factorial, n.indices)
+Base.abs(n::MultiIndex) = sum(n.indices)
+
+function Base.binomial(n::MultiIndex, k::MultiIndex)
+    prod(zip(n.indices, k.indices)) do (n, k)
+        binomial(n, k)
+    end
+end
+
+Base.:<(a::MultiIndex, b::MultiIndex) = all(a.indices .< b.indices)
