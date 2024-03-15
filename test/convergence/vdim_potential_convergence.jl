@@ -21,7 +21,7 @@ function domain_and_mesh(; meshsize, meshorder = 1)
     return Ω, msh
 end
 
-function test_volume_potential(; meshsize, qorders, interpolation_order)
+function test_volume_potential(; meshsize, bdry_qorder, interpolation_order)
 
     tmesh = @elapsed begin
         Ω, msh = domain_and_mesh(; meshsize)
@@ -32,13 +32,15 @@ function test_volume_potential(; meshsize, qorders, interpolation_order)
     Ωₕ = view(msh, Ω)
     Γₕ = view(msh, Γ)
 
+    VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
+
     tquad = @elapsed begin
         # Use VDIM with the Vioreanu-Rokhlin quadrature rule for Ωₕ
-        Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorders[1])
+        Q = Inti.VioreanuRokhlin(; domain = :triangle, order = VR_qorder)
         dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
         Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
         # Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorders[1])
-        Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorders[2])
+        Γₕ_quad = Inti.Quadrature(Γₕ; qorder = bdry_qorder)
     end
     @info "Quadrature generation time: $tquad"
 
@@ -87,10 +89,10 @@ function test_volume_potential(; meshsize, qorders, interpolation_order)
 end
 
 meshsize = 0.2
-qorders = (4,8)
+bdry_qorder = 8
 interpolation_order = 2
 
-t = @elapsed er = test_volume_potential(;meshsize, qorders, interpolation_order)
+t = @elapsed er = test_volume_potential(;meshsize, bdry_qorder, interpolation_order)
 ndofs = length(er)
 
 @show ndofs, meshsize, norm(er, Inf), t
