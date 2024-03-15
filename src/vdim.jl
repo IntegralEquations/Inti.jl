@@ -62,17 +62,17 @@ function vdim_correction(
             jglob = @view qtags[:, n]
             # compute translation and scaling
             c, r = translation_and_scaling(els[n])
-            L = B[jglob, :] # vandermond matrix for current element
+            #L = B[jglob, :] # vandermond matrix for current element
             L̃ = [f((q.coords-c)/r) for q in view(source,jglob), f in p] # and its scaled version
             # build transfer matrix s.t. c = S'*̃c
             S = change_of_basis(multiindices, c, r)
             @debug begin
-                max_cond = max(max_cond, cond(L))
+                max_cond = max(max_cond, cond(L̃))
             end
             for i in near_list[n]
-                wei = R[i:i, :] / L # weights for the current element and target i
+                #wei = R[i:i, :] / L # weights for the current element and target i
                 wei_tilde = (R[i:i, :]*S') / L̃
-                @show norm(wei-wei_tilde)
+                #@show norm(wei-wei_tilde)
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
