@@ -270,3 +270,4 @@ function Base.binomial(n::MultiIndex, k::MultiIndex)
 end
 
 Base.:<(a::MultiIndex, b::MultiIndex) = all(a.indices .< b.indices)
+Base.:<=(a::MultiIndex, b::MultiIndex) = all(a.indices .<= b.indices)

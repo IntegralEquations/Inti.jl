@@ -64,25 +64,20 @@ function vdim_correction(
             c, r = translation_and_scaling(els[n])
             L = B[jglob, :] # vandermond matrix for current element
             L̃ = [f((q.coords-c)/r) for q in view(source,jglob), f in p] # and its scaled version
-            # build transfer matrix s.t. c = S*̃c
+            # build transfer matrix s.t. c = S'*̃c
             S = change_of_basis(multiindices, c, r)
             @debug begin
                 max_cond = max(max_cond, cond(L))
             end
-            # if isdefined(Main, :Infiltrator)
-            #     Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-            # end
             for i in near_list[n]
                 wei = R[i:i, :] / L # weights for the current element and target i
-                wei_tilde = R[i:i, :]*(S*pinv(L̃))
-                # wei_tilde = (R[i:i, :]*S) / L̃
+                wei_tilde = (R[i:i, :]*S') / L̃
                 @show norm(wei-wei_tilde)
-                # wei = translate_and_rescale(wei_tilde, r, c)
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
-                    push!(Vs, wei[k])
-                    # push!(Vs, wei_tilde[k])
+                    #push!(Vs, wei[k])
+                    push!(Vs, wei_tilde[k])
                 end
             end
         end
@@ -100,7 +95,7 @@ function change_of_basis(multiindices, c, r)
         for j in 1:nbasis
             β = multiindices[j]
             β ≤ α || continue
-            P[i, j] = prod((-c).^((α - β).indices)) / r^abs(β)
+            P[i, j] = prod((-c).^((α - β).indices)) / r^abs(α) / factorial(α - β)
         end
     end
     return P
@@ -123,8 +118,8 @@ function translation_and_scaling(el::LagrangeTriangle)
         Bp = vertices[2] - vertices[1]
         Cp = vertices[3] - vertices[1]
         Dp = 2 * (Bp[1] * Cp[2] - Bp[2] * Cp[1])
-        Upx = 1 / Dp * (Cp[2] * (Bp[1]^2 + Bp[1]^2) - Bp[2] * (Cp[1]^2 + Cp[2]^2))
-        Upy = 1 / Dp * (Bp[2] * (Cp[1]^2 + Cp[1]^2) - Cp[2] * (Bp[1]^2 + Bp[2]^2))
+        Upx = 1 / Dp * (Cp[2] * (Bp[1]^2 + Bp[2]^2) - Bp[2] * (Cp[1]^2 + Cp[2]^2))
+        Upy = 1 / Dp * (Bp[1] * (Cp[1]^2 + Cp[2]^2) - Cp[2] * (Bp[1]^2 + Bp[2]^2))
         Up = SVector{2}(Upx, Upy)
         r = norm(Up)
         c = Up + vertices[1]
@@ -195,7 +190,7 @@ function polynomial_solutions_vdim(pde::AbstractPDE, order::Integer)
         sum(I) > order && continue
         # define the monomial basis functions, and the corresponding solutions.
         # TODO: adapt this to vectorial case
-        p   = ElementaryPDESolutions.Polynomial(I => 1.0)
+        p   = ElementaryPDESolutions.Polynomial(I => 1 / factorial(MultiIndex(I)))
         P   = polynomial_solution(pde, p)
         γ₁P = neumann_trace(pde, P)
         push!(monomials, p)
