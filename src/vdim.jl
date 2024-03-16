@@ -44,8 +44,7 @@ function vdim_correction(
         error("green_multiplier must be a scalar")
     end
     dict_near = etype_to_nearest_points(target, source; maxdist)
-    R =
-        _vdim_auxiliary_quantities(p, P, γ₁P, target, source, boundary, μ, Sop, Dop, Vop)
+    R = _vdim_auxiliary_quantities(p, P, γ₁P, target, source, boundary, μ, Sop, Dop, Vop)
     #tvdim_wei = @elapsed begin
     # compute sparse correction
     Is = Int[]
@@ -64,7 +63,7 @@ function vdim_correction(
             # compute translation and scaling
             c, r = translation_and_scaling(els[n])
             #L = B[jglob, :] # vandermond matrix for current element
-            L̃ = [f((q.coords-c)/r) for q in view(source,jglob), f in p] # and its scaled version
+            L̃ = [f((q.coords - c) / r) for q in view(source, jglob), f in p] # and its scaled version
             # build transfer matrix s.t. c = S'*̃c
             S = change_of_basis(multiindices, c, r)
             @debug begin
@@ -72,7 +71,7 @@ function vdim_correction(
             end
             for i in near_list[n]
                 #wei = R[i:i, :] / L # weights for the current element and target i
-                wei_tilde = (R[i:i, :]*S') / L̃
+                wei_tilde = (R[i:i, :] * S') / L̃
                 #@show norm(wei-wei_tilde)
                 for k in 1:nq
                     push!(Is, i)
@@ -98,12 +97,11 @@ function change_of_basis(multiindices, c, r)
         for j in 1:nbasis
             β = multiindices[j]
             β ≤ α || continue
-            P[i, j] = prod((-c).^((α - β).indices)) / r^abs(α) / factorial(α - β)
+            P[i, j] = prod((-c) .^ ((α - β).indices)) / r^abs(α) / factorial(α - β)
         end
     end
     return P
 end
-
 
 function translation_and_scaling(el::LagrangeTriangle)
     vertices = el.vals[1:3]
@@ -161,14 +159,14 @@ function _vdim_auxiliary_quantities(
     Θ = zeros(eltype(Vop), num_targets, num_basis)
     # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
     tvdim_precomp = @elapsed begin
-    for n in 1:num_basis
-        @views mul!(Θ[:, n], Sop, γ₁B[:, n])
-        @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
-        @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
-        for i in 1:num_targets
-            Θ[i, n] += σ * P[n](X[i])
+        for n in 1:num_basis
+            @views mul!(Θ[:, n], Sop, γ₁B[:, n])
+            @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
+            @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
+            for i in 1:num_targets
+                Θ[i, n] += σ * P[n](X[i])
+            end
         end
-    end
     end
     @info "VDIM Operator Eval time: $tvdim_precomp"
     return Θ

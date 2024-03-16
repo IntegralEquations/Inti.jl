@@ -22,7 +22,6 @@ function domain_and_mesh(; meshsize, meshorder = 1)
     return Ω, msh
 end
 
-
 meshsize = 0.01
 bdry_qorder = 16
 interpolation_order = 4
@@ -54,24 +53,24 @@ k  = 0
 #u  = (x) -> exp(im * k0 * dot(x, θ))
 #du = (x,n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
 u  = (x) -> cos(k0 * dot(x, θ))
-du = (x,n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
-f = (x) -> (k^2 - k0^2) * u(x)
+du = (x, n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
+f  = (x) -> (k^2 - k0^2) * u(x)
 
 u_d = map(q -> u(q.coords), Ωₕ_quad)
-u_b    = map(q -> u(q.coords), Γₕ_quad)
-du_b  = map(q -> du(q.coords, q.normal), Γₕ_quad)
+u_b = map(q -> u(q.coords), Γₕ_quad)
+du_b = map(q -> du(q.coords, q.normal), Γₕ_quad)
 f_d = map(q -> f(q.coords), Ωₕ_quad)
 
-pde = k == 0 ? Inti.Laplace(;dim=2) : Inti.Helmholtz(;dim=2,k)
+pde = k == 0 ? Inti.Laplace(; dim = 2) : Inti.Helmholtz(; dim = 2, k)
 
 ## Boundary operators
 tbnd = @elapsed begin
     S_b2d, D_b2d = Inti.single_double_layer(;
-    pde,
-    target = Ωₕ_quad,
-    source = Γₕ_quad,
-    compression = (method = :fmm, tol = 1e-14),
-    correction = (method = :dim, maxdist = 5 * meshsize),
+        pde,
+        target = Ωₕ_quad,
+        source = Γₕ_quad,
+        compression = (method = :fmm, tol = 1e-14),
+        correction = (method = :dim, maxdist = 5 * meshsize),
     )
 end
 @info "Boundary operators time: $tbnd"
@@ -88,9 +87,9 @@ tvol = @elapsed begin
 end
 @info "Volume potential time: $tvol"
 
-vref    = -u_d - D_b2d*u_b + S_b2d*du_b
-vapprox = V_d2d*f_d
-er = vref - vapprox
+vref    = -u_d - D_b2d * u_b + S_b2d * du_b
+vapprox = V_d2d * f_d
+er      = vref - vapprox
 
 ndofs = length(er)
 

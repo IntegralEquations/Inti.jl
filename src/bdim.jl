@@ -50,7 +50,7 @@ function bdim_correction(
     derivative = false,
     maxdist = Inf,
     green_multiplier = nothing,
-    filterTargetParams = nothing
+    filterTargetParams = nothing,
 )
     max_cond = -Inf
     T = eltype(Sop)
@@ -159,7 +159,7 @@ function bdim_correction(
                 max_cond = max(cond(M_), max_cond)
             end
             for i in near_list[n]
-                j = glob_loc_near_trgs[i]
+                j   = glob_loc_near_trgs[i]
                 Θi  = @view Θ[j:j, :]
                 Θi_ = _copyto!(Θi_, Θi)
                 W_  = ldiv!(W_, F_, transpose(Θi_))
