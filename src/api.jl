@@ -218,8 +218,19 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
         else
             error("Missing correction.boundary field for :dim method on a volume potential")
         end
-        S, D =
-            single_double_layer(; pde, target, source = boundary, compression, correction)
+        # Advanced usage: Use previously constructed layer operators for VDIM
+        if !haskey(correction, :S_b2d) || !haskey(correction, :D_b2d)
+            S, D = single_double_layer(;
+                pde,
+                target,
+                source = boundary,
+                compression,
+                correction,
+            )
+        else
+            S = correction.S_b2d
+            D = correction.D_b2d
+        end
         interpolation_order = correction.interpolation_order
         δV = vdim_correction(
             pde,
