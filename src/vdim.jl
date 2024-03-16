@@ -44,8 +44,9 @@ function vdim_correction(
         error("green_multiplier must be a scalar")
     end
     dict_near = etype_to_nearest_points(target, source; maxdist)
-    B, R =
+    R =
         _vdim_auxiliary_quantities(p, P, γ₁P, target, source, boundary, μ, Sop, Dop, Vop)
+    #tvdim_wei = @elapsed begin
     # compute sparse correction
     Is = Int[]
     Js = Int[]
@@ -84,6 +85,8 @@ function vdim_correction(
     end
     @debug "maximum condition encountered: $max_cond"
     δV = sparse(Is, Js, Vs, m, n)
+    #end
+    #@info "VDIM Weights Computation: $tvdim_wei"
     return δV
 end
 
@@ -157,6 +160,7 @@ function _vdim_auxiliary_quantities(
     γ₁B = [f(q) for q in Γ, f in γ₁P]
     Θ = zeros(eltype(Vop), num_targets, num_basis)
     # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
+    tvdim_precomp = @elapsed begin
     for n in 1:num_basis
         @views mul!(Θ[:, n], Sop, γ₁B[:, n])
         @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
@@ -165,7 +169,9 @@ function _vdim_auxiliary_quantities(
             Θ[i, n] += σ * P[n](X[i])
         end
     end
-    return b, Θ
+    end
+    @info "VDIM Operator Eval time: $tvdim_precomp"
+    return Θ
 end
 
 """
