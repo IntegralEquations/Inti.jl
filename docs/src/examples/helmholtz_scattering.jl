@@ -493,7 +493,7 @@ S,D = Inti.single_double_layer(;
     target,
     source = Q,
     compression = (method = :fmm, tol=1e-4),
-    correction = (method = :none, maxdist = 5 * meshsize),
+    correction = (method = :dim, maxdist = 5 * meshsize),
 )
 
 ui_eval_msh = uᵢ.(target)
