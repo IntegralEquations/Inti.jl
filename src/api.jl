@@ -77,7 +77,8 @@ function single_double_layer(;
             for (E, qtags) in source.etype2qtags
                 append!(glob_near_trgs, collect(Iterators.flatten(dict_near[E])))
             end
-            glob_loc_near_trgs = Dict(glob_near_trgs[i] => i for i in eachindex(glob_near_trgs))
+            glob_loc_near_trgs =
+                Dict(glob_near_trgs[i] => i for i in eachindex(glob_near_trgs))
 
             # Set up new IntegralOperator maps for only the targets needing correction
             Sop_dim = IntegralOperator(G, target[glob_near_trgs], source)
@@ -96,7 +97,11 @@ function single_double_layer(;
                 error("Unknown compression method. Available options: $COMPRESSION_METHODS")
             end
 
-            filterTargetParams = ( dict_near = dict_near, ntrgs = length(target), glob_loc_near_trgs = glob_loc_near_trgs )
+            filterTargetParams = (
+                dict_near = dict_near,
+                ntrgs = length(target),
+                glob_loc_near_trgs = glob_loc_near_trgs,
+            )
             δS, δD = bdim_correction(
                 pde,
                 target[glob_near_trgs],
@@ -105,7 +110,7 @@ function single_double_layer(;
                 Dop_dim_mat;
                 maxdist = correction.maxdist,
                 derivative,
-                filterTargetParams
+                filterTargetParams,
             )
         else
             δS, δD = bdim_correction(

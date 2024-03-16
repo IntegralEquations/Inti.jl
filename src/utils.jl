@@ -265,7 +265,7 @@ Base.abs(n::MultiIndex) = sum(n.indices)
 
 function Base.binomial(n::MultiIndex, k::MultiIndex)
     prod(zip(n.indices, k.indices)) do (n, k)
-        binomial(n, k)
+        return binomial(n, k)
     end
 end
 
