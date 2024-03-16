@@ -25,6 +25,8 @@ end
 meshsize = 0.01
 bdry_qorder = 16
 interpolation_order = 4
+bdry_qorder =
+    2 * Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
 
 tmesh = @elapsed begin
     Ω, msh = domain_and_mesh(; meshsize)
@@ -82,7 +84,13 @@ tvol = @elapsed begin
         target = Ωₕ_quad,
         source = Ωₕ_quad,
         compression = (method = :fmm, tol = 1e-14),
-        correction = (method = :dim, interpolation_order, maxdist = 5 * meshsize),
+        correction = (
+            method = :dim,
+            interpolation_order,
+            maxdist = 5 * meshsize,
+            S_b2d = S_b2d,
+            D_b2d = D_b2d,
+        ),
     )
 end
 @info "Volume potential time: $tvol"
