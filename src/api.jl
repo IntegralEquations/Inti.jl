@@ -97,9 +97,9 @@ function single_double_layer(;
                 error("Unknown compression method. Available options: $COMPRESSION_METHODS")
             end
 
-            filterTargetParams = (
+            filter_target_params = (
                 dict_near = dict_near,
-                ntrgs = length(target),
+                num_trgs = length(target),
                 glob_loc_near_trgs = glob_loc_near_trgs,
             )
             δS, δD = bdim_correction(
@@ -110,7 +110,7 @@ function single_double_layer(;
                 Dop_dim_mat;
                 maxdist = correction.maxdist,
                 derivative,
-                filterTargetParams,
+                filter_target_params,
             )
         else
             δS, δD = bdim_correction(
