@@ -1,5 +1,5 @@
 """
-    vdim_correction(pde,X,Y,Γ,S,D,V[;order, multiplier])
+    vdim_correction(pde,X,Y,Γ,S,D,V[;interpolation_order, multiplier])
 """
 function vdim_correction(
     pde,
@@ -45,7 +45,7 @@ function vdim_correction(
     end
     dict_near = etype_to_nearest_points(target, source; maxdist)
     R = _vdim_auxiliary_quantities(p, P, γ₁P, target, source, boundary, μ, Sop, Dop, Vop)
-    #tvdim_wei = @elapsed begin
+    tvdim_wei = @elapsed begin
     # compute sparse correction
     Is = Int[]
     Js = Int[]
@@ -84,8 +84,8 @@ function vdim_correction(
     end
     @debug "maximum condition encountered: $max_cond"
     δV = sparse(Is, Js, Vs, m, n)
-    #end
-    #@info "VDIM Weights Computation: $tvdim_wei"
+    end
+    @info "VDIM Weights Computation: $tvdim_wei"
     return δV
 end
 
