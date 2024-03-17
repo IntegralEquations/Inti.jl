@@ -218,7 +218,7 @@ struct VioreanuRokhlin{D,N} <: ReferenceQuadrature{D}
     # tabulated.
     function VioreanuRokhlin(; domain, order)
         domain == :triangle && (domain = ReferenceTriangle())
-        domain == :tetrehedron && (domain = ReferenceTetrahedron())
+        domain == :tetrahedron && (domain = ReferenceTetrahedron())
         if domain isa ReferenceTriangle
             msg = "VioreanuRokhlin quadrature of order $order not available for ReferenceTriangle"
             haskey(TRIANGLE_VR_ORDER_TO_NPTS, order) || error(msg)
