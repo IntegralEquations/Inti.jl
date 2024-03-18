@@ -45,47 +45,45 @@ function vdim_correction(
     end
     dict_near = etype_to_nearest_points(target, source; maxdist)
     R = _vdim_auxiliary_quantities(p, P, γ₁P, target, source, boundary, μ, Sop, Dop, Vop)
-    tvdim_wei = @elapsed begin
-        # compute sparse correction
-        Is = Int[]
-        Js = Int[]
-        Vs = eltype(Vop)[]
-        nbasis = length(p)
-        for (E, qtags) in source.etype2qtags
-            els = elements(source.mesh, E)
-            near_list = dict_near[E]
-            nq, ne = size(qtags)
-            @assert length(near_list) == ne
-            for n in 1:ne
-                # indices of nodes in element `n`
-                isempty(near_list[n]) && continue
-                jglob = @view qtags[:, n]
-                # compute translation and scaling
-                c, r = translation_and_scaling(els[n])
-                #L = B[jglob, :] # vandermond matrix for current element
-                L̃ = [f((q.coords - c) / r) for q in view(source, jglob), f in p] # and its scaled version
-                # build transfer matrix s.t. c = S'*̃c
-                S = change_of_basis(multiindices, c, r)
-                @debug begin
-                    max_cond = max(max_cond, cond(L̃))
-                end
-                for i in near_list[n]
-                    #wei = R[i:i, :] / L # weights for the current element and target i
-                    wei_tilde = (R[i:i, :] * S') / L̃
-                    #@show norm(wei-wei_tilde)
-                    for k in 1:nq
-                        push!(Is, i)
-                        push!(Js, jglob[k])
-                        #push!(Vs, wei[k])
-                        push!(Vs, wei_tilde[k])
-                    end
+    # compute sparse correction
+    Is = Int[]
+    Js = Int[]
+    Vs = eltype(Vop)[]
+    nbasis = length(p)
+    for (E, qtags) in source.etype2qtags
+        els = elements(source.mesh, E)
+        near_list = dict_near[E]
+        nq, ne = size(qtags)
+        @assert length(near_list) == ne
+        for n in 1:ne
+            # indices of nodes in element `n`
+            isempty(near_list[n]) && continue
+            jglob = @view qtags[:, n]
+            # compute translation and scaling
+            c, r = translation_and_scaling(els[n])
+            #L = B[jglob, :] # vandermond matrix for current element
+            L̃ = [f((q.coords - c) / r) for q in view(source, jglob), f in p] # and its scaled version
+            # build transfer matrix s.t. c = S'*̃c
+            S = change_of_basis(multiindices, c, r)
+            @debug begin
+                max_cond = max(max_cond, cond(L̃))
+            end
+            F = lu(L̃)
+            for i in near_list[n]
+                #wei = R[i:i, :] / L # weights for the current element and target i
+                wei_tilde = (R[i:i, :] * S') / F
+                #@show norm(wei-wei_tilde)
+                for k in 1:nq
+                    push!(Is, i)
+                    push!(Js, jglob[k])
+                    #push!(Vs, wei[k])
+                    push!(Vs, wei_tilde[k])
                 end
             end
         end
-        @debug "maximum condition encountered: $max_cond"
-        δV = sparse(Is, Js, Vs, m, n)
     end
-    @info "VDIM Weights Computation: $tvdim_wei"
+    @debug "maximum condition encountered: $max_cond"
+    δV = sparse(Is, Js, Vs, m, n)
     return δV
 end
 
@@ -218,17 +216,14 @@ function _vdim_auxiliary_quantities(
     γ₁B = [f(q) for q in Γ, f in γ₁P]
     Θ = zeros(eltype(Vop), num_targets, num_basis)
     # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
-    tvdim_precomp = @elapsed begin
-        for n in 1:num_basis
-            @views mul!(Θ[:, n], Sop, γ₁B[:, n])
-            @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
-            @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
-            for i in 1:num_targets
-                Θ[i, n] += σ * P[n](X[i])
-            end
+    for n in 1:num_basis
+        @views mul!(Θ[:, n], Sop, γ₁B[:, n])
+        @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
+        @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
+        for i in 1:num_targets
+            Θ[i, n] += σ * P[n](X[i])
         end
     end
-    @info "VDIM Operator Eval time: $tvdim_precomp"
     return Θ
 end
 
