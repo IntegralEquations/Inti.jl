@@ -218,7 +218,7 @@ struct VioreanuRokhlin{D,N} <: ReferenceQuadrature{D}
     # tabulated.
     function VioreanuRokhlin(; domain, order)
         domain == :triangle && (domain = ReferenceTriangle())
-        domain == :tetrehedron && (domain = ReferenceTetrahedron())
+        domain == :tetrahedron && (domain = ReferenceTetrahedron())
         if domain isa ReferenceTriangle
             msg = "VioreanuRokhlin quadrature of order $order not available for ReferenceTriangle"
             haskey(TRIANGLE_VR_ORDER_TO_NPTS, order) || error(msg)
@@ -242,6 +242,22 @@ end
 
 function order(q::VioreanuRokhlin{ReferenceTetrahedron,N}) where {N}
     return TETRAHEDRON_VR_NPTS_TO_ORDER[N]
+end
+
+function interpolation_order(q::VioreanuRokhlin{ReferenceTriangle,N}) where {N}
+    return TRIANGLE_VR_QORDER_TO_IORDER[N]
+end
+
+function interpolation_order(q::VioreanuRokhlin{ReferenceTetrahedron,N}) where {N}
+    return TETRAHEDRON_VR_QORDER_TO_IORDER[N]
+end
+
+function Triangle_VR_interpolation_order_to_quadrature_order(i::Integer)
+    return TRIANGLE_VR_IORDER_TO_QORDER[i]
+end
+
+function Tetrahedron_VR_interpolation_order_to_quadrature_order(i::Integer)
+    return TETRAHEDRON_VR_IORDER_TO_QORDER[i]
 end
 
 @generated function (q::VioreanuRokhlin{D,N})() where {D,N}
