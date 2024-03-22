@@ -31,8 +31,9 @@ using Inti
 # Seeking for a solution $u$ of the form ...
 
 meshsize = 0.05
-qorder = 5
-interpolation_order = qorder
+# `n` in the VDIM paper
+interpolation_order = 3
+qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
 
 # ## Meshing
 
@@ -66,9 +67,9 @@ gmsh_disk(; meshsize, order = 2, name)
 Ωₕ = view(msh, Ω)
 Γₕ = view(msh, Γ)
 # Use VDIM with the Vioreanu-Rokhlin quadrature rule
-# Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder);
-# dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
-Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder)
+Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder);
+dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
+Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
 Γₕ_quad = Inti.Quadrature(Γₕ; qorder)
 
 # ## Manufactured solution
