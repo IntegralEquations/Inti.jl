@@ -69,15 +69,60 @@ function single_double_layer(;
     if correction.method == :none
         return Smat, Dmat # shortcircuit case without correction
     elseif correction.method == :dim
-        δS, δD = bdim_correction(
-            pde,
-            target,
-            source,
-            Smat,
-            Dmat;
-            maxdist = correction.maxdist,
-            derivative,
-        )
+        dict_near = etype_to_nearest_points(target, source; correction.maxdist)
+        # If target != source then we want to filter the near-field points and construct auxiliary
+        # IntegralOperator with targets limited to those that will be corrected.
+        if target !== source
+            glob_near_trgs = Int[]
+            for (E, qtags) in source.etype2qtags
+                append!(glob_near_trgs, collect(Iterators.flatten(dict_near[E])))
+            end
+            glob_loc_near_trgs =
+                Dict(glob_near_trgs[i] => i for i in eachindex(glob_near_trgs))
+
+            # Set up new IntegralOperator maps for only the targets needing correction
+            Sop_dim = IntegralOperator(G, target[glob_near_trgs], source)
+            Dop_dim = IntegralOperator(dG, target[glob_near_trgs], source)
+            # compress 'em
+            if compression.method == :hmatrix
+                Sop_dim_mat = assemble_hmatrix(Sop_dim; atol = compression.tol)
+                Dop_dim_mat = assemble_hmatrix(Dop_dim; atol = compression.tol)
+            elseif compression.method == :none
+                Sop_dim_mat = assemble_matrix(Sop_dim)
+                Dop_dim_mat = assemble_matrix(Dop_dim)
+            elseif compression.method == :fmm
+                Sop_dim_mat = assemble_fmm(Sop_dim; atol = compression.tol)::LinearMap
+                Dop_dim_mat = assemble_fmm(Dop_dim; atol = compression.tol)::LinearMap
+            else
+                error("Unknown compression method. Available options: $COMPRESSION_METHODS")
+            end
+
+            filter_target_params = (
+                dict_near = dict_near,
+                num_trgs = length(target),
+                glob_loc_near_trgs = glob_loc_near_trgs,
+            )
+            δS, δD = bdim_correction(
+                pde,
+                target[glob_near_trgs],
+                source,
+                Sop_dim_mat,
+                Dop_dim_mat;
+                maxdist = correction.maxdist,
+                derivative,
+                filter_target_params,
+            )
+        else
+            δS, δD = bdim_correction(
+                pde,
+                target,
+                source,
+                Smat,
+                Dmat;
+                maxdist = correction.maxdist,
+                derivative,
+            )
+        end
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end
@@ -173,8 +218,19 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
         else
             error("Missing correction.boundary field for :dim method on a volume potential")
         end
-        S, D =
-            single_double_layer(; pde, target, source = boundary, compression, correction)
+        # Advanced usage: Use previously constructed layer operators for VDIM
+        if !haskey(correction, :S_b2d) || !haskey(correction, :D_b2d)
+            S, D = single_double_layer(;
+                pde,
+                target,
+                source = boundary,
+                compression,
+                correction,
+            )
+        else
+            S = correction.S_b2d
+            D = correction.D_b2d
+        end
         interpolation_order = correction.interpolation_order
         δV = vdim_correction(
             pde,

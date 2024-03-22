@@ -50,13 +50,22 @@ function bdim_correction(
     derivative = false,
     maxdist = Inf,
     green_multiplier = nothing,
+    filter_target_params = nothing,
 )
     max_cond = -Inf
     T = eltype(Sop)
     N = ambient_dimension(source)
     @assert eltype(Dop) == T "eltype of S and D must match"
     m, n = length(target), length(source)
-    dict_near = etype_to_nearest_points(target, source; maxdist)
+    if isnothing(filter_target_params)
+        dict_near = etype_to_nearest_points(target, source; maxdist)
+        num_trgs = m
+        glob_loc_near_trgs = Dict(i => i for i in 1:m)
+    else
+        dict_near = filter_target_params.dict_near
+        num_trgs = filter_target_params.num_trgs
+        glob_loc_near_trgs = filter_target_params.glob_loc_near_trgs
+    end
     # find first an appropriate set of source points to center the monopoles
     qmax = sum(size(mat, 1) for mat in values(source.etype2qtags)) # max number of qnodes per el
     ns   = ceil(Int, parameters.sources_oversample_factor * qmax)
@@ -150,7 +159,8 @@ function bdim_correction(
                 max_cond = max(cond(M_), max_cond)
             end
             for i in near_list[n]
-                Θi  = @view Θ[i:i, :]
+                j   = glob_loc_near_trgs[i]
+                Θi  = @view Θ[j:j, :]
                 Θi_ = _copyto!(Θi_, Θi)
                 W_  = ldiv!(W_, F_, transpose(Θi_))
                 W   = T <: Number ? W_ : _copyto!(W, W_)
@@ -164,7 +174,7 @@ function bdim_correction(
         end
     end
     @debug "Maximum condition number of linear system: " max_cond
-    δS = sparse(Is, Js, Ss, m, n)
-    δD = sparse(Is, Js, Ds, m, n)
+    δS = sparse(Is, Js, Ss, num_trgs, n)
+    δD = sparse(Is, Js, Ds, num_trgs, n)
     return δS, δD
 end
