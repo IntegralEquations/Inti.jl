@@ -96,7 +96,7 @@ fₑ = (x) -> -8 * uₑ(x)
 # Inti.write_gmsh_view(Ωₕ, uₑ.(Ωₕ.nodes))
 
 # ## Boundary and integral operators
-using FMMLIB2D
+using FMM2D
 
 pde = Inti.Laplace(; dim = 2)
 

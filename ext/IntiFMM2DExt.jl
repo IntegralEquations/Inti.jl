@@ -1,11 +1,11 @@
-module IntiFMMLIB2DExt
+module IntiFMM2DExt
 
 import Inti
-import FMMLIB2D
+import FMM2D
 import LinearMaps
 
 function __init__()
-    @info "Loading Inti.jl FMMLIB2D extension"
+    @info "Loading Inti.jl FMM2D extension"
 end
 
 function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
@@ -31,16 +31,17 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
         return LinearMaps.LinearMap{Float64}(m, n) do y, x
             # multiply by weights and constant
             @. charges = -1 / (2 * π) * weights * x
-            # FMMLIB2D does no checking for if targets are also sources
             if same_surface
-                out = FMMLIB2D.rfmm2d(; source = sources, charge = charges, tol = atol)
+                out =
+                    FMM2D.rfmm2d(; sources = sources, charges = charges, eps = atol, pg = 1)
                 return copyto!(y, out.pot)
             else
-                out = FMMLIB2D.rfmm2d(;
-                    source = sources,
-                    charge = charges,
-                    target = targets,
-                    tol = atol,
+                out = FMM2D.rfmm2d(;
+                    sources = sources,
+                    charges = charges,
+                    targets = targets,
+                    eps     = atol,
+                    pgt     = 1,
                 )
                 return copyto!(y, out.pottarg)
             end
@@ -60,22 +61,23 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
             for j in 1:n
                 dipstr[j] = x[j]
             end
-            # FMMLIB2D does no checking for if targets are also sources
             if same_surface
-                out = FMMLIB2D.rfmm2d(;
-                    source = sources,
-                    dipstr = dipstr,
-                    dipvec = dipvecs,
-                    tol = atol,
+                out = FMM2D.rfmm2d(;
+                    sources = sources,
+                    dipstr  = dipstr,
+                    dipvecs = dipvecs,
+                    eps     = atol,
+                    pg      = 1,
                 )
                 return copyto!(y, out.pot)
             else
-                out = FMMLIB2D.rfmm2d(;
-                    source = sources,
-                    target = targets,
-                    dipstr = dipstr,
-                    dipvec = dipvecs,
-                    tol = atol,
+                out = FMM2D.rfmm2d(;
+                    sources = sources,
+                    targets = targets,
+                    dipstr  = dipstr,
+                    dipvecs = dipvecs,
+                    eps     = atol,
+                    pgt     = 1,
                 )
                 return copyto!(y, out.pottarg)
             end
@@ -89,22 +91,17 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
         return LinearMaps.LinearMap{Float64}(m, n) do y, x
             # multiply by weights and constant
             @. charges = -1 / (2 * π) * weights * x
-            # FMMLIB2D does no checking for if targets are also sources
             if same_surface
-                out = FMMLIB2D.rfmm2d(;
-                    charge = charges,
-                    source = sources,
-                    ifgrad = true,
-                    tol = atol,
-                )
+                out =
+                    FMM2D.rfmm2d(; charges = charges, sources = sources, eps     = atol, pg      = 2)
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
             else
-                out = FMMLIB2D.rfmm2d(;
-                    charge = charges,
-                    source = sources,
-                    target = targets,
-                    ifgradtarg = true,
-                    tol = atol,
+                out = FMM2D.rfmm2d(;
+                    charges = charges,
+                    sources = sources,
+                    targets = targets,
+                    eps     = atol,
+                    pgt     = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
@@ -128,24 +125,23 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
             for j in 1:n
                 dipstrs[j] = x[j]
             end
-            # FMMLIB2D does no checking for if targets are also sources
             if same_surface
-                out = FMMLIB2D.rfmm2d(;
-                    dipvec = dipvecs,
-                    dipstr = dipstrs,
-                    source = sources,
-                    ifgrad = true,
-                    tol = atol,
+                out = FMM2D.rfmm2d(;
+                    dipvecs = dipvecs,
+                    dipstr  = dipstrs,
+                    sources = sources,
+                    eps     = atol,
+                    pg      = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
             else
-                out = FMMLIB2D.rfmm2d(;
-                    dipvec = dipvecs,
-                    dipstr = dipstrs,
-                    source = sources,
-                    target = targets,
-                    ifgradtarg = true,
-                    tol = atol,
+                out = FMM2D.rfmm2d(;
+                    dipvecs = dipvecs,
+                    dipstr  = dipstrs,
+                    sources = sources,
+                    targets = targets,
+                    eps     = atol,
+                    pgt     = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
@@ -157,22 +153,23 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights and constant
             @. charges = weights * x
-            # FMMLIB2D does no checking for if targets are also sources
             if same_surface
-                out = FMMLIB2D.hfmm2d(;
-                    zk = zk,
-                    source = sources,
-                    charge = charges,
-                    tol = atol,
+                out = FMM2D.hfmm2d(;
+                    zk      = zk,
+                    sources = sources,
+                    charges = charges,
+                    eps     = atol,
+                    pg      = 1,
                 )
                 return copyto!(y, out.pot)
             else
-                out = FMMLIB2D.hfmm2d(;
-                    zk = zk,
-                    source = sources,
-                    charge = charges,
-                    target = targets,
-                    tol = atol,
+                out = FMM2D.hfmm2d(;
+                    zk      = zk,
+                    sources = sources,
+                    charges = charges,
+                    targets = targets,
+                    eps     = atol,
+                    pgt     = 1,
                 )
                 return copyto!(y, out.pottarg)
             end
@@ -193,24 +190,25 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
             for j in 1:n
                 dipstrs[j] = x[j]
             end
-            # FMMLIB2D does no checking for if targets are also sources
             if same_surface
-                out = FMMLIB2D.hfmm2d(;
-                    zk = zk,
-                    source = sources,
-                    dipstr = dipstrs,
-                    dipvec = dipvecs,
-                    tol = atol,
+                out = FMM2D.hfmm2d(;
+                    zk      = zk,
+                    sources = sources,
+                    dipstr  = dipstrs,
+                    dipvecs = dipvecs,
+                    eps     = atol,
+                    pg      = 1,
                 )
                 return copyto!(y, out.pot)
             else
-                out = FMMLIB2D.hfmm2d(;
-                    zk = zk,
-                    source = sources,
-                    target = targets,
-                    dipstr = dipstrs,
-                    dipvec = dipvecs,
-                    tol = atol,
+                out = FMM2D.hfmm2d(;
+                    zk      = zk,
+                    sources = sources,
+                    targets = targets,
+                    dipstr  = dipstrs,
+                    dipvecs = dipvecs,
+                    eps     = atol,
+                    pgt     = 1,
                 )
                 return copyto!(y, out.pottarg)
             end
@@ -225,24 +223,23 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights
             @. charges = x * weights
-            # FMMLIB2D does no checking for if targets are also sources
             if same_surface
-                out = FMMLIB2D.hfmm2d(;
-                    zk = zk,
-                    charge = charges,
-                    source = sources,
-                    ifgrad = true,
-                    tol = atol,
+                out = FMM2D.hfmm2d(;
+                    zk      = zk,
+                    charges = charges,
+                    sources = sources,
+                    eps     = atol,
+                    pg      = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
             else
-                out = FMMLIB2D.hfmm2d(;
-                    zk = zk,
-                    charge = charges,
-                    source = sources,
-                    target = targets,
-                    ifgradtarg = true,
-                    tol = atol,
+                out = FMM2D.hfmm2d(;
+                    zk      = zk,
+                    charges = charges,
+                    sources = sources,
+                    targets = targets,
+                    eps     = atol,
+                    pgt     = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
@@ -267,32 +264,31 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
             for j in 1:n
                 dipstrs[j] = x[j]
             end
-            # FMMLIB2D does no checking for if targets are also sources
             if same_surface
-                out = FMMLIB2D.hfmm2d(;
-                    zk = zk,
-                    dipvec = dipvecs,
-                    dipstr = dipstrs,
-                    source = sources,
-                    ifgrad = true,
-                    tol = atol,
+                out = FMM2D.hfmm2d(;
+                    zk      = zk,
+                    dipvecs = dipvecs,
+                    dipstr  = dipstrs,
+                    sources = sources,
+                    eps     = atol,
+                    pg      = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
             else
-                out = FMMLIB2D.hfmm2d(;
-                    zk = zk,
-                    dipvec = dipvecs,
-                    dipstr = dipstrs,
-                    source = sources,
-                    target = targets,
-                    ifgradtarg = true,
-                    tol = atol,
+                out = FMM2D.hfmm2d(;
+                    zk      = zk,
+                    dipvecs = dipvecs,
+                    dipstr  = dipstrs,
+                    sources = sources,
+                    targets = targets,
+                    eps     = atol,
+                    pgt     = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
         end
     else
-        error("integral operator not supported by Inti's FMMLIB2D wrapper")
+        error("integral operator not supported by Inti's FMM2D wrapper")
     end
 end
 

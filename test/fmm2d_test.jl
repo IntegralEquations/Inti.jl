@@ -1,6 +1,6 @@
 using Test
 using Inti
-using FMMLIB2D
+using FMM2D
 using Gmsh
 using LinearAlgebra
 using Random

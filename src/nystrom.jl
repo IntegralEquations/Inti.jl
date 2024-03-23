@@ -118,7 +118,7 @@ function assemble_fmm(iop::IntegralOperator, args...; kwargs...)
 end
 
 function _assemble_fmm2d(args...; kwargs...)
-    return error("_assemble_fmm2d not found. Did you forget to import FMMLIB2D ?")
+    return error("_assemble_fmm2d not found. Did you forget to import FMM2D ?")
 end
 
 function _assemble_fmm3d(args...; kwargs...)
