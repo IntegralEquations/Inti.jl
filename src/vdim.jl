@@ -13,8 +13,10 @@ function vdim_correction(
     derivative = false,
     green_multiplier = nothing,
     maxdist = Inf,
-)
+    shift::Val{SHIFT} = Val(false),
+) where {SHIFT}
     max_cond = -Inf
+    max_coefs = -Inf
     T = eltype(Vop)
     @assert eltype(Dop) == eltype(Sop) == T "eltype of Sop, Dop, and Vop must match"
     # figure out if we are dealing with a scalar or vector PDE
@@ -61,28 +63,30 @@ function vdim_correction(
             jglob = @view qtags[:, n]
             # compute translation and scaling
             c, r = translation_and_scaling(els[n])
-            #L = B[jglob, :] # vandermond matrix for current element
-            L̃ = [f((q.coords - c) / r) for q in view(source, jglob), f in p] # and its scaled version
-            # build transfer matrix s.t. c = S'*̃c
-            S = change_of_basis(multiindices, c, r)
-            @debug begin
-                max_cond = max(max_cond, cond(L̃))
+            if SHIFT
+                L̃ = [f(q.coords) for f in p, q in view(source, jglob)]
+                @debug (max_cond = max(max_cond, cond(L̃))) maxlog = 0
+                S = change_of_basis(multiindices, c, r)
+                F = lu(L̃)
+            else
+                L = [f((q.coords - c) / r) for f in p, q in view(source, jglob)]
+                @debug (max_cond = max(max_cond, cond(L))) maxlog = 0
+                F = lu(L)
             end
-            F = lu(L̃)
+            # correct each target near the current element
             for i in near_list[n]
-                #wei = R[i:i, :] / L # weights for the current element and target i
-                wei_tilde = (R[i:i, :] * S') / F
-                #@show norm(wei-wei_tilde)
+                wei = SHIFT ? F \ (S * R[i, :]) : F \ R[i, :] # weights for the current element and target i
+                max_coefs = max(max_coefs, norm(wei, Inf))
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
-                    #push!(Vs, wei[k])
-                    push!(Vs, wei_tilde[k])
+                    push!(Vs, wei[k])
                 end
             end
         end
     end
     @debug "maximum condition encountered: $max_cond"
+    @debug "maximum norm of coefficiets:   $max_coefs"
     δV = sparse(Is, Js, Vs, m, n)
     return δV
 end
