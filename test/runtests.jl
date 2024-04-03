@@ -16,6 +16,8 @@ using Aqua
 
 @safetestset "Density interpolation method" include("dim_test.jl")
 
+@safetestset "HCubature integration" include("hcubature_test.jl")
+
 @safetestset "Gmsh import" include("gmsh_test.jl")
 
 @safetestset "HMatrices extension" include("hmatrices_test.jl")
