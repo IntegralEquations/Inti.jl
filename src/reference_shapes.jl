@@ -20,15 +20,9 @@ geometric_dimension(::ReferenceSimplex{N}) where {N} = N
 ambient_dimension(::ReferenceSimplex{N}) where {N} = N
 function Base.in(x, ::ReferenceSimplex{N}) where {N}
     for i in 1:N
-        0 ≤ x[i] ≤ 1 - sum(view(x,1:i-1); init=zero(x[i])) || return false
+        0 ≤ x[i] ≤ 1 - sum(view(x, 1:i-1); init = zero(x[i])) || return false
     end
     return true
-end
-function vertices(::ReferenceSimplex{N}) where {N}
-    return svector(
-        i -> i == 1 ? zero(SVector{N,Int64}) : standard_basis_vector(i - 1, Val(N)),
-        N + 1,
-    )
 end
 center(::ReferenceSimplex{N}) where {N} = svector(i -> 1 / (N + 1), N)
 
@@ -39,6 +33,8 @@ Singleton type representing the triangle with vertices `(0,0),(1,0),(0,1)`
 """
 const ReferenceTriangle = ReferenceSimplex{2}
 
+vertices(::ReferenceTriangle) = Point2D(0, 0), Point2D(1, 0), Point2D(0, 1)
+
 """
     struct ReferenceTetrahedron
 
@@ -46,6 +42,10 @@ Singleton type representing the tetrahedron with vertices
 `(0,0,0),(0,0,1),(0,1,0),(1,0,0)`
 """
 const ReferenceTetrahedron = ReferenceSimplex{3}
+
+function vertices(::ReferenceTetrahedron)
+    return Point3D(0, 0, 0), Point3D(1, 0, 0), Point3D(0, 1, 0), Point3D(0, 0, 1)
+end
 
 """
     struct ReferenceHyperCube{N} <: ReferenceShape{N}
@@ -66,7 +66,7 @@ Singleton type representing the `[0,1]` segment.
 """
 const ReferenceLine = ReferenceHyperCube{1}
 
-vertices(::ReferenceLine) = SVector(0), SVector(1)
+vertices(::ReferenceLine) = Point1D(0), Point1D(1)
 
 """
     const ReferenceSquare = ReferenceHyperCube{2}
@@ -75,7 +75,7 @@ Singleton type representing the unit square `[0,1]²`.
 """
 const ReferenceSquare = ReferenceHyperCube{2}
 
-vertices(::ReferenceSquare) = SVector(0,0), SVector(1,0), SVector(1,1), SVector(0,1)
+vertices(::ReferenceSquare) = Point2D(0, 0), Point2D(1, 0), Point2D(1, 1), Point2D(0, 1)
 
 """
     const ReferenceCube = ReferenceHyperCube{3}

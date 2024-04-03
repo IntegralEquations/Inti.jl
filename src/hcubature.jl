@@ -23,18 +23,21 @@ function HCubature.hcubature(
                 # too large can lead to rounding errors since e.g. τ₁(x^p) = a +
                 # xᵖ*(b-a) can become indistinguishable from to τ₁(0) = 0.
                 # Perhaps this can be fixed?
-                p = 2; x̃ = x.^p; μ = p*x[1]^(p-1)
+                p = 2
+                x̃ = x .^ p
+                μ = p * x[1]^(p - 1)
                 return (f(τ₁(x̃)) * l₁ + f(τ₂(x̃)) * l₂) * μ
             end
         elseif N == 2
-            duffy  = (u) -> SVector(u[1], (1 - u[1]) * u[2])
+            duffy = (u) -> SVector(u[1], (1 - u[1]) * u[2])
             duffy′ = (u) -> 1 - u[1] # determinant of jacobian
             τ₁, τ₂, τ₃, τ₄ = decompose(τ̂, x̂ₛ)
             a₁, a₂, a₃, a₄ = map(x -> integration_measure(x, lb), (τ₁, τ₂, τ₃, τ₄))
             return hcubature(lb, ub; kwargs...) do x
                 x̃ = duffy(x)
                 μ = duffy′(x)
-                return (a₁ * f(τ₁(x̃)) + a₂ * f(τ₂(x̃)) + a₃ * f(τ₃(x̃)) + a₄ * f(τ₄(x̃))) * μ
+                return (a₁ * f(τ₁(x̃)) + a₂ * f(τ₂(x̃)) + a₃ * f(τ₃(x̃)) + a₄ * f(τ₄(x̃))) *
+                       μ
             end
         else
             error("not implemented")
