@@ -27,7 +27,6 @@ using Inti
             Γ_quad = Inti.Quadrature(M[Γ]; qorder = 5)
             A = 2 * (lx * ly + lx * lz + ly * lz)
             @test A ≈ Inti.integrate(x -> 1, Γ_quad)
-            d = Inti.farfield_distance(Γ_quad, K, 1e-5)
             # generate a Nystrom mesh for volume
             Ω_quad = Inti.Quadrature(M[Ω]; qorder = 1)
             V = prod(widths)
@@ -98,7 +97,7 @@ end
     K = Inti.SingleLayerKernel(pde)
     p1, p2, p3 = SVector(0.0, 0.0), SVector(1.0, 0.0), SVector(0.0, 1.0)
     h = 1e-1
-    el = Inti.LagrangeTriangle(h.* (p1, p2, p3))
+    el = Inti.LagrangeTriangle(h .* (p1, p2, p3))
     qrule = Inti.VioreanuRokhlin(; domain = :triangle, order = 4)
     maxiter = 10
     d = Inti._farfield_distance(el, K, qrule, 1e-10, maxiter)
