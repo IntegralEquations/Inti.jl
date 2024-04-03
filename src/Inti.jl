@@ -2,6 +2,7 @@ module Inti
 
 const PROJECT_ROOT = pkgdir(Inti)
 
+using HCubature
 using LinearAlgebra
 using LinearMaps
 using NearestNeighbors
@@ -32,6 +33,7 @@ include("kernels.jl")
 include("nystrom.jl")
 include("bdim.jl")
 include("vdim.jl")
+include("hcubature.jl")
 
 # some zero-argument methods for the Inti's gmsh extension
 include("gmsh_api.jl")

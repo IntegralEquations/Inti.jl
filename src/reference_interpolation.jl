@@ -391,3 +391,51 @@ function lagrange_basis(::Type{LagrangeElement{D,N,T}}) where {D,N,T}
     vals = svector(i -> svector(j -> i == j, N), N)
     return LagrangeElement{D}(vals)
 end
+
+"""
+    decompose(s::ReferenceShape,x)
+
+Decompose an [`ReferenceShape`](@ref) into [`LagrangeElement`](@ref)s so
+that `x` is a fixed vertex of the children elements.
+
+The decomposed elements may be oriented differently than the parent, and thus
+care has to be taken regarding e.g. normal vectors.
+
+```jldoctest
+s = Inti.ReferenceLine()
+el1, el2 = Inti.decompose(s,0.3)
+el1(0) ≈ el2(0) ≈ Inti.Point1D(0.3)
+
+# output
+
+true
+
+```
+"""
+function decompose(ln::ReferenceLine, x::SVector{1,<:Real})
+    # @assert x ∈ ln
+    a, b = vertices(ln)
+    # two lines with x on (0,) reference vertex
+    return LagrangeLine(x, a), LagrangeLine(x, b)
+end
+
+function decompose(sq::ReferenceSquare, x::SVector{2,<:Real})
+    a, b, c, d = vertices(sq)
+    # @assert x ∈ sq
+    return LagrangeTriangle(a, x, b),
+    LagrangeTriangle(b, x, c),
+    LagrangeTriangle(c, x, d),
+    LagrangeTriangle(d, x, a)
+    # # four rectangles with x on the (0,0) reference vertex
+    # return LagrangeSquare(x, (0, x[2]), a, (x[1], 0)),
+    # LagrangeSquare(x, (x[1], 0), b, (1, x[2])),
+    # LagrangeSquare(x, (1, x[2]), c, (x[1], 1)),
+    # LagrangeSquare(x, (x[1], 1), d, (0, x[2]))
+end
+
+function decompose(tri::ReferenceTriangle, x::SVector{2,<:Real})
+    # @assert x ∈ tri
+    a, b, c = vertices(tri)
+    # three triangles with x on (1,0) reference vertex
+    return LagrangeTriangle(a, x, b), LagrangeTriangle(b, x, c), LagrangeTriangle(c, x, a)
+end

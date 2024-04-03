@@ -20,7 +20,7 @@ geometric_dimension(::ReferenceSimplex{N}) where {N} = N
 ambient_dimension(::ReferenceSimplex{N}) where {N} = N
 function Base.in(x, ::ReferenceSimplex{N}) where {N}
     for i in 1:N
-        0 ≤ x[i] ≤ 1 - sum(x[1:i-1]) || return false
+        0 ≤ x[i] ≤ 1 - sum(view(x,1:i-1); init=zero(x[i])) || return false
     end
     return true
 end
@@ -56,9 +56,6 @@ the lower corner at the origin and the upper corner at `(1,1,…,1)`.
 struct ReferenceHyperCube{N} <: ReferenceShape end
 geometric_dimension(::ReferenceHyperCube{N}) where {N} = N
 ambient_dimension(::ReferenceHyperCube{N}) where {N} = N
-function vertices(::ReferenceHyperCube{N}) where {N}
-    return ntuple(i -> SVector(ntuple(j -> (i >> j) & 1, N)), 2^N)
-end
 Base.in(x, ::ReferenceHyperCube{N}) where {N} = all(0 .≤ x .≤ 1)
 center(::ReferenceHyperCube{N}) where {N} = svector(i -> 0.5, N)
 
@@ -69,12 +66,16 @@ Singleton type representing the `[0,1]` segment.
 """
 const ReferenceLine = ReferenceHyperCube{1}
 
+vertices(::ReferenceLine) = SVector(0), SVector(1)
+
 """
     const ReferenceSquare = ReferenceHyperCube{2}
 
 Singleton type representing the unit square `[0,1]²`.
 """
 const ReferenceSquare = ReferenceHyperCube{2}
+
+vertices(::ReferenceSquare) = SVector(0,0), SVector(1,0), SVector(1,1), SVector(0,1)
 
 """
     const ReferenceCube = ReferenceHyperCube{3}
@@ -89,4 +90,4 @@ geometric_dimension(E::Type{<:ReferenceShape}) = geometric_dimension(E())
 ambient_dimension(E::Type{<:ReferenceShape}) = ambient_dimension(E())
 vertices(E::Type{<:ReferenceShape}) = vertices(E())
 center(E::Type{<:ReferenceShape}) = center(E())
-Base.in(E::Type{<:ReferenceShape}) = in(E())
+Base.in(x, E::Type{<:ReferenceShape}) = in(x, E())
