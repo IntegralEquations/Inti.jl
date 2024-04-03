@@ -78,6 +78,17 @@ Given a function-like object `f: Ω → R`, return `f(Ω)`.
 function image end
 
 """
+    integration_measure(f, x)
+
+Given the Jacobian matrix `J` of a transformation `f : ℝᴹ → ℝᴺ`, compute the
+integration measure `√det(JᵀJ)`.
+"""
+function integration_measure(f, x)
+    jac = jacobian(f, x)
+    return _integration_measure(jac)
+end
+
+"""
     _integration_measure(J::AbstractMatrix)
 
 Given the Jacobian matrix `J` of a transformation `f : ℝᴹ → ℝᴺ`, compute the
@@ -99,11 +110,11 @@ end
     _normal(jac::SMatrix{M,N})
 
 Given a an `M` by `N` matrix representing the jacobian of a codimension one
-object, compute the normal vector.
+object, compute the normal vector. If the codimension is not one, return
+`nothing`.
 """
 function _normal(jac::SMatrix{N,M}) where {N,M}
-    msg = "computing the normal vector requires the element to be of co-dimension one."
-    @assert (N - M == 1) msg
+    N - M == 1 || (return nothing)
     if M == 1 # a line in 2d
         t = jac[:, 1] # tangent vector
         n = SVector(t[2], -t[1]) |> normalize
@@ -206,13 +217,14 @@ macro usethreads(multithreaded, expr::Expr)
 end
 
 # some useful type aliases
+const Point1D = SVector{1,Float64}
 const Point2D = SVector{2,Float64}
 const Point3D = SVector{3,Float64}
 
 function _normalize_compression(compression)
     methods = (:hmatrix, :fmm, :none)
     # check that method is valid
-    compression.method ∈ (:hmatrix, :fmm, :none) || error(
+    compression.method ∈ methods || error(
         "Unknown compression.method $(compression.method). Available options: $methods",
     )
     # set default tolerance if not provided
@@ -223,7 +235,7 @@ end
 function _normalize_correction(correction)
     methods = (:dim, :none)
     # check that method is valid
-    correction.method ∈ (:dim, :none) ||
+    correction.method ∈ methods ||
         error("Unknown correction.method $(correction.method). Available options: $methods")
     #
     if correction.method == :dim
