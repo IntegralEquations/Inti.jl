@@ -98,8 +98,13 @@ end
     assemble_fmm(iop; atol)
 
 Set up a 2D or 3D FMM for evaluating the discretized integral operator `iop`
-associated with the `pde`. In 2D the `FMM2D` library is used while in 3D
-`FMM3D` is used.
+associated with the `pde`. In 2D the `FMM2D` or `FMMLIB2D` library is used
+(whichever was most recently loaded) while in 3D `FMM3D` is used.
+
+!!! warning "FMMLIB2D"
+    FMMLIB2D does *no* checking for if the targets and sources coincide, and
+    will return `Inf` values if `iop.target !== iop.source`, but there is a
+    point `x ∈ iop.target` such that `x ∈ iop.source`.
 """
 function assemble_fmm(iop::IntegralOperator, args...; kwargs...)
     N = ambient_dimension(iop.source)
@@ -113,7 +118,7 @@ function assemble_fmm(iop::IntegralOperator, args...; kwargs...)
 end
 
 function _assemble_fmm2d(args...; kwargs...)
-    return error("_assemble_fmm2d not found. Did you forget to import FMM2D ?")
+    return error("_assemble_fmm2d not found. Did you forget to import FMM2D or FMMLIB2D ?")
 end
 
 function _assemble_fmm3d(args...; kwargs...)
