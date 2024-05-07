@@ -93,7 +93,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
             @. charges = -1 / (2 * π) * weights * x
             if same_surface
                 out =
-                    FMM2D.rfmm2d(; charges = charges, sources = sources, eps     = atol, pg      = 2)
+                    FMM2D.rfmm2d(; charges = charges, sources = sources, eps = atol, pg = 2)
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
             else
                 out = FMM2D.rfmm2d(;
