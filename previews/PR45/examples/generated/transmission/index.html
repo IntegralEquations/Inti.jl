@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>- · Inti.jl</title><meta name="title" content="- · Inti.jl"/><meta property="og:title" content="- · Inti.jl"/><meta property="twitter:title" content="- · Inti.jl"/><meta name="description" content="Documentation for Inti.jl."/><meta property="og:description" content="Documentation for Inti.jl."/><meta property="twitter:description" content="Documentation for Inti.jl."/><meta property="og:url" content="https://IntegralEquations.github.io/Inti.jl/examples/generated/transmission/"/><meta property="twitter:url" content="https://IntegralEquations.github.io/Inti.jl/examples/generated/transmission/"/><link rel="canonical" href="https://IntegralEquations.github.io/Inti.jl/examples/generated/transmission/"/><script data-outdated-warner src="../../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../../assets/documenter.js"></script><script src="../../../search_index.js"></script><script src="../../../siteinfo.js"></script><script src="../../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../../">Inti.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../../">Home</a></li><li><span class="tocitem">Helmholtz Example</span><ul><li><a class="tocitem" href="../helmholtz_scattering/">Helmholtz scattering</a></li></ul></li><li><span class="tocitem">Poisson Example</span><ul><li><a class="tocitem" href="../poisson/">Poisson solver</a></li></ul></li><li><span class="tocitem">Acoustic Transmission Example</span><ul><li class="is-active"><a class="tocitem" href>-</a></li></ul></li><li><span class="tocitem">Lippmann Schwinger Example</span><ul><li><a class="tocitem" href="../lippmann_schwinger/">Lippmann Schwinger Solver</a></li></ul></li><li><a class="tocitem" href="../../../references/">References</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Acoustic Transmission Example</a></li><li class="is-active"><a href>-</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>-</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl/blob/main/docs/src/examples/transmission.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><p>In this tutorial we will show how to solve an acoustic transmission problem in the context of Helmholtz equation in two dimensions.</p><pre><code class="language-julia hljs">using Inti
+
+k₁ = 8π
+k₂ = 2π
+λ₁ = 2π / k₁
+λ₂ = 2π / k₂
+meshsize   = min(λ₁,λ₂) / 10
+qorder     = 4 # quadrature order
+gorder     = 2 # order of geometrical approximation
+
+using Gmsh # this will trigger the loading of Inti&#39;s Gmsh extension
+
+function gmsh_circle(; name, meshsize, order = 1, radius = 1, center = (0, 0))
+    try
+        gmsh.initialize()
+        gmsh.model.add(&quot;circle-mesh&quot;)
+        gmsh.option.setNumber(&quot;Mesh.MeshSizeMax&quot;, meshsize)
+        gmsh.option.setNumber(&quot;Mesh.MeshSizeMin&quot;, meshsize)
+        gmsh.model.occ.addDisk(center[1], center[2], 0, radius, radius)
+        gmsh.model.occ.synchronize()
+        gmsh.model.mesh.generate(1)
+        gmsh.model.mesh.setOrder(order)
+        gmsh.write(name)
+    finally
+        gmsh.finalize()
+    end
+end
+
+
+name = joinpath(@__DIR__, &quot;circle.msh&quot;)
+gmsh_circle(; meshsize, order = gorder, name)
+Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 2)
+
+Γ = Inti.boundary(Ω)
+Γ_msh = view(msh,Γ)
+
+Q = Inti.Quadrature(Γ_msh; qorder)
+
+pde₁ = Inti.Helmholtz(; k=k₁, dim = 2)
+pde₂ = Inti.Helmholtz(; k=k₂, dim = 2)
+
+using FMMLIB2D
+S₁, D₁ = Inti.single_double_layer(;
+    pde=pde₁,
+    target = Q,
+    source = Q,
+    compression = (method = :fmm,tol=:1e-8),
+    correction = (method = :dim, maxdist = 5 * meshsize),
+)
+
+K₁, N₁ = Inti.adj_double_layer_hypersingular(;
+    pde=pde₁,
+    target = Q,
+    source = Q,
+    compression = (method = :fmm,tol=:1e-8),
+    correction = (method = :dim, maxdist = 5 * meshsize),
+)
+
+S₂, D₂ = Inti.single_double_layer(;
+    pde=pde₂,
+    target = Q,
+    source = Q,
+    compression = (method = :fmm,tol=:1e-8),
+    correction = (method = :dim, maxdist = 5 * meshsize),
+)
+
+K₂, N₂ = Inti.adj_double_layer_hypersingular(;
+    pde=pde₂,
+    target = Q,
+    source = Q,
+    compression = (method = :fmm,tol=:1e-8),
+    correction = (method = :dim, maxdist = 5 * meshsize),
+)
+
+using LinearAlgebra
+using LinearMaps
+
+L =[I+LinearMap(D₁)-LinearMap(D₂) -LinearMap(S₁)+LinearMap(S₂);LinearMap(N₁)-LinearMap(N₂) I-LinearMap(K₁)+LinearMap(K₂)]
+
+θ = π/4; 𝐝 = [cos(θ),sin(θ)]
+u₂ = x -&gt; exp(im * k₂ * dot(x,𝐝)) # plane-wave incident field
+∇u₂ = x -&gt; im*k₂*u₂(x)*𝐝     # gradient of incident field
+
+using SpecialFunctions
+u₁ = x -&gt; hankelh1(0,k₁*sqrt(dot(x,x))) # point source in the interior of the circle
+∇u₁ = x -&gt; -k₁*hankelh1(1,k₁*sqrt(dot(x,x)))*x/sqrt(dot(x,x))     # gradient of the point source field
+
+rhs₁ = map(Q) do q
+    x = q.coords
+    return u₁(x)+u₂(x)
+end
+
+rhs₂ = map(Q) do q
+    x = q.coords
+    n = q.normal
+    return dot(n,∇u₁(x)+∇u₂(x))
+end
+
+rhs = [rhs₁;rhs₂]
+
+using IterativeSolvers
+sol, hist =
+    gmres(L, rhs; log = true, abstol = 1e-6, verbose = false, restart = 400, maxiter = 400)
+@show hist</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Converged after 46 iterations.</code></pre><p>sol = L \ rhs</p><pre><code class="language-julia hljs">nQ = size(Q,1)
+sol = reshape(sol,nQ,2)
+φ,ψ = sol[:,1],sol[:,2]
+
+
+𝒮₁, 𝒟₁ = Inti.single_double_layer_potential(; pde=pde₁, source = Q)
+𝒮₂, 𝒟₂ = Inti.single_double_layer_potential(; pde=pde₂, source = Q)
+
+v₁  = x -&gt;  𝒟₁[φ](x) - 𝒮₁[ψ](x)
+v₂  = x -&gt; -𝒟₂[φ](x) + 𝒮₂[ψ](x)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">#16 (generic function with 1 method)</code></pre><p>Here is the maximum error on some points located on a circle of radius <code>2</code>:</p><pre><code class="language-julia hljs">er₁ = maximum(0:0.01:2π) do θ
+    R = 2.0
+    x = (R * cos(θ), R * sin(θ))
+    xp = [R * cos(θ), R * sin(θ)]
+    return abs(v₁(x) - u₁(xp))
+end
+@info &quot;maximum error = $er₁&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: maximum error = 2.105411760835214e-8</code></pre><p>Here is the maximum error on some points located on a circle of radius <code>0.5</code>:</p><pre><code class="language-julia hljs">er₂ = maximum(0:0.01:2π) do θ
+    R = 0.5
+    x = (R * cos(θ), R * sin(θ))
+    xp = [R * cos(θ), R * sin(θ)]
+    return abs(v₂(x) - u₂(xp))
+end
+@info &quot;maximum error = $er₂&quot;
+
+
+
+using CairoMakie
+xx = yy = range(-4; stop = 4, length = 200)
+vals = map(pt -&gt; norm(pt) &gt; 1 ? real(u₁(pt)) : real(u₂(pt)), Iterators.product(xx, yy))
+fig, ax, hm = heatmap(
+    xx,
+    yy,
+    vals;
+    colormap = :inferno,
+    interpolate = true,
+    axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
+)
+lines!(
+    ax,
+    [cos(θ) for θ in 0:0.01:2π],
+    [sin(θ) for θ in 0:0.01:2π];
+    color = :black,
+    linewidth = 4,
+)
+Colorbar(fig[1, 2], hm)
+fig</code></pre><img src="651e0826.png" alt="Example block output"/><p>function gmsh<em>kite(; radius = 1, center = (0,0,0), npts = ceil(Int,radius<em>10))     f = (s) -&gt; center .+ radius .</em> (cospi(2 * s[1]) + 0.65 * cospi(4 * s[1]) - 0.65,             1.5 * sinpi(2 * s[1]))     pt</em>tags = Int32[]     for i in 0:npts-1         s = i / npts         x = center[1] + radius * (cospi(2 * s[1]) + 0.65 * cospi(4 * s[1]) - 0.65)         y = center[2] + radius * (1.5 * sinpi(2 * s[1]))         z = 0         t = gmsh.model.occ.addPoint(x,y,z)         push!(pt<em>tags,t)     end     # close the curve by adding the first point again     push!(pt</em>tags,pt<em>tags[1])     gmsh.model.occ.addSpline(pt</em>tags, 1000)     gmsh.model.occ.synchronize() end</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../poisson/">« Poisson solver</a><a class="docs-footer-nextpage" href="../lippmann_schwinger/">Lippmann Schwinger Solver »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Wednesday 15 May 2024 00:07">Wednesday 15 May 2024</span>. Using Julia version 1.10.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
