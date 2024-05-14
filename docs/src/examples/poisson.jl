@@ -3,6 +3,10 @@ import Pkg                            #src
 docsdir = joinpath(@__DIR__, "../..") #src
 Pkg.activate(docsdir)                 #src
 
+#nb ## Environment setup
+#nb const DEPENDENCIES = ["CairoMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "FMM3D", "FMM2D"];
+#nb ## __NOTEBOOK_SETUP__
+
 # # [Poisson solver](@id poisson)
 
 #md # [![ipynb](https://img.shields.io/badge/download-ipynb-blue)](poisson.ipynb)
@@ -78,7 +82,7 @@ dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
 # will use the method of manufactured solutions. For simplicity, we will take as
 # an exact solution
 
-uₑ = (x) -> cos(2*x[1]) * sin(2*x[2])
+uₑ = (x) -> cos(2 * x[1]) * sin(2 * x[2])
 
 # which yields
 
@@ -106,14 +110,14 @@ S_b2b, D_b2b = Inti.single_double_layer(;
     target = Γₕ_quad,
     source = Γₕ_quad,
     compression = (method = :fmm, tol = 1e-12),
-    correction = (method = :dim,),
+    correction = (method = :dim, target_location = :on),
 )
 S_b2d, D_b2d = Inti.single_double_layer(;
     pde,
     target = Ωₕ_quad,
     source = Γₕ_quad,
     compression = (method = :fmm, tol = 1e-12),
-    correction = (method = :dim, maxdist = 5 * meshsize),
+    correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
 )
 
 ## Volume potentials
@@ -122,14 +126,19 @@ V_d2d = Inti.volume_potential(;
     target = Ωₕ_quad,
     source = Ωₕ_quad,
     compression = (method = :fmm, tol = 1e-12),
-    correction = (method = :dim, interpolation_order)
+    correction = (method = :dim, interpolation_order, target_location = :inside),
 )
 V_d2b = Inti.volume_potential(;
     pde,
     target = Γₕ_quad,
     source = Ωₕ_quad,
     compression = (method = :fmm, tol = 1e-12),
-    correction = (method = :dim, maxdist = 5 * meshsize, interpolation_order),
+    correction = (
+        method = :dim,
+        maxdist = 5 * meshsize,
+        interpolation_order,
+        target_location = :on,
+    ),
 )
 
 # We can now solve a BIE for the unknown density $\sigma$:
@@ -160,14 +169,14 @@ er = abs.(uₕ_quad - uₑ_quad)
 @show norm(er, Inf)
 
 # ## Visualize the solution error using Gmsh
-# er_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, er)
+## er_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, er)
 sol_nodes = uₑ.(Inti.nodes(Ωₕ))
 solₕ_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, uₑ_quad)
 er_nodes = abs.(sol_nodes - solₕ_nodes)
 
 gmsh.initialize()
 Inti.write_gmsh_model(msh)
-Inti.write_gmsh_view!(Ωₕ, er_nodes; name="error")
-# Inti.write_gmsh_view!(Ωₕ, sol_nodes; name="solution")
-"-nopopup" in ARGS || gmsh.fltk.run()
+Inti.write_gmsh_view!(Ωₕ, er_nodes; name = "error")
+## Inti.write_gmsh_view!(Ωₕ, sol_nodes; name="solution")
+isinteractive() && gmsh.fltk.run()
 gmsh.finalize()

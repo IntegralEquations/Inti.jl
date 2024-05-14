@@ -20,7 +20,7 @@ ON_CI && (draft = false) # always full build on CI
 
 function insert_setup(content)
     ON_CI || return content
-    replace(content, "#nb ## __NOTEBOOK_SETUP__" => SETUP)
+    return replace(content, "#nb ## __NOTEBOOK_SETUP__" => SETUP)
 end
 
 # Generate examples using Literate
@@ -32,7 +32,12 @@ for example in ["helmholtz_scattering.jl", "poisson.jl"]
         src = joinpath(examples_dir, example)
         Literate.markdown(src, generated_dir; mdstrings = true)
         # if on CI, also generate the notebook
-        ON_CI && Literate.notebook(src, generated_dir; mdstrings = true, preprocess = insert_setup)
+        ON_CI && Literate.notebook(
+            src,
+            generated_dir;
+            mdstrings = true,
+            preprocess = insert_setup,
+        )
     end
 end
 

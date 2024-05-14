@@ -71,7 +71,7 @@ for h in hh
         target = Q,
         source = Q,
         compression = (method = :none,),
-        correction = (method = :dim,),
+        correction = (method = :dim, target_location = :on),
     )
     e0 = norm(S0 * γ₁u - D0 * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
     e1 = norm(S1 * γ₁u - D1 * γ₀u - σ * γ₀u, Inf) / γ₀u_norm

@@ -3,6 +3,10 @@ import Pkg                            #src
 docsdir = joinpath(@__DIR__, "../..") #src
 Pkg.activate(docsdir)                 #src
 
+#nb ## Environment setup
+#nb const DEPENDENCIES = ["CairoMakie", "Gmsh", "HMatrices", "IterativeSolvers", "LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "FMM3D"];
+#nb ## __NOTEBOOK_SETUP__
+
 # # [Helmholtz scattering](@id helmholtz_scattering)
 
 #md # [![ipynb](https://img.shields.io/badge/download-ipynb-blue)](helmholtz_scattering.ipynb)
@@ -102,11 +106,11 @@ Pkg.activate(docsdir)                 #src
 
 using Inti
 
-k = 8π
-λ = 2π / k
-meshsize   = λ / 5
-qorder     = 4 # quadrature order
-gorder     = 2 # order of geometrical approximation
+k        = 4π
+λ        = 2π / k
+meshsize = λ / 5
+qorder   = 4 # quadrature order
+gorder   = 2 # order of geometrical approximation
 nothing #hide
 
 # ## [Two-dimensional scattering](@id helmholtz-scattering-2d)
@@ -165,7 +169,7 @@ gmsh_circle(; meshsize, order = gorder, name)
 # for:
 
 Γ = Inti.boundary(Ω)
-Γ_msh = view(msh,Γ)
+Γ_msh = view(msh, Γ)
 Q = Inti.Quadrature(Γ_msh; qorder)
 nothing #hide
 
@@ -194,7 +198,7 @@ S, D = Inti.single_double_layer(;
     target = Q,
     source = Q,
     compression = (method = :none,),
-    correction = (method = :dim, maxdist = 5 * meshsize),
+    correction = (method = :dim, maxdist = 5 * meshsize, target_location = :on),
 )
 
 # There are two well-known difficulties related to the discretization of
@@ -336,10 +340,11 @@ function gmsh_sphere(; meshsize, order = gorder, radius = 1, visualize = false, 
     gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
     gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
     sphere_tag = gmsh.model.occ.addSphere(0, 0, 0, radius)
-    xl,yl,zl = -2*radius,-2*radius,0
-    Δx, Δy = 4*radius, 4*radius
+    xl, yl, zl = -2 * radius, -2 * radius, 0
+    Δx, Δy = 4 * radius, 4 * radius
     rectangle_tag = gmsh.model.occ.addRectangle(xl, yl, zl, Δx, Δy)
-    outDimTags, _ = gmsh.model.occ.cut([(2, rectangle_tag)], [(3, sphere_tag)], -1, true, false)
+    outDimTags, _ =
+        gmsh.model.occ.cut([(2, rectangle_tag)], [(3, sphere_tag)], -1, true, false)
     gmsh.model.occ.synchronize()
     gmsh.model.addPhysicalGroup(3, [sphere_tag], -1, "omega")
     gmsh.model.addPhysicalGroup(2, [dt[2] for dt in outDimTags], -1, "sigma")
@@ -348,13 +353,13 @@ function gmsh_sphere(; meshsize, order = gorder, radius = 1, visualize = false, 
     visualize && gmsh.fltk.run()
     gmsh.option.setNumber("Mesh.SaveAll", 1) # otherwise only the physical groups are saved
     gmsh.write(name)
-    gmsh.finalize()
+    return gmsh.finalize()
 end
 
 # As before, lets write a file with our mesh, and import it into `Inti.jl`:
 
 name = joinpath(@__DIR__, "sphere.msh")
-gmsh_sphere(; meshsize, order = gorder, name, visualize=false)
+gmsh_sphere(; meshsize, order = gorder, name, visualize = false)
 Inti.clear_entities!()
 Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 3)
 Γ = Inti.boundary(Ω)
@@ -363,8 +368,8 @@ Inti.clear_entities!()
 # order to extract the relevant domains `Ω` and `Σ`. We can now create a
 # quadrature as before
 
-Γ_msh = view(msh,Γ)
-Q = Inti.Quadrature(Γ_msh; qorder = 4)
+Γ_msh = view(msh, Γ)
+Q = Inti.Quadrature(Γ_msh; qorder)
 
 # !!! tip
 #       If you pass `visualize=true` to `gmsh_sphere`, it will open a window
@@ -386,7 +391,7 @@ S, D = Inti.single_double_layer(;
     target = Q,
     source = Q,
     compression = (method = :hmatrix, tol = 1e-6),
-    correction = (method = :dim,),
+    correction = (method = :dim, target_location = :on),
 )
 
 # Here is how much memory it would take to store the dense representation of
@@ -428,7 +433,7 @@ rhs = map(Q) do q
     return -uᵢ(x)
 end
 σ, hist =
-    gmres(L, rhs; log = true, abstol = 1e-6, verbose = false, restart = 100, maxiter = 100)
+    gmres(L, rhs; log = true, abstol = 1e-6, verbose = true, restart = 100, maxiter = 100)
 @show hist
 
 # As before, let us represent the solution using `IntegralPotential`s:
@@ -485,28 +490,28 @@ end
 using FMM3D
 
 Σ = Inti.Domain(e -> "sigma" ∈ Inti.labels(e), Inti.entities(msh))
-Σ_msh = view(msh,Σ)
+Σ_msh = view(msh, Σ)
 target = Inti.nodes(Σ_msh)
 
-S,D = Inti.single_double_layer(;
+S, D = Inti.single_double_layer(;
     pde,
     target,
     source = Q,
-    compression = (method = :fmm, tol=1e-4),
-    correction = (method = :dim, maxdist = 5 * meshsize),
+    compression = (method = :fmm, tol = 1e-4),
+    correction = (method = :none,),
 )
 
 ui_eval_msh = uᵢ.(target)
-us_eval_msh = D*σ - im*k*S*σ
+us_eval_msh = D * σ - im * k * S * σ
 u_eval_msh = ui_eval_msh + us_eval_msh
 nothing #hide
 
 # Finalize, we use gmsh to visualize the scattered field:
 gmsh.initialize()
 Inti.write_gmsh_model(msh)
-Inti.write_gmsh_view!(Σ_msh, real(u_eval_msh); name="sigma real")
-Inti.write_gmsh_view!(Γ_msh, x -> 0, name = "gamma real")
+Inti.write_gmsh_view!(Σ_msh, real(u_eval_msh); name = "sigma real")
+Inti.write_gmsh_view!(Γ_msh, x -> 0; name = "gamma real")
 # Launch the GUI to see the results:
-"-nopopup" in ARGS || gmsh.fltk.run()
+isinteractive() && gmsh.fltk.run()
 gmsh.finalize()
 # Add a gmsh view of the solution and save it:

@@ -221,13 +221,20 @@ function _normalize_compression(compression)
 end
 
 function _normalize_correction(correction)
-    methods = (:dim, :none)
+    methods = (:dim, :hcubature, :none)
     # check that method is valid
-    correction.method ∈ (:dim, :none) ||
+    correction.method ∈ methods ||
         error("Unknown correction.method $(correction.method). Available options: $methods")
-    #
+    # set default values if absent
     if correction.method == :dim
-        correction = merge((maxdist = Inf, interpolation_order = nothing), correction)
+        haskey(correction, :target_location) ||
+            error("missing target_location field in correction")
+        haskey(correction, :maxdist) ||
+            @warn("missing maxdist field in correction: setting to Inf")
+        correction = merge(
+            (maxdist = Inf, interpolation_order = nothing, center = nothing),
+            correction,
+        )
     end
     return correction
 end
