@@ -156,6 +156,26 @@ end
 _green_multiplier(x::Tuple, Q::Quadrature) = _green_multiplier(SVector(x), Q)
 _green_multiplier(x::QuadratureNode, Q::Quadrature) = _green_multiplier(coords(x), Q)
 
+"""
+    _green_multiplier(s::Symbol)
+
+Return `-1.0` if `s == :inside`, `0.0` if `s == :outside`, and `-0.5` if `s ==
+:on`; otherwise, throw an error. The orientation is relative to the normal of
+the bounding curve/surface.
+"""
+function _green_multiplier(s::Symbol)
+    # assume an exterior normal orientation and a smooth surface
+    if s == :inside
+        return -1.0
+    elseif s == :outside
+        return 0.0
+    elseif s == :on
+        return -0.5
+    else
+        return error("Unknown target location $s. Expected :inside, :outside, or :on")
+    end
+end
+
 # Applying Laplace's double-layer to a constant will yield either 1 or -1,
 # depending on whether the target point is inside or outside the obstacle.
 # Assumes `quad` is the quadrature of a closed curve/surface

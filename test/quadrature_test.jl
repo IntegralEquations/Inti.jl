@@ -65,6 +65,7 @@ using Inti
             Inti.clear_entities!()
             gmsh.initialize()
             gmsh.option.setNumber("General.Verbosity", 2)
+            gmsh.option.setNumber("Mesh.MeshSizeMax", 0.1)
             Inti.clear_entities!()
             gmsh.model.occ.addDisk(0, 0, 0, rx, ry)
             gmsh.model.occ.synchronize()

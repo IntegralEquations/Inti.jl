@@ -10,7 +10,7 @@ Parameters associated with the density interpolation method used in
 end
 
 """
-    bdim_correction(pde,X,Y,S,D[;parameters,derivative,maxdist])
+    bdim_correction(pde,X,Y,S,D; green_multiplier, kwargs...)
 
 Given a `pde` and a (possibly innacurate) discretizations of its single and
 double-layer operators `S` and `D` (taking a vector of values on `Y` and
@@ -18,27 +18,31 @@ returning a vector on of values on `X`), compute corrections `δS` and `δD` suc
 that `S + δS` and `D + δD` are more accurate approximations of the underlying
 single- and double-layer integral operators.
 
-Requirements:
-- `pde` must be an `AbstractPDE`
-- `Y` must be a `Quadrature` object of a closed surface
-- `X` is either on, inside, or outside `Y`
+# Arguments
 
-The following optional keyword arguments are available:
+## Required:
+
+- `pde` must be an [`AbstractPDE`](@ref)
+- `Y` must be a [`Quadrature`](@ref) object of a closed surface
+- `X` is either inside, outside, or on `Y`
+- `S` and `D` are approximations to the single- and double-layer operators for
+  `pde` taking densities in `Y` and returning densities in `X`.
+- `green_multiplier` (keyword argument) is a vector with the same length as `X`
+  storing the value of `μ(x)` for `x ∈ X` in the Green identity `S\\[γ₁u\\](x) -
+  D\\[γ₀u\\](x) + μ*u(x) = 0`. See [`_green_multiplier`](@ref).
+
+## Optional `kwargs`:
+
 - `parameters::DimParameters`: parameters associated with the density
   interpolation method
 - `derivative`: if true, compute the correction to the adjoint double-layer and
   hypersingular operators instead. In this case, `S` and `D` should be replaced
   by a (possibly innacurate) discretization of adjoint double-layer and
   hypersingular operators, respectively.
-- `maxdist`: distance beyond which interactions are considered sufficiently far so
-  that no correction is needed. This is used to determine a threshold for
+- `maxdist`: distance beyond which interactions are considered sufficiently far
+  so that no correction is needed. This is used to determine a threshold for
   nearly-singular corrections when `X` and `Y` are different surfaces. When `X
   === Y`, this is not needed.
-- `green_multiplier`: the value of `μ` in the Green identity `S\\[γ₁u\\](x) -
-  D\\[γ₀u\\](x) + μ*u(x) = 0` for `x ∈ X`. When a scalar value is passed, it is
-  taken to be the same for all values of `x`. If `nothing`, the value is inferred
-  using `_green_multiplier` and the quadrature `Y` (assumes `X` is either inside,
-  on, or outside `Y`).
 """
 function bdim_correction(
     pde,
@@ -46,13 +50,13 @@ function bdim_correction(
     source::Quadrature,
     Sop,
     Dop;
+    green_multiplier::Vector{<:Real},
     parameters = DimParameters(),
-    derivative = false,
+    derivative::Bool = false,
     maxdist = Inf,
-    green_multiplier = nothing,
     filter_target_params = nothing,
 )
-    max_cond = -Inf
+    imat_cond = imat_norm = res_norm = rhs_norm = -Inf
     T = eltype(Sop)
     N = ambient_dimension(source)
     @assert eltype(Dop) == T "eltype of S and D must match"
@@ -93,15 +97,6 @@ function bdim_correction(
     γ₁G = AdjointDoubleLayerKernel(pde, T)
     γ₀B = Matrix{T}(undef, length(source), ns)
     γ₁B = Matrix{T}(undef, length(source), ns)
-    μ   = if isnothing(green_multiplier)
-        μ_ = _green_multiplier(target[1], source)
-        # snap to the nearest "generic" value of μ
-        argmin(x -> norm(μ_ - x), (-1, -0.5, 0, 0.5, 1))
-    elseif isscalar(green_multiplier)
-        green_multiplier
-    else
-        error("green_multiplier must be a scalar")
-    end
     for k in 1:ns
         for j in 1:length(source)
             γ₀B[j, k] = G(source[j], xs[k])
@@ -111,23 +106,17 @@ function bdim_correction(
     # integrate the monopoles/dipoles over Y with target on X. This is the
     # slowest step, and passing a custom S,D can accelerate this computation.
     Θ = zeros(T, m, ns)
-    # Compute Θ <-- S * γ₁B - D * γ₀B + σ * B(x) usig in-place matvec
+    # Compute Θ <-- S * γ₁B - D * γ₀B + μ * B(x) usig in-place matvec
     for k in 1:ns
         @views mul!(Θ[:, k], Sop, γ₁B[:, k])
         @views mul!(Θ[:, k], Dop, γ₀B[:, k], -1, 1)
-        if derivative
-            for i in 1:length(target)
-                Θ[i, k] += μ * γ₁G(target[i], xs[k])
-            end
-        else
-            for i in 1:length(target)
-                Θ[i, k] += μ * G(target[i], xs[k])
-            end
+        for i in 1:length(target)
+            μ = green_multiplier[i]
+            v = derivative ? γ₁G(target[i], xs[k]) : G(target[i], xs[k])
+            Θ[i, k] += μ * v
         end
     end
-    @debug "Norm of correction: " norm(Θ)
     # finally compute the corrected weights as sparse matrices
-    @debug "precomputation finished"
     Is, Js, Ss, Ds = Int[], Int[], T[], T[]
     for (E, qtags) in source.etype2qtags
         near_list = dict_near[E]
@@ -155,15 +144,17 @@ function bdim_correction(
             _copyto!(view(M_, 1:(nq*σ), :), M0)
             _copyto!(view(M_, (nq*σ+1):2*nq*σ, :), M1)
             F_ = qr!(transpose(M_))
-            @debug begin
-                max_cond = max(cond(M_), max_cond)
-            end
+            @debug (imat_cond = max(cond(M_), imat_cond)) maxlog = 0
+            @debug (imat_norm = max(norm(M_), imat_norm)) maxlog = 0
             for i in near_list[n]
-                j   = glob_loc_near_trgs[i]
-                Θi  = @view Θ[j:j, :]
+                j = glob_loc_near_trgs[i]
+                Θi = @view Θ[j:j, :]
                 Θi_ = _copyto!(Θi_, Θi)
-                W_  = ldiv!(W_, F_, transpose(Θi_))
-                W   = T <: Number ? W_ : _copyto!(W, W_)
+                @debug (rhs_norm = max(rhs_norm, norm(Θi))) maxlog = 0
+                W_ = ldiv!(W_, F_, transpose(Θi_))
+                @debug (res_norm = max(norm(Matrix(F_) * W_ - transpose(Θi_)), res_norm)) maxlog =
+                    0
+                W = T <: Number ? W_ : _copyto!(W, W_)
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
@@ -173,7 +164,12 @@ function bdim_correction(
             end
         end
     end
-    @debug "Maximum condition number of linear system: " max_cond
+    @debug """Condition properties of bdim correction:
+    |-- max interp. matrix cond.: $imat_cond
+    |-- max interp. matrix norm : $imat_norm
+    |-- max residual error:       $res_norm
+    |-- max norm of source term:  $rhs_norm
+    """
     δS = sparse(Is, Js, Ss, num_trgs, n)
     δD = sparse(Is, Js, Ds, num_trgs, n)
     return δS, δD

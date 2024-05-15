@@ -209,7 +209,7 @@ end
 const Point2D = SVector{2,Float64}
 const Point3D = SVector{3,Float64}
 
-function _normalize_compression(compression)
+function _normalize_compression(compression, target, source)
     methods = (:hmatrix, :fmm, :none)
     # check that method is valid
     compression.method ∈ (:hmatrix, :fmm, :none) || error(
@@ -220,14 +220,26 @@ function _normalize_compression(compression)
     return compression
 end
 
-function _normalize_correction(correction)
-    methods = (:dim, :none)
+function _normalize_correction(correction, target, source)
+    methods = (:dim, :hcubature, :none)
     # check that method is valid
-    correction.method ∈ (:dim, :none) ||
+    correction.method ∈ methods ||
         error("Unknown correction.method $(correction.method). Available options: $methods")
-    #
+    # set default values if absent
     if correction.method == :dim
-        correction = merge((maxdist = Inf, interpolation_order = nothing), correction)
+        haskey(correction, :target_location) &&
+            target === source &&
+            @warn("ignoring target_location field in correction since target === source")
+        # target location required unless target === source
+        haskey(correction, :target_location) ||
+            target === source ||
+            error("missing target_location field in correction")
+        haskey(correction, :maxdist) ||
+            @warn("missing maxdist field in correction: setting to Inf")
+        correction = merge(
+            (maxdist = Inf, interpolation_order = nothing, center = nothing),
+            correction,
+        )
     end
     return correction
 end
