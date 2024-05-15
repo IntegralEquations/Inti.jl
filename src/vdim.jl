@@ -1,3 +1,30 @@
+"""
+    vdim_correction(pde,X,Y,Y_boundary,S,D,V; green_multiplier, kwargs...)
+
+Compute a correction to the volume potential `V : Y → X` such that `V + δV` is a
+more accurate approximation of the underlying volume potential operator. The
+correction is computed using the (volume) density interpolation method.
+
+This function requires a `pde::AbstractPDE`, a target set `X`, a source
+quadrature `Y`, a boundary quadrature `Y_boundary`, approximations `S :
+Y_boundary -> X` and `D : Y_boundary -> X` to the single- and double-layer
+potentials (correctly handling nearly-singular integrals), and a naive
+approximation of the volume potential `V`. The `green_multiplier` is a vector of
+the same length as `X` storing the value of `μ(x)` for `x ∈ X` in the Green
+identity (see [`_green_multiplier`](@ref)).
+
+## Optional `kwargs`:
+
+- `interpolation_order`: the order of the polynomial interpolation. By default,
+  the maximum order of the quadrature rules is used.
+- `maxdist`: distance beyond which interactions are considered sufficiently far
+  so that no correction is needed. This is used to determine a threshold for
+  nearly-singular corrections.
+- `center`: the center of the basis functions. By default, the basis functions
+  are centered at the origin.
+- `shift`: a boolean indicating whether the basis functions should be shifted
+  and rescaled to each element.
+"""
 function vdim_correction(
     pde,
     target,
@@ -6,9 +33,8 @@ function vdim_correction(
     Sop,
     Dop,
     Vop;
-    interpolation_order = nothing,
-    derivative = false,
     green_multiplier::Vector{<:Real},
+    interpolation_order = nothing,
     maxdist = Inf,
     center = nothing,
     shift::Val{SHIFT} = Val(false),
