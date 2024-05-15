@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Helmholtz scattering · Inti.jl</title><meta name="title" content="Helmholtz scattering · Inti.jl"/><meta property="og:title" content="Helmholtz scattering · Inti.jl"/><meta property="twitter:title" content="Helmholtz scattering · Inti.jl"/><meta name="description" content="Documentation for Inti.jl."/><meta property="og:description" content="Documentation for Inti.jl."/><meta property="twitter:description" content="Documentation for Inti.jl."/><meta property="og:url" content="https://IntegralEquations.github.io/Inti.jl/examples/generated/helmholtz_scattering/"/><meta property="twitter:url" content="https://IntegralEquations.github.io/Inti.jl/examples/generated/helmholtz_scattering/"/><link rel="canonical" href="https://IntegralEquations.github.io/Inti.jl/examples/generated/helmholtz_scattering/"/><script data-outdated-warner src="../../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../../assets/documenter.js"></script><script src="../../../search_index.js"></script><script src="../../../siteinfo.js"></script><script src="../../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../../">Inti.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../../">Home</a></li><li><span class="tocitem">Helmholtz Example</span><ul><li class="is-active"><a class="tocitem" href>Helmholtz scattering</a><ul class="internal"><li><a class="tocitem" href="#helmholtz-soundsoft"><span>Sound-soft problem</span></a></li><li><a class="tocitem" href="#helmholtz-scattering-2d"><span>Two-dimensional scattering</span></a></li><li><a class="tocitem" href="#helmholtz-scattering-3d"><span>Three-dimensional scattering</span></a></li></ul></li></ul></li><li><span class="tocitem">Poisson Example</span><ul><li><a class="tocitem" href="../poisson/">Poisson solver</a></li></ul></li><li><a class="tocitem" href="../../../references/">References</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Helmholtz Example</a></li><li class="is-active"><a href>Helmholtz scattering</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Helmholtz scattering</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl/blob/main/docs/src/examples/helmholtz_scattering.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="helmholtz_scattering"><a class="docs-heading-anchor" href="#helmholtz_scattering">Helmholtz scattering</a><a id="helmholtz_scattering-1"></a><a class="docs-heading-anchor-permalink" href="#helmholtz_scattering" title="Permalink"></a></h1><p><a href="../helmholtz_scattering.ipynb"><img src="https://img.shields.io/badge/download-ipynb-blue" alt="ipynb"/></a> <a href="https://nbviewer.jupyter.org/github/IntegralEquations/Inti.jl/blob/gh-pages/dev/examples/generated/helmholtz_scattering.ipynb"><img src="https://img.shields.io/badge/show-nbviewer-blue.svg" alt="nbviewer"/></a></p><div class="admonition is-info"><header class="admonition-header">Important points covered in this example</header><div class="admonition-body"><ul><li>Creating a geometry using the <em>Gmsh</em> API</li><li>Assembling integral operators and integral potentials</li><li>Setting up a sound-soft problem in both 2 and 3 spatial dimensions</li><li>Using <em>GMRES</em> to solve the linear system</li><li>Exporting the solution to <em>Gmsh</em> for visualization</li></ul></div></div><p>In this tutorial we will show how to solve an acoustic scattering problem in the context of Helmholtz equation. We will focus on a <em>smooth</em> sound-soft obstacle for simplicity, and introduce along the way the necessary techniques used to handle some difficulties encountered. We will use various packages throughout this example (including of course <code>Inti.jl</code>); if they are not on your environment, you can install them using <code>] add &lt;package&gt;</code> in the REPL.</p><p>In the <a href="#helmholtz-soundsoft">following section</a>, we will provide a brief mathematical description of the problem (valid in both <span>$2$</span> and <span>$3$</span> dimensions). We will tackle the <a href="#helmholtz-scattering-2d">two-dimensional problem</a> first, for which we do not need to worry much about performance issues (e.g. compressing the integral operators, or exporting the solution to <em>Gmsh</em> for visualization). Finally, we present a <a href="#helmholtz-scattering-3d">three-dimensional example</a>, where we will use <a href="https://github.com/WaveProp/HMatrices.jl"><code>HMatrices.jl</code></a> to compress the underlying integral operators.</p><h2 id="helmholtz-soundsoft"><a class="docs-heading-anchor" href="#helmholtz-soundsoft">Sound-soft problem</a><a id="helmholtz-soundsoft-1"></a><a class="docs-heading-anchor-permalink" href="#helmholtz-soundsoft" title="Permalink"></a></h2><p>This example concerns the sound-soft acoustic scattering problem. Mathematically, this means solving an exterior problem governed by Helmholtz equation (time-harmonic acoustics) with a Dirichlet boundary condition. More precisely, letting <span>$\Omega \subset \mathbb{R}^d$</span> be a bounded domain, and denoting by <span>$\Gamma = \partial \Omega$</span> its boundary, we wish to solve</p><p class="math-container">\[    \Delta u + k^2 u = 0 \quad \text{on} \quad \mathbb{R}^d \setminus \bar{\Omega},\]</p><p>subject to Dirichlet boundary conditions on <span>$\Gamma$</span></p><p class="math-container">\[    u(\boldsymbol{x}) = g(\boldsymbol{x}) \quad \text{for} \quad \boldsymbol{x} \in \Gamma.\]</p><p>and the <em>Sommerfeld radiation condition</em> at infinity</p><p class="math-container">\[    \lim_{|\boldsymbol{x}| \to \infty} \|\boldsymbol{x}|^{(d-1)/2} \left( \frac{\partial u}{\partial |\boldsymbol{x}|} - i k u \right) = 0.\]</p><p>Here <span>$g$</span> is a (given) boundary datum, and <span>$k$</span> is the constant wavenumber.</p><p>For simplicity, we will take <span>$\Gamma$</span> circle/sphere, and focus on the <em>plane-wave scattering</em> problem. This means we will seek a solution <span>$u$</span> of the form <span>$u = u_s + u_i$</span>, where <span>$u_i$</span> is a known incident field, and <span>$u_s$</span> is the scattered field we wish to compute.</p><div class="admonition is-info"><header class="admonition-header">Complex geometries</header><div class="admonition-body"><p>The main reason for focusing on such a simple example is two-folded. First,   it alleviates the complexities associated with the mesh generation. Second,   since exact solutions are known for this problem (in the form of a series),   it is easy to assess the accuracy of the solution obtained. In practice, you   can use the same techniques to solve the problem on more complex geometries   by providing a <code>.msh</code> file containing the mesh.</p></div></div><p>Using the theory of boundary integral equations, we can express <span>$u_s$</span> as</p><p class="math-container">\[    u_s(\boldsymbol{r}) = \mathcal{D}[\sigma](\boldsymbol{r}) - i k \mathcal{S}[\sigma](\boldsymbol{r}),\]</p><p>where <span>$\mathcal{S}$</span> is the so-called single layer potential, <span>$\mathcal{D}$</span> is the double-layer potential, and <span>$\sigma : \Gamma \to \mathbb{C}$</span> is a surface density. This is an indirect formulation (because <span>$\sigma$</span> is an <em>auxiliary</em> density, not necessarily physical) commonly referred to as a <em>combined field formulation</em>. Taking the limit <span>$\mathbb{R}^d \setminus \bar \Omega \ni x \to \Gamma$</span>, it can be shown that the following equation holds on <span>$\Gamma$</span>:</p><p class="math-container">\[    \left( \frac{\mathrm{I}}{2} + \mathrm{D} - i k \mathrm{S} \right)[\sigma] = g,\]</p><p>where <span>$\mathrm{I}$</span> is the identity operator, and <span>$\mathrm{S}$</span> and <span>$\mathrm{D}$</span> are the single- and double-layer operators. This is the <strong>combined field integral equation</strong> that we will solve. The boundary data <span>$g$</span> is obtained by applying the sound-soft condition <span>$u=0$</span> on <span>$\Gamma$</span>, from which it readily follows that <span>$u_s = -u_i$</span> on <span>$\Gamma$</span>.</p><p>We are now have the necessary background to solve this problem in both 2 and 3 spatial dimensions. Let&#39;s load <code>Inti.jl</code> and setup some of the (global) problem parameters:</p><pre><code class="language-julia hljs">using Inti
 
-k = 8π
-λ = 2π / k
-meshsize   = λ / 5
-qorder     = 4 # quadrature order
-gorder     = 2 # order of geometrical approximation</code></pre><h2 id="helmholtz-scattering-2d"><a class="docs-heading-anchor" href="#helmholtz-scattering-2d">Two-dimensional scattering</a><a id="helmholtz-scattering-2d-1"></a><a class="docs-heading-anchor-permalink" href="#helmholtz-scattering-2d" title="Permalink"></a></h2><p>We use <a href="https://gmsh.info/doc/texinfo/gmsh.html#Gmsh-application-programming-interface">Gmsh API</a> for creating <code>.msh</code> file containing the desired geometry and mesh. Here is a function to mesh the circle:</p><pre><code class="language-julia hljs">using Gmsh # this will trigger the loading of Inti&#39;s Gmsh extension
+k        = 4π
+λ        = 2π / k
+meshsize = λ / 5
+qorder   = 4 # quadrature order
+gorder   = 2 # order of geometrical approximation</code></pre><h2 id="helmholtz-scattering-2d"><a class="docs-heading-anchor" href="#helmholtz-scattering-2d">Two-dimensional scattering</a><a id="helmholtz-scattering-2d-1"></a><a class="docs-heading-anchor-permalink" href="#helmholtz-scattering-2d" title="Permalink"></a></h2><p>We use <a href="https://gmsh.info/doc/texinfo/gmsh.html#Gmsh-application-programming-interface">Gmsh API</a> for creating <code>.msh</code> file containing the desired geometry and mesh. Here is a function to mesh the circle:</p><pre><code class="language-julia hljs">using Gmsh # this will trigger the loading of Inti&#39;s Gmsh extension
 
 function gmsh_circle(; name, meshsize, order = 1, radius = 1, center = (0, 0))
     try
@@ -24,93 +24,94 @@ function gmsh_circle(; name, meshsize, order = 1, radius = 1, center = (0, 0))
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">gmsh_circle (generic function with 1 method)</code></pre><p>Let us now use <code>gmsh_circle</code> to create a <code>circle.msh</code> file. As customary in wave-scattering problems, we will choose a mesh size that is proportional to wavelength:</p><pre><code class="language-julia hljs">name = joinpath(@__DIR__, &quot;circle.msh&quot;)
 gmsh_circle(; meshsize, order = gorder, name)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : Meshing curve 1 (Ellipse)
-Info    : Done meshing 1D (Wall 0.000224778s, CPU 0.00025s)
-Info    : 126 nodes 127 elements
+Info    : Done meshing 1D (Wall 0.000169556s, CPU 0.000175s)
+Info    : 63 nodes 64 elements
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
 Info    : [ 50%] Meshing surface 1 order 2
-Info    : Done meshing order 2 (Wall 0.00115121s, CPU 0.00115s)
+Info    : Done meshing order 2 (Wall 0.000593901s, CPU 0.000543s)
 Info    : Writing &#39;/home/lfaria/runner-integral-equations/_work/Inti.jl/Inti.jl/docs/build/examples/generated/circle.msh&#39;...
-Info    : Done writing &#39;/home/lfaria/runner-integral-equations/_work/Inti.jl/Inti.jl/docs/build/examples/generated/circle.msh&#39;</code></pre><p>We can now import the file and parse the mesh and domain information into <code>Inti.jl</code> using the <a href="../../../references/#Inti.import_mesh_from_gmsh_file"><code>import_mesh_from_gmsh_file</code></a> function:</p><pre><code class="language-julia hljs">Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 2)
+Info    : Done writing &#39;/home/lfaria/runner-integral-equations/_work/Inti.jl/Inti.jl/docs/build/examples/generated/circle.msh&#39;</code></pre><p>We can now import the file and parse the mesh and domain information into <code>Inti.jl</code> using the <a href="../../../references/#Inti.import_mesh_from_gmsh_file"><code>import_mesh_from_gmsh_file</code></a> function:</p><pre><code class="language-julia hljs">Inti.clear_entities!() # empty the entity cache
+Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 2)
 @show Ω</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Domain with 1 entity:
  EntityKey(2,1) --&gt; Inti.GeometricEntity with (dim,tag)=(2,1) and labels String[]</code></pre><pre><code class="language-julia hljs">@show msh</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Inti.LagrangeMesh{2, Float64} containing:
-	 126 elements of type Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 3, StaticArraysCore.SVector{2, Float64}}
+	 63 elements of type Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 3, StaticArraysCore.SVector{2, Float64}}
 	 1 elements of type StaticArraysCore.SVector{2, Float64}</code></pre><p>The code above will parse all entities in the <code>name</code> of dimension <code>2</code> as a <a href="../../../references/#Inti.Domain"><code>Domain</code></a>, and also import the underlying mesh (that, in this case, is projected into two dimensions by ignoring the third component). Note that in the example above, <code>Ω</code> is a two-dimensional domain containing a single <code>GmshEntity</code> which represents the disk. To extract the boundary <span>$\Gamma = \partial \Omega$</span>, we can use the <a href="../../../references/#Inti.boundary-Tuple{Inti.Domain}"><code>boundary</code></a> function:</p><pre><code class="language-julia hljs">Γ = Inti.boundary(Ω)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Domain with 1 entity:
  EntityKey(1,1) --&gt; Inti.GeometricEntity with (dim,tag)=(1,1) and labels String[]</code></pre><p>To solve our boundary integral equation usign a Nyström method, we actually need a quadrature of our curve/surface (and possibly the normal vectors at the quadrature nodes). Once a mesh is available, creating a quadrature object can be done via the <a href="../../../references/#Inti.Quadrature"><code>Quadrature</code></a> constructor, which requires passing a mesh the domain that one wishes to generate a quadrature for:</p><pre><code class="language-julia hljs">Γ = Inti.boundary(Ω)
-Γ_msh = view(msh,Γ)
-Q = Inti.Quadrature(Γ_msh; qorder)</code></pre><div class="admonition is-success"><header class="admonition-header">Views of a mesh</header><div class="admonition-body"><p>In <code>Inti.jl</code>, you can use domain to create a <em>view</em> of a mesh containing <em>only   the elements in the domain</em>. For example <code>view(msh,Γ)</code> will return an   <code>SubMesh</code> type that you can use to iterate over the elements in the boundary   of the disk without actually creating a new mesh. You can use <code>msh[Γ]</code>,   or <code>collect(view(msh,Γ))</code> to create a new mesh containing <em>only</em> the   elements and nodes in <code>Γ</code>.</p></div></div><p>The object <code>Q</code> now contains a quadrature (of order <code>4</code>) that can be used to solve a boundary integral equation on <code>Γ</code>. As a sanity check, let&#39;s make sure integrating the function <code>x-&gt;1</code> over <code>Q</code> gives an approximation to the perimeter:</p><pre><code class="language-julia hljs">Inti.integrate(x -&gt; 1, Q) - 2π</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-4.046297252813247e-8</code></pre><p>With the <a href="../../../references/#Inti.Quadrature"><code>Quadrature</code></a> constructed, we now can define discrete approximation to the integral operators <span>$\mathrm{S}$</span> and <span>$\mathrm{D}$</span> as follows:</p><pre><code class="language-julia hljs">pde = Inti.Helmholtz(; k, dim = 2)
+Γ_msh = view(msh, Γ)
+Q = Inti.Quadrature(Γ_msh; qorder)</code></pre><div class="admonition is-success"><header class="admonition-header">Views of a mesh</header><div class="admonition-body"><p>In <code>Inti.jl</code>, you can use domain to create a <em>view</em> of a mesh containing <em>only   the elements in the domain</em>. For example <code>view(msh,Γ)</code> will return an   <code>SubMesh</code> type that you can use to iterate over the elements in the boundary   of the disk without actually creating a new mesh. You can use <code>msh[Γ]</code>,   or <code>collect(view(msh,Γ))</code> to create a new mesh containing <em>only</em> the   elements and nodes in <code>Γ</code>.</p></div></div><p>The object <code>Q</code> now contains a quadrature (of order <code>4</code>) that can be used to solve a boundary integral equation on <code>Γ</code>. As a sanity check, let&#39;s make sure integrating the function <code>x-&gt;1</code> over <code>Q</code> gives an approximation to the perimeter:</p><pre><code class="language-julia hljs">Inti.integrate(x -&gt; 1, Q) - 2π</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-6.470135645031405e-7</code></pre><p>With the <a href="../../../references/#Inti.Quadrature"><code>Quadrature</code></a> constructed, we now can define discrete approximation to the integral operators <span>$\mathrm{S}$</span> and <span>$\mathrm{D}$</span> as follows:</p><pre><code class="language-julia hljs">pde = Inti.Helmholtz(; k, dim = 2)
 S, D = Inti.single_double_layer(;
     pde,
     target = Q,
     source = Q,
     compression = (method = :none,),
     correction = (method = :dim, maxdist = 5 * meshsize),
-)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(ComplexF64[0.0026533898319544063 + 0.001046580456233058im 0.0034805563354252346 + 0.0032324412022761476im … 0.002728527958667407 + 0.0032078950572651836im 0.0019334135174574499 + 0.0010450354339482596im; 0.0011545531921793863 + 0.0010325223843597265im 0.006032767168679149 + 0.0032758934237525524im … 0.0013770109102204577 + 0.003060946159081764im 0.0008712272296526036 + 0.0010242905940836882im; … ; 0.0008712272296525736 + 0.0010242905940836655im 0.0013770109102204337 + 0.0030609461590817106im … 0.0060327671693308944 + 0.0032758934235157674im 0.001154553191924856 + 0.0010325223844565206im; 0.0019334135174574084 + 0.0010450354339482373im 0.002728527958667395 + 0.0032078950572651294im … 0.0034805563360414274 + 0.0032324412019255925im 0.0026533898317172536 + 0.0010465804563710654im], ComplexF64[-0.0003474088196428925 - 3.193002564887076e-6im -0.0010620563104253974 - 3.131075823027224e-5im … -0.0011222145701332614 - 6.768044866564956e-5im -0.0003359104404731084 - 9.862558353014844e-7im; -0.00034613794167411444 - 1.2543754208272612e-5im -0.0010583575934607512 - 2.492458454595087e-6im … -0.0012110309450514734 - 0.00021139187505503417im -0.00035862936064174657 - 2.162883701467664e-5im; … ; -0.00035862936064362825 - 2.1628837014790774e-5im -0.0012110309450540577 - 0.00021139187505548522im … -0.0010583575850597068 - 2.492467485666184e-6im -0.0003461379450700503 - 1.2543750617783251e-5im; -0.0003359104405011361 - 9.862558353837758e-7im -0.0011222145701392213 - 6.768044866600695e-5im … -0.0010620563038948045 - 3.131077067524894e-5im -0.0003474088222003963 - 3.192997687697826e-6im])</code></pre><p>There are two well-known difficulties related to the discretization of the boundary integral operators <span>$S$</span> and <span>$D$</span>:</p><ul><li>The kernel of the integral operator is not smooth, and thus specialized quadrature rules are required to accurately approximate the matrix entries for which the target and source point lie <em>close</em> (relative to some scale) to each other.</li><li>The underlying matrix is dense, and thus the storage and computational cost of the operator is prohibitive for large problems unless acceleration techniques such as <em>Fast Multipole Methods</em> or <em>Hierarchical Matrices</em> are employed.</li></ul><p><code>Inti.jl</code> tries to provide a modular and transparent interface for dealing with both of these difficulties, where the general approach for solving a BIE will be to first construct a (possible compressed) naive representation of the integral operator where singular and nearly-singular integrals are ignored, followed by a the creation of a (sparse) correction intended to account for such singular interactions. See <a href="../../../references/#Inti.single_double_layer-Tuple{}"><code>single_double_layer</code></a> for more details on the various options available.</p><p>We can now combine <code>S</code> and <code>D</code> to form the combined-field operator:</p><pre><code class="language-julia hljs">using LinearAlgebra
-L = I / 2 + D - im * k * S</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">630×630 Matrix{ComplexF64}:
-     0.525956-0.0666902im    …    0.0259287-0.048593im
-     0.025604-0.0290296im         0.0253846-0.021918im
-    0.0236132-0.00782656im        0.0231248-0.00639229im
-     0.020117+0.000803893im       0.0194109+0.00259713im
-    0.0173648+0.006155im          0.0165565+0.0065015im
-    0.0165566+0.00650158im   …    0.0157322+0.00737868im
-    0.0134085+0.00941233im        0.0125253+0.0100405im
-   0.00800312+0.0122571im        0.00709557+0.0125237im
-   0.00266767+0.0130468im        0.00182098+0.0129989im
- -0.000378962+0.0126372im       -0.00114971+0.0124229im
+)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(ComplexF64[0.005306268572510223 + 0.0020953808664248012im 0.006967210011452582 + 0.006462524727698027im … 0.005455754451723189 + 0.006415780375258497im 0.003868112849528189 + 0.002091180485627494im; 0.0023111327769694302 + 0.0020662383601504786im 0.012062660370151934 + 0.006551557794426443im … 0.002752905482995407 + 0.006121761154496977im 0.0017429459395478164 + 0.0020496447288890257im; … ; 0.0017429459395477778 + 0.0020496447288889975im 0.0027529054829953754 + 0.0061217611544969065im … 0.012062660370242654 + 0.006551557794317812im 0.002311132776936814 + 0.002066238360194443im; 0.003868112849528137 + 0.002091180485627466im 0.005455754451723174 + 0.006415780375258426im … 0.006967210011005856 + 0.006462524727665662im 0.005306268572682765 + 0.0020953808664408435im], ComplexF64[-0.0007159646357596954 - 1.6358953708978783e-5im -0.0020610555806409372 - 3.709258185885402e-5im … -0.0022430136043976204 - 0.0001353526552179253im -0.0006770858228474637 - 1.9902443094022552e-6im; -0.0006831945232874564 - 2.187864660796506e-5im -0.0021375961876552 - 1.3050043700996715e-5im … -0.002421679648786967 - 0.0004228953560894282im -0.000718995525740438 - 4.338714366599218e-5im; … ; -0.0007189955257412145 - 4.3387143666039904e-5im -0.002421679648787142 - 0.0004228953560894587im … -0.002137596184912499 - 1.3050042585661258e-5im -0.0006831945243684123 - 2.187864701777032e-5im; -0.0006770858228732805 - 1.990244309478142e-6im -0.0022430136043998174 - 0.00013535265521805517im … -0.0020610555829069996 - 3.709257931806199e-5im -0.000715964634905485 - 1.635895466116465e-5im])</code></pre><p>There are two well-known difficulties related to the discretization of the boundary integral operators <span>$S$</span> and <span>$D$</span>:</p><ul><li>The kernel of the integral operator is not smooth, and thus specialized quadrature rules are required to accurately approximate the matrix entries for which the target and source point lie <em>close</em> (relative to some scale) to each other.</li><li>The underlying matrix is dense, and thus the storage and computational cost of the operator is prohibitive for large problems unless acceleration techniques such as <em>Fast Multipole Methods</em> or <em>Hierarchical Matrices</em> are employed.</li></ul><p><code>Inti.jl</code> tries to provide a modular and transparent interface for dealing with both of these difficulties, where the general approach for solving a BIE will be to first construct a (possible compressed) naive representation of the integral operator where singular and nearly-singular integrals are ignored, followed by a the creation of a (sparse) correction intended to account for such singular interactions. See <a href="../../../references/#Inti.single_double_layer-Tuple{}"><code>single_double_layer</code></a> for more details on the various options available.</p><p>We can now combine <code>S</code> and <code>D</code> to form the combined-field operator:</p><pre><code class="language-julia hljs">using LinearAlgebra
+L = I / 2 + D - im * k * S</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">315×315 Matrix{ComplexF64}:
+     0.525615-0.0666969im    …    0.0256015-0.0486101im
+    0.0252819-0.0290644im         0.0250376-0.0219459im
+    0.0232344-0.0079231im          0.022736-0.00650406im
+    0.0197273+0.000577423im       0.0190164+0.0023525im
+    0.0170367+0.00580127im        0.0161884+0.00616371im
+    0.0161892+0.00616435im   …    0.0153755+0.00701557im
+    0.0130947+0.00898138im        0.0122301+0.00958488im
+   0.00783753+0.0116953im        0.00696029+0.0119445im
+   0.00271097+0.012413im         0.00190265+0.0123603im
+ -0.000188998+0.0120005im       -0.00091916+0.011791im
              ⋮               ⋱  
-   0.00182098+0.0129989im        0.00266767+0.0130468im
-   0.00709557+0.0125237im        0.00800312+0.0122571im
-    0.0125253+0.0100405im         0.0134085+0.00941233im
-    0.0157322+0.00737868im        0.0165566+0.00650158im
-    0.0165565+0.0065015im    …    0.0173648+0.006155im
-    0.0194109+0.00259713im         0.020117+0.000803893im
-    0.0231248-0.00639229im        0.0236132-0.00782656im
-    0.0253846-0.021918im           0.025604-0.0290296im
-    0.0259287-0.048593im           0.525956-0.0666902im</code></pre><p>where <code>I</code> is the identity matrix. Assuming an incident field along the <span>$x_1$</span> direction of the form <span>$u_i =e^{ikx_1}$</span>, the right-hand side of the equation can be construted using:</p><pre><code class="language-julia hljs">uᵢ = x -&gt; exp(im * k * x[1]) # plane-wave incident field
+   0.00190265+0.0123603im        0.00271097+0.012413im
+   0.00696029+0.0119445im        0.00783753+0.0116953im
+    0.0122301+0.00958488im        0.0130947+0.00898138im
+    0.0153755+0.00701557im        0.0161892+0.00616435im
+    0.0161884+0.00616371im   …    0.0170367+0.00580127im
+    0.0190164+0.0023525im         0.0197273+0.000577423im
+     0.022736-0.00650406im        0.0232344-0.0079231im
+    0.0250376-0.0219459im         0.0252819-0.0290644im
+    0.0256015-0.0486101im          0.525615-0.0666969im</code></pre><p>where <code>I</code> is the identity matrix. Assuming an incident field along the <span>$x_1$</span> direction of the form <span>$u_i =e^{ikx_1}$</span>, the right-hand side of the equation can be construted using:</p><pre><code class="language-julia hljs">uᵢ = x -&gt; exp(im * k * x[1]) # plane-wave incident field
 rhs = map(Q) do q
     x = q.coords
     return -uᵢ(x)
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">630-element Vector{ComplexF64}:
- -0.9999999998227967 + 1.882569028297627e-5im
- -0.9999991182591593 + 0.0013279611831148279im
- -0.9999694887615413 + 0.007811628894255199im
- -0.9998061279873904 + 0.01969026253917802im
- -0.9995580452141599 + 0.029727331660401958im
- -0.9994624611177755 + 0.032783971943606605im
- -0.9989675518228854 + 0.04542940022706338im
-  -0.997531641049351 + 0.07021841001752205im
- -0.9949551167178109 + 0.10032106317741694im
- -0.9925849060791077 + 0.12155329787352154im
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">315-element Vector{ComplexF64}:
+ -0.9999999992656585 + 3.8323400312725004e-5im
+ -0.9999964647582099 + 0.002659035742951587im
+ -0.9998779948375077 + 0.015620353380278828im
+ -0.9992253630323544 + 0.03935319393466633im
+ -0.9982347259260077 + 0.059392187663262944im
+ -0.9978530659478186 + 0.0654924329868605im
+ -0.9958788311536455 + 0.09069373550609117im
+ -0.9901662593189073 + 0.13989560002516985im
+ -0.9799538336956448 + 0.19922470686440613im
+  -0.970592670563311 + 0.24072778786168442im
                      ⋮
- -0.9949551167178109 + 0.10032106317741694im
- -0.9975316410493507 + 0.0702184100175256im
- -0.9989675518228854 + 0.04542940022706338im
- -0.9994624611177754 + 0.03278397194361015im
-   -0.99955804521416 + 0.02972733166039841im
- -0.9998061279873905 + 0.01969026253917447im
- -0.9999694887615413 + 0.007811628894255199im
- -0.9999991182591593 + 0.0013279611831183806im
- -0.9999999998227967 + 1.882569028297627e-5im</code></pre><div class="admonition is-info"><header class="admonition-header">Iterating over a quadrature</header><div class="admonition-body"><p>In computing <code>rhs</code> above, we used <code>map</code> to evaluate the incident field at   all quadrature nodes. When iterating over <code>Q</code>, the iterator returns a   <a href="../../../references/#Inti.QuadratureNode"><code>QuadratureNode</code></a>, and not simply the   <em>coordinate</em> of the quadrature node. This is so that you can access   additional information, such as the <code>normal</code> vector, at the quadrature node.</p></div></div><p>We can now solve the integral equation using e.g. the backslash operator:</p><pre><code class="language-julia hljs">σ = L \ rhs</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">630-element Vector{ComplexF64}:
-  -1.018224623658088 - 0.1179495417054391im
-  -1.017721645880051 - 0.11396001840256098im
- -1.0152514769217105 - 0.09449734277559355im
- -1.0108152841516322 - 0.060098901039623065im
- -1.0071510545955051 - 0.03225806272810065im
- -1.0060496638984289 - 0.023996053564489306im
- -1.0015611317897033 + 0.009143388995397156im
- -0.9930480665660066 + 0.06947515896135675im
- -0.9831322216901194 + 0.13513630543780397im
- -0.9763537636343438 + 0.17688238336522344im
+ -0.9799538336956445 + 0.19922470686440785im
+ -0.9901662593189069 + 0.13989560002517337im
+ -0.9958788311536454 + 0.09069373550609294im
+ -0.9978530659478184 + 0.06549243298686228im
+ -0.9982347259260075 + 0.05939218766326649im
+ -0.9992253630323544 + 0.03935319393466811im
+ -0.9998779948375077 + 0.015620353380282379im
+ -0.9999964647582099 + 0.002659035742951587im
+ -0.9999999992656585 + 3.832340031627772e-5im</code></pre><div class="admonition is-info"><header class="admonition-header">Iterating over a quadrature</header><div class="admonition-body"><p>In computing <code>rhs</code> above, we used <code>map</code> to evaluate the incident field at   all quadrature nodes. When iterating over <code>Q</code>, the iterator returns a   <a href="../../../references/#Inti.QuadratureNode"><code>QuadratureNode</code></a>, and not simply the   <em>coordinate</em> of the quadrature node. This is so that you can access   additional information, such as the <code>normal</code> vector, at the quadrature node.</p></div></div><p>We can now solve the integral equation using e.g. the backslash operator:</p><pre><code class="language-julia hljs">σ = L \ rhs</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">315-element Vector{ComplexF64}:
+ -0.9824698078752978 - 0.12532848301821714im
+ -0.9830295612915889 - 0.12026507252422096im
+ -0.9855749459687041 - 0.09541410648192775im
+ -0.9892832588924064 - 0.05076552998778128im
+ -0.9914725866067228 - 0.013904239028519116im
+ -0.9919702203309451 - 0.0028346291426532833im
+ -0.9932036428598631 + 0.0421613484869898im
+ -0.9918754595790851 + 0.12666377222704578im
+ -0.9839092160832384 + 0.22283815713408936im
+  -0.974325794911183 + 0.2865050243107987im
                      ⋮
- -0.9831322216901237 + 0.13513630543780575im
- -0.9930480665660052 + 0.06947515896136064im
- -1.0015611317897066 + 0.009143388995400875im
-  -1.006049663898432 - 0.023996053564486183im
- -1.0071510545955051 - 0.03225806272809752im
-  -1.010815284151634 - 0.0600989010396219im
- -1.0152514769217098 - 0.09449734277559987im
- -1.0177216458800522 - 0.11396001840254857im
- -1.0182246236580859 - 0.11794954170543444im</code></pre><p>The variable <code>σ</code> contains the value of the approximate density at the quadrature nodes. To reconstruct a continuous approximation to the solution, we can use <a href="../../../references/#Inti.single_double_layer_potential-Tuple{}"><code>single_double_layer_potential</code></a> to obtain the single- and double-layer potentials, and then combine them as follows:</p><pre><code class="language-julia hljs">𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+ -0.9839092160832386 + 0.22283815713409116im
+ -0.9918754595790867 + 0.12666377222705472im
+  -0.993203642859865 + 0.042161348486987466im
+ -0.9919702203309456 - 0.0028346291426526726im
+ -0.9914725866067209 - 0.013904239028520046im
+ -0.9892832588924082 - 0.050765529987781666im
+ -0.9855749459687038 - 0.09541410648192555im
+  -0.983029561291592 - 0.12026507252422797im
+ -0.9824698078753006 - 0.12532848301821944im</code></pre><p>The variable <code>σ</code> contains the value of the approximate density at the quadrature nodes. To reconstruct a continuous approximation to the solution, we can use <a href="../../../references/#Inti.single_double_layer_potential-Tuple{}"><code>single_double_layer_potential</code></a> to obtain the single- and double-layer potentials, and then combine them as follows:</p><pre><code class="language-julia hljs">𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
 uₛ   = x -&gt; 𝒟[σ](x) - im * k * 𝒮[σ](x)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">#10 (generic function with 1 method)</code></pre><p>The variable <code>uₛ</code> is an anonymous/lambda function representing the approximate scattered field.</p><p>To assess the accuracy of the solution, we can compare it to the exact solution (obtained by separation of variables in polar coordinates):</p><pre><code class="language-julia hljs">using SpecialFunctions # for bessel functions
 
 function circle_helmholtz_soundsoft(pt; radius = 1, k, θin)
@@ -136,7 +137,7 @@ er = maximum(0:0.01:2π) do θ
     x = (R * cos(θ), R * sin(θ))
     return abs(uₛ(x) - uₑ(x))
 end
-@info &quot;maximum error = $er&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: maximum error = 1.8832759999564553e-7</code></pre><p>As we can see, the error is quite small! To visualize the solution in this simple (2d) example, we could simply use <code>Makie</code>:</p><pre><code class="language-julia hljs">using CairoMakie
+@info &quot;maximum error = $er&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: maximum error = 1.5016309867134378e-6</code></pre><p>As we can see, the error is quite small! To visualize the solution in this simple (2d) example, we could simply use <code>Makie</code>:</p><pre><code class="language-julia hljs">using CairoMakie
 xx = yy = range(-4; stop = 4, length = 200)
 vals = map(pt -&gt; norm(pt) &gt; 1 ? real(uₛ(pt) + uᵢ(pt)) : NaN, Iterators.product(xx, yy))
 fig, ax, hm = heatmap(
@@ -155,16 +156,17 @@ lines!(
     linewidth = 4,
 )
 Colorbar(fig[1, 2], hm)
-fig</code></pre><img src="ae1c180c.png" alt="Example block output"/><p>More complex problems, however, may require a mesh-based visualization, where we would first need to create a mesh for the places where we want to visualize the solution. In the 3D example that follows, we will use the <code>Gmsh</code> API to create a <em>view</em> (in the sense of <em>Gmsh</em>) of the solution on a punctured plane.</p><h2 id="helmholtz-scattering-3d"><a class="docs-heading-anchor" href="#helmholtz-scattering-3d">Three-dimensional scattering</a><a id="helmholtz-scattering-3d-1"></a><a class="docs-heading-anchor-permalink" href="#helmholtz-scattering-3d" title="Permalink"></a></h2><p>We now consider the same problem in 3D. Unlike the 2D case, assembling dense matrix representations of the integral operators quickly becomes unfeasiable as the problem size increases. <code>Inti</code> adds support for compressing the underlying linear operators by wrapping external libraries. In this example, we will rely on <a href="https://github.com/WaveProp/HMatrices.jl"><code>HMatrices.jl</code></a> to handle the compression.</p><p>The visualization is also more involved, and we will use instead the <code>Gmsh</code> API to create a view of the solution on a punctured plane. Let us begin by creating our domain containing both the sphere and the puctured plane where we will visualize the solution:</p><pre><code class="language-julia hljs">function gmsh_sphere(; meshsize, order = gorder, radius = 1, visualize = false, name)
+fig</code></pre><img src="867d2001.png" alt="Example block output"/><p>More complex problems, however, may require a mesh-based visualization, where we would first need to create a mesh for the places where we want to visualize the solution. In the 3D example that follows, we will use the <code>Gmsh</code> API to create a <em>view</em> (in the sense of <em>Gmsh</em>) of the solution on a punctured plane.</p><h2 id="helmholtz-scattering-3d"><a class="docs-heading-anchor" href="#helmholtz-scattering-3d">Three-dimensional scattering</a><a id="helmholtz-scattering-3d-1"></a><a class="docs-heading-anchor-permalink" href="#helmholtz-scattering-3d" title="Permalink"></a></h2><p>We now consider the same problem in 3D. Unlike the 2D case, assembling dense matrix representations of the integral operators quickly becomes unfeasiable as the problem size increases. <code>Inti</code> adds support for compressing the underlying linear operators by wrapping external libraries. In this example, we will rely on <a href="https://github.com/WaveProp/HMatrices.jl"><code>HMatrices.jl</code></a> to handle the compression.</p><p>The visualization is also more involved, and we will use instead the <code>Gmsh</code> API to create a view of the solution on a punctured plane. Let us begin by creating our domain containing both the sphere and the puctured plane where we will visualize the solution:</p><pre><code class="language-julia hljs">function gmsh_sphere(; meshsize, order = gorder, radius = 1, visualize = false, name)
     gmsh.initialize()
     gmsh.model.add(&quot;sphere-scattering&quot;)
     gmsh.option.setNumber(&quot;Mesh.MeshSizeMax&quot;, meshsize)
     gmsh.option.setNumber(&quot;Mesh.MeshSizeMin&quot;, meshsize)
     sphere_tag = gmsh.model.occ.addSphere(0, 0, 0, radius)
-    xl,yl,zl = -2*radius,-2*radius,0
-    Δx, Δy = 4*radius, 4*radius
+    xl, yl, zl = -2 * radius, -2 * radius, 0
+    Δx, Δy = 4 * radius, 4 * radius
     rectangle_tag = gmsh.model.occ.addRectangle(xl, yl, zl, Δx, Δy)
-    outDimTags, _ = gmsh.model.occ.cut([(2, rectangle_tag)], [(3, sphere_tag)], -1, true, false)
+    outDimTags, _ =
+        gmsh.model.occ.cut([(2, rectangle_tag)], [(3, sphere_tag)], -1, true, false)
     gmsh.model.occ.synchronize()
     gmsh.model.addPhysicalGroup(3, [sphere_tag], -1, &quot;omega&quot;)
     gmsh.model.addPhysicalGroup(2, [dt[2] for dt in outDimTags], -1, &quot;sigma&quot;)
@@ -173,34 +175,34 @@ fig</code></pre><img src="ae1c180c.png" alt="Example block output"/><p>More comp
     visualize &amp;&amp; gmsh.fltk.run()
     gmsh.option.setNumber(&quot;Mesh.SaveAll&quot;, 1) # otherwise only the physical groups are saved
     gmsh.write(name)
-    gmsh.finalize()
+    return gmsh.finalize()
 end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">gmsh_sphere (generic function with 1 method)</code></pre><p>As before, lets write a file with our mesh, and import it into <code>Inti.jl</code>:</p><pre><code class="language-julia hljs">name = joinpath(@__DIR__, &quot;sphere.msh&quot;)
-gmsh_sphere(; meshsize, order = gorder, name, visualize=false)
+gmsh_sphere(; meshsize, order = gorder, name, visualize = false)
 Inti.clear_entities!()
 Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 3)
 Γ = Inti.boundary(Ω)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Domain with 1 entity:
- EntityKey(2,1) --&gt; Inti.GeometricEntity with (dim,tag)=(2,1) and labels String[]</code></pre><p>Note that for this example we relied instead on the labels to the entities in order to extract the relevant domains <code>Ω</code> and <code>Σ</code>. We can now create a quadrature as before</p><pre><code class="language-julia hljs">Γ_msh = view(msh,Γ)
-Q = Inti.Quadrature(Γ_msh; qorder = 4)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">73080-element Inti.Quadrature{3, Float64}:
- Inti.QuadratureNode{3, Float64}([-0.4734451532020426, 0.535465971849056, 0.6993752963210281], 0.00022827493014403546, [-0.4734404030373813, 0.5354682928525197, 0.6993767883776314])
- Inti.QuadratureNode{3, Float64}([-0.4611085010665634, 0.5440057944822501, 0.7010253763431926], 0.0002282772111988231, [-0.4611114574325287, 0.5440003988376322, 0.7010276669924994])
- Inti.QuadratureNode{3, Float64}([-0.4586422125538417, 0.532385316907492, 0.7114865551254731], 0.0002282745145403388, [-0.4586440428829509, 0.5323886962994576, 0.71148290069442])
- Inti.QuadratureNode{3, Float64}([-0.44488472221067343, 0.5410781324166787, 0.7136609706691894], 0.00011238480450969293, [-0.4448866905813992, 0.5410783735474494, 0.7136596010863843])
- Inti.QuadratureNode{3, Float64}([-0.47142788108816197, 0.5228256512482473, 0.7102176039767786], 0.0001123666112702614, [-0.47142653887933816, 0.5228284488632722, 0.7102164680570796])
- Inti.QuadratureNode{3, Float64}([-0.47664517055460165, 0.5476767047943127, 0.6876478388106608], 0.00011238811693075664, [-0.4766435268715887, 0.5476763241388801, 0.6876493236157055])
- Inti.QuadratureNode{3, Float64}([0.7734795657864142, 0.6289394711332889, -0.07851356914391361], 0.00029116546114445755, [0.7734761675530794, 0.6289430347773162, -0.0785192793681933])
- Inti.QuadratureNode{3, Float64}([0.7610689505541219, 0.643030968619001, -0.08535285859482458], 0.0002911670040174441, [0.7610738733994227, 0.6430249058307524, -0.08535531448100526])
- Inti.QuadratureNode{3, Float64}([0.7685804950624229, 0.6324434476241344, -0.09643233834375013], 0.00029116798416590697, [0.7685793040355008, 0.632446212228572, -0.0964242814131237])
- Inti.QuadratureNode{3, Float64}([0.755114819610695, 0.6472177964853167, -0.10445404272431782], 0.00014335753210647562, [0.7551165504837651, 0.6472161688846357, -0.10445202688217217])
+ EntityKey(2,1) --&gt; Inti.GeometricEntity with (dim,tag)=(2,1) and labels String[]</code></pre><p>Note that for this example we relied instead on the labels to the entities in order to extract the relevant domains <code>Ω</code> and <code>Σ</code>. We can now create a quadrature as before</p><pre><code class="language-julia hljs">Γ_msh = view(msh, Γ)
+Q = Inti.Quadrature(Γ_msh; qorder)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">18912-element Inti.Quadrature{3, Float64}:
+ Inti.QuadratureNode{3, Float64}([-0.05373189629208194, -0.01161698092548756, 0.9984868469648277], 0.00118579869363884, [-0.05361621936255531, -0.011608545081622965, 0.9984941375403034])
+ Inti.QuadratureNode{3, Float64}([-0.03492074140168075, 0.022170510743492314, 0.9991427196326353], 0.0011855731059084692, [-0.034983469901105964, 0.02212443248555452, 0.9991429659067167])
+ Inti.QuadratureNode{3, Float64}([-0.031761986002829895, -0.036601557303946465, 0.998823824836464], 0.001185610720355747, [-0.03183434750584738, -0.03656404879293807, 0.998824130993412])
+ Inti.QuadratureNode{3, Float64}([-0.011026214248489027, -0.002388771564555545, 0.9999355892140249], 0.0005832144771935264, [-0.01109284426595146, -0.0023958947761847133, 0.9999356021736162])
+ Inti.QuadratureNode{3, Float64}([-0.05121457271448638, -0.07482546995496009, 0.9958790414559278], 0.0005850030694509387, [-0.051291538792827024, -0.074793521145121, 0.995879062558792])
+ Inti.QuadratureNode{3, Float64}([-0.05800197296119256, 0.051213669467410614, 0.9970003700445476], 0.0005847076127932931, [-0.05806246091508734, 0.05116751192716394, 0.9970008206394153])
+ Inti.QuadratureNode{3, Float64}([-0.6501988722497838, 0.6489371883647597, -0.39511992062859846], 0.0012162373112223446, [-0.6501943511110959, 0.6489742507633552, -0.39506926940647086])
+ Inti.QuadratureNode{3, Float64}([-0.6364728535064232, 0.6764184717038679, -0.3706189601325529], 0.0012162993738145708, [-0.6365276209999458, 0.676366601167322, -0.3706221910915678])
+ Inti.QuadratureNode{3, Float64}([-0.6618619654037546, 0.659614321877928, -0.3561540062979435], 0.0012162773870343711, [-0.6618160784579561, 0.6596348045083624, -0.35620415912190945])
+ Inti.QuadratureNode{3, Float64}([-0.6472076196112453, 0.6880839892521321, -0.32811759018236186], 0.0005994689219439917, [-0.6472072000678947, 0.6880744991728245, -0.32814070727104694])
  ⋮
- Inti.QuadratureNode{3, Float64}([0.034067641593554764, -0.16002573411326476, -0.9865247643701125], 8.20647263134504e-5, [0.03406991836219493, -0.16002411193650926, -0.9865249739675751])
- Inti.QuadratureNode{3, Float64}([0.036002266441425984, -0.11671210352210026, -0.9925130084961924], 8.206129444585203e-5, [0.03600407470296316, -0.11671410246326369, -0.9925127328608829])
- Inti.QuadratureNode{3, Float64}([0.017210899372837395, -0.13600255457969795, -0.9905589647583228], 8.203730244346247e-5, [0.017213882398977667, -0.13600279640515686, -0.9905588935660169])
- Inti.QuadratureNode{3, Float64}([0.05619733828769549, -0.1534652466014442, -0.9865546848466166], 0.0002959136958909321, [0.056194381820372286, -0.15345847040868896, -0.9865559737347152])
- Inti.QuadratureNode{3, Float64}([0.05710370692657562, -0.13329539921512945, -0.9894298286206706], 0.00029591662740571724, [0.05709773400218833, -0.13330172912497532, -0.9894293798872698])
- Inti.QuadratureNode{3, Float64}([0.041990309001138384, -0.13984299139621567, -0.9892828896307114], 0.0002959171267916231, [0.04199921128883824, -0.1398434710852142, -0.9892825025471512])
- Inti.QuadratureNode{3, Float64}([0.042232245877574626, -0.11798127015072901, -0.9921173137587807], 0.00014570264419055243, [0.04223316304507883, -0.11798403388678026, -0.992116992943378])
- Inti.QuadratureNode{3, Float64}([0.04029520371281266, -0.16128981833989092, -0.9860840763902908], 0.0001456792840080544, [0.04029706304097866, -0.16128623874390913, -0.9860846291785073])
- Inti.QuadratureNode{3, Float64}([0.07273090663679406, -0.1472413395572331, -0.986422891227807], 0.00014567530181267972, [0.07272682090560367, -0.14724025747826877, -0.9864233959607291])</code></pre><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>If you pass <code>visualize=true</code> to <code>gmsh_sphere</code>, it will open a window   with the current mode. This is done by calling <code>gmsh.fltk.run()</code>. Note   that the main julia thread will be blocked until the window is closed.</p></div></div><div class="admonition is-success"><header class="admonition-header">Writing/reading a mesh from disk</header><div class="admonition-body"><p>Writing and reading a mesh to/from disk can be time consuming. You can   avoid doing so by using <a href="../../../references/#Inti.import_mesh_from_gmsh_file"><code>import_mesh_from_gmsh_file</code></a>   and <a href="../../../references/#Inti.import_mesh_from_gmsh_model"><code>import_mesh_from_gmsh_model</code></a> functions on an   active <code>gmsh</code> model without writing it to disk.</p></div></div><p>We can now assemble the integral operators, indicating that we wish to compress them using hierarchical matrices:</p><pre><code class="language-julia hljs">using HMatrices
+ Inti.QuadratureNode{3, Float64}([0.04173204513767651, 0.10352426085097419, -0.9937504616364803], 0.0004546832921112443, [0.04175454058409401, 0.10348630374445132, -0.9937540657918954])
+ Inti.QuadratureNode{3, Float64}([0.013457244073241838, 0.020212409648456976, -0.9997041927057123], 0.0004558919568156919, [0.013497744923169725, 0.020193131341377655, -0.9997049806460999])
+ Inti.QuadratureNode{3, Float64}([0.09127625501920729, 0.0963237458107087, -0.9911551197925532], 0.0004552156761508572, [0.09126485161296417, 0.09628825895556206, -0.9911605813627631])
+ Inti.QuadratureNode{3, Float64}([-0.09472235769872936, 0.0037906541320694154, 0.9954949077430773], 0.0014663761087425574, [-0.09463490026160616, 0.0037351466837836633, 0.9955050398324092])
+ Inti.QuadratureNode{3, Float64}([-0.06823846640761834, -0.016072900864404965, 0.997538140434608], 0.0014665415500284312, [-0.0683714746831031, -0.016085143364338632, 0.9975302549860864])
+ Inti.QuadratureNode{3, Float64}([-0.09149307527427684, -0.05497852189864191, 0.9942848077678527], 0.001466260669537865, [-0.0914363491248057, -0.05491220586319114, 0.9942957526339761])
+ Inti.QuadratureNode{3, Float64}([-0.06348859835074336, -0.07859956320952034, 0.9948807402366961], 0.0007228729658631738, [-0.06346743870697612, -0.0785449572276266, 0.9948882218209674])
+ Inti.QuadratureNode{3, Float64}([-0.12034709149517235, -0.036046165440201866, 0.9920760981846977], 0.0007215587484558297, [-0.12027522845803366, -0.036031213168334845, 0.9920864987978546])
+ Inti.QuadratureNode{3, Float64}([-0.07030708968947921, 0.04743830129791589, 0.9963949471865234], 0.0007237797303682895, [-0.0702576617687401, 0.04740512889398982, 0.9964018339592383])</code></pre><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>If you pass <code>visualize=true</code> to <code>gmsh_sphere</code>, it will open a window   with the current mode. This is done by calling <code>gmsh.fltk.run()</code>. Note   that the main julia thread will be blocked until the window is closed.</p></div></div><div class="admonition is-success"><header class="admonition-header">Writing/reading a mesh from disk</header><div class="admonition-body"><p>Writing and reading a mesh to/from disk can be time consuming. You can   avoid doing so by using <a href="../../../references/#Inti.import_mesh_from_gmsh_file"><code>import_mesh_from_gmsh_file</code></a>   and <a href="../../../references/#Inti.import_mesh_from_gmsh_model"><code>import_mesh_from_gmsh_model</code></a> functions on an   active <code>gmsh</code> model without writing it to disk.</p></div></div><p>We can now assemble the integral operators, indicating that we wish to compress them using hierarchical matrices:</p><pre><code class="language-julia hljs">using HMatrices
 pde = Inti.Helmholtz(; k, dim = 3)
 S, D = Inti.single_double_layer(;
     pde,
@@ -208,44 +210,44 @@ S, D = Inti.single_double_layer(;
     source = Q,
     compression = (method = :hmatrix, tol = 1e-6),
     correction = (method = :dim,),
-)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(HMatrix of ComplexF64 with range 1:73080 × 1:73080
-	 number of nodes in tree: 74901
-	 number of leaves: 56176 (18768 admissible + 37408 full)
-	 min rank of sparse blocks : 5
-	 max rank of sparse blocks : 68
-	 min length of dense blocks : 1225
-	 max length of dense blocks : 1296
-	 min number of elements per leaf: 1225
-	 max number of elements per leaf: 20866624
-	 depth of tree: 11
-	 compression ratio: 22.257272
-, HMatrix of ComplexF64 with range 1:73080 × 1:73080
-	 number of nodes in tree: 74901
-	 number of leaves: 56176 (18768 admissible + 37408 full)
+)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(HMatrix of ComplexF64 with range 1:18912 × 1:18912
+	 number of nodes in tree: 18237
+	 number of leaves: 13678 (4310 admissible + 9368 full)
 	 min rank of sparse blocks : 7
-	 max rank of sparse blocks : 85
-	 min length of dense blocks : 1225
-	 max length of dense blocks : 1296
-	 min number of elements per leaf: 1225
-	 max number of elements per leaf: 20866624
-	 depth of tree: 11
-	 compression ratio: 18.623193
+	 max rank of sparse blocks : 42
+	 min length of dense blocks : 1296
+	 max length of dense blocks : 1369
+	 min number of elements per leaf: 1296
+	 max number of elements per leaf: 1397124
+	 depth of tree: 9
+	 compression ratio: 8.567452
+, HMatrix of ComplexF64 with range 1:18912 × 1:18912
+	 number of nodes in tree: 18237
+	 number of leaves: 13678 (4310 admissible + 9368 full)
+	 min rank of sparse blocks : 8
+	 max rank of sparse blocks : 48
+	 min length of dense blocks : 1296
+	 max length of dense blocks : 1369
+	 min number of elements per leaf: 1296
+	 max number of elements per leaf: 1397124
+	 depth of tree: 9
+	 compression ratio: 7.545484
 )</code></pre><p>Here is how much memory it would take to store the dense representation of these matrices:</p><pre><code class="language-julia hljs">mem = 2 * length(S) * 16 / 1e9 # 16 bytes per complex number, 1e9 bytes per GB, two matrices
-println(&quot;memory required to store S and D: $(mem) GB&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">memory required to store S and D: 170.9019648 GB</code></pre><p>Even for this simple example, the dense representation of the integral operators as matrix is already quite expensive!</p><div class="admonition is-info"><header class="admonition-header">Compression methods</header><div class="admonition-body"><p>It is worth mentioning that hierchical matrices are not the only way to   compress such integral operators, and may in fact not even be the best   for the problem at hand. For example, one could use a fast multipole   method (FMM), which has a much lighter memory footprint, and is also   faster to assemble. The main advantage of hierarchical matrices is that   they are purely algebraic, allowing for the use of <em>direct solver</em>.   Hierarchical matrices also tend to give a faster matrix-vector product   after the (offline) assembly stage.</p></div></div><p>We will use the generalized minimal residual (GMRES) iterative solver, for the linear system. This requires us to define a linear operator <code>L</code>, approximating the combined-field operator, that supports the matrix-vector product. In what follows we use <code>LinearMaps</code> to <em>lazily</em> assemble <code>L</code>:</p><pre><code class="language-julia hljs">using LinearMaps
-L = I / 2 + LinearMap(D) - im * k * LinearMap(S)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">73080×73080 LinearMaps.LinearCombination{ComplexF64} with 3 maps:
-  73080×73080 LinearMaps.ScaledMap{ComplexF64} with scale: -0.0 - 25.132741228718345im of
-    73080×73080 LinearMaps.WrappedMap{ComplexF64} of
-      73080×73080 HMatrix{ClusterTree{3, Float64}, ComplexF64}
-  73080×73080 LinearMaps.UniformScalingMap{Float64} with scaling factor: 0.5
-  73080×73080 LinearMaps.WrappedMap{ComplexF64} of
-    73080×73080 HMatrix{ClusterTree{3, Float64}, ComplexF64}</code></pre><p>Note that wrapping <code>S</code> and <code>D</code> in <code>LinearMap</code> allows for combining them in a <em>lazy</em> fashion. Alternatively, you can use e.g. <code>axpy!</code> to add two hierarchical matrices.</p><p>We can now solve the linear system using GMRES solver:</p><pre><code class="language-julia hljs">using IterativeSolvers
+println(&quot;memory required to store S and D: $(mem) GB&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">memory required to store S and D: 11.445239808 GB</code></pre><p>Even for this simple example, the dense representation of the integral operators as matrix is already quite expensive!</p><div class="admonition is-info"><header class="admonition-header">Compression methods</header><div class="admonition-body"><p>It is worth mentioning that hierchical matrices are not the only way to   compress such integral operators, and may in fact not even be the best   for the problem at hand. For example, one could use a fast multipole   method (FMM), which has a much lighter memory footprint, and is also   faster to assemble. The main advantage of hierarchical matrices is that   they are purely algebraic, allowing for the use of <em>direct solver</em>.   Hierarchical matrices also tend to give a faster matrix-vector product   after the (offline) assembly stage.</p></div></div><p>We will use the generalized minimal residual (GMRES) iterative solver, for the linear system. This requires us to define a linear operator <code>L</code>, approximating the combined-field operator, that supports the matrix-vector product. In what follows we use <code>LinearMaps</code> to <em>lazily</em> assemble <code>L</code>:</p><pre><code class="language-julia hljs">using LinearMaps
+L = I / 2 + LinearMap(D) - im * k * LinearMap(S)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">18912×18912 LinearMaps.LinearCombination{ComplexF64} with 3 maps:
+  18912×18912 LinearMaps.ScaledMap{ComplexF64} with scale: -0.0 - 12.566370614359172im of
+    18912×18912 LinearMaps.WrappedMap{ComplexF64} of
+      18912×18912 HMatrix{ClusterTree{3, Float64}, ComplexF64}
+  18912×18912 LinearMaps.UniformScalingMap{Float64} with scaling factor: 0.5
+  18912×18912 LinearMaps.WrappedMap{ComplexF64} of
+    18912×18912 HMatrix{ClusterTree{3, Float64}, ComplexF64}</code></pre><p>Note that wrapping <code>S</code> and <code>D</code> in <code>LinearMap</code> allows for combining them in a <em>lazy</em> fashion. Alternatively, you can use e.g. <code>axpy!</code> to add two hierarchical matrices.</p><p>We can now solve the linear system using GMRES solver:</p><pre><code class="language-julia hljs">using IterativeSolvers
 rhs = map(Q) do q
     x = q.coords
     return -uᵢ(x)
 end
 σ, hist =
-    gmres(L, rhs; log = true, abstol = 1e-6, verbose = false, restart = 100, maxiter = 100)
-@show hist</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Converged after 22 iterations.</code></pre><p>As before, let us represent the solution using <code>IntegralPotential</code>s:</p><pre><code class="language-julia hljs">𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+    gmres(L, rhs; log = true, abstol = 1e-6, verbose = true, restart = 100, maxiter = 100)
+@show hist</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Converged after 18 iterations.</code></pre><p>As before, let us represent the solution using <code>IntegralPotential</code>s:</p><pre><code class="language-julia hljs">𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
 uₛ = x -&gt; 𝒟[σ](x) - im * k * 𝒮[σ](x)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">#29 (generic function with 1 method)</code></pre><p>To check the result, we compare against the exact solution obtained through a series:</p><pre><code class="language-julia hljs">using GSL
 sphbesselj(l, r) = sqrt(π / (2r)) * besselj(l + 1 / 2, r)
 sphbesselh(l, r) = sqrt(π / (2r)) * besselh(l + 1 / 2, r)
@@ -277,24 +279,24 @@ er = maximum(1:100) do _
     x = 2 * x̂
     return abs(uₛ(x) - uₑ(x))
 end
-@info &quot;error with correction = $er&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: error with correction = 1.5757891097916798e-5</code></pre><p>We see that, once again, the approximation is quite accurate. Let us now visualize the solution on the punctured plane (which we labeled as &quot;sigma&quot;). Since evaluating the integral representation of the solution at many points is expensive, we will use a compression method to accelerate the evaluation as well. In the example below, we use the fast-multipole method:</p><pre><code class="language-julia hljs">using FMM3D
+@info &quot;error with correction = $er&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: error with correction = 7.931323862708279e-6</code></pre><p>We see that, once again, the approximation is quite accurate. Let us now visualize the solution on the punctured plane (which we labeled as &quot;sigma&quot;). Since evaluating the integral representation of the solution at many points is expensive, we will use a compression method to accelerate the evaluation as well. In the example below, we use the fast-multipole method:</p><pre><code class="language-julia hljs">using FMM3D
 
 Σ = Inti.Domain(e -&gt; &quot;sigma&quot; ∈ Inti.labels(e), Inti.entities(msh))
-Σ_msh = view(msh,Σ)
+Σ_msh = view(msh, Σ)
 target = Inti.nodes(Σ_msh)
 
-S,D = Inti.single_double_layer(;
+S, D = Inti.single_double_layer(;
     pde,
     target,
     source = Q,
-    compression = (method = :fmm, tol=1e-4),
-    correction = (method = :dim, maxdist = 5 * meshsize),
+    compression = (method = :fmm, tol = 1e-4),
+    correction = (method = :none,),
 )
 
 ui_eval_msh = uᵢ.(target)
-us_eval_msh = D*σ - im*k*S*σ
+us_eval_msh = D * σ - im * k * S * σ
 u_eval_msh = ui_eval_msh + us_eval_msh</code></pre><p>Finalize, we use gmsh to visualize the scattered field:</p><pre><code class="language-julia hljs">gmsh.initialize()
 Inti.write_gmsh_model(msh)
-Inti.write_gmsh_view!(Σ_msh, real(u_eval_msh); name=&quot;sigma real&quot;)
-Inti.write_gmsh_view!(Γ_msh, x -&gt; 0, name = &quot;gamma real&quot;)</code></pre><p>Launch the GUI to see the results:</p><pre><code class="language-julia hljs">&quot;-nopopup&quot; in ARGS || gmsh.fltk.run()
-gmsh.finalize()</code></pre><p>Add a gmsh view of the solution and save it:</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../../">« Home</a><a class="docs-footer-nextpage" href="../poisson/">Poisson solver »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Friday 10 May 2024 04:26">Friday 10 May 2024</span>. Using Julia version 1.10.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+Inti.write_gmsh_view!(Σ_msh, real(u_eval_msh); name = &quot;sigma real&quot;)
+Inti.write_gmsh_view!(Γ_msh, x -&gt; 0; name = &quot;gamma real&quot;)</code></pre><p>Launch the GUI to see the results:</p><pre><code class="language-julia hljs">isinteractive() &amp;&amp; gmsh.fltk.run()
+gmsh.finalize()</code></pre><p>Add a gmsh view of the solution and save it:</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../../">« Home</a><a class="docs-footer-nextpage" href="../poisson/">Poisson solver »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Wednesday 15 May 2024 12:09">Wednesday 15 May 2024</span>. Using Julia version 1.10.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
