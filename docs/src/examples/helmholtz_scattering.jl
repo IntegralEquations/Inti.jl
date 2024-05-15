@@ -147,6 +147,7 @@ gmsh_circle(; meshsize, order = gorder, name)
 # We can now import the file and parse the mesh and domain information into
 # `Inti.jl` using the [`import_mesh_from_gmsh_file`](@ref Inti.import_mesh_from_gmsh_file) function:
 
+Inti.clear_entities!() # empty the entity cache
 Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 2)
 @show Ω
 #-
@@ -198,7 +199,7 @@ S, D = Inti.single_double_layer(;
     target = Q,
     source = Q,
     compression = (method = :none,),
-    correction = (method = :dim, maxdist = 5 * meshsize, target_location = :on),
+    correction = (method = :dim, maxdist = 5 * meshsize),
 )
 
 # There are two well-known difficulties related to the discretization of
@@ -391,7 +392,7 @@ S, D = Inti.single_double_layer(;
     target = Q,
     source = Q,
     compression = (method = :hmatrix, tol = 1e-6),
-    correction = (method = :dim, target_location = :on),
+    correction = (method = :dim,),
 )
 
 # Here is how much memory it would take to store the dense representation of

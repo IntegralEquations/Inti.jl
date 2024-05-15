@@ -65,6 +65,7 @@ end
 name = joinpath(@__DIR__, "disk.msh")
 gmsh_disk(; meshsize, order = 2, name)
 
+Inti.clear_entities!() # empty the entity cache
 Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 2)
 Γ = Inti.boundary(Ω)
 
@@ -110,7 +111,7 @@ S_b2b, D_b2b = Inti.single_double_layer(;
     target = Γₕ_quad,
     source = Γₕ_quad,
     compression = (method = :fmm, tol = 1e-12),
-    correction = (method = :dim, target_location = :on),
+    correction = (method = :dim,),
 )
 S_b2d, D_b2d = Inti.single_double_layer(;
     pde,
@@ -126,7 +127,7 @@ V_d2d = Inti.volume_potential(;
     target = Ωₕ_quad,
     source = Ωₕ_quad,
     compression = (method = :fmm, tol = 1e-12),
-    correction = (method = :dim, interpolation_order, target_location = :inside),
+    correction = (method = :dim, interpolation_order),
 )
 V_d2b = Inti.volume_potential(;
     pde,
@@ -166,6 +167,7 @@ using IterativeSolvers
 uₕ_quad = -(V_d2d * f) + D_b2d * σ
 uₑ_quad = map(q -> uₑ(q.coords), Ωₕ_quad)
 er = abs.(uₕ_quad - uₑ_quad)
+@assert norm(er) < 1e-5 #hide
 @show norm(er, Inf)
 
 # ## Visualize the solution error using Gmsh
@@ -177,6 +179,6 @@ er_nodes = abs.(sol_nodes - solₕ_nodes)
 gmsh.initialize()
 Inti.write_gmsh_model(msh)
 Inti.write_gmsh_view!(Ωₕ, er_nodes; name = "error")
-## Inti.write_gmsh_view!(Ωₕ, sol_nodes; name="solution")
+Inti.write_gmsh_view!(Ωₕ, sol_nodes; name = "solution")
 isinteractive() && gmsh.fltk.run()
 gmsh.finalize()

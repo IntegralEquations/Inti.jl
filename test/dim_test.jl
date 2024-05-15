@@ -51,7 +51,7 @@ for N in (2, 3)
                     target      = quad,
                     source      = quad,
                     compression = (method = :none,),
-                    correction  = (method = :dim, target_location = :on),
+                    correction  = (method = :dim,),
                 )
                 e1 = norm(Sdim * γ₁u - Ddim * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
                 @testset "Single/double layer $(string(pde))" begin
@@ -71,7 +71,7 @@ for N in (2, 3)
                     target = quad,
                     source = quad,
                     compression = (method = :none,),
-                    correction = (method = :dim, target_location = :on),
+                    correction = (method = :dim,),
                 )
                 e1 = norm(Kdim * γ₁u - Hdim * γ₀u - σ * γ₁u, Inf)
                 @testset "Adjoint double-layer/hypersingular $(string(pde))" begin

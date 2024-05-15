@@ -53,7 +53,8 @@ integrals should be computed. The available options are:
     source and target points above which no correction is performed (defaults to
     `Inf`). `target_location` should be either `:inside`, `:outside`, or `:on`,
     and specifies where the `target`` points lie relative to the to the `source`
-    curve/surface (which is assumed to be closed).
+    curve/surface (which is assumed to be closed). When `target === source`,
+    `target_location` is not needed.
 """
 function single_double_layer(;
     pde,
@@ -63,8 +64,8 @@ function single_double_layer(;
     correction,
     derivative = false,
 )
-    compression = _normalize_compression(compression)
-    correction  = _normalize_correction(correction)
+    compression = _normalize_compression(compression, target, source)
+    correction  = _normalize_correction(correction, target, source)
     G           = derivative ? AdjointDoubleLayerKernel(pde) : SingleLayerKernel(pde)
     dG          = derivative ? HyperSingularKernel(pde) : DoubleLayerKernel(pde)
     Sop         = IntegralOperator(G, target, source)
@@ -87,7 +88,8 @@ function single_double_layer(;
     if correction.method == :none
         return Smat, Dmat # shortcircuit case without correction
     elseif correction.method == :dim
-        μ = _green_multiplier(correction.target_location)
+        loc = target === source ? :on : correction.target_location
+        μ = _green_multiplier(loc)
         green_multiplier = fill(μ, length(target))
         dict_near = etype_to_nearest_points(target, source; correction.maxdist)
         # If target != source then we want to filter the near-field points and construct auxiliary
@@ -208,8 +210,8 @@ function single_double_layer_potential(; pde, source)
 end
 
 function volume_potential(; pde, target, source::Quadrature, compression, correction)
-    correction = _normalize_correction(correction)
-    compression = _normalize_compression(compression)
+    correction = _normalize_correction(correction, target, source)
+    compression = _normalize_compression(compression, target, source)
     G = SingleLayerKernel(pde)
     V = IntegralOperator(G, target, source)
     # compress V
@@ -226,7 +228,8 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
     if correction.method == :none
         return Vmat
     elseif correction.method == :dim
-        μ = _green_multiplier(correction.target_location)
+        loc = target === source ? :inside : correction.target_location
+        μ = _green_multiplier(loc)
         green_multiplier = fill(μ, length(target))
         if haskey(correction, :boundary)
             boundary = correction.boundary
@@ -248,7 +251,7 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
                 target,
                 source = boundary,
                 compression,
-                correction,
+                correction = (correction..., target_location = loc),
             )
         else
             S = correction.S_b2d
