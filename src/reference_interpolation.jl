@@ -154,11 +154,41 @@ const LagrangeSquare = LagrangeElement{ReferenceSquare}
 """
 const LagrangeCube = LagrangeElement{ReferenceCube}
 
-vertices(el::LagrangeLine)        = el.vals[1:2]
-vertices(el::LagrangeTriangle)    = el.vals[1:3]
-vertices(el::LagrangeSquare)      = el.vals[1:4]
-vertices(el::LagrangeTetrahedron) = el.vals[1:4]
-vertices(el::LagrangeCube)        = el.vals[1:8]
+"""
+    vertices_idxs(el::LagrangeElement)
+
+The indices of the nodes in `el` that define the vertices of the element.
+"""
+vertices_idxs(::Type{<:LagrangeLine}) = 1:2
+vertices_idxs(::Type{<:LagrangeTriangle}) = 1:3
+vertices_idxs(::Type{<:LagrangeSquare}) = 1:4
+vertices_idxs(::Type{<:LagrangeTetrahedron}) = 1:4
+vertices_idxs(::Type{<:LagrangeCube}) = 1:8
+vertices_idxs(el::LagrangeElement) = vertices_idxs(typeof(el))
+
+"""
+    vertices(el::LagrangeElement)
+
+Coordinates of the vertices of `el`.
+"""
+vertices(el::LagrangeElement) = view(vals(el), vertices_idxs(el))
+
+"""
+    boundary_idxs(el::LagrangeElement)
+
+The indices of the nodes in `el` that define the boundary of the element.
+"""
+function boundary_idxs(el::LagrangeLine)
+    return 1, length(vals(el))
+end
+
+function boundary_idxs(el::LagrangeTriangle{3})
+    return (1, 2), (2, 3), (3, 1)
+end
+
+function boundary_idxs(el::LagrangeTriangle{6})
+    return (1, 2), (2, 3), (3, 1)
+end
 
 #=
 Hardcode some basic elements.
