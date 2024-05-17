@@ -10,6 +10,15 @@ end
 
 ## Coversion to Meshes.jl equivalent formates for visualization
 
+"""
+    to_meshes(obj)
+
+Convert an object from Inti.jl to an equivalent object in Meshes.jl for
+visualization. High-order (curved) elements to their low-order (flat)
+counterparts.
+"""
+function to_meshes end
+
 # LagrangeLine
 to_meshes(el::Inti.LagrangeLine) = Segment(Point.(Inti.vertices(el))...)
 # LagrangeTriangle
@@ -54,13 +63,22 @@ end
 function Meshes.viz(el::Inti.LagrangeElement, args...; kwargs...)
     return viz(to_meshes(el), args...; kwargs...)
 end
+function Meshes.viz!(el::Inti.LagrangeElement, args...; kwargs...)
+    return viz!(to_meshes(el), args...; kwargs...)
+end
 
 function Meshes.viz(els::AbstractVector{<:Inti.LagrangeElement}, args...; kwargs...)
     return viz([to_meshes(el) for el in els])
 end
+function Meshes.viz!(els::AbstractVector{<:Inti.LagrangeElement}, args...; kwargs...)
+    return viz!([to_meshes(el) for el in els])
+end
 
 function Meshes.viz(msh::Inti.AbstractMesh, args...; kwargs...)
     return viz(to_meshes(msh), args...; kwargs...)
+end
+function Meshes.viz!(msh::Inti.AbstractMesh, args...; kwargs...)
+    return viz!(to_meshes(msh), args...; kwargs...)
 end
 
 end # module

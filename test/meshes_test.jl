@@ -14,6 +14,8 @@ viz(el)
 
 el1 = Inti.LagrangeLine(SVector(0.0, 0.0), SVector(1.0, 1.0))
 el2 = Inti.LagrangeLine(SVector(0.0, 1.0), SVector(1.0, 0.0))
+viz(el1)
+viz!(el2)
 viz([el1, el2])
 
 a, b = SVector(0.0, 0.0, 0.0), SVector(1.0, 1.0, 1.0)
