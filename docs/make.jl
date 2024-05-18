@@ -29,7 +29,8 @@ end
 # Generate examples using Literate
 const examples_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples")
 const generated_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples", "generated")
-for example in ["helmholtz_scattering.jl", "poisson.jl"]
+const examples = ["helmholtz_scattering.jl", "poisson.jl"]
+for example in examples
     println("\n*** Generating $example example")
     @time begin
         src = joinpath(examples_dir, example)
