@@ -3,8 +3,11 @@ import Pkg                            #src
 docsdir = joinpath(@__DIR__, "../..") #src
 Pkg.activate(docsdir)                 #src
 
+using Pkg
+Pkg.status()
+
 #nb ## Environment setup
-#nb const DEPENDENCIES = ["GLMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "FMM3D", "FMM2D"];
+#nb const DEPENDENCIES = ["GLMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "FMM3D", "FMM2D", "Meshes"];
 #nb ## __NOTEBOOK_SETUP__
 
 # # [Helmholtz scattering](@id helmholtz_scattering)
