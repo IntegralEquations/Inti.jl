@@ -1,5 +1,29 @@
 """
-    vdim_correction(pde,X,Y,Γ,S,D,V[;interpolation_order, multiplier])
+    vdim_correction(pde,X,Y,Y_boundary,S,D,V; green_multiplier, kwargs...)
+
+Compute a correction to the volume potential `V : Y → X` such that `V + δV` is a
+more accurate approximation of the underlying volume potential operator. The
+correction is computed using the (volume) density interpolation method.
+
+This function requires a `pde::AbstractPDE`, a target set `X`, a source
+quadrature `Y`, a boundary quadrature `Y_boundary`, approximations `S :
+Y_boundary -> X` and `D : Y_boundary -> X` to the single- and double-layer
+potentials (correctly handling nearly-singular integrals), and a naive
+approximation of the volume potential `V`. The `green_multiplier` is a vector of
+the same length as `X` storing the value of `μ(x)` for `x ∈ X` in the Green
+identity (see [`_green_multiplier`](@ref)).
+
+## Optional `kwargs`:
+
+- `interpolation_order`: the order of the polynomial interpolation. By default,
+  the maximum order of the quadrature rules is used.
+- `maxdist`: distance beyond which interactions are considered sufficiently far
+  so that no correction is needed. This is used to determine a threshold for
+  nearly-singular corrections.
+- `center`: the center of the basis functions. By default, the basis functions
+  are centered at the origin.
+- `shift`: a boolean indicating whether the basis functions should be shifted
+  and rescaled to each element.
 """
 function vdim_correction(
     pde,
@@ -9,49 +33,44 @@ function vdim_correction(
     Sop,
     Dop,
     Vop;
+    green_multiplier::Vector{<:Real},
     interpolation_order = nothing,
-    derivative = false,
-    green_multiplier = nothing,
     maxdist = Inf,
+    center = nothing,
     shift::Val{SHIFT} = Val(false),
 ) where {SHIFT}
-    max_cond = -Inf
-    max_coefs = -Inf
+    # variables for debugging the condition properties of the method
+    vander_cond = vander_norm = rhs_norm = res_norm = shift_norm = -Inf
     T = eltype(Vop)
     @assert eltype(Dop) == eltype(Sop) == T "eltype of Sop, Dop, and Vop must match"
     # figure out if we are dealing with a scalar or vector PDE
-    σ = if T <: Number
-        1
-    else
-        @assert allequal(size(T))
-        size(T, 1)
-    end
+    m, n = length(target), length(source)
     N = ambient_dimension(pde)
     @assert ambient_dimension(source) == N "vdim only works for volume potentials"
     m, n = length(target), length(source)
-    # maximum number of quadrature nodes per element
-    qmax = sum(size(mat, 1) for mat in values(source.etype2qtags))
-    # TODO: relate order to qmax?
+    # a reasonable interpolation_order if not provided
     isnothing(interpolation_order) &&
         (interpolation_order = maximum(order, values(source.etype2qrule)))
-    p, P, γ₁P = polynomial_solutions_vdim(pde, interpolation_order)
-    multiindices = [MultiIndex(first(keys(f.order2coeff))) for f in p]
-    μ = if isnothing(green_multiplier)
-        μ_ = _green_multiplier(target[1], boundary)
-        # snap to the nearest "generic" value of μ
-        argmin(x -> norm(μ_ - x), (-1, -0.5, 0, 0.5, 1))
-    elseif isscalar(green_multiplier)
-        green_multiplier
-    else
-        error("green_multiplier must be a scalar")
-    end
+    # by default basis centered at origin
+    center = isnothing(center) ? zero(SVector{N,Float64}) : center
+    p, P, γ₁P, multiindices = polynomial_solutions_vdim(pde, interpolation_order, center)
     dict_near = etype_to_nearest_points(target, source; maxdist)
-    R = _vdim_auxiliary_quantities(p, P, γ₁P, target, source, boundary, μ, Sop, Dop, Vop)
+    R = _vdim_auxiliary_quantities(
+        p,
+        P,
+        γ₁P,
+        target,
+        source,
+        boundary,
+        green_multiplier,
+        Sop,
+        Dop,
+        Vop,
+    )
     # compute sparse correction
     Is = Int[]
     Js = Int[]
     Vs = eltype(Vop)[]
-    nbasis = length(p)
     for (E, qtags) in source.etype2qtags
         els = elements(source.mesh, E)
         near_list = dict_near[E]
@@ -64,19 +83,30 @@ function vdim_correction(
             # compute translation and scaling
             c, r = translation_and_scaling(els[n])
             if SHIFT
-                L̃ = [f(q.coords) for f in p, q in view(source, jglob)]
-                @debug (max_cond = max(max_cond, cond(L̃))) maxlog = 0
-                S = change_of_basis(multiindices, c, r)
+                iszero(center) || error("SHIFT is not implemented for non-zero center")
+                L̃ = [f((q.coords - c) / r) for f in p, q in view(source, jglob)]
+                S = change_of_basis(multiindices, p, c, r)
                 F = lu(L̃)
+                @debug (vander_cond = max(vander_cond, cond(L̃))) maxlog = 0
+                @debug (shift_norm = max(shift_norm, norm(S))) maxlog = 0
+                @debug (vander_norm = max(vander_norm, norm(L̃))) maxlog = 0
             else
-                L = [f((q.coords - c) / r) for f in p, q in view(source, jglob)]
-                @debug (max_cond = max(max_cond, cond(L))) maxlog = 0
+                L = [f(q.coords) for f in p, q in view(source, jglob)]
                 F = lu(L)
+                @debug (vander_cond = max(vander_cond, cond(L))) maxlog = 0
+                @debug (shift_norm = max(shift_norm, 1)) maxlog = 0
+                @debug (vander_norm = max(vander_norm, norm(L))) maxlog = 0
             end
             # correct each target near the current element
             for i in near_list[n]
-                wei = SHIFT ? F \ (S * R[i, :]) : F \ R[i, :] # weights for the current element and target i
-                max_coefs = max(max_coefs, norm(wei, Inf))
+                b = @views R[i, :]
+                wei = SHIFT ? F \ (S * b) : F \ b # weights for the current element and target i
+                rhs_norm = max(rhs_norm, norm(b))
+                res_norm = if SHIFT
+                    max(res_norm, norm(L̃ * wei - S * b))
+                else
+                    max(res_norm, norm(L * wei - b))
+                end
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
@@ -85,13 +115,18 @@ function vdim_correction(
             end
         end
     end
-    @debug "maximum condition encountered: $max_cond"
-    @debug "maximum norm of coefficiets:   $max_coefs"
+    @debug """Condition properties of vdim correction:
+    |-- max interp. matrix condition: $vander_cond
+    |-- max norm of source term:      $rhs_norm
+    |-- max residual error:           $res_norm
+    |-- max interp. matrix norm :     $vander_norm
+    |-- max shift norm :              $shift_norm
+    """
     δV = sparse(Is, Js, Vs, m, n)
     return δV
 end
 
-function change_of_basis(multiindices, c, r)
+function change_of_basis(multiindices, p, c, r)
     nbasis = length(multiindices)
     P = zeros(nbasis, nbasis)
     for i in 1:nbasis
@@ -99,7 +134,11 @@ function change_of_basis(multiindices, c, r)
         for j in 1:nbasis
             β = multiindices[j]
             β ≤ α || continue
-            P[i, j] = prod((-c) .^ ((α - β).indices)) / r^abs(α) / factorial(α - β)
+            # P[i, j] = prod((-c) .^ ((α - β).indices)) / r^abs(α) / factorial(α
+            # - β)
+            γ = α - β
+            p_γ = p[findfirst(x -> x == γ, multiindices)] # p_{\alpha - \beta}
+            P[i, j] = p_γ(-c) / r^abs(α)
         end
     end
     return P
@@ -208,7 +247,7 @@ function _vdim_auxiliary_quantities(
     X,
     Y::Quadrature,
     Γ::Quadrature,
-    σ,
+    μ,
     Sop,
     Dop,
     Vop,
@@ -225,22 +264,47 @@ function _vdim_auxiliary_quantities(
         @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
         @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
         for i in 1:num_targets
-            Θ[i, n] += σ * P[n](X[i])
+            Θ[i, n] += μ[i] * P[n](X[i])
         end
     end
     return Θ
 end
 
 """
-    polynomial_solutions_vdim(pde, order)
+    vdim_mesh_center(msh)
+
+Point `x` which minimizes ∑ (x-xⱼ)²/r²ⱼ, where xⱼ and rⱼ are the circumcenter
+and circumradius of the elements of `msh`, respectively.
+"""
+function vdim_mesh_center(msh::AbstractMesh)
+    N = ambient_dimension(msh)
+    M = 0.0
+    xc = zero(SVector{N,Float64})
+    for E in element_types(msh)
+        for el in elements(msh, E)
+            c, r = translation_and_scaling(el)
+            # w = 1/r^2
+            w = 1
+            M += w
+            xc += c * w
+        end
+    end
+    return xc / M
+end
+
+"""
+    polynomial_solutions_vdim(pde, order[, center])
 
 For every monomial term `pₙ` of degree `order`, compute a polynomial `Pₙ` such
 that `ℒ[Pₙ] = pₙ`, where `ℒ` is the differential operator associated with `pde`.
 This function returns `{pₙ,Pₙ,γ₁Pₙ}`, where `γ₁Pₙ` is the generalized Neumann
 trace of `Pₙ`.
+
+Passing a point `center` will shift the monomials and solutions accordingly.
 """
-function polynomial_solutions_vdim(pde::AbstractPDE, order::Integer)
+function polynomial_solutions_vdim(pde::AbstractPDE, order::Integer, center = nothing)
     N = ambient_dimension(pde)
+    center = isnothing(center) ? zero(SVector{N,Float64}) : center
     # create empty arrays to store the monomials, solutions, and traces. For the
     # neumann trace, we try to infer the concrete return type instead of simply
     # having a vector of `Function`.
@@ -248,6 +312,7 @@ function polynomial_solutions_vdim(pde::AbstractPDE, order::Integer)
     dirchlet_traces = Vector{ElementaryPDESolutions.Polynomial{N,Float64}}()
     T = return_type(neumann_trace, typeof(pde), eltype(dirchlet_traces))
     neumann_traces = Vector{T}()
+    multiindices = Vector{MultiIndex{N}}()
     # iterate over N-tuples going from 0 to order
     for I in Iterators.product(ntuple(i -> 0:order, N)...)
         sum(I) > order && continue
@@ -256,11 +321,22 @@ function polynomial_solutions_vdim(pde::AbstractPDE, order::Integer)
         p   = ElementaryPDESolutions.Polynomial(I => 1 / factorial(MultiIndex(I)))
         P   = polynomial_solution(pde, p)
         γ₁P = neumann_trace(pde, P)
+        push!(multiindices, MultiIndex(I))
         push!(monomials, p)
         push!(dirchlet_traces, P)
         push!(neumann_traces, γ₁P)
     end
-    return monomials, dirchlet_traces, neumann_traces
+    monomial_shift = map(monomials) do f
+        return (q) -> f(coords(q) - center)
+    end
+    dirchlet_shift = map(dirchlet_traces) do f
+        return (q) -> f(coords(q) - center)
+    end
+    neumann_shift = map(neumann_traces) do f
+        return (q) -> f((coords = q.coords - center, normal = q.normal))
+    end
+    return monomial_shift, dirchlet_shift, neumann_shift, multiindices
+    # return monomials, dirchlet_traces, neumann_traces, multiindices
 end
 
 # dispatch to the correct solver in ElementaryPDESolutions
@@ -284,7 +360,7 @@ end
 
 function _normal_derivative(P::ElementaryPDESolutions.Polynomial{N,T}) where {N,T}
     ∇P = ElementaryPDESolutions.gradient(P)
-    return (q) -> dot(normal(q), ∇P(q))
+    return (q) -> dot(normal(q), ∇P(coords(q)))
 end
 
 function (∇P::NTuple{N,<:ElementaryPDESolutions.Polynomial})(x) where {N}

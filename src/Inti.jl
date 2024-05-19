@@ -1,3 +1,8 @@
+"""
+    module Inti
+
+Library for solving integral equations using Nyström methods.
+"""
 module Inti
 
 const PROJECT_ROOT = pkgdir(Inti)

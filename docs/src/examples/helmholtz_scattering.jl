@@ -3,6 +3,13 @@ import Pkg                            #src
 docsdir = joinpath(@__DIR__, "../..") #src
 Pkg.activate(docsdir)                 #src
 
+using Pkg
+Pkg.status()
+
+#nb ## Environment setup
+#nb const DEPENDENCIES = ["GLMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "FMM3D", "FMM2D", "Meshes"];
+#nb ## __NOTEBOOK_SETUP__
+
 # # [Helmholtz scattering](@id helmholtz_scattering)
 
 #md # [![ipynb](https://img.shields.io/badge/download-ipynb-blue)](helmholtz_scattering.ipynb)
@@ -102,11 +109,11 @@ Pkg.activate(docsdir)                 #src
 
 using Inti
 
-k = 8π
-λ = 2π / k
-meshsize   = λ / 5
-qorder     = 4 # quadrature order
-gorder     = 2 # order of geometrical approximation
+k        = 4π
+λ        = 2π / k
+meshsize = λ / 5
+qorder   = 4 # quadrature order
+gorder   = 2 # order of geometrical approximation
 nothing #hide
 
 # ## [Two-dimensional scattering](@id helmholtz-scattering-2d)
@@ -133,16 +140,19 @@ function gmsh_circle(; name, meshsize, order = 1, radius = 1, center = (0, 0))
         gmsh.finalize()
     end
 end
+nothing #hide
 
 # Let us now use `gmsh_circle` to create a `circle.msh` file. As customary in
 # wave-scattering problems, we will choose a mesh size that is proportional to
 # wavelength:
 name = joinpath(@__DIR__, "circle.msh")
 gmsh_circle(; meshsize, order = gorder, name)
+nothing #hide
 
 # We can now import the file and parse the mesh and domain information into
 # `Inti.jl` using the [`import_mesh_from_gmsh_file`](@ref Inti.import_mesh_from_gmsh_file) function:
 
+Inti.clear_entities!() # empty the entity cache
 Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 2)
 @show Ω
 #-
@@ -165,7 +175,7 @@ gmsh_circle(; meshsize, order = gorder, name)
 # for:
 
 Γ = Inti.boundary(Ω)
-Γ_msh = view(msh,Γ)
+Γ_msh = view(msh, Γ)
 Q = Inti.Quadrature(Γ_msh; qorder)
 nothing #hide
 
@@ -196,6 +206,7 @@ S, D = Inti.single_double_layer(;
     compression = (method = :none,),
     correction = (method = :dim, maxdist = 5 * meshsize),
 )
+nothing #hide
 
 # There are two well-known difficulties related to the discretization of
 # the boundary integral operators $S$ and $D$:
@@ -219,6 +230,7 @@ S, D = Inti.single_double_layer(;
 # We can now combine `S` and `D` to form the combined-field operator:
 using LinearAlgebra
 L = I / 2 + D - im * k * S
+nothing #hide
 
 # where `I` is the identity matrix. Assuming an incident field along the $x_1$
 # direction of the form $u_i =e^{ikx_1}$, the right-hand side of the equation
@@ -229,6 +241,7 @@ rhs = map(Q) do q
     x = q.coords
     return -uᵢ(x)
 end
+nothing #hide
 
 # !!! note "Iterating over a quadrature"
 #       In computing `rhs` above, we used `map` to evaluate the incident field at
@@ -240,6 +253,7 @@ end
 # We can now solve the integral equation using e.g. the backslash operator:
 
 σ = L \ rhs
+nothing #hide
 
 # The variable `σ` contains the value of the approximate density at the
 # quadrature nodes. To reconstruct a continuous approximation to the solution,
@@ -248,6 +262,7 @@ end
 
 𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
 uₛ   = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
+nothing #hide
 
 # The variable `uₛ` is an anonymous/lambda function representing the approximate
 # scattered field.
@@ -275,6 +290,7 @@ function circle_helmholtz_soundsoft(pt; radius = 1, k, θin)
     end
     return u
 end
+nothing #hide
 
 # Here is the maximum error on some points located on a circle of radius `2`:
 
@@ -290,7 +306,7 @@ end
 # As we can see, the error is quite small! To visualize the solution in this
 # simple (2d) example, we could simply use `Makie`:
 
-using CairoMakie
+using GLMakie
 xx = yy = range(-4; stop = 4, length = 200)
 vals = map(pt -> norm(pt) > 1 ? real(uₛ(pt) + uᵢ(pt)) : NaN, Iterators.product(xx, yy))
 fig, ax, hm = heatmap(
@@ -314,7 +330,28 @@ fig
 # More complex problems, however, may require a mesh-based visualization, where
 # we would first need to create a mesh for the places where we want to visualize
 # the solution. In the 3D example that follows, we will use the `Gmsh` API to
-# create a *view* (in the sense of *Gmsh*) of the solution on a punctured plane.
+# create a a mesh of a punctured plane where we will visualize the solution.
+
+# Before moving on to the 3D example let us simply mention that, besides the
+# fact that an analytic solution was available for comparisson, there was
+# nothing special about the unit disk in the example above. We could have, for
+# instance, replaced the disk by a kite-like shape:
+
+f = (s) -> (cospi(2 * s[1]) + 0.65 * cospi(4 * s[1]) - 0.65, 1.5 * sinpi(2 * s[1]))
+Inti.clear_entities!() # empty the entity cacheg
+gmsh.initialize()
+gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+## parametrization of a kite-like shape
+tag = Inti.gmsh_curve(f, 0, 1; npts = 100)
+## create a surface from the curve
+tl = gmsh.model.occ.addCurveLoop([tag])
+ta = gmsh.model.occ.addPlaneSurface([tl])
+gmsh.model.occ.synchronize()
+gmsh.model.mesh.generate(2)
+gmsh.model.mesh.setOrder(gorder)
+Ω, msh = Inti.import_mesh_from_gmsh_model(; dim = 2)
+gmsh.finalize()
 
 # ## [Three-dimensional scattering](@id helmholtz-scattering-3d)
 #
@@ -336,10 +373,11 @@ function gmsh_sphere(; meshsize, order = gorder, radius = 1, visualize = false, 
     gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
     gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
     sphere_tag = gmsh.model.occ.addSphere(0, 0, 0, radius)
-    xl,yl,zl = -2*radius,-2*radius,0
-    Δx, Δy = 4*radius, 4*radius
+    xl, yl, zl = -2 * radius, -2 * radius, 0
+    Δx, Δy = 4 * radius, 4 * radius
     rectangle_tag = gmsh.model.occ.addRectangle(xl, yl, zl, Δx, Δy)
-    outDimTags, _ = gmsh.model.occ.cut([(2, rectangle_tag)], [(3, sphere_tag)], -1, true, false)
+    outDimTags, _ =
+        gmsh.model.occ.cut([(2, rectangle_tag)], [(3, sphere_tag)], -1, true, false)
     gmsh.model.occ.synchronize()
     gmsh.model.addPhysicalGroup(3, [sphere_tag], -1, "omega")
     gmsh.model.addPhysicalGroup(2, [dt[2] for dt in outDimTags], -1, "sigma")
@@ -348,23 +386,26 @@ function gmsh_sphere(; meshsize, order = gorder, radius = 1, visualize = false, 
     visualize && gmsh.fltk.run()
     gmsh.option.setNumber("Mesh.SaveAll", 1) # otherwise only the physical groups are saved
     gmsh.write(name)
-    gmsh.finalize()
+    return gmsh.finalize()
 end
+nothing #hide
 
 # As before, lets write a file with our mesh, and import it into `Inti.jl`:
 
 name = joinpath(@__DIR__, "sphere.msh")
-gmsh_sphere(; meshsize, order = gorder, name, visualize=false)
+gmsh_sphere(; meshsize, order = gorder, name, visualize = false)
 Inti.clear_entities!()
 Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 3)
 Γ = Inti.boundary(Ω)
+nothing #hide
 
 # Note that for this example we relied instead on the labels to the entities in
 # order to extract the relevant domains `Ω` and `Σ`. We can now create a
 # quadrature as before
 
-Γ_msh = view(msh,Γ)
-Q = Inti.Quadrature(Γ_msh; qorder = 4)
+Γ_msh = view(msh, Γ)
+Q = Inti.Quadrature(Γ_msh; qorder)
+nothing #hide
 
 # !!! tip
 #       If you pass `visualize=true` to `gmsh_sphere`, it will open a window
@@ -388,6 +429,7 @@ S, D = Inti.single_double_layer(;
     compression = (method = :hmatrix, tol = 1e-6),
     correction = (method = :dim,),
 )
+nothing #hide
 
 # Here is how much memory it would take to store the dense representation of
 # these matrices:
@@ -415,6 +457,7 @@ println("memory required to store S and D: $(mem) GB")
 
 using LinearMaps
 L = I / 2 + LinearMap(D) - im * k * LinearMap(S)
+nothing #hide
 
 # Note that wrapping `S` and `D` in `LinearMap` allows for combining them in a
 # *lazy* fashion. Alternatively, you can use e.g. `axpy!` to add two
@@ -435,6 +478,7 @@ end
 
 𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
 uₛ = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
+nothing #hide
 
 # To check the result, we compare against the exact solution obtained through a
 # series:
@@ -464,6 +508,7 @@ function sphere_helmholtz_soundsoft(xobs; radius = 1, k = 1, θin = 0, ϕin = 0)
     end
     return u
 end
+nothing #hide
 
 # We will compute the error on some point on the sphere of radius `2`:
 
@@ -485,28 +530,32 @@ end
 using FMM3D
 
 Σ = Inti.Domain(e -> "sigma" ∈ Inti.labels(e), Inti.entities(msh))
-Σ_msh = view(msh,Σ)
+Σ_msh = view(msh, Σ)
 target = Inti.nodes(Σ_msh)
 
-S,D = Inti.single_double_layer(;
+S, D = Inti.single_double_layer(;
     pde,
     target,
     source = Q,
-    compression = (method = :fmm, tol=1e-4),
-    correction = (method = :dim, maxdist = 5 * meshsize),
+    compression = (method = :fmm, tol = 1e-4),
+    ## correction for the nearfield (for visual purposes, set to `:none` to disable)
+    correction = (method = :dim, maxdist = meshsize, target_location = :outside),
 )
 
 ui_eval_msh = uᵢ.(target)
-us_eval_msh = D*σ - im*k*S*σ
+us_eval_msh = D * σ - im * k * S * σ
 u_eval_msh = ui_eval_msh + us_eval_msh
 nothing #hide
 
-# Finalize, we use gmsh to visualize the scattered field:
-gmsh.initialize()
-Inti.write_gmsh_model(msh)
-Inti.write_gmsh_view!(Σ_msh, real(u_eval_msh); name="sigma real")
-Inti.write_gmsh_view!(Γ_msh, x -> 0, name = "gamma real")
-# Launch the GUI to see the results:
-"-nopopup" in ARGS || gmsh.fltk.run()
-gmsh.finalize()
-# Add a gmsh view of the solution and save it:
+# Finalize, we use [`viz`](@ref Meshes.viz) to visualize the scattered field:
+
+using Meshes
+using GLMakie # or your preferred Makie backend
+
+nv = length(Inti.nodes(Γ_msh))
+colorrange = extrema(real(u_eval_msh))
+colormap = :inferno
+fig, ax, pl = viz(Γ_msh; colorrange, colormap, color = zeros(nv))
+viz!(Σ_msh; colorrange, colormap, color = real(u_eval_msh))
+cb = Colorbar(fig[1, 2]; label = "real(u)", colormap, colorrange)
+fig

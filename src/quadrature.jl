@@ -216,7 +216,7 @@ function etype_to_nearest_points(X, Y::Quadrature; maxdist = Inf)
     return dict
 end
 
-function _etype_to_nearest_points(X, Y::Quadrature, maxdist = Inf)
+function _etype_to_nearest_points(X, Y::Quadrature, maxdist)
     y = [coords(q) for q in Y]
     kdtree = KDTree(y)
     dict = Dict(j => Int[] for j in 1:length(y))
@@ -252,7 +252,6 @@ function quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
     ivals = zeros(eltype(qvals), length(inodes))
     areas = zeros(length(inodes)) # area of neighboring triangles
     for (E, mat) in etype2mat(msh)
-        @info E
         qrule = Q.etype2qrule[E]
         V = mapreduce(lagrange_basis(E), hcat, qcoords(qrule)) |> Matrix
         ni, nel = size(mat) # number of interpolation nodes by number of elements
