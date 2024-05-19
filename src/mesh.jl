@@ -84,6 +84,14 @@ nodes(msh::LagrangeMesh) = msh.nodes
 ent2etags(msh::LagrangeMesh) = msh.ent2etags
 etype2mat(msh::LagrangeMesh) = msh.etype2mat
 
+"""
+    connectivity(msh::AbstractMesh,E::DataType)
+
+Return the connectivity matrix for elements of type `E` in `msh`. The integer
+tags in the matrix refer to the points in `nodes(msh)`
+"""
+connectivity(msh::LagrangeMesh, E::DataType) = msh.etype2mat[E]
+
 function ent2nodetags(msh::LagrangeMesh, ent::EntityKey)
     tags = Int[]
     for (E, t) in msh.ent2etags[ent]
@@ -232,6 +240,14 @@ given by the [`nodetags`](@ref) function.
 function nodes(msh::SubMesh)
     tags = nodetags(msh)
     return view(msh.parent.nodes, tags)
+end
+
+function connectivity(msh::SubMesh, E::DataType)
+    tags = nodetags(msh) # tags of the nodes relative to the parent mesh
+    g2l = Dict(zip(tags, 1:length(tags))) # global to local index
+    eltags = msh.etype2etags[E] # indices of elements in submesh
+    # connectity matrix
+    return map(t -> g2l[t], view(msh.parent.etype2mat[E], :, eltags))
 end
 
 # ElementIterator for submesh

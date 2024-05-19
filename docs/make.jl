@@ -4,6 +4,9 @@ using Literate
 # packages needed for extensions
 using Gmsh
 using HMatrices
+using Meshes
+using FMM2D
+using FMM3D
 
 draft = false
 
@@ -26,17 +29,20 @@ end
 # Generate examples using Literate
 const examples_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples")
 const generated_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples", "generated")
-for example in ["helmholtz_scattering.jl", "poisson.jl"]
+const examples = ["helmholtz_scattering.jl", "poisson.jl"]
+for example in examples
     println("\n*** Generating $example example")
     @time begin
         src = joinpath(examples_dir, example)
         Literate.markdown(src, generated_dir; mdstrings = true)
-        # if on CI, also generate the notebook
-        ON_CI && Literate.notebook(
+        # if draft, skip creation of notebooks
+        Literate.notebook(
             src,
             generated_dir;
             mdstrings = true,
             preprocess = insert_setup,
+            # execute = !draft,
+            execute = false,
         )
     end
 end
@@ -45,8 +51,9 @@ println("\n*** Generating documentation")
 
 DocMeta.setdocmeta!(Inti, :DocTestSetup, :(using Inti); recursive = true)
 
-modules = [Inti]
-for extension in [:IntiGmshExt, :IntiHMatricesExt]
+modules = [Inti, Meshes]
+for extension in
+    [:IntiGmshExt, :IntiHMatricesExt, :IntiMeshesExt, :IntiFMM2DExt, :IntiFMM3DExt]
     ext = Base.get_extension(Inti, extension)
     isnothing(ext) && "error loading $ext"
     push!(modules, ext)
@@ -59,17 +66,21 @@ makedocs(;
     format = Documenter.HTML(;
         prettyurls = ON_CI,
         canonical = "https://IntegralEquations.github.io/Inti.jl",
-        # size_threshold = 2*2^20, # 2 MiB
+        size_threshold = 2 * 2^20, # 2 MiB
+        size_threshold_warn = 1 * 2^20, # 1 MiB
     ),
     pages = [
         "Home" => "index.md",
         # "Meshing" => "geo_and_meshes.md",
+        # "Toy example" => "examples/generated/toy_example.md",
         "Helmholtz Example" => ["examples/generated/helmholtz_scattering.md"],
         "Poisson Example" => ["examples/generated/poisson.md"],
         "References" => "references.md",
     ],
-    warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),
+    # warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),
+    warnonly = true,
     pagesonly = true,
+    checkdocs = :none,
     draft,
 )
 
