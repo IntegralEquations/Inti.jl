@@ -36,12 +36,38 @@ struct ElementIterator{E,M}
     mesh::M
 end
 
-"""
-    elements(msh::AbstractMesh,E::DataType)
+Base.eltype(::ElementIterator{E}) where {E} = E
 
-Return an iterator for all elements of type `E` on a mesh `msh`.
+"""
+    elements(msh::AbstractMesh [, E::DataType])
+
+Return an iterator the elements of a `msh`. Passing and element type `E` will
+restrict the iterator to elements of that type.
+
+A common pattern to avoid type-instabilies in performance critical parts of the
+code is to use a [function
+barrier](https://docs.julialang.org/en/v1/manual/performance-tips/#kernel-functions),
+as illustrated below:
+
+```julia
+for E in element_types(msh)
+    _long_computation(elements(msh, E), args...)
+end
+
+@noinline function _long_computation(iter, args...)
+    for el in iter # the type of el is known at compile time
+        # do something with el
+    end
+end
+```
+
+where a dynamic dispatch is performed only on the element type (typically small
+for a given mesh).
 """
 elements(msh::AbstractMesh, E::DataType) = ElementIterator{E,typeof(msh)}(msh)
+function elements(msh::AbstractMesh)
+    return Iterators.flatten(elements(msh, E) for E in element_types(msh))
+end
 
 """
     struct LagrangeMesh{N,T} <: AbstractMesh{N,T}
@@ -173,6 +199,77 @@ function _convert_to_2d(::Type{LagrangeElement{R,N,SVector{3,T}}}) where {R,N,T}
     return LagrangeElement{R,N,SVector{2,T}}
 end
 _convert_to_2d(::Type{SVector{3,T}}) where {T} = SVector{2,T}
+
+"""
+    struct UniformCartesianMesh{N,T} <: AbstractMesh{N,T}
+
+An `N`-dimensional axis-aligned cartesian mesh given as the tensor-product of
+uniform one-dimensional grids.
+
+Iterating over a `UniformCartesianMesh` generates the [`HyperRectangle`](@ref)s
+composing the mesh.
+"""
+struct UniformCartesianMesh{N,T} <: AbstractMesh{N,T}
+    low_corner::SVector{N,T}
+    high_corner::SVector{N,T}
+    sz::NTuple{N,Int}            # number of `HyperRectangle` cells per dimension
+end
+
+"""
+    UniformCartesianMesh(low_corner, high_corner, sz::NTuple)
+    UniformCartesianMesh(low_corner, high_corner; meshsize::NTuple)
+
+Construct a uniform `UniformCartesianMesh` with `sz[d]` elements along dimension
+`d`. If the kwarg `meshsize` is passed, construct a `UniformCartesianMesh` with
+elements of approximate size `meshsize[d]` for each dimension `d`.
+"""
+function UniformCartesianMesh(lc, hc; meshsize::NTuple{N}) where {N}
+    sz = ntuple(N) do i
+        return Int(ceil((hc[i] - lc[i]) / meshsize[i]))
+    end
+    return UniformCartesianMesh(lc, hc, sz)
+end
+
+element_types(::UniformCartesianMesh{N,T}) where {N,T} = (HyperRectangle{N,T},)
+# a type-stable elements iterator for a uniform cartesian mesh
+function elements(msh::UniformCartesianMesh{N,T}) where {N,T}
+    return ElementIterator{HyperRectangle{N,T},typeof(msh)}(msh)
+end
+
+Base.size(iter::ElementIterator{<:HyperRectangle,<:UniformCartesianMesh}) = iter.mesh.sz
+
+function Base.length(iter::ElementIterator{<:HyperRectangle,<:UniformCartesianMesh})
+    return prod(size(iter))
+end
+
+function Base.getindex(
+    iter::ElementIterator{<:HyperRectangle,<:UniformCartesianMesh},
+    I::Vararg{Int},
+)
+    m = iter.mesh
+    N = ambient_dimension(m)
+    @assert N == length(I)
+    @assert all(i -> 1 ≤ I[i] ≤ m.sz[i], 1:N)
+    Δx = (m.high_corner .- m.low_corner) ./ m.sz
+    lc = m.low_corner .+ (I .- 1) .* Δx
+    hc = lc .+ Δx
+    return HyperRectangle(lc, hc)
+end
+function Base.getindex(
+    iter::ElementIterator{<:HyperRectangle,<:UniformCartesianMesh},
+    i::Int,
+)
+    I = CartesianIndices(size(iter))[i] |> Tuple
+    return getindex(iter, I...)
+end
+
+function Base.iterate(
+    iter::ElementIterator{<:HyperRectangle,<:UniformCartesianMesh},
+    state = 1,
+)
+    state > length(iter) && (return nothing)
+    return iter[state], state + 1
+end
 
 """
     struct SubMesh{N,T} <: AbstractMesh{N,T}

@@ -47,6 +47,59 @@ function range_dimension(el::Type{<:ReferenceInterpolant{R,T}}) where {R,T}
 end
 
 """
+    ParametricElement{F,D,T} <: ReferenceInterpolant{D,T}
+
+An element represented through a explicit function `f` mapping `D` into the
+element. For performance reasons, `f` should take as input a `StaticVector` and
+return a `StaticVector` or `StaticArray`.
+
+See also: [`ReferenceInterpolant`](@ref), [`LagrangeElement`](@ref)
+"""
+struct ParametricElement{D,T,F} <: ReferenceInterpolant{D,T}
+    parametrization::F
+    function ParametricElement{D,T}(f::F) where {F,D,T}
+        return new{F,D,T}(f)
+    end
+end
+
+parametrization(el::ParametricElement) = el.parametrization
+domain(::ParametricElement{F,D,T}) where {F,D,T} = D()
+return_type(::ParametricElement{F,D,T}) where {F,D,T} = T
+
+geometric_dimension(p::ParametricElement) = geometric_dimension(domain(p))
+ambient_dimension(p::ParametricElement) = length(return_type(p))
+
+function (el::ParametricElement)(u)
+    @assert u ∈ domain(el)
+    f = parametrization(el)
+    return f(u)
+end
+
+"""
+    struct HyperRectangle{N,T} <: ReferenceInterpolant{ReferenceHyperCube{N},T}
+
+Axis-aligned hyperrectangle in `N` dimensions given by
+`low_corner::SVector{N,T}` and `high_corner::SVector{N,T}`.
+"""
+struct HyperRectangle{N,T} <: ReferenceInterpolant{ReferenceHyperCube{N},T}
+    low_corner::SVector{N,T}
+    high_corner::SVector{N,T}
+end
+
+function (el::HyperRectangle)(u)
+    lc = low_corner(el)
+    hc = high_corner(el)
+    v = @. lc + (hc - lc) * u
+    return v
+end
+
+function jacobian(el::HyperRectangle, u)
+    lc = low_corner(el)
+    hc = high_corner(el)
+    return SDiagonal(hc - lc)
+end
+
+"""
     struct LagrangeElement{D,Np,T} <: ReferenceInterpolant{D,T}
 
 A polynomial `p : D → T` uniquely defined by its `Np` values on the `Np` reference nodes
