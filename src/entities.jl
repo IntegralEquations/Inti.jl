@@ -30,17 +30,16 @@ Used to represent geometrical objects such as lines, surfaces, and volumes.
 Geometrical entities are stored in a global [`ENTITIES`](@ref) dictionary
 mapping [`EntityKey`](@ref) to the corresponding `GeometricEntity`.
 
-A `GeometricEntity `may also have a `push_forward` field associated with it,
-which provides a map from a reference domain to the entity itself.
+A `GeometricEntity` can also contain a `pushforward` field used to
+parametrically represent the entry as the image of a reference domain
+(`pushforward.domain`) under some function (`pushforward.parametrization`).
 """
-@kwdef struct GeometricEntity
-    # TODO: the (dim,tag) fields are probably redundant since they are already
-    # present in the `key` of `ENTITIES`
+struct GeometricEntity
     dim::Integer
     tag::Integer
-    boundary::Vector{EntityKey} = EntityKey[]
-    labels::Vector{String} = String[]
-    push_forward = nothing
+    boundary::Vector{EntityKey}
+    labels::Vector{String}
+    pushforward
     function GeometricEntity(d::Integer, tag::Integer, boundary, labels, par)
         msg = "an elementary entities in the boundary has the wrong dimension"
         for b in boundary
@@ -55,11 +54,25 @@ which provides a map from a reference domain to the entity itself.
     end
 end
 
+function GeometricEntity(;
+    domain,
+    parametrization,
+    boundary = EntityKey[],
+    labels = String[],
+    tag = nothing,
+)
+    d = geometric_dimension(domain)
+    t = isnothing(tag) ? new_tag(d) : tag
+    return GeometricEntity(d, t, boundary, labels, (; domain, parametrization))
+end
+
 geometric_dimension(e::GeometricEntity) = e.dim
-tag(e::GeometricEntity) = e.tag
-boundary(e::GeometricEntity) = e.boundary
-labels(e::GeometricEntity) = e.labels
-push_forward(e::GeometricEntity) = e.push_forward
+tag(e::GeometricEntity)                 = e.tag
+boundary(e::GeometricEntity)            = e.boundary
+labels(e::GeometricEntity)              = e.labels
+push_forward(e::GeometricEntity)        = e.push_forward
+domain(e::GeometricEntity)              = e.pushforward.domain
+parametrization(e::GeometricEntity)     = e.pushforward.parametrization
 
 function Base.show(io::IO, ent::GeometricEntity)
     T = typeof(ent)
