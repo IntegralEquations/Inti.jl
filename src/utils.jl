@@ -78,11 +78,16 @@ Given a function-like object `f: Ω → R`, return `f(Ω)`.
 function image end
 
 """
-    _integration_measure(J::AbstractMatrix)
+    integration_measure(f)
 
-Given the Jacobian matrix `J` of a transformation `f : ℝᴹ → ℝᴺ`, compute the
-integration measure `√det(JᵀJ)`.
+Given the Jacobian matrix `J` of a transformation `f : ℝᴹ → ℝᴺ` at the point
+`x`, compute the integration measure `√det(JᵀJ)`.
 """
+function integration_measure(f, x)
+    jac = jacobian(f, x)
+    return _integration_measure(jac)
+end
+
 function _integration_measure(jac::AbstractMatrix)
     M, N = size(jac)
     if M == N

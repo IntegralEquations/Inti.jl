@@ -29,28 +29,34 @@ to_meshes(el::Inti.LagrangeSquare) = Quadrangle(Point.(Inti.vertices(el))...)
 to_meshes(el::Inti.LagrangeTetrahedron) = Tetrahedron(Point.(Inti.vertices(el))...)
 # LagrangeCube
 to_meshes(el::Inti.LagrangeCube) = Hexahedron(Point.(Inti.vertices(el))...)
+
+# ParametricElement gets converted to its low-order equivalent
+function to_meshes(el::Inti.ParametricElement{D}) where {D}
+    x̂ = Inti.vertices(D())
+    v = map(el, x̂)
+    lag_el = Inti.LagrangeElement{D}(v)
+    return to_meshes(lag_el)
+end
+
 # AbstractMesh
+const ReferenceShapeToMeshes = Dict(
+    Inti.ReferenceLine() => Segment,
+    Inti.ReferenceTriangle() => Triangle,
+    Inti.ReferenceSquare() => Quadrangle,
+    Inti.ReferenceTetrahedron() => Tetrahedron,
+    Inti.ReferenceCube() => Hexahedron,
+)
+
 function to_meshes(msh::Inti.AbstractMesh)
     pts = Point.(Inti.nodes(msh))
     connec = Vector{Connectivity}()
     for E in Inti.element_types(msh)
-        E <: SVector && continue
+        E <: SVector && continue # skip points
+        # map to equivalent Meshes type depending on the ReferenceShape
+        T = ReferenceShapeToMeshes[Inti.domain(E)]
         idxs = Inti.vertices_idxs(E)
         npts = length(idxs)
         mat = Inti.connectivity(msh, E)
-        T = if E <: Inti.LagrangeLine
-            Segment
-        elseif E <: Inti.LagrangeTriangle
-            Triangle
-        elseif E <: Inti.LagrangeSquare
-            Quadrangle
-        elseif E <: Inti.LagrangeTetrahedron
-            Tetrahedron
-        elseif E <: Inti.LagrangeCube
-            Hexahedron
-        else
-            error("Element type not supported")
-        end
         els = map(eachcol(mat)) do col
             return connect(ntuple(i -> col[idxs[i]], npts), T)
         end
@@ -60,17 +66,17 @@ function to_meshes(msh::Inti.AbstractMesh)
 end
 
 # Overload the viz function to accept Inti elements and meshes
-function Meshes.viz(el::Inti.LagrangeElement, args...; kwargs...)
+function Meshes.viz(el::Inti.ReferenceInterpolant, args...; kwargs...)
     return viz(to_meshes(el), args...; kwargs...)
 end
-function Meshes.viz!(el::Inti.LagrangeElement, args...; kwargs...)
+function Meshes.viz!(el::Inti.ReferenceInterpolant, args...; kwargs...)
     return viz!(to_meshes(el), args...; kwargs...)
 end
 
-function Meshes.viz(els::AbstractVector{<:Inti.LagrangeElement}, args...; kwargs...)
+function Meshes.viz(els::AbstractVector{<:Inti.ReferenceInterpolant}, args...; kwargs...)
     return viz([to_meshes(el) for el in els])
 end
-function Meshes.viz!(els::AbstractVector{<:Inti.LagrangeElement}, args...; kwargs...)
+function Meshes.viz!(els::AbstractVector{<:Inti.ReferenceInterpolant}, args...; kwargs...)
     return viz!([to_meshes(el) for el in els])
 end
 
