@@ -23,26 +23,10 @@ function Base.show(io::IO, msh::AbstractMesh)
 end
 
 """
-    struct ElementIterator{E,M}
-
-Iterator for all elements of type `E` on a mesh of type `M`.
-
-Besides the methods listed in the [iterator
-iterface](https://docs.julialang.org/en/v1/manual/interfaces/) of `Julia`, some
-functions also require the `getindex(iter,i::Int)` method for accessing the
-`i`-th element directly.
-"""
-struct ElementIterator{E,M}
-    mesh::M
-end
-
-Base.eltype(::ElementIterator{E}) where {E} = E
-
-"""
     elements(msh::AbstractMesh [, E::DataType])
 
-Return an iterator the elements of a `msh`. Passing and element type `E` will
-restrict the iterator to elements of that type.
+Return the elements of a `msh`. Passing and element type `E` will restricts to
+elements of that type.
 
 A common pattern to avoid type-instabilies in performance critical parts of the
 code is to use a [function
@@ -61,13 +45,17 @@ end
 end
 ```
 
-where a dynamic dispatch is performed only on the element type (typically small
+where a dynamic dispatch is performed only on the element types (typically small
 for a given mesh).
 """
-elements(msh::AbstractMesh, E::DataType) = ElementIterator{E,typeof(msh)}(msh)
-function elements(msh::AbstractMesh)
-    return Iterators.flatten(elements(msh, E) for E in element_types(msh))
-end
+function elements end
+
+"""
+    element_types(msh::AbstractMesh)
+
+Return the element types present in the `msh`.
+"""
+function element_types end
 
 """
     struct LagrangeMesh{N,T} <: AbstractMesh{N,T}
@@ -99,14 +87,15 @@ function LagrangeMesh{N,T}() where {N,T}
     )
 end
 
-"""
-    element_types(msh::AbstractMesh)
-
-Return the element types present in the `msh`.
-"""
 element_types(msh::LagrangeMesh) = keys(msh.etype2mat)
 
-nodes(msh::LagrangeMesh) = msh.nodes
+elements(msh::AbstractMesh, E::DataType) = ElementIterator(msh, E)
+
+function elements(msh::LagrangeMesh)
+    return Iterators.flatten(elements(msh, E) for E in element_types(msh))
+end
+
+nodes(msh::LagrangeMesh)     = msh.nodes
 ent2etags(msh::LagrangeMesh) = msh.ent2etags
 etype2mat(msh::LagrangeMesh) = msh.etype2mat
 
@@ -129,18 +118,18 @@ end
 entities(msh::LagrangeMesh) = keys(msh.ent2etags)
 
 """
-    domain(msh::LagrangeMesh)
+    domain(msh::AbstractMesh)
 
-Set of all entities covered by the mesh.
+Return a [`Domain`] containing of all entities covered by the mesh.
 """
-domain(msh::LagrangeMesh) = Domain(entities(msh))
+domain(msh::AbstractMesh) = Domain(entities(msh))
 
 """
     dom2elt(m::LagrangeMesh,Ω,E)::Vector{Int}
 
 Compute the element indices `idxs` of the elements of type `E` composing `Ω`.
 """
-function dom2elt(m::LagrangeMesh, Ω::Domain, E::DataType)
+function dom2elt(m::AbstractMesh, Ω::Domain, E::DataType)
     idxs = Int[]
     for ent in entities(Ω)
         tags = get(m.ent2etags[ent], E, Int[])
@@ -148,6 +137,48 @@ function dom2elt(m::LagrangeMesh, Ω::Domain, E::DataType)
     end
     return idxs
 end
+
+function Base.getindex(msh::LagrangeMesh, Ω::Domain)
+    nodes = empty(msh.nodes)
+    etype2mat = empty(msh.etype2mat)
+    ent2etags = empty(msh.ent2etags)
+    foreach(ent -> ent2etags[ent] = Dict{DataType,Vector{Int}}(), entities(Ω))
+    glob2loc = Dict{Int,Int}()
+    for E in element_types(msh)
+        connect = msh.etype2mat[E]::Matrix{Int}
+        np, _ = size(connect)
+        mat = Int[]
+        for ent in entities(Ω)
+            etags = Int[]
+            haskey(msh.ent2etags[ent], E) || continue
+            for (iloc, i) in enumerate(msh.ent2etags[ent][E])
+                push!(etags, iloc)
+                for j in view(connect, :, i)
+                    if !haskey(glob2loc, j) # new node
+                        push!(nodes, msh.nodes[j])
+                        glob2loc[j] = length(nodes)
+                    end
+                    push!(mat, glob2loc[j]) # push local index of node
+                end
+            end
+            push!(ent2etags[ent], E => etags)
+        end
+        isempty(mat) || (etype2mat[E] = reshape(mat, np, :))
+    end
+    return LagrangeMesh(nodes, etype2mat, ent2etags)
+end
+"""
+    struct ElementIterator{E,M} <: AbstractVector{E}
+
+Structure to lazily access elements of type `E` in a mesh of type `M`. This is
+particularly useful for [`LagrangeElement`](@ref)s, where the information to
+reconstruct the element is stored in the mesh connectivity matrix.
+"""
+struct ElementIterator{E,M} <: AbstractVector{E}
+    mesh::M
+end
+
+ElementIterator(m, E::DataType) = ElementIterator{E,typeof(m)}(m)
 
 # implement the interface for ElementIterator of lagrange elements on a generic
 # mesh. The elements are constructed on the flight based on the global nodes and
@@ -157,18 +188,17 @@ function Base.length(iter::ElementIterator{E,<:LagrangeMesh}) where {E}
     _, Nel = size(tags)
     return Nel
 end
+Base.size(iter::ElementIterator{E,<:LagrangeMesh}) where {E} = (length(iter),)
 
-function Base.getindex(iter::ElementIterator{E,<:LagrangeMesh}, i::Int) where {E}
+function Base.getindex(
+    iter::ElementIterator{E,<:LagrangeMesh},
+    i::Int,
+) where {E<:LagrangeElement}
     tags = iter.mesh.etype2mat[E]::Matrix{Int}
     node_tags = view(tags, :, i)
     vtx = view(iter.mesh.nodes, node_tags)
     el = E(vtx)
     return el
-end
-
-function Base.iterate(iter::ElementIterator{<:LagrangeElement,<:LagrangeMesh}, state = 1)
-    state > length(iter) && (return nothing)
-    return iter[state], state + 1
 end
 
 # convert a mesh to 2d by ignoring third component. Note that this also requires
@@ -199,77 +229,6 @@ function _convert_to_2d(::Type{LagrangeElement{R,N,SVector{3,T}}}) where {R,N,T}
     return LagrangeElement{R,N,SVector{2,T}}
 end
 _convert_to_2d(::Type{SVector{3,T}}) where {T} = SVector{2,T}
-
-"""
-    struct UniformCartesianMesh{N,T} <: AbstractMesh{N,T}
-
-An `N`-dimensional axis-aligned cartesian mesh given as the tensor-product of
-uniform one-dimensional grids.
-
-Iterating over a `UniformCartesianMesh` generates the [`HyperRectangle`](@ref)s
-composing the mesh.
-"""
-struct UniformCartesianMesh{N,T} <: AbstractMesh{N,T}
-    low_corner::SVector{N,T}
-    high_corner::SVector{N,T}
-    sz::NTuple{N,Int}            # number of `HyperRectangle` cells per dimension
-end
-
-"""
-    UniformCartesianMesh(low_corner, high_corner, sz::NTuple)
-    UniformCartesianMesh(low_corner, high_corner; meshsize::NTuple)
-
-Construct a uniform `UniformCartesianMesh` with `sz[d]` elements along dimension
-`d`. If the kwarg `meshsize` is passed, construct a `UniformCartesianMesh` with
-elements of approximate size `meshsize[d]` for each dimension `d`.
-"""
-function UniformCartesianMesh(lc, hc; meshsize::NTuple{N}) where {N}
-    sz = ntuple(N) do i
-        return Int(ceil((hc[i] - lc[i]) / meshsize[i]))
-    end
-    return UniformCartesianMesh(lc, hc, sz)
-end
-
-element_types(::UniformCartesianMesh{N,T}) where {N,T} = (HyperRectangle{N,T},)
-# a type-stable elements iterator for a uniform cartesian mesh
-function elements(msh::UniformCartesianMesh{N,T}) where {N,T}
-    return ElementIterator{HyperRectangle{N,T},typeof(msh)}(msh)
-end
-
-Base.size(iter::ElementIterator{<:HyperRectangle,<:UniformCartesianMesh}) = iter.mesh.sz
-
-function Base.length(iter::ElementIterator{<:HyperRectangle,<:UniformCartesianMesh})
-    return prod(size(iter))
-end
-
-function Base.getindex(
-    iter::ElementIterator{<:HyperRectangle,<:UniformCartesianMesh},
-    I::Vararg{Int},
-)
-    m = iter.mesh
-    N = ambient_dimension(m)
-    @assert N == length(I)
-    @assert all(i -> 1 ≤ I[i] ≤ m.sz[i], 1:N)
-    Δx = (m.high_corner .- m.low_corner) ./ m.sz
-    lc = m.low_corner .+ (I .- 1) .* Δx
-    hc = lc .+ Δx
-    return HyperRectangle(lc, hc)
-end
-function Base.getindex(
-    iter::ElementIterator{<:HyperRectangle,<:UniformCartesianMesh},
-    i::Int,
-)
-    I = CartesianIndices(size(iter))[i] |> Tuple
-    return getindex(iter, I...)
-end
-
-function Base.iterate(
-    iter::ElementIterator{<:HyperRectangle,<:UniformCartesianMesh},
-    state = 1,
-)
-    state > length(iter) && (return nothing)
-    return iter[state], state + 1
-end
 
 """
     struct SubMesh{N,T} <: AbstractMesh{N,T}
@@ -314,6 +273,12 @@ element_types(msh::SubMesh) = keys(msh.etype2etags)
 
 ent2nodetags(msh::SubMesh, ent::EntityKey) = ent2nodetags(msh.parent, ent)
 
+function elements(msh::SubMesh, E::DataType)
+    tags = msh.etype2etags[E]
+    p_els = elements(msh.parent, E)
+    return view(p_els, tags)
+end
+
 """
     nodetags(msh::SubMesh)
 
@@ -345,58 +310,4 @@ function connectivity(msh::SubMesh, E::DataType)
     eltags = msh.etype2etags[E] # indices of elements in submesh
     # connectity matrix
     return map(t -> g2l[t], view(msh.parent.etype2mat[E], :, eltags))
-end
-
-# ElementIterator for submesh
-function Base.length(iter::ElementIterator{E,<:SubMesh}) where {E<:LagrangeElement}
-    submesh = iter.mesh
-    idxs    = submesh.etype2etags[E]::Vector{Int}
-    return length(idxs)
-end
-
-function Base.getindex(
-    iter::ElementIterator{E,<:SubMesh},
-    i::Int,
-) where {E<:LagrangeElement}
-    submsh = iter.mesh
-    p_msh  = submsh.parent # parent mesh
-    idxs   = submsh.etype2etags[E]::Vector{Int}
-    iglob  = idxs[i] # global index of element in parent mesh
-    iter   = elements(p_msh, E) # iterator over parent mesh
-    return iter[iglob]
-end
-
-function Base.iterate(iter::ElementIterator{<:LagrangeElement,<:SubMesh}, state = 1)
-    state > length(iter) && (return nothing)
-    return iter[state], state + 1
-end
-
-function Base.getindex(msh::LagrangeMesh, Ω::Domain)
-    nodes = empty(msh.nodes)
-    etype2mat = empty(msh.etype2mat)
-    ent2etags = empty(msh.ent2etags)
-    foreach(ent -> ent2etags[ent] = Dict{DataType,Vector{Int}}(), entities(Ω))
-    glob2loc = Dict{Int,Int}()
-    for E in element_types(msh)
-        connect = msh.etype2mat[E]::Matrix{Int}
-        np, _ = size(connect)
-        mat = Int[]
-        for ent in entities(Ω)
-            etags = Int[]
-            haskey(msh.ent2etags[ent], E) || continue
-            for (iloc, i) in enumerate(msh.ent2etags[ent][E])
-                push!(etags, iloc)
-                for j in view(connect, :, i)
-                    if !haskey(glob2loc, j) # new node
-                        push!(nodes, msh.nodes[j])
-                        glob2loc[j] = length(nodes)
-                    end
-                    push!(mat, glob2loc[j]) # push local index of node
-                end
-            end
-            push!(ent2etags[ent], E => etags)
-        end
-        isempty(mat) || (etype2mat[E] = reshape(mat, np, :))
-    end
-    return LagrangeMesh(nodes, etype2mat, ent2etags)
 end

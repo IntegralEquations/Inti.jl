@@ -103,7 +103,7 @@ end
 
 @noinline function _build_quadrature!(
     quad,
-    els::ElementIterator{E},
+    els::AbstractVector{E},
     qrule::ReferenceQuadrature,
 ) where {E}
     N = ambient_dimension(quad)
