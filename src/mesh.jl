@@ -137,8 +137,8 @@ Compute the element indices `idxs` of the elements of type `E` composing `Ω`.
 """
 function dom2elt(m::AbstractMesh, Ω::Domain, E::DataType)
     idxs = Int[]
-    for ent in entities(Ω)
-        tags = get(m.ent2etags[ent], E, Int[])
+    for k in keys(Ω)
+        tags = get(m.ent2etags[k], E, Int[])
         append!(idxs, tags)
     end
     return idxs
@@ -147,7 +147,7 @@ end
 function Base.getindex(msh::LagrangeMesh{N,T}, Ω::Domain) where {N,T}
     new_msh = LagrangeMesh{N,T}()
     (; nodes, etype2mat, etype2els, ent2etags) = new_msh
-    foreach(ent -> ent2etags[ent] = Dict{DataType,Vector{Int}}(), entities(Ω))
+    foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), keys(Ω))
     glob2loc = Dict{Int,Int}()
     for E in element_types(msh)
         # create new element iterator
@@ -157,11 +157,11 @@ function Base.getindex(msh::LagrangeMesh{N,T}, Ω::Domain) where {N,T}
         np, _ = size(connect)
         mat = Int[]
         etag_loc = 0 # tag of the element in the new mesh
-        for ent in entities(Ω)
+        for k in keys(Ω)
             # check if parent has elements of type E for the entity
-            haskey(msh.ent2etags[ent], E) || continue
-            etags_glob = msh.ent2etags[ent][E]
-            etags_loc  = get!(ent2etags[ent], E, Int[])
+            haskey(msh.ent2etags[k], E) || continue
+            etags_glob = msh.ent2etags[k][E]
+            etags_loc  = get!(ent2etags[k], E, Int[])
             for iglob in etags_glob
                 etag_loc += 1
                 # add nodes and connectivity matrix

@@ -42,7 +42,6 @@ function jacobian(f, x)
     return hcat(partials...)
 end
 
-# TODO Should we use SType here?
 domain(::ReferenceInterpolant{D,T}) where {D,T} = D()
 domain(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = D()
 return_type(::ReferenceInterpolant{D,T}) where {D,T} = T

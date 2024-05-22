@@ -3,9 +3,11 @@
 
 A set of [`EntityKey`](@ref)s with the same geometric dimension used to
 represent a physical domain.
+
+Use [`global_get_entity(key)`](@ref) to fetch a given entity given its key.
 """
 struct Domain
-    entities::Set{EntityKey}
+    keys::Set{EntityKey}
     function Domain(ents::Set{EntityKey})
         @assert allequal(geometric_dimension(ent) for ent in ents) "entities in a domain have different dimensions"
         return new(ents)
@@ -15,7 +17,7 @@ end
 Domain() = Domain(Set{EntityKey}())
 
 """
-    Domain([f::Function,] ents)
+    Domain([f::Function,] keys)
 
 Create a domain from a set of [`EntityKey`](@ref)s. Optionally, a filter
 function `f` can be passed to filter the entities.
@@ -27,18 +29,20 @@ function Domain(f::Function, ents)
 end
 Domain(ents) = Domain(Set(ents))
 
+Base.keys(Ω::Domain) = Ω.keys
+
 """
     entities(Ω::Domain)
 
 Return all entities making up a domain.
 """
-entities(Ω::Domain) = Ω.entities
+entities(Ω::Domain) = (global_get_entity(k) for k in Ω.keys)
 
 function Base.show(io::IO, d::Domain)
-    keys = entities(d)
-    n = length(entities(d))
-    n == 1 ? print(io, "Domain with $n entity:") : print(io, "Domain with $n entities:")
-    for k in keys
+    kk = keys(d)
+    n  = length(entities(d))
+    n == print(io, "Domain with $n ", n == 1 ? "entity" : "entities")
+    for k in kk
         ent = global_get_entity(k)
         print(io, "\n $(k) --> $ent")
     end
@@ -97,7 +101,7 @@ See also: [`external_boundary`](@ref), [`internal_boundary`](@ref), [`skeleton`]
 boundary(Ω::Domain) = external_boundary(Ω)
 
 function Base.setdiff(Ω1::Domain, Ω2::Domain)
-    return Domain(setdiff(entities(Ω1), entities(Ω2)))
+    return Domain(setdiff(keys(Ω1), keys(Ω2)))
 end
 
 function geometric_dimension(Ω::Domain)
