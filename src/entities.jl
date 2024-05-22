@@ -19,9 +19,6 @@ tag(k::EntityKey) = k.tag
 Base.hash(ent::EntityKey, h::UInt) = hash((ent.dim, abs(ent.tag)), h)
 Base.:(==)(e1::EntityKey, e2::EntityKey) = e1.dim == e2.dim && abs(e1.tag) == abs(e2.tag)
 
-boundary(e::EntityKey) = boundary(global_get_entity(e))
-labels(e::EntityKey) = labels(global_get_entity(e))
-
 """
     struct GeometricEntity
 
@@ -55,14 +52,16 @@ struct GeometricEntity
 end
 
 function GeometricEntity(;
-    domain,
+    domain::HyperRectangle{N,T},
     parametrization,
     boundary = EntityKey[],
     labels = String[],
     tag = nothing,
-)
+) where {N,T}
     d = geometric_dimension(domain)
     t = isnothing(tag) ? new_tag(d) : tag
+    V = return_type(parametrization, SVector{N,T})
+    isbitstype(V) || (@warn "nonbits type $V returned by parametrization")
     return GeometricEntity(d, t, boundary, labels, (; domain, parametrization))
 end
 
@@ -73,6 +72,16 @@ labels(e::GeometricEntity)              = e.labels
 push_forward(e::GeometricEntity)        = e.push_forward
 domain(e::GeometricEntity)              = e.pushforward.domain
 parametrization(e::GeometricEntity)     = e.pushforward.parametrization
+hasparametrization(e::GeometricEntity)  = !isnothing(e.pushforward)
+key(e::GeometricEntity)                 = EntityKey(geometric_dimension(e), tag(e))
+
+function ambient_dimension(e::GeometricEntity)
+    hasparametrization(e) || error("entity $(key(e)) has no parametrization")
+    d = domain(e)
+    x = center(d)
+    f = parametrization(e)
+    return length(f(x))
+end
 
 function Base.show(io::IO, ent::GeometricEntity)
     T = typeof(ent)

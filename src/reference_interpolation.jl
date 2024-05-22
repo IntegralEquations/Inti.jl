@@ -24,10 +24,22 @@ end
     jacobian(f,x)
 
 Given a (possibly vector-valued) functor `f : 𝐑ᵐ → 𝐅ⁿ`, return the `n × m`
-matrix `Aᵢⱼ = ∂fᵢ/∂xⱼ`.Both `x` and `f(x)` are expected to be of `SVector` type.
+matrix `Aᵢⱼ = ∂fᵢ/∂xⱼ`. By default a finite-difference approximation is
+performed, but you should overload this method for specific `f` if better
+performance and/or precision is required.
+
+Note: both `x` and `f(x)` are expected to be of `SArray` type.
 """
 function jacobian(f, x)
-    return interface_method(f)
+    T = eltype(x)
+    N = length(x)
+    h = (eps())^(1 / 3)
+    partials = svector(N) do d
+        xp = SVector(ntuple(i -> i == d ? x[i] + h : x[i], N))
+        xm = SVector(ntuple(i -> i == d ? x[i] - h : x[i], N))
+        return (f(xp) - f(xm)) / (2h)
+    end
+    return hcat(partials...)
 end
 
 # TODO Should we use SType here?
@@ -47,35 +59,6 @@ function range_dimension(el::Type{<:ReferenceInterpolant{R,T}}) where {R,T}
 end
 
 """
-    ParametricElement{F,D,T} <: ReferenceInterpolant{D,T}
-
-An element represented through a explicit function `f` mapping `D` into the
-element. For performance reasons, `f` should take as input a `StaticVector` and
-return a `StaticVector` or `StaticArray`.
-
-See also: [`ReferenceInterpolant`](@ref), [`LagrangeElement`](@ref)
-"""
-struct ParametricElement{D,T,F} <: ReferenceInterpolant{D,T}
-    parametrization::F
-    function ParametricElement{D,T}(f::F) where {F,D,T}
-        return new{F,D,T}(f)
-    end
-end
-
-parametrization(el::ParametricElement) = el.parametrization
-domain(::ParametricElement{F,D,T}) where {F,D,T} = D()
-return_type(::ParametricElement{F,D,T}) where {F,D,T} = T
-
-geometric_dimension(p::ParametricElement) = geometric_dimension(domain(p))
-ambient_dimension(p::ParametricElement) = length(return_type(p))
-
-function (el::ParametricElement)(u)
-    @assert u ∈ domain(el)
-    f = parametrization(el)
-    return f(u)
-end
-
-"""
     struct HyperRectangle{N,T} <: ReferenceInterpolant{ReferenceHyperCube{N},T}
 
 Axis-aligned hyperrectangle in `N` dimensions given by
@@ -85,6 +68,12 @@ struct HyperRectangle{N,T} <: ReferenceInterpolant{ReferenceHyperCube{N},T}
     low_corner::SVector{N,T}
     high_corner::SVector{N,T}
 end
+
+low_corner(el::HyperRectangle) = el.low_corner
+high_corner(el::HyperRectangle) = el.high_corner
+geometric_dimension(::HyperRectangle{N,T}) where {N,T} = N
+ambient_dimension(::HyperRectangle{N,T}) where {N,T} = N
+center(el::HyperRectangle) = 0.5 * (low_corner(el) + high_corner(el))
 
 function (el::HyperRectangle)(u)
     lc = low_corner(el)
@@ -97,6 +86,53 @@ function jacobian(el::HyperRectangle, u)
     lc = low_corner(el)
     hc = high_corner(el)
     return SDiagonal(hc - lc)
+end
+
+"""
+    ParametricElement{D,T,F} <: ReferenceInterpolant{D,T}
+
+An element represented through a explicit function `f` mapping `D` into the
+element. For performance reasons, `f` should take as input a `StaticVector` and
+return a `StaticVector` or `StaticArray`.
+
+See also: [`ReferenceInterpolant`](@ref), [`LagrangeElement`](@ref)
+"""
+struct ParametricElement{D,T,F} <: ReferenceInterpolant{D,T}
+    parametrization::F
+    function ParametricElement{D,T}(f::F) where {F,D,T}
+        return new{D,T,F}(f)
+    end
+end
+
+parametrization(el::ParametricElement) = el.parametrization
+domain(::ParametricElement{D,T,F}) where {D,T,F} = D()
+return_type(::ParametricElement{D,T,F}) where {D,T,F} = T
+
+geometric_dimension(p::ParametricElement) = geometric_dimension(domain(p))
+ambient_dimension(p::ParametricElement) = length(return_type(p))
+
+function (el::ParametricElement)(u)
+    @assert u ∈ domain(el)
+    f = parametrization(el)
+    return f(u)
+end
+
+vertices_idxs(::Type{<:ParametricElement{ReferenceLine}}) = 1:2
+vertices_idxs(::Type{<:ParametricElement{ReferenceTriangle}}) = 1:3
+vertices_idxs(::Type{<:ParametricElement{ReferenceSquare}}) = 1:4
+vertices_idxs(::Type{<:ParametricElement{ReferenceTetrahedron}}) = 1:4
+vertices_idxs(::Type{<:ParametricElement{ReferenceCube}}) = 1:8
+vertices_idxs(el::ParametricElement) = vertices_idxs(typeof(el))
+
+"""
+    ParametricElement(f, d::HyperRectangle)
+
+Construct the element defined as the image of `f` over `d`.
+"""
+function ParametricElement(f, d::HyperRectangle{N,T}) where {N,T}
+    V = return_type(f, SVector{N,T})
+    D = ReferenceHyperCube{N}
+    return ParametricElement{D,V}((x) -> f(d(x)))
 end
 
 """

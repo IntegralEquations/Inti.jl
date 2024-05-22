@@ -180,6 +180,96 @@ function Base.getindex(msh::LagrangeMesh{N,T}, Ω::Domain) where {N,T}
     end
     return new_msh
 end
+
+"""
+    meshgen(Ω::Domain,num_elements)
+    meshgen(Ω::Domain;meshsize)
+
+Generate a `LagrangeMesh` for the domain `Ω` with `num_elements` per entity. To
+specify a different number of elements per entity, `num_elements` should be a
+dictionary mapping entities `e ∈ Ω` to the desired `num_elements`.
+
+Alternatively, a `meshsize` can be passed, either as a scalar or a dictionary as
+above. In such cases, the number of elements is computed as so as to obtain an
+*average* mesh size of `meshsize`; the actual mesh size may vary significantly
+for each element if the parametrization is far from uniform.
+
+Requires the entities forming `Ω` to have an explicit parametrization.
+
+!!! warning
+    The quality of the generated mesh created usign `meshgen` depends on the
+    quality of the underlying parametrization. For complex surfaces, you are
+    better off using a proper mesher such as `gmsh`.
+"""
+function meshgen(Ω::Domain, num_elements::Dict)
+    # extract the ambient dimension for these entities (i.e. are we in 2d or
+    # 3d). Only makes sense if all entities have the same ambient dimension.
+    N = ambient_dimension(first(Ω))
+    @assert all(p -> ambient_dimension(p) == N, entities(Ω))
+    mesh = LagrangeMesh{N,Float64}()
+    meshgen!(mesh, Ω, num_elements)
+    return mesh
+end
+function meshgen(Ω::Domain, num_elements::NTuple{<:Any,Int})
+    return meshgen(Ω, Dict(e => num_elements for e in entities(Ω)))
+end
+
+"""
+    meshgen!(mesh,Ω,sz)
+
+Similar to [`meshgen`](@ref), but append entries to `mesh`.
+"""
+function meshgen!(msh::LagrangeMesh, Ω::Domain, num_elements)
+    @assert length(entities(Ω)) == length(num_elements)
+    for ent in entities(Ω)
+        sz = num_elements[ent]
+        _meshgen!(msh, ent, sz)
+    end
+    _build_connectivity!(msh)
+    return msh
+end
+
+# a simple mesh generation for GeometricEntity objects containing a
+# parametrization
+function _meshgen!(mesh::LagrangeMesh, key::EntityKey, sz)
+    ent = global_get_entity(key)
+    hasparametrization(ent) || error("$key has no parametrization")
+    @assert ambient_dimension(ent) == ambient_dimension(mesh)
+    N = geometric_dimension(ent)
+    @assert length(sz) == N
+    # extract relevant fields and mesh the entity
+    f = parametrization(ent)
+    d = domain(ent)
+    @assert d isa HyperRectangle "reference domain must be a HyperRectangle for meshgen"
+    els = _meshgen(f, d, sz)
+    # push related information to mesh
+    E = eltype(els)
+    vals = get!(mesh.etype2els, E, Vector{E}())
+    istart = length(vals) + 1
+    append!(vals, els)
+    iend = length(vals)
+    haskey(mesh.ent2etags, key) && @warn "$key already present in mesh"
+    mesh.ent2etags[key] = Dict(E => collect(istart:iend)) # add key
+    return mesh
+end
+
+"""
+    _meshgen(f,d::HyperRectangle,sz)
+
+Create `prod(sz)` elements of [`ParametricElement`](@ref) type representing the
+push forward of `f` on each of the subdomains defined by a uniform cartesian
+mesh of `d` of size `sz`.
+"""
+function _meshgen(f, d::HyperRectangle, sz::NTuple)
+    lc, hc = low_corner(d), high_corner(d)
+    Δx = (hc - lc) ./ sz
+    map(CartesianIndices(sz)) do I
+        low  = lc + (Tuple(I) .- 1) .* Δx
+        high = low .+ Δx
+        return ParametricElement(f, HyperRectangle(low, high))
+    end |> vec
+end
+
 """
     struct ElementIterator{E,M} <: AbstractVector{E}
 
@@ -246,6 +336,58 @@ function _convert_to_2d(::Type{LagrangeElement{R,N,SVector{3,T}}}) where {R,N,T}
     return LagrangeElement{R,N,SVector{2,T}}
 end
 _convert_to_2d(::Type{SVector{3,T}}) where {T} = SVector{2,T}
+
+function _build_connectivity!(msh::LagrangeMesh{N,T}, tol = 1e-8) where {N,T}
+    nodes = msh.nodes
+    empty!(nodes)
+    connect_dict = msh.etype2mat
+    empty!(connect_dict)
+    # first build a naive connectivity matrix where duplicate points are present
+    for E in Inti.element_types(msh)
+        E <: ParametricElement || continue
+        connect = Int[]
+        E <: SVector && continue # skip points
+        # map to equivalent Meshes type depending on the ReferenceShape
+        x̂ = Inti.vertices(Inti.domain(E))
+        nv = length(x̂)
+        els = map(Inti.elements(msh, E)) do el
+            istart = length(nodes) + 1
+            for i in 1:nv
+                push!(nodes, el(x̂[i]))
+            end
+            iend = length(nodes)
+            return append!(connect, istart:iend)
+        end
+        connect_dict[E] = reshape(connect, nv, :)
+    end
+    remove_duplicate_nodes!(msh, tol)
+    return msh
+end
+
+function remove_duplicate_nodes!(msh::LagrangeMesh, tol)
+    nodes = copy(msh.nodes)
+    new_nodes = empty!(msh.nodes)
+    connect_dict = msh.etype2mat
+    btree = BallTree(nodes)
+    prox = inrange(btree, nodes, tol)
+    old2new = Dict{Int,Int}()
+    glob2loc = Dict{Int,Int}()
+    for (i, jnear) in enumerate(prox)
+        # favor the point with smallest index
+        iglob = minimum(jnear)
+        inew = if haskey(glob2loc, iglob)
+            glob2loc[iglob]
+        else
+            push!(new_nodes, nodes[iglob])
+            glob2loc[iglob] = length(new_nodes)
+        end
+        old2new[i] = inew
+    end
+    for mat in values(connect_dict)
+        replace!(i -> old2new[i], mat)
+    end
+    return msh
+end
 
 """
     struct SubMesh{N,T} <: AbstractMesh{N,T}
