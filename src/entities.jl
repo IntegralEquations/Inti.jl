@@ -71,9 +71,12 @@ boundary(e::GeometricEntity)            = e.boundary
 labels(e::GeometricEntity)              = e.labels
 push_forward(e::GeometricEntity)        = e.push_forward
 domain(e::GeometricEntity)              = e.pushforward.domain
-parametrization(e::GeometricEntity)     = e.pushforward.parametrization
-hasparametrization(e::GeometricEntity)  = !isnothing(e.pushforward)
-key(e::GeometricEntity)                 = EntityKey(geometric_dimension(e), tag(e))
+function parametrization(e::GeometricEntity)
+    hasparametrization(e) || error("entity $(key(e)) has no parametrization")
+    return e.pushforward.parametrization
+end
+hasparametrization(e::GeometricEntity) = !isnothing(e.pushforward)
+key(e::GeometricEntity)                = EntityKey(geometric_dimension(e), tag(e))
 
 function ambient_dimension(e::GeometricEntity)
     hasparametrization(e) || error("entity $(key(e)) has no parametrization")
@@ -93,6 +96,83 @@ end
 
 function Base.show(io::IO, k::EntityKey)
     return print(io, "EntityKey($(k.dim),$(k.tag))")
+end
+
+"""
+    line(a,b)
+
+Create a [`GeometricEntity`] representing a straight line connecting points `a`
+and `b`. The points `a` and `b` can be either `SVector`s or a `Tuple`.
+
+The parametrization of the line is given by `f(u) = a + u(b - a)`, where `0 ≤ u
+≤ 1`.
+
+```jldoctest
+l = line((0.0, 0.0), SVector(1.0, 1.0))
+f = parametrization(l)
+f(0.5)
+
+# output
+2-element SVector{2, Float64} with indices SOneTo(2):
+ 0.5
+ 0.5
+```
+"""
+function line(a, b)
+    a, b = SVector(a), SVector(b)
+    f = (u) -> a + u[1] * (b - a)
+    d = HyperRectangle(SVector(0.0), SVector(1.0))
+    return GeometricEntity(; domain = d, parametrization = f)
+end
+line(a, b) = line(SVector(a), SVector(b))
+
+"""
+    parametric_curve(f, a::Real, b::Real)
+
+Create a [`GeometricEntity`] representing a parametric curve defined by the
+`{f(t) | a ≤ t ≤ b}`.
+"""
+function parametric_curve(f, a::Real, b::Real)
+    d = HyperRectangle(SVector(a), SVector(b))
+    return GeometricEntity(; domain = d, parametrization = f)
+end
+
+# https://www.ljll.fr/perronnet/transfini/transfini.html
+function transfinite_square(k1::T, k2::T, k3::T, k4::T) where {T<:EntityKey}
+    c1, c2, c3, c4 = map((k1, k2, k3, k4)) do k
+        l = global_get_entity(k)
+        hasparametrization(l) || error("entity $(key(l)) has no parametrization")
+        # chech that l is a curve in 2d
+        @assert geometric_dimension(l) == 1
+        @assert ambient_dimension(l) == 2
+        # renormalize the parametrization to go from 0 to 1, flipping
+        # orientation if needed
+        f̂ = let f = parametrization(l), d = domain(l), flip = tag(k) < 0
+            if flip
+                x̂ -> f(d(1 - x̂))
+            else
+                x̂ -> f(d(x̂))
+            end
+        end
+        return f̂
+    end
+    @assert c1(1) ≈ c2(0) && c2(1) ≈ c3(0) && c3(1) ≈ c4(0) && c4(1) ≈ c1(0)
+    # create a closure and compute the parametrization
+    f2d = _transfinite_square(c1, c2, c3, c4)
+    d = HyperRectangle(SVector(0.0, 0.0), SVector(1.0, 1.0))
+    return GeometricEntity(; domain = d, parametrization = f2d, boundary = [k1, k2, k3, k4])
+end
+
+function _transfinite_square(c1, c2, c3, c4)
+    return x -> begin
+        u, v = x[1], x[2]
+        (1 - u) * c4(1 - v) + u * c2(v) + (1 - v) * c1(u) + v * c3(1 - u) - (
+            (1 - u) * (1 - v) * c1(0) +
+            u * (1 - v) * c2(0) +
+            u * v * c3(0) +
+            (1 - u) * v * c4(0)
+        )
+    end
 end
 
 """

@@ -18,6 +18,16 @@ using StaticArrays
     msh = Inti.meshgen(Γ, (100,))
     quad = Inti.Quadrature(msh; qorder = 2)
     @test Inti.integrate(x -> 1, quad) ≈ 2 * π * r
+
+    # transfinite patch
+    Inti.clear_entities!()
+    l1 = Inti.line(SVector(0.0, 0.0), SVector(2.0, 0.0))
+    l2 = Inti.line(SVector(2.0, 0.0), SVector(1.0, 1.0))
+    l3 = Inti.line(SVector(1.0, 1.0), SVector(0.0, 1.0))
+    l4 = Inti.line(SVector(0.0, 1.0), (0.0, 0.0))
+    sq = Inti.transfinite_square(Inti.key.((l1, l2, l3, l4))...)
+    Ω = Inti.Domain(Inti.key.(Set([sq])))
+    msh = Inti.meshgen(Ω, (10, 10))
 end
 
 @testset "Gmsh backend" begin
