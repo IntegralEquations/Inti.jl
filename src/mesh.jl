@@ -60,20 +60,24 @@ function element_types end
 """
     struct LagrangeMesh{N,T} <: AbstractMesh{N,T}
 
-Data structure representing a generic mesh in an ambient space of dimension `N`,
-with data of type `T`.
+Unstructured mesh is defined by a set of `nodes`` (of type `SVector{N,T}`), and
+a dictionary mapping element types to connectivity matrices. Each columns of a
+given connectivity matrix stores the integer tags of the nodes in the mesh
+comprising the element.
 
-The `LagrangeMesh` can, in principle, store elements of any type. Those are given
-as a key in the `elements` dictionary, and the value is a data structure which
-is capable of reconstructing the elements. For example, for a Lagrange element
-described by `p` nodes, the value is a `p×Nel` matrix of integer, where each
-columns is a list of tags for the nodes of the element. The nodes are stored in
-the `nodes` field.
+Additionally, the mesh contains a mapping from [`EntityKey`](@ref)s to the tags
+of the elements composing the entity. This can be used to extract submeshes from
+a given mesh using e.g. `view(msh,Γ)` or `msh[Γ]`, where `Γ` is a
+[`Domain`](@ref).
+
+See [`elements`](@ref) for a way to iterate over the elements of a mesh.
 """
 struct LagrangeMesh{N,T} <: AbstractMesh{N,T}
     nodes::Vector{SVector{N,T}}
     # for each element type (key), return the connectivity matrix
     etype2mat::Dict{DataType,Matrix{Int}}
+    # store abstract vector of elements
+    etype2els::Dict{DataType,AbstractVector}
     # mapping from entity to a dict containing (etype=>tags)
     ent2etags::Dict{EntityKey,Dict{DataType,Vector{Int}}}
 end
@@ -83,13 +87,14 @@ function LagrangeMesh{N,T}() where {N,T}
     return LagrangeMesh{N,T}(
         SVector{N,T}[],
         Dict{DataType,Matrix{Int}}(),
+        Dict{DataType,AbstractVector{<:ReferenceInterpolant}}(),
         Dict{EntityKey,Dict{DataType,Vector{Int}}}(),
     )
 end
 
 element_types(msh::LagrangeMesh) = keys(msh.etype2mat)
 
-elements(msh::AbstractMesh, E::DataType) = ElementIterator(msh, E)
+elements(msh::LagrangeMesh, E::DataType) = msh.etype2els[E]
 
 function elements(msh::LagrangeMesh)
     return Iterators.flatten(elements(msh, E) for E in element_types(msh))
@@ -98,6 +103,7 @@ end
 nodes(msh::LagrangeMesh)     = msh.nodes
 ent2etags(msh::LagrangeMesh) = msh.ent2etags
 etype2mat(msh::LagrangeMesh) = msh.etype2mat
+etype2els(msh::LagrangeMesh) = msh.etype2els
 
 """
     connectivity(msh::AbstractMesh,E::DataType)
@@ -138,34 +144,41 @@ function dom2elt(m::AbstractMesh, Ω::Domain, E::DataType)
     return idxs
 end
 
-function Base.getindex(msh::LagrangeMesh, Ω::Domain)
-    nodes = empty(msh.nodes)
-    etype2mat = empty(msh.etype2mat)
-    ent2etags = empty(msh.ent2etags)
+function Base.getindex(msh::LagrangeMesh{N,T}, Ω::Domain) where {N,T}
+    new_msh = LagrangeMesh{N,T}()
+    (; nodes, etype2mat, etype2els, ent2etags) = new_msh
     foreach(ent -> ent2etags[ent] = Dict{DataType,Vector{Int}}(), entities(Ω))
     glob2loc = Dict{Int,Int}()
     for E in element_types(msh)
+        # create new element iterator
+        etype2els[E] = ElementIterator(new_msh, E)
+        # create new connectivity
         connect = msh.etype2mat[E]::Matrix{Int}
         np, _ = size(connect)
         mat = Int[]
+        etag_loc = 0 # tag of the element in the new mesh
         for ent in entities(Ω)
-            etags = Int[]
+            # check if parent has elements of type E for the entity
             haskey(msh.ent2etags[ent], E) || continue
-            for (iloc, i) in enumerate(msh.ent2etags[ent][E])
-                push!(etags, iloc)
-                for j in view(connect, :, i)
-                    if !haskey(glob2loc, j) # new node
-                        push!(nodes, msh.nodes[j])
-                        glob2loc[j] = length(nodes)
+            etags_glob = msh.ent2etags[ent][E]
+            etags_loc  = get!(ent2etags[ent], E, Int[])
+            for iglob in etags_glob
+                etag_loc += 1
+                # add nodes and connectivity matrix
+                for jglob in view(connect, :, iglob)
+                    if !haskey(glob2loc, jglob) # new node
+                        push!(nodes, msh.nodes[jglob])
+                        glob2loc[jglob] = length(nodes)
                     end
-                    push!(mat, glob2loc[j]) # push local index of node
+                    push!(mat, glob2loc[jglob]) # push local index of node
                 end
+                # add new tag for the element
+                push!(etags_loc, etag_loc)
             end
-            push!(ent2etags[ent], E => etags)
         end
         isempty(mat) || (etype2mat[E] = reshape(mat, np, :))
     end
-    return LagrangeMesh(nodes, etype2mat, ent2etags)
+    return new_msh
 end
 """
     struct ElementIterator{E,M} <: AbstractVector{E}
@@ -206,12 +219,15 @@ end
 # because some meshers like gmsh always create three-dimensional objects, so we
 # must convert after importing the mesh
 function _convert_to_2d(mesh::LagrangeMesh{3,T}) where {T}
+    msh2d = LagrangeMesh{2,T}()
     # create new dictionaries for elements and ent2etagsdict with 2d elements as keys
-    new_etype2mat = empty(mesh.etype2mat)
-    new_ent2etags = empty(mesh.ent2etags)
+    new_etype2mat = msh2d.etype2mat
+    new_ent2etags = msh2d.ent2etags
+    new_etype2els = msh2d.etype2els
     for (E, tags) in mesh.etype2mat
         E2d = _convert_to_2d(E)
         new_etype2mat[E2d] = tags
+        new_etype2els[E2d] = ElementIterator(msh2d, E2d)
     end
     for (ent, dict) in mesh.ent2etags
         new_dict = empty(dict)
@@ -221,8 +237,9 @@ function _convert_to_2d(mesh::LagrangeMesh{3,T}) where {T}
         end
         new_ent2etags[ent] = new_dict
     end
-    # construct new 2d mesh
-    return LagrangeMesh{2,T}([x[1:2] for x in mesh.nodes], new_etype2mat, new_ent2etags)
+    nodes2d = [x[1:2] for x in mesh.nodes]
+    append!(msh2d.nodes, nodes2d)
+    return msh2d
 end
 
 function _convert_to_2d(::Type{LagrangeElement{R,N,SVector{3,T}}}) where {R,N,T}
