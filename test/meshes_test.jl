@@ -94,4 +94,4 @@ gmsh.finalize()
 
 Γ = Inti.boundary(Ω)
 viz(msh[Γ]; showsegments = true)
-viz(msh[Ω]; showsegments = true)
+viz(msh[Ω]; showsegments = true, alpha = 0.5)

@@ -211,7 +211,7 @@ function meshgen(Ω::Domain, num_elements::Dict)
     return mesh
 end
 function meshgen(Ω::Domain, num_elements::NTuple{<:Any,Int})
-    return meshgen(Ω, Dict(e => num_elements for e in entities(Ω)))
+    return meshgen(Ω, Dict(e => num_elements for e in keys(Ω)))
 end
 
 """
@@ -220,10 +220,10 @@ end
 Similar to [`meshgen`](@ref), but append entries to `mesh`.
 """
 function meshgen!(msh::LagrangeMesh, Ω::Domain, num_elements)
-    @assert length(entities(Ω)) == length(num_elements)
-    for ent in entities(Ω)
-        sz = num_elements[ent]
-        _meshgen!(msh, ent, sz)
+    @assert length(keys(Ω)) == length(num_elements)
+    for k in keys(Ω)
+        sz = num_elements[k]
+        _meshgen!(msh, k, sz)
     end
     _build_connectivity!(msh)
     return msh
@@ -268,6 +268,31 @@ function _meshgen(f, d::HyperRectangle, sz::NTuple)
         high = low .+ Δx
         return ParametricElement(f, HyperRectangle(low, high))
     end |> vec
+end
+
+function _build_connectivity!(msh::LagrangeMesh{N,T}, tol = 1e-8) where {N,T}
+    nodes = msh.nodes
+    connect_dict = msh.etype2mat
+    # first build a naive connectivity matrix where duplicate points are present
+    for E in keys(msh.etype2els)
+        E <: ParametricElement || continue
+        connect = Int[]
+        E <: SVector && continue # skip points
+        # map to equivalent Meshes type depending on the ReferenceShape
+        x̂ = Inti.vertices(Inti.domain(E))
+        nv = length(x̂)
+        map(Inti.elements(msh, E)) do el
+            istart = length(nodes) + 1
+            for i in 1:nv
+                push!(nodes, el(x̂[i]))
+            end
+            iend = length(nodes)
+            return append!(connect, istart:iend)
+        end
+        connect_dict[E] = reshape(connect, nv, :)
+    end
+    remove_duplicate_nodes!(msh, tol)
+    return msh
 end
 
 """
@@ -336,33 +361,6 @@ function _convert_to_2d(::Type{LagrangeElement{R,N,SVector{3,T}}}) where {R,N,T}
     return LagrangeElement{R,N,SVector{2,T}}
 end
 _convert_to_2d(::Type{SVector{3,T}}) where {T} = SVector{2,T}
-
-function _build_connectivity!(msh::LagrangeMesh{N,T}, tol = 1e-8) where {N,T}
-    nodes = msh.nodes
-    empty!(nodes)
-    connect_dict = msh.etype2mat
-    empty!(connect_dict)
-    # first build a naive connectivity matrix where duplicate points are present
-    for E in Inti.element_types(msh)
-        E <: ParametricElement || continue
-        connect = Int[]
-        E <: SVector && continue # skip points
-        # map to equivalent Meshes type depending on the ReferenceShape
-        x̂ = Inti.vertices(Inti.domain(E))
-        nv = length(x̂)
-        els = map(Inti.elements(msh, E)) do el
-            istart = length(nodes) + 1
-            for i in 1:nv
-                push!(nodes, el(x̂[i]))
-            end
-            iend = length(nodes)
-            return append!(connect, istart:iend)
-        end
-        connect_dict[E] = reshape(connect, nv, :)
-    end
-    remove_duplicate_nodes!(msh, tol)
-    return msh
-end
 
 function remove_duplicate_nodes!(msh::LagrangeMesh, tol)
     nodes = copy(msh.nodes)

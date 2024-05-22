@@ -14,7 +14,7 @@ using StaticArrays
     end
     arc1 = Inti.GeometricEntity(; domain = d1, parametrization)
     arc2 = Inti.GeometricEntity(; domain = d2, parametrization)
-    Γ = Inti.Domain(Set([arc1, arc2]))
+    Γ = Inti.Domain(Inti.key.(Set([arc1, arc2])))
     msh = Inti.meshgen(Γ, (100,))
     quad = Inti.Quadrature(msh; qorder = 2)
     @test Inti.integrate(x -> 1, quad) ≈ 2 * π * r
