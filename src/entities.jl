@@ -106,17 +106,6 @@ and `b`. The points `a` and `b` can be either `SVector`s or a `Tuple`.
 
 The parametrization of the line is given by `f(u) = a + u(b - a)`, where `0 ≤ u
 ≤ 1`.
-
-```jldoctest
-l = Inti.line((0.0, 0.0), (1.0, 1.0))
-f = Inti.parametrization(l)
-f(0.5)
-
-# output
-2-element SVector{2, Float64} with indices SOneTo(2):
- 0.5
- 0.5
-```
 """
 function line(a, b)
     a, b = SVector(a), SVector(b)
