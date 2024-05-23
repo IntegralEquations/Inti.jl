@@ -189,23 +189,22 @@ Generate a `LagrangeMesh` for the domain `Ω` with `num_elements` per entity. To
 specify a different number of elements per entity, `num_elements` should be a
 dictionary mapping entities `e ∈ Ω` to the desired `num_elements`.
 
-Alternatively, a `meshsize` can be passed, either as a scalar or a dictionary as
-above. In such cases, the number of elements is computed as so as to obtain an
+Alternatively, a `meshsize` can be passed, either as a scalar or a dictionary.
+In such cases, the number of elements is computed as so as to obtain an
 *average* mesh size of `meshsize`; the actual mesh size may vary significantly
 for each element if the parametrization is far from uniform.
 
 Requires the entities forming `Ω` to have an explicit parametrization.
 
-!!! warning
-    The quality of the generated mesh created usign `meshgen` depends on the
-    quality of the underlying parametrization. For complex surfaces, you are
+!!! warning The quality of the generated mesh created usign `meshgen` depends on
+    the quality of the underlying parametrization. For complex surfaces, you are
     better off using a proper mesher such as `gmsh`.
 """
 function meshgen(Ω::Domain, num_elements::Dict)
     # extract the ambient dimension for these entities (i.e. are we in 2d or
     # 3d). Only makes sense if all entities have the same ambient dimension.
     N = ambient_dimension(first(Ω))
-    @assert all(p -> ambient_dimension(p) == N, entities(Ω))
+    @assert all(p -> ambient_dimension(p) == N, entities(Ω)) "Entities must have the same ambient dimension"
     mesh = LagrangeMesh{N,Float64}()
     meshgen!(mesh, Ω, num_elements)
     return mesh
@@ -219,11 +218,44 @@ end
 
 Similar to [`meshgen`](@ref), but append entries to `mesh`.
 """
-function meshgen!(msh::LagrangeMesh, Ω::Domain, num_elements)
-    @assert length(keys(Ω)) == length(num_elements)
+function meshgen!(msh::LagrangeMesh, Ω::Domain, dict::Dict)
+    N = ambient_dimension(msh)
+    d = geometric_dimension(Ω)
+    @assert N == 2 "meshgen! only supports 2d meshes for now"
     for k in keys(Ω)
-        sz = num_elements[k]
-        _meshgen!(msh, k, sz)
+        if d == 1
+            haskey(dict, k) || error(msg1(k))
+            sz = dict[k]
+            _meshgen!(msh, k, sz)
+        elseif d == 2
+            # mesh the boundary first, then the interior
+            ent = global_get_entity(k)
+            @assert length(boundary(ent)) == 4
+            b1, b2, b3, b4 = boundary(ent)
+            @show b1, b2, b3, b4
+            # check consistency between the size of a boundary curve and its
+            # opposite side
+            pairs = ((b1, b3), (b2, b4))
+            n = map(pairs) do (l, op_l)
+                if haskey(dict, l)
+                    haskey(dict, op_l) &&
+                        dict[l] != dict[op_l] &&
+                        error("num_elements for $l and $op_l must be the same")
+                    return dict[l]
+                elseif haskey(dict, l_op)
+                    return dict[l_op]
+                else
+                    error("missing num_elements entry for entity $b1")
+                end
+            end
+            # mesh boundary (if needed)
+            b1 ∈ entities(msh) || _meshgen!(msh, b1, (n[1],))
+            b2 ∈ entities(msh) || _meshgen!(msh, b2, (n[2],))
+            b3 ∈ entities(msh) || _meshgen!(msh, b3, (n[1],))
+            b4 ∈ entities(msh) || _meshgen!(msh, b4, (n[2],))
+            # mesh area
+            _meshgen!(msh, k, n)
+        end
     end
     _build_connectivity!(msh)
     return msh
@@ -233,6 +265,7 @@ end
 # parametrization
 function _meshgen!(mesh::LagrangeMesh, key::EntityKey, sz)
     ent = global_get_entity(key)
+    d = domain(ent)
     hasparametrization(ent) || error("$key has no parametrization")
     @assert ambient_dimension(ent) == ambient_dimension(mesh)
     N = geometric_dimension(ent)
@@ -444,7 +477,7 @@ Return the tags of the nodes in the parent mesh belonging to the submesh.
 function nodetags(msh::SubMesh)
     tags = Int[]
     for ent in entities(msh)
-        append!(tags, ent2nodetags(msh, ent))
+        append!(tags, ent2nodetags(msh, key(ent)))
     end
     return unique!(tags)
 end

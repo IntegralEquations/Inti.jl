@@ -15,6 +15,7 @@ struct Domain
 end
 
 Domain() = Domain(Set{EntityKey}())
+Domain(ents::Vararg{EntityKey}) = Domain(Set(ents))
 
 """
     Domain([f::Function,] keys)
@@ -27,7 +28,7 @@ Note that all entities in a domain must have the same geometric dimension.
 function Domain(f::Function, ents)
     return Domain(filter(f, ents))
 end
-Domain(ents) = Domain(Set(ents))
+Domain(ents::AbstractVector{EntityKey}) = Domain(Set(ents))
 
 Base.keys(Ω::Domain) = Ω.keys
 

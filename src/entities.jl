@@ -108,8 +108,8 @@ The parametrization of the line is given by `f(u) = a + u(b - a)`, where `0 ≤ 
 ≤ 1`.
 
 ```jldoctest
-l = line((0.0, 0.0), SVector(1.0, 1.0))
-f = parametrization(l)
+l = Inti.line((0.0, 0.0), (1.0, 1.0))
+f = Inti.parametrization(l)
 f(0.5)
 
 # output
@@ -122,9 +122,9 @@ function line(a, b)
     a, b = SVector(a), SVector(b)
     f = (u) -> a + u[1] * (b - a)
     d = HyperRectangle(SVector(0.0), SVector(1.0))
-    return GeometricEntity(; domain = d, parametrization = f)
+    ent = GeometricEntity(; domain = d, parametrization = f)
+    return key(ent)
 end
-line(a, b) = line(SVector(a), SVector(b))
 
 """
     parametric_curve(f, a::Real, b::Real)
@@ -133,8 +133,9 @@ Create a [`GeometricEntity`] representing a parametric curve defined by the
 `{f(t) | a ≤ t ≤ b}`.
 """
 function parametric_curve(f, a::Real, b::Real)
-    d = HyperRectangle(SVector(a), SVector(b))
-    return GeometricEntity(; domain = d, parametrization = f)
+    d = HyperRectangle(SVector(float(a)), SVector(float(b)))
+    ent = GeometricEntity(; domain = d, parametrization = f)
+    return key(ent)
 end
 
 # https://www.ljll.fr/perronnet/transfini/transfini.html
@@ -160,7 +161,8 @@ function transfinite_square(k1::T, k2::T, k3::T, k4::T) where {T<:EntityKey}
     # create a closure and compute the parametrization
     f2d = _transfinite_square(c1, c2, c3, c4)
     d = HyperRectangle(SVector(0.0, 0.0), SVector(1.0, 1.0))
-    return GeometricEntity(; domain = d, parametrization = f2d, boundary = [k1, k2, k3, k4])
+    ent = GeometricEntity(; domain = d, parametrization = f2d, boundary = [k1, k2, k3, k4])
+    return key(ent)
 end
 
 function _transfinite_square(c1, c2, c3, c4)
@@ -193,6 +195,12 @@ function global_add_entity!(ent::GeometricEntity)
     return ENTITIES[k] = ent
 end
 
+"""
+    global_get_entity(k::EntityKey)
+
+Retrieve the [`GeometricEntity`](@ref) corresponding to the [`EntityKey`](@ref)
+`k` from the global `ENTITIES` dictionary.
+"""
 function global_get_entity(k::EntityKey)
     return ENTITIES[k]
 end

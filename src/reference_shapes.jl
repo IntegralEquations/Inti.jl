@@ -66,7 +66,7 @@ Singleton type representing the `[0,1]` segment.
 """
 const ReferenceLine = ReferenceHyperCube{1}
 
-vertices(::ReferenceLine) = SVector(SVector(0), SVector(1))
+vertices(::ReferenceLine) = (SVector(0), SVector(1))
 
 """
     const ReferenceSquare = ReferenceHyperCube{2}
@@ -76,7 +76,7 @@ Singleton type representing the unit square `[0,1]²`.
 const ReferenceSquare = ReferenceHyperCube{2}
 
 function vertices(::ReferenceSquare)
-    return SVector(SVector(0, 0), SVector(1, 0), SVector(1, 1), SVector(0, 1))
+    return (SVector(0, 0), SVector(1, 0), SVector(1, 1), SVector(0, 1))
 end
 
 """
@@ -87,7 +87,7 @@ Singleton type representing the unit cube `[0,1]³`.
 const ReferenceCube = ReferenceHyperCube{3}
 
 function vertices(::ReferenceCube)
-    return SVector(
+    return (
         SVector(0, 0, 0),
         SVector(1, 0, 0),
         SVector(1, 1, 0),
