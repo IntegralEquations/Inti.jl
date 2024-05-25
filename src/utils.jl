@@ -240,6 +240,7 @@ function _normalize_correction(correction, target, source)
             target === source ||
             error("missing target_location field in correction")
         haskey(correction, :maxdist) ||
+            target === source ||
             @warn("missing maxdist field in correction: setting to Inf")
         correction = merge(
             (maxdist = Inf, interpolation_order = nothing, center = nothing),

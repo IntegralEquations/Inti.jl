@@ -3,9 +3,6 @@ import Pkg                            #src
 docsdir = joinpath(@__DIR__, "../..") #src
 Pkg.activate(docsdir)                 #src
 
-using Pkg
-Pkg.status()
-
 #nb ## Environment setup
 #nb const DEPENDENCIES = ["GLMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "FMM3D", "FMM2D", "Meshes"];
 #nb ## __NOTEBOOK_SETUP__
@@ -204,7 +201,7 @@ S, D = Inti.single_double_layer(;
     target = Q,
     source = Q,
     compression = (method = :none,),
-    correction = (method = :dim, maxdist = 5 * meshsize),
+    correction = (method = :dim,),
 )
 nothing #hide
 
@@ -537,7 +534,7 @@ S, D = Inti.single_double_layer(;
     pde,
     target,
     source = Q,
-    compression = (method = :fmm, tol = 1e-4),
+    compression = (method = :fmm, tol = 1e-6),
     ## correction for the nearfield (for visual purposes, set to `:none` to disable)
     correction = (method = :dim, maxdist = meshsize, target_location = :outside),
 )

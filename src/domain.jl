@@ -1,10 +1,12 @@
 """
     struct Domain
 
-A set of [`EntityKey`](@ref)s with the same geometric dimension used to
-represent a physical domain.
+Representation of a geometrical domain formed by a set of entities with the same
+geometric dimension. For basic set operations on domains are supported (union,
+intersection, difference, etc), and they all return a new `Domain` object.
 
-Use [`global_get_entity(key)`](@ref) to fetch a given entity given its key.
+The unlerlying entities are stored in a [`Set`](@ref) of [`EntityKey`](@ref)s;
+the underlying entities can be accessed with [`global_get_entity(key)`](@ref).
 """
 struct Domain
     keys::Set{EntityKey}

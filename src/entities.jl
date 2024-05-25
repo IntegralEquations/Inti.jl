@@ -19,6 +19,14 @@ tag(k::EntityKey) = k.tag
 Base.hash(ent::EntityKey, h::UInt) = hash((ent.dim, abs(ent.tag)), h)
 Base.:(==)(e1::EntityKey, e2::EntityKey) = e1.dim == e2.dim && abs(e1.tag) == abs(e2.tag)
 
+labels(e::EntityKey) = labels(global_get_entity(e))
+
+function Base.show(io::IO, k::EntityKey)
+    e = global_get_entity(k)
+    print(io, "EntityKey: ($(k.dim), $(k.tag)) => $e")
+    return io
+end
+
 """
     struct GeometricEntity
 
@@ -92,10 +100,6 @@ function Base.show(io::IO, ent::GeometricEntity)
     t = tag(ent)
     l = labels(ent)
     return print(io, "$T with (dim,tag)=($d,$t) and labels $l")
-end
-
-function Base.show(io::IO, k::EntityKey)
-    return print(io, "EntityKey($(k.dim),$(k.tag))")
 end
 
 """
