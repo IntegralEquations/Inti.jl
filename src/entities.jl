@@ -20,6 +20,7 @@ Base.hash(ent::EntityKey, h::UInt) = hash((ent.dim, abs(ent.tag)), h)
 Base.:(==)(e1::EntityKey, e2::EntityKey) = e1.dim == e2.dim && abs(e1.tag) == abs(e2.tag)
 
 labels(e::EntityKey) = labels(global_get_entity(e))
+boundary(e::EntityKey) = boundary(global_get_entity(e))
 
 function Base.show(io::IO, k::EntityKey)
     e = global_get_entity(k)
