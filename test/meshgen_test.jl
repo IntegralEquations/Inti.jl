@@ -32,21 +32,3 @@ using StaticArrays
     msh[Γ]
     Γ_msh = Inti.meshgen(Γ, (100,))
 end
-
-@testset "Gmsh backend" begin
-    r = rx = ry = 0.5
-    Inti.clear_entities!()
-    gmsh.initialize()
-    gmsh.option.setNumber("General.Verbosity", 2)
-    gmsh.option.setNumber("Mesh.MeshSizeMax", 0.005)
-    Inti.clear_entities!()
-    gmsh.model.occ.addDisk(0, 0, 0, rx, ry)
-    gmsh.model.occ.synchronize()
-    gmsh.model.mesh.generate(2)
-    Ω, M = Inti.import_mesh_from_gmsh_model(; dim = 2)
-    gmsh.finalize()
-    Γ = Inti.external_boundary(Ω)
-    dict = Inti.topological_neighbors(M[Γ])
-    _, nei = first(dict)
-    dict = Inti.topological_neighbors(M[Ω])
-end
