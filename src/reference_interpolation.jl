@@ -14,7 +14,9 @@ Instances `el` of `ReferenceInterpolant` are expected to implement:
     For performance reasons, both `el(x̂)` and `jacobian(el,x̂)` should
     take as input a `StaticVector` and output a static vector or static array.
 """
-abstract type ReferenceInterpolant{D<:ReferenceShape,T} end
+abstract type ReferenceInterpolant{D,T} end
+
+struct Foo <: ReferenceInterpolant{ReferenceLine,Float64} end
 
 function (el::ReferenceInterpolant)(x)
     return interface_method(el)
@@ -96,7 +98,7 @@ return a `StaticVector` or `StaticArray`.
 
 See also: [`ReferenceInterpolant`](@ref), [`LagrangeElement`](@ref)
 """
-struct ParametricElement{D,T,F} <: ReferenceInterpolant{D,T}
+struct ParametricElement{D<:ReferenceShape,T,F} <: ReferenceInterpolant{D,T}
     parametrization::F
     function ParametricElement{D,T}(f::F) where {F,D,T}
         return new{D,T,F}(f)
@@ -144,7 +146,7 @@ The return type `T` should be a vector space (i.e. support addition and
 multiplication by scalars). For istance, `T` could be a number or a vector, but
 not a `Tuple`.
 """
-struct LagrangeElement{D,Np,T} <: ReferenceInterpolant{D,T}
+struct LagrangeElement{D<:ReferenceShape,Np,T} <: ReferenceInterpolant{D,T}
     vals::SVector{Np,T}
 end
 
