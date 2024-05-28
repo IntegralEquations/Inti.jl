@@ -24,12 +24,12 @@ function gmsh_circle(; name, meshsize, order = 1, radius = 1, center = (0, 0))
 end</code></pre><p>Let us now use <code>gmsh_circle</code> to create a <code>circle.msh</code> file. As customary in wave-scattering problems, we will choose a mesh size that is proportional to wavelength:</p><pre><code class="language-julia hljs">name = joinpath(@__DIR__, &quot;circle.msh&quot;)
 gmsh_circle(; meshsize, order = gorder, name)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : Meshing curve 1 (Ellipse)
-Info    : Done meshing 1D (Wall 0.000219326s, CPU 0.00021s)
+Info    : Done meshing 1D (Wall 0.000210753s, CPU 0.0002s)
 Info    : 63 nodes 64 elements
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
 Info    : [ 50%] Meshing surface 1 order 2
-Info    : Done meshing order 2 (Wall 0.000582756s, CPU 0.00052s)
+Info    : Done meshing order 2 (Wall 0.000576242s, CPU 0.00051s)
 Info    : Writing &#39;/home/lfaria/runner-integral-equations/_work/Inti.jl/Inti.jl/docs/build/examples/generated/circle.msh&#39;...
 Info    : Done writing &#39;/home/lfaria/runner-integral-equations/_work/Inti.jl/Inti.jl/docs/build/examples/generated/circle.msh&#39;</code></pre><p>We can now import the file and parse the mesh and domain information into <code>Inti.jl</code> using the <a href="../../../references/#Inti.import_mesh_from_gmsh_file"><code>import_mesh_from_gmsh_file</code></a> function:</p><pre><code class="language-julia hljs">Inti.clear_entities!() # empty the entity cache
 Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 2)
@@ -112,16 +112,16 @@ gmsh.model.mesh.setOrder(gorder)
 Ω, msh = Inti.import_mesh_from_gmsh_model(; dim = 2)
 gmsh.finalize()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : Meshing curve 1 (BSpline)
-Info    : Done meshing 1D (Wall 0.015037s, CPU 0.015046s)
+Info    : Done meshing 1D (Wall 0.0152104s, CPU 0.015222s)
 Info    : Meshing 2D...
 Info    : Meshing surface 1 (Plane, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.0954864s, CPU 0.095474s)
+Info    : Done meshing 2D (Wall 0.0964264s, CPU 0.096391s)
 Info    : 717 nodes 1335 elements
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
 Info    : [ 50%] Meshing surface 1 order 2
 Info    : Surface mesh: worst distortion = 0.978009 (0 elements in ]0, 0.2]); worst gamma = 0.764133
-Info    : Done meshing order 2 (Wall 0.00932528s, CPU 0.009327s)</code></pre><h2 id="helmholtz-scattering-3d"><a class="docs-heading-anchor" href="#helmholtz-scattering-3d">Three-dimensional scattering</a><a id="helmholtz-scattering-3d-1"></a><a class="docs-heading-anchor-permalink" href="#helmholtz-scattering-3d" title="Permalink"></a></h2><p>We now consider the same problem in 3D. Unlike the 2D case, assembling dense matrix representations of the integral operators quickly becomes unfeasiable as the problem size increases. <code>Inti</code> adds support for compressing the underlying linear operators by wrapping external libraries. In this example, we will rely on <a href="https://github.com/WaveProp/HMatrices.jl"><code>HMatrices.jl</code></a> to handle the compression.</p><p>The visualization is also more involved, and we will use instead the <code>Gmsh</code> API to create a view of the solution on a punctured plane. Let us begin by creating our domain containing both the sphere and the puctured plane where we will visualize the solution:</p><pre><code class="language-julia hljs">function gmsh_sphere(; meshsize, order = gorder, radius = 1, visualize = false, name)
+Info    : Done meshing order 2 (Wall 0.0093515s, CPU 0.009353s)</code></pre><h2 id="helmholtz-scattering-3d"><a class="docs-heading-anchor" href="#helmholtz-scattering-3d">Three-dimensional scattering</a><a id="helmholtz-scattering-3d-1"></a><a class="docs-heading-anchor-permalink" href="#helmholtz-scattering-3d" title="Permalink"></a></h2><p>We now consider the same problem in 3D. Unlike the 2D case, assembling dense matrix representations of the integral operators quickly becomes unfeasiable as the problem size increases. <code>Inti</code> adds support for compressing the underlying linear operators by wrapping external libraries. In this example, we will rely on <a href="https://github.com/WaveProp/HMatrices.jl"><code>HMatrices.jl</code></a> to handle the compression.</p><p>The visualization is also more involved, and we will use instead the <code>Gmsh</code> API to create a view of the solution on a punctured plane. Let us begin by creating our domain containing both the sphere and the puctured plane where we will visualize the solution:</p><pre><code class="language-julia hljs">function gmsh_sphere(; meshsize, order = gorder, radius = 1, visualize = false, name)
     gmsh.initialize()
     gmsh.model.add(&quot;sphere-scattering&quot;)
     gmsh.option.setNumber(&quot;Mesh.MeshSizeMax&quot;, meshsize)
@@ -152,11 +152,11 @@ Info    : [ 50%] Meshing curve 5 (Line)
 Info    : [ 70%] Meshing curve 6 (Line)
 Info    : [ 80%] Meshing curve 7 (Line)
 Info    : [ 90%] Meshing curve 8 (Circle)
-Info    : Done meshing 1D (Wall 0.000655279s, CPU 0.000629s)
+Info    : Done meshing 1D (Wall 0.000652706s, CPU 0.000625s)
 Info    : Meshing 2D...
 Info    : [  0%] Meshing surface 1 (Sphere, Frontal-Delaunay)
 Info    : [ 50%] Meshing surface 2 (Plane, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.162324s, CPU 0.162152s)
+Info    : Done meshing 2D (Wall 0.162775s, CPU 0.162739s)
 Info    : 3233 nodes 6501 elements
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
@@ -171,7 +171,7 @@ Info    : [ 80%] Meshing surface 1 order 2
 Info    : [ 90%] Meshing surface 2 order 2
 Info    : [100%] Meshing volume 1 order 2
 Info    : Surface mesh: worst distortion = 0.94322 (0 elements in ]0, 0.2]); worst gamma = 0.593524
-Info    : Done meshing order 2 (Wall 0.0249918s, CPU 0.02499s)
+Info    : Done meshing order 2 (Wall 0.0248613s, CPU 0.024836s)
 Info    : Writing &#39;/home/lfaria/runner-integral-equations/_work/Inti.jl/Inti.jl/docs/build/examples/generated/sphere.msh&#39;...
 Info    : Done writing &#39;/home/lfaria/runner-integral-equations/_work/Inti.jl/Inti.jl/docs/build/examples/generated/sphere.msh&#39;
 Info    : Reading &#39;/home/lfaria/runner-integral-equations/_work/Inti.jl/Inti.jl/docs/build/examples/generated/sphere.msh&#39;...
@@ -228,7 +228,7 @@ er = maximum(1:100) do _
     x = 2 * x̂
     return abs(uₛ(x) - uₑ(x))
 end
-@info &quot;error with correction = $er&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: error with correction = 8.21981633496319e-6</code></pre><p>We see that, once again, the approximation is quite accurate. Let us now visualize the solution on the punctured plane (which we labeled as &quot;sigma&quot;). Since evaluating the integral representation of the solution at many points is expensive, we will use a compression method to accelerate the evaluation as well. In the example below, we use the fast-multipole method:</p><pre><code class="language-julia hljs">using FMM3D
+@info &quot;error with correction = $er&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: error with correction = 7.856276252851619e-6</code></pre><p>We see that, once again, the approximation is quite accurate. Let us now visualize the solution on the punctured plane (which we labeled as &quot;sigma&quot;). Since evaluating the integral representation of the solution at many points is expensive, we will use a compression method to accelerate the evaluation as well. In the example below, we use the fast-multipole method:</p><pre><code class="language-julia hljs">using FMM3D
 
 Σ = Inti.Domain(e -&gt; &quot;sigma&quot; ∈ Inti.labels(e), Inti.entities(msh))
 Σ_msh = view(msh, Σ)
@@ -254,4 +254,4 @@ colormap = :inferno
 fig, ax, pl = viz(Γ_msh; colorrange, colormap, color = zeros(nv))
 viz!(Σ_msh; colorrange, colormap, color = real(u_eval_msh))
 cb = Colorbar(fig[1, 2]; label = &quot;real(u)&quot;, colormap, colorrange)
-fig</code></pre><img src="744feb79.png" alt="Example block output"/><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../../">« Home</a><a class="docs-footer-nextpage" href="../poisson/">Poisson solver »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Tuesday 28 May 2024 18:49">Tuesday 28 May 2024</span>. Using Julia version 1.10.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+fig</code></pre><img src="744feb79.png" alt="Example block output"/><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../../">« Home</a><a class="docs-footer-nextpage" href="../poisson/">Poisson solver »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Tuesday 28 May 2024 21:49">Tuesday 28 May 2024</span>. Using Julia version 1.10.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
