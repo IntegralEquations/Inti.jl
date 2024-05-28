@@ -1,11 +1,15 @@
 """
     struct Domain
 
-A set of [`EntityKey`](@ref)s with the same geometric dimension used to
-represent a physical domain.
+Representation of a geometrical domain formed by a set of entities with the same
+geometric dimension. For basic set operations on domains are supported (union,
+intersection, difference, etc), and they all return a new `Domain` object.
+
+The unlerlying entities are stored in a [`Set`](@ref) of [`EntityKey`](@ref)s;
+the underlying entities can be accessed with [`global_get_entity(key)`](@ref).
 """
 struct Domain
-    entities::Set{EntityKey}
+    keys::Set{EntityKey}
     function Domain(ents::Set{EntityKey})
         @assert allequal(geometric_dimension(ent) for ent in ents) "entities in a domain have different dimensions"
         return new(ents)
@@ -13,9 +17,10 @@ struct Domain
 end
 
 Domain() = Domain(Set{EntityKey}())
+Domain(ents::Vararg{EntityKey}) = Domain(Set(ents))
 
 """
-    Domain([f::Function,] ents)
+    Domain([f::Function,] keys)
 
 Create a domain from a set of [`EntityKey`](@ref)s. Optionally, a filter
 function `f` can be passed to filter the entities.
@@ -25,20 +30,22 @@ Note that all entities in a domain must have the same geometric dimension.
 function Domain(f::Function, ents)
     return Domain(filter(f, ents))
 end
-Domain(ents) = Domain(Set(ents))
+Domain(ents::AbstractVector{EntityKey}) = Domain(Set(ents))
+
+Base.keys(Ω::Domain) = Ω.keys
 
 """
     entities(Ω::Domain)
 
 Return all entities making up a domain.
 """
-entities(Ω::Domain) = Ω.entities
+entities(Ω::Domain) = (global_get_entity(k) for k in Ω.keys)
 
 function Base.show(io::IO, d::Domain)
-    keys = entities(d)
-    n = length(entities(d))
-    n == 1 ? print(io, "Domain with $n entity:") : print(io, "Domain with $n entities:")
-    for k in keys
+    kk = keys(d)
+    n  = length(entities(d))
+    n == print(io, "Domain with $n ", n == 1 ? "entity" : "entities")
+    for k in kk
         ent = global_get_entity(k)
         print(io, "\n $(k) --> $ent")
     end
@@ -97,7 +104,7 @@ See also: [`external_boundary`](@ref), [`internal_boundary`](@ref), [`skeleton`]
 boundary(Ω::Domain) = external_boundary(Ω)
 
 function Base.setdiff(Ω1::Domain, Ω2::Domain)
-    return Domain(setdiff(entities(Ω1), entities(Ω2)))
+    return Domain(setdiff(keys(Ω1), keys(Ω2)))
 end
 
 function geometric_dimension(Ω::Domain)

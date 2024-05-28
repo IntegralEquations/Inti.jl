@@ -20,6 +20,11 @@ function Inti.import_mesh_from_gmsh_model(; dim = 3)
     Ω = Inti.Domain(Inti.entities(msh)) do ent
         return Inti.geometric_dimension(ent) == dim
     end
+    # create iterators for the lagrange elements
+    for E in keys(msh.etype2mat)
+        @assert E <: Union{Inti.LagrangeElement,SVector}
+        msh.etype2els[E] = Inti.ElementIterator(msh, E)
+    end
     return Ω, msh
 end
 

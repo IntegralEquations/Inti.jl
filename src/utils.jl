@@ -78,11 +78,16 @@ Given a function-like object `f: Ω → R`, return `f(Ω)`.
 function image end
 
 """
-    _integration_measure(J::AbstractMatrix)
+    integration_measure(f)
 
-Given the Jacobian matrix `J` of a transformation `f : ℝᴹ → ℝᴺ`, compute the
-integration measure `√det(JᵀJ)`.
+Given the Jacobian matrix `J` of a transformation `f : ℝᴹ → ℝᴺ` at the point
+`x`, compute the integration measure `√det(JᵀJ)`.
 """
+function integration_measure(f, x)
+    jac = jacobian(f, x)
+    return _integration_measure(jac)
+end
+
 function _integration_measure(jac::AbstractMatrix)
     M, N = size(jac)
     if M == N
@@ -235,6 +240,7 @@ function _normalize_correction(correction, target, source)
             target === source ||
             error("missing target_location field in correction")
         haskey(correction, :maxdist) ||
+            target === source ||
             @warn("missing maxdist field in correction: setting to Inf")
         correction = merge(
             (maxdist = Inf, interpolation_order = nothing, center = nothing),

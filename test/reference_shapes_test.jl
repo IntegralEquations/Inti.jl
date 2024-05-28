@@ -15,6 +15,19 @@ using StaticArrays
     @test Inti.center(l) == SVector(1 / 2)
     @test Inti.vertices(l) == (SVector(0), SVector(1))
 end
+@testset "Square" begin
+    sq = Inti.ReferenceSquare()
+    @test Inti.ambient_dimension(sq) == 2
+    @test Inti.geometric_dimension(sq) == 2
+    x = SVector(0.5, 0.5)
+    @test x ∈ sq
+    x = SVector(1.0, 1.0)
+    @test x ∈ sq
+    x = SVector(1.1, 1.0)
+    @test !in(x, sq)
+    @test Inti.center(sq) == SVector(1 / 2, 1 / 2)
+    @test Inti.vertices(sq) == (SVector(0, 0), SVector(1, 0), SVector(1, 1), SVector(0, 1))
+end
 @testset "Triangle" begin
     t = Inti.ReferenceTriangle()
     @test Inti.ambient_dimension(t) == 2

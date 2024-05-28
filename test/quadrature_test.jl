@@ -11,7 +11,6 @@ using Inti
             Inti.clear_entities!()
             gmsh.initialize()
             gmsh.option.setNumber("General.Verbosity", 2)
-            Inti.clear_entities!()
             gmsh.model.occ.addBox(0, 0, 0, lx, ly, lz)
             gmsh.model.occ.synchronize()
             gmsh.model.mesh.generate(3)
