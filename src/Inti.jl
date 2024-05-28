@@ -7,6 +7,7 @@ module Inti
 
 const PROJECT_ROOT = pkgdir(Inti)
 
+using DataStructures
 using LinearAlgebra
 using LinearMaps
 using NearestNeighbors
