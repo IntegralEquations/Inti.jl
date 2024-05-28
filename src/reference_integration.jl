@@ -163,6 +163,8 @@ function _get_gauss_qcoords_and_qweights(R::Type{<:ReferenceShape}, N)
     if !haskey(GAUSS_QRULES, R) || !haskey(GAUSS_QRULES[R], N)
         error("quadrature rule not found")
     end
+    # TODO: it makes no sense to store the tabulated rules in a format
+    # different from what is needed when they are fetched.
     qrule = GAUSS_QRULES[R][N]
     @assert length(qrule) == N
     # qnodes
@@ -245,11 +247,11 @@ function order(q::VioreanuRokhlin{ReferenceTetrahedron,N}) where {N}
 end
 
 function interpolation_order(q::VioreanuRokhlin{ReferenceTriangle,N}) where {N}
-    return TRIANGLE_VR_QORDER_TO_IORDER[N]
+    return TRIANGLE_VR_QORDER_TO_IORDER[order(q)]
 end
 
 function interpolation_order(q::VioreanuRokhlin{ReferenceTetrahedron,N}) where {N}
-    return TETRAHEDRON_VR_QORDER_TO_IORDER[N]
+    return TETRAHEDRON_VR_QORDER_TO_IORDER[order(q)]
 end
 
 function Triangle_VR_interpolation_order_to_quadrature_order(i::Integer)
@@ -275,6 +277,8 @@ function _get_vioreanurokhlin_qcoords_and_qweights(R::Type{<:ReferenceShape}, N)
     if !haskey(VR_QRULES, R) || !haskey(VR_QRULES[R], N)
         error("quadrature rule not found")
     end
+    # TODO: it makes no sense to store the tabulated rules in a format
+    # different from what is needed when they are fetched.
     qrule = VR_QRULES[R][N]
     @assert length(qrule) == N
     # qnodes
