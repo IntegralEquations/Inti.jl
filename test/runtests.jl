@@ -14,6 +14,8 @@ using Aqua
 
 @safetestset "Reference integration" include("reference_integration_test.jl")
 
+@safetestset "Native mesh generation" include("meshgen_test.jl")
+
 @safetestset "Quadrature" include("quadrature_test.jl")
 
 @safetestset "Density interpolation method" include("dim_test.jl")
