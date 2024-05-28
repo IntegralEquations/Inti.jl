@@ -22,6 +22,7 @@ include("utils.jl")
 
 # basic interpolation and integration
 include("reference_shapes.jl")
+include("polynomials.jl")
 include("reference_interpolation.jl")
 include("quad_rules_tables.jl")
 include("reference_integration.jl")
