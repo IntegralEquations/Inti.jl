@@ -38,6 +38,7 @@ meshsize = 0.05
 # `n` in the VDIM paper
 interpolation_order = 3
 qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
+nothing #hide
 
 # ## Meshing
 
