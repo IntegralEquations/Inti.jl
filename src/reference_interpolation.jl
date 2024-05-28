@@ -232,10 +232,24 @@ end
 """
 const LagrangeLine = LagrangeElement{ReferenceLine}
 
+const Line1D{T} = LagrangeElement{ReferenceLine,2,SVector{1,T}}
+const Line2D{T} = LagrangeElement{ReferenceLine,2,SVector{2,T}}
+const Line3D{T} = LagrangeElement{ReferenceLine,2,SVector{3,T}}
+Line1D(args...) = Line1D{Float64}(args...)
+Line2D(args...) = Line2D{Float64}(args...)
+Line3D(args...) = Line3D{Float64}(args...)
+
+integration_measure(l::Line1D) = norm(vals(l)[2] - vals(l)[1])
+
 """
     const LagrangeTriangle = LagrangeElement{ReferenceTriangle}
 """
 const LagrangeTriangle = LagrangeElement{ReferenceTriangle}
+
+const Triangle2D{T} = LagrangeElement{ReferenceTriangle,3,SVector{2,T}}
+const Triangle3D{T} = LagrangeElement{ReferenceTriangle,3,SVector{3,T}}
+Triangle2D(args...) = Triangle2D{Float64}(args...)
+Triangle3D(args...) = Triangle3D{Float64}(args...)
 
 """
     const LagrangeTetrahedron = LagrangeElement{ReferenceTetrahedron}
@@ -246,6 +260,11 @@ const LagrangeTetrahedron = LagrangeElement{ReferenceTetrahedron}
     const LagrangeSquare = LagrangeElement{ReferenceSquare}
 """
 const LagrangeSquare = LagrangeElement{ReferenceSquare}
+
+const Quadrangle2D{T} = LagrangeElement{ReferenceSquare,4,SVector{2,T}}
+const Quadrangle3D{T} = LagrangeElement{ReferenceSquare,4,SVector{3,T}}
+Quadrangle2D(args...) = Quadrangle2D{Float64}(args...)
+Quadrangle3D(args...) = Quadrangle3D{Float64}(args...)
 
 """
     const LagrangeSquare = LagrangeElement{ReferenceSquare}
@@ -518,4 +537,10 @@ value of each basis function at `x`.
 function lagrange_basis(::Type{LagrangeElement{D,N,T}}) where {D,N,T}
     vals = svector(i -> svector(j -> i == j, N), N)
     return LagrangeElement{D}(vals)
+end
+
+# construct a LagrangeElement from a reference shape
+function LagrangeElement(::ReferenceLine)
+    v = SVector(SVector(0.0), SVector(1.0))
+    return LagrangeLine(v)
 end

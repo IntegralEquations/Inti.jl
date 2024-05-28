@@ -133,7 +133,6 @@ struct Gauss{D,N} <: ReferenceQuadrature{D}
             haskey(TRIANGLE_GAUSS_ORDER_TO_NPTS, order) || error(msg)
             n = TRIANGLE_GAUSS_ORDER_TO_NPTS[order]
         elseif domain isa ReferenceTetrahedron
-            msg = "quadrature of order $order not available for ReferenceTetrahedron"
             haskey(TETRAHEDRON_GAUSS_ORDER_TO_NPTS, order) || error(msg)
             n = TETRAHEDRON_GAUSS_ORDER_TO_NPTS[order]
         else

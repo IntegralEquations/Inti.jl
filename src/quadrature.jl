@@ -56,9 +56,15 @@ struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
 end
 
 # AbstractArray interface
-Base.size(quad::Quadrature) = size(quad.qnodes)
-Base.getindex(quad::Quadrature, i) = quad.qnodes[i]
+Base.size(quad::Quadrature)            = size(quad.qnodes)
+Base.getindex(quad::Quadrature, i)     = quad.qnodes[i]
+Base.setindex!(quad::Quadrature, q, i) = (quad.qnodes[i] = q)
 
+qnodes(quad::Quadrature)         = quad.qnodes
+mesh(quad::Quadrature)           = quad.mesh
+etype2qtags(quad::Quadrature, E) = quad.etype2qtags[E]
+
+quadrature_rule(quad::Quadrature, E) = quad.etype2qrule[E]
 ambient_dimension(quad::Quadrature{N}) where {N} = N
 
 function Base.show(io::IO, quad::Quadrature)

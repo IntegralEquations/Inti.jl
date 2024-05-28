@@ -14,11 +14,11 @@ using Aqua
 
 @safetestset "Reference integration" include("reference_integration_test.jl")
 
-@safetestset "Meshgen" include("meshgen_test.jl")
-
 @safetestset "Quadrature" include("quadrature_test.jl")
 
 @safetestset "Density interpolation method" include("dim_test.jl")
+
+@safetestset "Adaptive integration" include("adaptive_test.jl")
 
 @safetestset "Gmsh extension" include("gmsh_test.jl")
 
