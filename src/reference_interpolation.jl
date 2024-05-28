@@ -16,8 +16,6 @@ Instances `el` of `ReferenceInterpolant` are expected to implement:
 """
 abstract type ReferenceInterpolant{D,T} end
 
-struct Foo <: ReferenceInterpolant{ReferenceLine,Float64} end
-
 function (el::ReferenceInterpolant)(x)
     return interface_method(el)
 end
@@ -59,6 +57,17 @@ function range_dimension(el::Type{<:ReferenceInterpolant{R,T}}) where {R,T}
     return domain(el) |> center |> el |> length
 end
 
+center(el::ReferenceInterpolant{D}) where {D} = el(center(D()))
+
+# FIXME: need a practical definition of an approximate "radius" of an element.
+# Does not need to be very sharp, since we mostly need to put elements inside a
+# bounding ball. The method below is more a of a hack, but it is valid for
+# convex polygons.
+function radius(el::ReferenceInterpolant{D}) where {D}
+    xc = center(el)
+    return maximum(x -> norm(x - xc), vertices(el))
+end
+
 """
     struct HyperRectangle{N,T} <: ReferenceInterpolant{ReferenceHyperCube{N},T}
 
@@ -74,7 +83,6 @@ low_corner(el::HyperRectangle) = el.low_corner
 high_corner(el::HyperRectangle) = el.high_corner
 geometric_dimension(::HyperRectangle{N,T}) where {N,T} = N
 ambient_dimension(::HyperRectangle{N,T}) where {N,T} = N
-center(el::HyperRectangle) = 0.5 * (low_corner(el) + high_corner(el))
 
 function (el::HyperRectangle)(u)
     lc = low_corner(el)
