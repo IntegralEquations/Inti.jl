@@ -232,7 +232,6 @@ function meshgen!(msh::LagrangeMesh, Ω::Domain, dict::Dict)
             ent = global_get_entity(k)
             @assert length(boundary(ent)) == 4
             b1, b2, b3, b4 = boundary(ent)
-            @show b1, b2, b3, b4
             # check consistency between the size of a boundary curve and its
             # opposite side
             pairs = ((b1, b3), (b2, b4))

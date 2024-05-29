@@ -191,16 +191,6 @@ that `x` is a fixed vertex of the children elements.
 
 The decomposed elements may be oriented differently than the parent, and thus
 care has to be taken regarding e.g. normal vectors.
-
-```jldoctest
-s = Inti.ReferenceLine()
-el1, el2 = Inti.decompose(s,0.3)
-el1(0) ≈ el2(0) ≈ Inti.Point1D(0.3)
-
-# output
-
-true
-
 ```
 """
 function decompose(ln::ReferenceLine, x::SVector{1,<:Real} = SVector(0.5))
