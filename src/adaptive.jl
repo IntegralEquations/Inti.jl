@@ -14,7 +14,7 @@ quadrature node of the standard quadrature.
 =#
 
 """
-    adaptive_correction(iop::IntegralOperator; maxdist, atol, maxsplit = 1000)
+    adaptive_correction(iop::IntegralOperator; tol, maxdist = farfield_distance(iop; atol), maxsplit = 1000])
 
 Given an integral operator `iop`, this function provides a sparse correction to
 `iop` for the entries `i,j` such that the distance between the `i`-th target and
@@ -23,21 +23,22 @@ the `j`-th source is less than `maxdist`.
 Choosing `maxdist` is a trade-off between accuracy and efficiency. The smaller
 the value, the fewer corrections are needed, but this may compromise the
 accuracy. For a *fixed* quadrature, the size of `maxdist` has to grow as the
-tolerance `atol` decreases. You can use [`farfield_distance(ipo; tol =
-atol)`](@ref) for a heuristic estimate of `maxdist`.
+tolerance `tol` decreases. The default `[farfield_distance(iop; tol)](@ref)
+provides a heuristic to determine a suitable `maxdist`.
 
 The correction is computed by using the [`adaptive_integration`](@ref) routine,
 with a tolerance `atol` and a maximum number of subdivisions `maxsplit`; see
 [`adaptive_integration`](@ref) for more details.
 """
-function adaptive_correction(iop::IntegralOperator; maxdist, atol, maxsplit = 1000)
+function adaptive_correction(iop::IntegralOperator; tol, maxdist = nothing, maxsplit = 1000)
+    maxdist = isnothing(maxdist) ? farfield_distance(iop; tol) : maxdist
     # unpack type-unstable fields in iop, allocate output, and dispatch
     X, Y, K = target(iop), source(iop), kernel(iop)
     # normalize maxdist
     maxdist = if isa(maxdist, Number)
         Dict(E => maxdist for E in element_types(mesh(Y)))
     elseif isnothing(maxdist)
-        farfield_distance(Y, K; tol = atol)
+        farfield_distance(Y, K; tol = tol)
     else
         maxdist
     end
@@ -61,7 +62,7 @@ function adaptive_correction(iop::IntegralOperator; maxdist, atol, maxsplit = 10
             Y,
             K,
             maxdist[E],
-            atol,
+            tol,
             maxsplit,
         )
     end

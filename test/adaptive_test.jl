@@ -84,11 +84,11 @@ end
                     D = Inti.IntegralOperator(dG, Γ_quad)
                     D0 = Inti.assemble_matrix(D)
                     e0 = norm(S0 * γ₁u - D0 * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
-                    maxdist = Inti.farfield_distance(S; tol = atol)
                     # @test d > meshsize
-                    d = Inti.farfield_distance(D; tol = atol)
-                    δS = Inti.adaptive_correction(S; maxdist = d, atol)
-                    δD = Inti.adaptive_correction(D; maxdist = d, atol)
+                    maxdist = Inti.farfield_distance(S; tol = atol)
+                    δS = Inti.adaptive_correction(S; maxdist, tol = atol)
+                    maxdist = Inti.farfield_distance(D; tol = atol)
+                    δD = Inti.adaptive_correction(D; maxdist, tol = atol)
                     Smat, Dmat = S0 + δS, D0 + δD
                     e1 = norm(Smat * γ₁u - Dmat * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
                     @testset "Single/double layer $(string(pde))" begin

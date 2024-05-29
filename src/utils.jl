@@ -246,6 +246,9 @@ function _normalize_correction(correction, target, source)
             (maxdist = Inf, interpolation_order = nothing, center = nothing),
             correction,
         )
+    elseif correction.method == :adaptive
+        haskey(correction, :tol) || error("missing tol field in correction")
+        correction = merge((maxsplit = 10_000, maxdist = nothing), correction)
     end
     return correction
 end
