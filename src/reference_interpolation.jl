@@ -16,8 +16,6 @@ Instances `el` of `ReferenceInterpolant` are expected to implement:
 """
 abstract type ReferenceInterpolant{D,T} end
 
-struct Foo <: ReferenceInterpolant{ReferenceLine,Float64} end
-
 function (el::ReferenceInterpolant)(x)
     return interface_method(el)
 end
@@ -59,6 +57,17 @@ function range_dimension(el::Type{<:ReferenceInterpolant{R,T}}) where {R,T}
     return domain(el) |> center |> el |> length
 end
 
+center(el::ReferenceInterpolant{D}) where {D} = el(center(D()))
+
+# FIXME: need a practical definition of an approximate "radius" of an element.
+# Does not need to be very sharp, since we mostly need to put elements inside a
+# bounding ball. The method below is more a of a hack, but it is valid for
+# convex polygons.
+function radius(el::ReferenceInterpolant{D}) where {D}
+    xc = center(el)
+    return maximum(x -> norm(x - xc), vertices(el))
+end
+
 """
     struct HyperRectangle{N,T} <: ReferenceInterpolant{ReferenceHyperCube{N},T}
 
@@ -74,7 +83,6 @@ low_corner(el::HyperRectangle) = el.low_corner
 high_corner(el::HyperRectangle) = el.high_corner
 geometric_dimension(::HyperRectangle{N,T}) where {N,T} = N
 ambient_dimension(::HyperRectangle{N,T}) where {N,T} = N
-center(el::HyperRectangle) = 0.5 * (low_corner(el) + high_corner(el))
 
 function (el::HyperRectangle)(u)
     lc = low_corner(el)
@@ -224,10 +232,24 @@ end
 """
 const LagrangeLine = LagrangeElement{ReferenceLine}
 
+const Line1D{T} = LagrangeElement{ReferenceLine,2,SVector{1,T}}
+const Line2D{T} = LagrangeElement{ReferenceLine,2,SVector{2,T}}
+const Line3D{T} = LagrangeElement{ReferenceLine,2,SVector{3,T}}
+Line1D(args...) = Line1D{Float64}(args...)
+Line2D(args...) = Line2D{Float64}(args...)
+Line3D(args...) = Line3D{Float64}(args...)
+
+integration_measure(l::Line1D) = norm(vals(l)[2] - vals(l)[1])
+
 """
     const LagrangeTriangle = LagrangeElement{ReferenceTriangle}
 """
 const LagrangeTriangle = LagrangeElement{ReferenceTriangle}
+
+const Triangle2D{T} = LagrangeElement{ReferenceTriangle,3,SVector{2,T}}
+const Triangle3D{T} = LagrangeElement{ReferenceTriangle,3,SVector{3,T}}
+Triangle2D(args...) = Triangle2D{Float64}(args...)
+Triangle3D(args...) = Triangle3D{Float64}(args...)
 
 """
     const LagrangeTetrahedron = LagrangeElement{ReferenceTetrahedron}
@@ -238,6 +260,11 @@ const LagrangeTetrahedron = LagrangeElement{ReferenceTetrahedron}
     const LagrangeSquare = LagrangeElement{ReferenceSquare}
 """
 const LagrangeSquare = LagrangeElement{ReferenceSquare}
+
+const Quadrangle2D{T} = LagrangeElement{ReferenceSquare,4,SVector{2,T}}
+const Quadrangle3D{T} = LagrangeElement{ReferenceSquare,4,SVector{3,T}}
+Quadrangle2D(args...) = Quadrangle2D{Float64}(args...)
+Quadrangle3D(args...) = Quadrangle3D{Float64}(args...)
 
 """
     const LagrangeSquare = LagrangeElement{ReferenceSquare}
@@ -510,4 +537,10 @@ value of each basis function at `x`.
 function lagrange_basis(::Type{LagrangeElement{D,N,T}}) where {D,N,T}
     vals = svector(i -> svector(j -> i == j, N), N)
     return LagrangeElement{D}(vals)
+end
+
+# construct a LagrangeElement from a reference shape
+function LagrangeElement(::ReferenceLine)
+    v = SVector(SVector(0.0), SVector(1.0))
+    return LagrangeLine(v)
 end

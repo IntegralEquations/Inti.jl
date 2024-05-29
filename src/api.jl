@@ -11,7 +11,7 @@ const COMPRESSION_METHODS = [:none, :hmatrix, :fmm]
 Available correction methods for the singular and nearly-singular integrals in
 [`Inti`](@ref).
 """
-const CORRECTION_METHODS = [:none, :dim, :hcubature]
+const CORRECTION_METHODS = [:none, :dim, :adaptive]
 
 """
     single_double_layer(; pde, target, source::Quadrature, compression,
@@ -147,6 +147,14 @@ function single_double_layer(;
                 derivative,
             )
         end
+    elseif correction.method == :adaptive
+        derivative && error(
+            "Adaptive quadrature not supported for derivative operators since they are not weakly singular.",
+        )
+        δS =
+            adaptive_correction(Sop; correction.maxdist, correction.maxplit, correction.tol)
+        δD =
+            adaptive_correction(Dop; correction.maxdist, correction.maxplit, correction.tol)
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end

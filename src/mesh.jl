@@ -501,3 +501,38 @@ function connectivity(msh::SubMesh, E::DataType)
     # connectity matrix
     return map(t -> g2l[t], view(msh.parent.etype2mat[E], :, eltags))
 end
+
+"""
+    near_interaction_list(X,Y::AbstractMesh; tol)
+
+For each element `el` of type `E` in `Y`, return the indices of the points in
+`X` which are closer than `tol` to the `center` of `el`.
+
+This function returns a dictionary where e.g. `dict[E][5] --> Vector{Int}` gives
+the indices of points in `X` which are closer than `tol` to the center of the
+fifth element of type `E`.
+
+If `tol` is a `Dict`, then `tol[E]` is the tolerance for elements of type `E`.
+"""
+function near_interaction_list(
+    X::AbstractVector{<:SVector{N}},
+    Y::AbstractMesh{N};
+    tol,
+) where {N}
+    @assert isa(tol, Number) || isa(tol, Dict) "tol must be a number or a dictionary mapping element types to numbers"
+    # for each element type, build the list of targets close to a given element
+    dict = Dict{DataType,Vector{Vector{Int}}}()
+    balltree = BallTree(X)
+    for E in element_types(Y)
+        els = elements(Y, E)
+        tol_ = isa(tol, Number) ? tol : tol[E]
+        idxs = _near_interaction_list(balltree, els, tol_)
+        dict[E] = idxs
+    end
+    return dict
+end
+
+@noinline function _near_interaction_list(balltree, els, tol)
+    centers = map(center, els)
+    return inrange(balltree, centers, tol)
+end

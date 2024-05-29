@@ -10,7 +10,7 @@ Utility functions that have nowhere obvious to go.
 Create an `SVector` of length n, computing each element as f(i), where i is the
 index of the element.
 """
-svector(f, n) = ntuple(f, n) |> SVector
+@inline svector(f::F, n) where {F} = ntuple(f, n) |> SVector
 
 """
     interface_method(x)
@@ -246,6 +246,9 @@ function _normalize_correction(correction, target, source)
             (maxdist = Inf, interpolation_order = nothing, center = nothing),
             correction,
         )
+    elseif correction.method == :adaptive
+        haskey(correction, :tol) || error("missing tol field in correction")
+        correction = merge((maxsplit = 10_000, maxdist = nothing), correction)
     end
     return correction
 end

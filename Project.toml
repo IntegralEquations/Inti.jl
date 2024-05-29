@@ -3,6 +3,7 @@ uuid = "fb74042b-437e-4c5b-88cf-d4e2beb394d5"
 version = "0.1.0"
 
 [deps]
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 ElementaryPDESolutions = "88a69b33-da0f-4502-8c8c-d680cf4d883b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearMaps = "7a12625a-238d-50fd-b39a-03d52299707e"
@@ -29,6 +30,7 @@ IntiHMatricesExt = "HMatrices"
 IntiMeshesExt = "Meshes"
 
 [compat]
+DataStructures = "0.18"
 ElementaryPDESolutions = "0.2"
 FMMLIB2D = "0.3"
 FMM2D = "0.2"

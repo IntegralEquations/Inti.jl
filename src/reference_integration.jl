@@ -121,14 +121,18 @@ struct Gauss{D,N} <: ReferenceQuadrature{D}
     # of nodes. This ensures you don't instantiate quadratures which are not
     # tabulated.
     function Gauss(; domain, order)
+        domain == :segment && (domain = ReferenceLine())
         domain == :triangle && (domain = ReferenceTriangle())
         domain == :tetrehedron && (domain = ReferenceTetrahedron())
-        if domain isa ReferenceTriangle
-            msg = "quadrature of order $order not available for ReferenceTriangle"
+        msg = "quadrature of order $order not available for $domain"
+        if domain isa ReferenceLine
+            # TODO: support Gauss-Legendre quadratures of arbitrary order
+            order == 13 || error(msg)
+            n = 7
+        elseif domain isa ReferenceTriangle
             haskey(TRIANGLE_GAUSS_ORDER_TO_NPTS, order) || error(msg)
             n = TRIANGLE_GAUSS_ORDER_TO_NPTS[order]
         elseif domain isa ReferenceTetrahedron
-            msg = "quadrature of order $order not available for ReferenceTetrahedron"
             haskey(TETRAHEDRON_GAUSS_ORDER_TO_NPTS, order) || error(msg)
             n = TETRAHEDRON_GAUSS_ORDER_TO_NPTS[order]
         else
@@ -163,6 +167,8 @@ function _get_gauss_qcoords_and_qweights(R::Type{<:ReferenceShape}, N)
     if !haskey(GAUSS_QRULES, R) || !haskey(GAUSS_QRULES[R], N)
         error("quadrature rule not found")
     end
+    # TODO: it makes no sense to store the tabulated rules in a format
+    # different from what is needed when they are fetched.
     qrule = GAUSS_QRULES[R][N]
     @assert length(qrule) == N
     # qnodes
@@ -245,11 +251,11 @@ function order(q::VioreanuRokhlin{ReferenceTetrahedron,N}) where {N}
 end
 
 function interpolation_order(q::VioreanuRokhlin{ReferenceTriangle,N}) where {N}
-    return TRIANGLE_VR_QORDER_TO_IORDER[N]
+    return TRIANGLE_VR_QORDER_TO_IORDER[order(q)]
 end
 
 function interpolation_order(q::VioreanuRokhlin{ReferenceTetrahedron,N}) where {N}
-    return TETRAHEDRON_VR_QORDER_TO_IORDER[N]
+    return TETRAHEDRON_VR_QORDER_TO_IORDER[order(q)]
 end
 
 function Triangle_VR_interpolation_order_to_quadrature_order(i::Integer)
@@ -275,6 +281,8 @@ function _get_vioreanurokhlin_qcoords_and_qweights(R::Type{<:ReferenceShape}, N)
     if !haskey(VR_QRULES, R) || !haskey(VR_QRULES[R], N)
         error("quadrature rule not found")
     end
+    # TODO: it makes no sense to store the tabulated rules in a format
+    # different from what is needed when they are fetched.
     qrule = VR_QRULES[R][N]
     @assert length(qrule) == N
     # qnodes
@@ -284,4 +292,200 @@ function _get_vioreanurokhlin_qcoords_and_qweights(R::Type{<:ReferenceShape}, N)
     qweightstype = SVector{N,Float64}
     w = qweightstype([q[2] for q in qrule])
     return x, w
+end
+
+"""
+    struct EmbeddedQuadrature{L,H,D} <: ReferenceQuadrature{D}
+
+A quadrature rule for the reference shape `D` based on a high-order quadrature
+of type `H` and a low-order quadrature of type `L`. The low-order quadrature
+rule is *embedded* in the sense that its `n` nodes are exactly the first `n`
+nodes of the high-order quadrature rule.
+"""
+struct EmbeddedQuadrature{L,H,D} <: ReferenceQuadrature{D}
+    low::L
+    high::H
+    function EmbeddedQuadrature(lquad, hquad)
+        d = domain(lquad)
+        @assert domain(lquad) == domain(hquad) "quadrature domains must match"
+        xlow = qcoords(lquad)
+        xhigh = qcoords(hquad)
+        @assert length(xhigh) > length(xlow) "high-order quadrature must have more nodes than low-order"
+        @assert xlow == xhigh[1:length(xlow)] "low-order nodes must exactly match the first high-order nodes. Got $(xlow) and $(xhigh)"
+        return new{typeof(lquad),typeof(hquad),typeof(d)}(lquad, hquad)
+    end
+end
+
+(q::EmbeddedQuadrature)() = q.high()
+
+"""
+    integrate_with_error_estimate(f, quad::EmbeddedQuadrature, norm = LinearAlgebra.norm)
+
+Return `I, E` where `I` is the estimated integral of `f` over `domain(quad)`
+using the high-order quadrature and `E` is the error estimate obtained by taking
+the `norm` of the difference between the high and low-order quadratures in
+`quad`.
+"""
+function integrate_with_error_estimate(
+    f,
+    quad::EmbeddedQuadrature,
+    norm = LinearAlgebra.norm,
+)
+    x, w_high = quad.high()
+    w_low = qweights(quad.low)
+    nhigh, nlow = length(w_high), length(w_low)
+    # assuming that nodes in quad_high are ordered so that the overlapping nodes
+    # come first, add them up
+    x1     = first(x)
+    v1     = f(x1)
+    I_high = v1 * first(w_high)
+    I_low  = v1 * first(w_low)
+    for i in 2:nlow
+        v = f(x[i])
+        I_high += v * w_high[i]
+        I_low += v * w_low[i]
+    end
+    # now compute the rest of the high order quadrature
+    for i in nlow+1:nhigh
+        v = f(x[i])
+        I_high += v * w_high[i]
+    end
+    return I_high, norm(I_high - I_low)
+end
+
+"""
+    adaptive_integration(f, τ̂::RefernceShape; kwargs...)
+    adaptive_integration(f, qrule::EmbeddedQuadrature; kwargs...)
+
+Use an adaptive procedure to estimate the integral of `f` over `τ̂ =
+domain(qrule)`. The following optional keyword arguments are available:
+- `atol::Real=0.0`: absolute tolerance for the integral estimate
+- `rtol::Real=0.0`: relative tolerance for the integral estimate
+- `maxsplit::Int=1000`: maximum number of times to split the domain
+- `norm::Function=LinearAlgebra.norm`: norm to use for error estimates
+- `buffer::BinaryHeap`: a pre-allocated buffer to use for the adaptive procedure
+  (see [allocate_buffer](@ref))
+"""
+function adaptive_integration(
+    f,
+    quad::EmbeddedQuadrature;
+    atol = 0.0,
+    rtol = iszero(atol) ? sqrt(eps()) : 0.0,
+    maxsplit = 1000,
+    norm = LinearAlgebra.norm,
+    buffer = nothing,
+)
+    return _adaptive_integration(f, quad, atol, rtol, maxsplit, norm, buffer)
+end
+function adaptive_integration(f, τ̂::ReferenceShape; kwargs...)
+    return adaptive_integration(f, default_embedded_quadrature(τ̂); kwargs...)
+end
+
+function _adaptive_integration(f, quad::EmbeddedQuadrature, atol, rtol, maxsplit, norm, buf)
+    τ̂ = domain(quad)
+    nsplit = 0
+    I, E = integrate_with_error_estimate(f, quad)
+    # a quick check to see if splitting is really needed
+    if E < atol || E < rtol * norm(I) || nsplit >= maxsplit
+        return I, E
+    end
+    # split is needed, so prepare heap if needed, push the element to the heap
+    # and begin
+    heap = if isnothing(buf)
+        allocate_buffer(f, quad)
+    else
+        empty!(buf.valtree)
+        buf
+    end
+    # create a first (non-singleton) element, push it to the heap, and begin
+    push!(heap, (LagrangeElement(τ̂), I, E))
+    while E > atol && E > rtol * norm(I) && nsplit < maxsplit
+        el, Ic, Ec = pop!(heap)
+        I -= Ic
+        E -= Ec
+        for child in subdivide(el)
+            μ = integration_measure(child)
+            Inew, Enew = μ .* integrate_with_error_estimate(x -> f(child(x)), quad)
+            I += Inew
+            E += Enew
+            push!(heap, (child, Inew, Enew))
+        end
+        nsplit += 1
+    end
+    nsplit >= maxsplit && @warn "maximum number of steps reached"
+
+    return I, E
+end
+
+function allocate_buffer(f, quad::EmbeddedQuadrature)
+    T = Float64 # TODO: make this a parameter so that we can do single precision?
+    τ̂ = domain(quad)
+    # type of element that will be returned by by quad. Pay the cost of single
+    # call to figure this out
+    I, E = integrate_with_error_estimate(f, quad)
+    # the heap of adaptive quadratures have elements of the form (s,I,E), where
+    # I and E are the value and error estimate over the simplex s. The ordering
+    # used is based the maximum error
+    ord = Base.Order.By(el -> -el[3])
+    # figure out the shape of the domains that will be needed for the heap
+    S = if τ̂ isa ReferenceLine
+        Line1D{T}
+    elseif τ̂ isa ReferenceTriangle
+        Triangle2D{T}
+        error("not implemented")
+    end
+    heap = BinaryHeap{Tuple{S,typeof(I),typeof(E)}}(ord)
+    return heap
+end
+allocate_buffer(f, τ̂::ReferenceShape) = allocate_buffer(f, default_embedded_quadrature(τ̂))
+
+function subdivide(ln::Line1D)
+    # @assert x ∈ ln
+    a, b = vertices(ln)
+    m = (a + b) / 2
+    return LagrangeLine(a, m), LagrangeLine(m, b)
+end
+
+function default_embedded_quadrature(::ReferenceLine)
+    qhigh = Kronrod{ReferenceLine,15}()
+    qlow = Gauss(; domain = ReferenceLine(), order = 13)
+    return EmbeddedQuadrature(qlow, qhigh)
+end
+
+# some tabulated rules used for EmbeddedQuadrature
+"""
+    struct Kronrod{D,N} <: ReferenceQuadrature{D}
+
+`N`-point Kronrod rule obtained by adding `n+1` points to a Gauss quadrature
+containing `n` points. The order is either `3n + 1` for `n` even or `3n + 2` for
+`n` odd.
+"""
+struct Kronrod{D,N} <: ReferenceQuadrature{D} end
+
+function (qrule::Gauss{ReferenceLine,7})()
+    return SEGMENT_G13N7
+end
+
+function (qrule::Kronrod{ReferenceLine,15})()
+    return SEGMENT_K23N15
+end
+
+"""
+    lagrange_basis(qrule::ReferenceQuadrature)
+
+Return a function `L : ℝᴺ → ℝᵖ` where `N` is the dimension of the domain of
+`qrule`, and `p` is the number of nodes in `qrule`. The function `L` is a
+polynomial in [`polynomial_space(qrule)`](@ref), and `L(xⱼ)[i] = δᵢⱼ` (i.e. the `i`th component of `L` is the `i`th
+Lagrange basis).
+"""
+function lagrange_basis(qrule::ReferenceQuadrature{D}) where {D}
+    k = interpolation_order(qrule)
+    sp = PolynomialSpace{D,k}()
+    nodes = qcoords(qrule)
+    return lagrange_basis(nodes, sp)
+end
+
+function interpolation_order(qrule::ReferenceQuadrature{ReferenceLine})
+    N = length(qrule)
+    return N - 1
 end
