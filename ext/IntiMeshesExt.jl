@@ -19,16 +19,17 @@ counterparts.
 """
 function to_meshes end
 
+to_point(x::SVector) = Point(x...)
 # LagrangeLine
-to_meshes(el::Inti.LagrangeLine) = Segment(Point.(Inti.vertices(el))...)
+to_meshes(el::Inti.LagrangeLine) = Segment(to_point.(Inti.vertices(el))...)
 # LagrangeTriangle
-to_meshes(el::Inti.LagrangeTriangle) = Triangle(Point.(Inti.vertices(el))...)
+to_meshes(el::Inti.LagrangeTriangle) = Triangle(to_point.(Inti.vertices(el))...)
 # LagrangeSquare
-to_meshes(el::Inti.LagrangeSquare) = Quadrangle(Point.(Inti.vertices(el))...)
+to_meshes(el::Inti.LagrangeSquare) = Quadrangle(to_point.(Inti.vertices(el))...)
 # LagrangeTetrahedron
-to_meshes(el::Inti.LagrangeTetrahedron) = Tetrahedron(Point.(Inti.vertices(el))...)
+to_meshes(el::Inti.LagrangeTetrahedron) = Tetrahedron(to_point.(Inti.vertices(el))...)
 # LagrangeCube
-to_meshes(el::Inti.LagrangeCube) = Hexahedron(Point.(Inti.vertices(el))...)
+to_meshes(el::Inti.LagrangeCube) = Hexahedron(to_point.(Inti.vertices(el))...)
 
 # ParametricElement gets converted to its low-order equivalent
 function to_meshes(el::Inti.ParametricElement{D}) where {D}
@@ -48,7 +49,7 @@ const ReferenceShapeToMeshes = Dict(
 )
 
 function to_meshes(msh::Inti.AbstractMesh)
-    pts = Point.(Inti.nodes(msh))
+    pts = to_point.(Inti.nodes(msh))
     connec = Vector{Connectivity}()
     for E in Inti.element_types(msh)
         E <: SVector && continue # skip points
