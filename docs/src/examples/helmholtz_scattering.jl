@@ -147,12 +147,10 @@ gmsh_circle(; meshsize, order = gorder, name)
 nothing #hide
 
 # We can now import the file and parse the mesh and domain information into
-# `Inti.jl` using the [`import_mesh_from_gmsh_file`](@ref Inti.import_mesh_from_gmsh_file) function:
+# `Inti.jl` using the [`import_mesh`](@ref Inti.import_mesh) function:
 
 Inti.clear_entities!() # empty the entity cache
-Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 2)
-@show Ω
-#-
+msh = Inti.import_mesh(name; dim = 2)
 @show msh
 
 # The code above will parse all entities in the `name` of dimension `2` as a
@@ -347,7 +345,7 @@ ta = gmsh.model.occ.addPlaneSurface([tl])
 gmsh.model.occ.synchronize()
 gmsh.model.mesh.generate(2)
 gmsh.model.mesh.setOrder(gorder)
-Ω, msh = Inti.import_mesh_from_gmsh_model(; dim = 2)
+msh = Inti.import_mesh_from_gmsh_model(; dim = 2)
 gmsh.finalize()
 
 # ## [Three-dimensional scattering](@id helmholtz-scattering-3d)
@@ -392,7 +390,7 @@ nothing #hide
 name = joinpath(@__DIR__, "sphere.msh")
 gmsh_sphere(; meshsize, order = gorder, name, visualize = false)
 Inti.clear_entities!()
-Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 3)
+Ω, msh = Inti.import_mesh(name; dim = 3)
 Γ = Inti.boundary(Ω)
 nothing #hide
 
@@ -411,8 +409,8 @@ nothing #hide
 
 # !!! tip "Writing/reading a mesh from disk"
 #       Writing and reading a mesh to/from disk can be time consuming. You can
-#       avoid doing so by using [`import_mesh_from_gmsh_file`](@ref Inti.import_mesh_from_gmsh_file)
-#       and [`import_mesh_from_gmsh_model`](@ref Inti.import_mesh_from_gmsh_model) functions on an
+#       avoid doing so by using [`import_mesh`](@ref Inti.import_mesh)
+#       and [`import_mesh`](@ref Inti.import_mesh) functions on an
 #       active `gmsh` model without writing it to disk.
 
 # We can now assemble the integral operators, indicating that we

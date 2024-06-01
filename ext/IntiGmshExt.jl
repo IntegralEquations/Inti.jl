@@ -16,19 +16,15 @@ function Inti.import_mesh_from_gmsh_model(; dim = 3)
     msh = Inti.LagrangeMesh{3,Float64}()
     _import_mesh!(msh)
     dim == 2 && (msh = Inti._convert_to_2d(msh))
-    # create a Domain with the entities of dimension `dim`
-    Ω = Inti.Domain(Inti.entities(msh)) do ent
-        return Inti.geometric_dimension(ent) == dim
-    end
     # create iterators for the lagrange elements
     for E in keys(msh.etype2mat)
         @assert E <: Union{Inti.LagrangeElement,SVector}
         msh.etype2els[E] = Inti.ElementIterator(msh, E)
     end
-    return Ω, msh
+    return msh
 end
 
-function Inti.import_mesh_from_gmsh_file(fname; dim = 3)
+function Inti.import_mesh(fname; dim = 3)
     initialized = gmsh.isInitialized() == 1
     try
         initialized || gmsh.initialize()
@@ -36,9 +32,9 @@ function Inti.import_mesh_from_gmsh_file(fname; dim = 3)
     catch
         @error "could not open $fname"
     end
-    Ω, msh = Inti.import_mesh_from_gmsh_model(; dim)
+    msh = Inti.import_mesh_from_gmsh_model(; dim)
     initialized || gmsh.finalize()
-    return Ω, msh
+    return msh
 end
 
 """

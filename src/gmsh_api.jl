@@ -11,13 +11,13 @@ This function assumes that the *Gmsh* API has been initialized through
 function import_mesh_from_gmsh_model end
 
 """
-    import_mesh_from_gmsh_file(fname::String; dim=3)
+    import_mesh(fname::String; dim=3)
 
 Open `fname` and create a [`LagrangeMesh`](@ref) from the `gmsh` model in it.
 
 See also: [`import_mesh_from_gmsh_model`](@ref).
 """
-function import_mesh_from_gmsh_file end
+function import_mesh end
 
 """
     gmsh_curve(f::Function, a, b; npts=100, tag=-1)
