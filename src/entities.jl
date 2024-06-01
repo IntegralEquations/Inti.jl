@@ -160,7 +160,7 @@ Create a [`GeometricEntity`] representing a parametric curve defined by the
 """
 function parametric_curve(f, a::Real, b::Real)
     d = HyperRectangle(SVector(float(a)), SVector(float(b)))
-    ent = GeometricEntity(; domain = d, parametrization = f)
+    ent = GeometricEntity(; domain = d, parametrization = x -> f(x[1]))
     return key(ent)
 end
 

@@ -36,6 +36,13 @@ function normal(x::T) where {T}
     end
 end
 
+"""
+    flip_normal(q::QuadratureNode)
+
+Return a new `QuadratureNode` with the normal vector flipped.
+"""
+flip_normal(q::QuadratureNode) = QuadratureNode(q.coords, q.weight, -q.normal)
+
 weight(q::QuadratureNode) = q.weight
 
 # useful for using either a quadrature node or a just a simple point in
@@ -56,12 +63,12 @@ struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
 end
 
 # AbstractArray interface
-Base.size(quad::Quadrature)            = size(quad.qnodes)
-Base.getindex(quad::Quadrature, i)     = quad.qnodes[i]
+Base.size(quad::Quadrature) = size(quad.qnodes)
+Base.getindex(quad::Quadrature, i) = quad.qnodes[i]
 Base.setindex!(quad::Quadrature, q, i) = (quad.qnodes[i] = q)
 
-qnodes(quad::Quadrature)         = quad.qnodes
-mesh(quad::Quadrature)           = quad.mesh
+qnodes(quad::Quadrature) = quad.qnodes
+mesh(quad::Quadrature) = quad.mesh
 etype2qtags(quad::Quadrature, E) = quad.etype2qtags[E]
 
 quadrature_rule(quad::Quadrature, E) = quad.etype2qrule[E]
@@ -93,10 +100,21 @@ function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
     )
     # loop element types and generate quadrature for each
     for E in element_types(msh)
-        els   = elements(msh, E)
+        els = elements(msh, E)
         qrule = etype2qrule[E]
         # dispatch to type-stable method
         _build_quadrature!(quad, els, qrule)
+    end
+    # check for entities with negative orientation and flip normal vectors if
+    # present
+    for ent in entities(msh)
+        if (sign(tag(ent)) < 0) && (N - geometric_dimension(ent) == 1)
+            @debug "Flipping normals of $ent"
+            tags = dom2qtags(quad, Domain(ent))
+            for i in tags
+                quad[i] = flip_normal(quad[i])
+            end
+        end
     end
     return quad
 end
@@ -152,8 +170,8 @@ its quadrature.
 function dom2qtags(Q::Quadrature, dom::Domain)
     msh = Q.mesh
     tags = Int[]
-    for E in element_types(Q)
-        idxs  = dom2elt(msh, dom, E)
+    for E in element_types(msh)
+        idxs = dom2elt(msh, dom, E)
         qtags = @view Q.etype2qtags[E][:, idxs]
         append!(tags, qtags)
     end

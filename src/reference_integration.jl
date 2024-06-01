@@ -417,6 +417,12 @@ function _adaptive_integration(f, quad::EmbeddedQuadrature, atol, rtol, maxsplit
     return I, E
 end
 
+"""
+    allocate_buffer(f, quad::EmbeddedQuadrature)
+
+Create the `buffer` needed for the call [`adaptive_integration(f, τ̂; buffer,
+...)`](@ref).
+"""
 function allocate_buffer(f, quad::EmbeddedQuadrature)
     T = Float64 # TODO: make this a parameter so that we can do single precision?
     τ̂ = domain(quad)
