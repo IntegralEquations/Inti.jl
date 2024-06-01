@@ -5,7 +5,7 @@ using Aqua
 @testset "Aqua" begin
     Aqua.test_all(
         Inti;
-        ambiguities = true,
+        ambiguities = false, # test only `Inti` for ambiguities later
         unbound_args = true,
         undefined_exports = true,
         project_extras = true,
@@ -14,4 +14,5 @@ using Aqua
         piracies = (; broken = true), # piracy related to ElementaryPDESolutions
         persistent_tasks = (; broken = false), # fixed?
     )
+    Aqua.test_ambiguities(Inti)
 end

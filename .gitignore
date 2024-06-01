@@ -11,3 +11,5 @@
 /docs/src/examples/generated/
 /sandbox/*
 
+.markdownlint.json
+Inti.code-workspace
