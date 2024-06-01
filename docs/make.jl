@@ -8,7 +8,7 @@ using Meshes
 using FMM2D
 using FMM3D
 
-draft = false
+draft = true
 
 const ON_CI = get(ENV, "CI", "false") == "true"
 const GIT_HEAD = chomp(read(`git rev-parse HEAD`, String))
@@ -29,11 +29,11 @@ end
 # Generate examples using Literate
 const examples_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples")
 const generated_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples", "generated")
-const examples = ["helmholtz_scattering.jl", "poisson.jl"]
-for example in examples
-    println("\n*** Generating $example example")
+const tutorials = ["getting_started.jl"]
+for t in tutorials
+    println("\n*** Generating $t example")
     @time begin
-        src = joinpath(examples_dir, example)
+        src = joinpath(examples_dir, t)
         Literate.markdown(src, generated_dir; mdstrings = true)
         # if draft, skip creation of notebooks
         Literate.notebook(
@@ -41,8 +41,8 @@ for example in examples
             generated_dir;
             mdstrings = true,
             preprocess = insert_setup,
-            # execute = !draft,
-            execute = false,
+            execute = !draft,
+            # execute = false,
         )
     end
 end
@@ -72,9 +72,9 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         # "Meshing" => "geo_and_meshes.md",
-        # "Toy example" => "examples/generated/toy_example.md",
-        "Helmholtz Example" => ["examples/generated/helmholtz_scattering.md"],
-        "Poisson Example" => ["examples/generated/poisson.md"],
+        "Tutorials" => ["examples/generated/getting_started.md"],
+        # "Helmholtz Example" => ["examples/generated/helmholtz_scattering.md"],
+        # "Poisson Example" => ["examples/generated/poisson.md"],
         "References" => "references.md",
     ],
     # warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),
