@@ -70,7 +70,15 @@ function GeometricEntity(;
     d = geometric_dimension(domain)
     t = isnothing(tag) ? new_tag(d) : tag
     V = return_type(parametrization, SVector{N,T})
-    isbitstype(V) || (@warn "nonbits type $V returned by parametrization")
+    # the parametrization should maps SVector to SVector
+    if !(V <: SVector)
+        msg = """return_type of parametrization was $V (expected an SVector).
+        This is usually due to a type instability in the parametrization
+        function. Consider fixing this, as it may lead to serious performance issues."""
+        @warn msg
+        f = parametrization
+        parametrization = x -> SVector(f(x))
+    end
     return GeometricEntity(d, t, boundary, labels, (; domain, parametrization))
 end
 
@@ -101,6 +109,30 @@ function Base.show(io::IO, ent::GeometricEntity)
     t = tag(ent)
     l = labels(ent)
     return print(io, "$T with (dim,tag)=($d,$t) and labels $l")
+end
+
+"""
+    measure(k::EntityKey, rtol)
+
+Compute the length/area/volume of the entity `k` using an adaptive quadrature
+with a relative tolerance `rtol`. Assumes that the entity has an explicit
+parametrization.
+"""
+function measure(k::EntityKey, rtol = 1e-2)
+    ent = global_get_entity(k)
+    geometric_dimension(ent) == 1 || error("measure only supports 1d entities")
+    hasparametrization(ent) || error("$k has no parametrization")
+    d = domain(ent)
+    τ̂ = domain(d)::ReferenceLine # FIXME: getters of reference domains should be renamed to avoid confusion
+    a, b = low_corner(d), high_corner(d)
+    l = norm(b - a)
+    f = parametrization(ent) # map from [a,b] to the curve
+    I, E = adaptive_integration(τ̂; rtol) do s
+        x = d(s)
+        μ = integration_measure(f, x)
+        return l * μ
+    end
+    return I
 end
 
 """

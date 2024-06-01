@@ -182,35 +182,37 @@ function Base.getindex(msh::LagrangeMesh{N,T}, Ω::Domain) where {N,T}
 end
 
 """
-    meshgen(Ω::Domain,num_elements)
-    meshgen(Ω::Domain;meshsize)
+    meshgen(Ω::Domain, n)
+    meshgen(Ω::Domain, n_dict)
+    meshgen(Ω::Domain; meshsize)
 
-Generate a `LagrangeMesh` for the domain `Ω` with `num_elements` per entity. To
-specify a different number of elements per entity, `num_elements` should be a
-dictionary mapping entities `e ∈ Ω` to the desired `num_elements`.
 
-Alternatively, a `meshsize` can be passed, either as a scalar or a dictionary.
-In such cases, the number of elements is computed as so as to obtain an
-*average* mesh size of `meshsize`; the actual mesh size may vary significantly
-for each element if the parametrization is far from uniform.
+Generate a `LagrangeMesh` for the domain `Ω` where each curve is meshed using
+`n` elements. Passing a dictionary allows for a finer control; in such cases,
+`n_dict[ent]` should return an integer for each entity `ent` in `Ω` of
+`geometric_dimension` one.
 
-Requires the entities forming `Ω` to have an explicit parametrization.
+Alternatively, a `meshsize` can be passed, in which case, the number of elements
+is computed as so as to obtain an *average* mesh size of `meshsize`. Note that
+the actual mesh size may vary significantly for each element if the
+parametrization is far from uniform.
 
-!!! warning The quality of the generated mesh created usign `meshgen` depends on
+This function requires the entities forming `Ω` to have an explicit
+parametrization.
+
+!!! warning "Mesh quality"
+    The quality of the generated mesh created usign `meshgen` depends on
     the quality of the underlying parametrization. For complex surfaces, you are
     better off using a proper mesher such as `gmsh`.
 """
-function meshgen(Ω::Domain, num_elements::Dict)
+function meshgen(Ω::Domain, args...; kwargs...)
     # extract the ambient dimension for these entities (i.e. are we in 2d or
     # 3d). Only makes sense if all entities have the same ambient dimension.
     N = ambient_dimension(first(Ω))
     @assert all(p -> ambient_dimension(p) == N, entities(Ω)) "Entities must have the same ambient dimension"
     mesh = LagrangeMesh{N,Float64}()
-    meshgen!(mesh, Ω, num_elements)
+    meshgen!(mesh, Ω, args...; kwargs...)
     return mesh
-end
-function meshgen(Ω::Domain, num_elements::NTuple{<:Any,Int})
-    return meshgen(Ω, Dict(e => num_elements for e in keys(Ω)))
 end
 
 """
@@ -218,6 +220,16 @@ end
 
 Similar to [`meshgen`](@ref), but append entries to `mesh`.
 """
+function meshgen!(msh::LagrangeMesh, Ω::Domain, num_elements::Int)
+    e1d = filter(k -> geometric_dimension(k) == 1, all_keys(Ω))
+    return meshgen!(msh, Ω, Dict(e => num_elements for e in e1d))
+end
+function meshgen!(msh::LagrangeMesh, Ω::Domain; meshsize::Real)
+    # compute the length of each curve using an adaptive quadrature
+    e1d = filter(k -> geometric_dimension(k) == 1, all_keys(Ω))
+    dict = Dict(k => ceil(Int, measure(k) / meshsize) for k in e1d)
+    return meshgen!(msh, Ω, dict)
+end
 function meshgen!(msh::LagrangeMesh, Ω::Domain, dict::Dict)
     N = ambient_dimension(msh)
     d = geometric_dimension(Ω)
@@ -226,7 +238,7 @@ function meshgen!(msh::LagrangeMesh, Ω::Domain, dict::Dict)
         if d == 1
             haskey(dict, k) || error(msg1(k))
             sz = dict[k]
-            _meshgen!(msh, k, sz)
+            _meshgen!(msh, k, (sz,))
         elseif d == 2
             # mesh the boundary first, then the interior
             ent = global_get_entity(k)

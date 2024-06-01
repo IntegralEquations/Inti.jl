@@ -34,6 +34,19 @@ Domain(ents::AbstractVector{EntityKey}) = Domain(Set(ents))
 
 Base.keys(Ω::Domain) = Ω.keys
 
+# helper function to get all keys in a domain recursively
+function all_keys(Ω::Domain)
+    k = Set{EntityKey}()
+    return _all_keys!(k, Ω)
+end
+function _all_keys!(k, Ω::Domain)
+    union!(k, Ω.keys)
+    sk = skeleton(Ω)
+    isempty(sk) && return k
+    _all_keys!(k, skeleton(Ω))
+    return k
+end
+
 """
     entities(Ω::Domain)
 
@@ -51,11 +64,6 @@ function Base.show(io::IO, d::Domain)
     end
     return io
 end
-
-Base.union(Ω1::Domain, Ωs...) = Domain(union(Ω1.keys, map(ω -> keys(ω), Ωs)...))
-Base.union(e1::EntityKey, e2::EntityKey) = Domain(e1, e2)
-Base.union(e1::EntityKey, Ω::Domain) = Domain(e1, keys(Ω)...)
-Base.union(Ω::Domain, e::EntityKey) = Domain(keys(Ω)..., e)
 
 """
     skeleton(Ω::Domain)
@@ -129,3 +137,8 @@ Base.isempty(Ω::Domain) = isempty(entities(Ω))
 
 Base.in(ent::EntityKey, Ω::Domain) = in(ent, entities(Ω))
 Base.in(Ω1::Domain, Ω2::Domain) = all(ent ∈ Ω2 for ent in entities(Ω1))
+
+Base.union(Ω1::Domain, Ωs...) = Domain(union(Ω1.keys, map(ω -> keys(ω), Ωs)...))
+Base.union(e1::EntityKey, e2::EntityKey) = Domain(e1, e2)
+Base.union(e1::EntityKey, Ω::Domain) = Domain(e1, keys(Ω)...)
+Base.union(Ω::Domain, e::EntityKey) = Domain(keys(Ω)..., e)
