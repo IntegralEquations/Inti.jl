@@ -52,6 +52,11 @@ function Base.show(io::IO, d::Domain)
     return io
 end
 
+Base.union(Ω1::Domain, Ωs...) = Domain(union(Ω1.keys, map(ω -> keys(ω), Ωs)...))
+Base.union(e1::EntityKey, e2::EntityKey) = Domain(e1, e2)
+Base.union(e1::EntityKey, Ω::Domain) = Domain(e1, keys(Ω)...)
+Base.union(Ω::Domain, e::EntityKey) = Domain(keys(Ω)..., e)
+
 """
     skeleton(Ω::Domain)
 
