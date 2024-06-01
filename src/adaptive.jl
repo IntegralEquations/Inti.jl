@@ -191,7 +191,6 @@ that `x` is a fixed vertex of the children elements.
 
 The decomposed elements may be oriented differently than the parent, and thus
 care has to be taken regarding e.g. normal vectors.
-```
 """
 function decompose(ln::ReferenceLine, x::SVector{1,<:Real} = SVector(0.5))
     # @assert x ∈ ln

@@ -8,7 +8,7 @@ using Meshes
 using FMM2D
 using FMM3D
 
-draft = true
+draft = false
 
 const ON_CI = get(ENV, "CI", "false") == "true"
 const GIT_HEAD = chomp(read(`git rev-parse HEAD`, String))
@@ -41,8 +41,7 @@ for t in tutorials
             generated_dir;
             mdstrings = true,
             preprocess = insert_setup,
-            execute = !draft,
-            # execute = false,
+            execute = ON_CI,
         )
     end
 end
