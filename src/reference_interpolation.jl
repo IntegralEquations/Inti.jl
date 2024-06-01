@@ -24,23 +24,16 @@ end
     jacobian(f,x)
 
 Given a (possibly vector-valued) functor `f : 𝐑ᵐ → 𝐅ⁿ`, return the `n × m`
-matrix `Aᵢⱼ = ∂fᵢ/∂xⱼ`. By default a finite-difference approximation is
-performed, but you should overload this method for specific `f` if better
+matrix `Aᵢⱼ = ∂fᵢ/∂xⱼ`. By default `ForwardDiff` is used to comptue the
+jacobian, but you should overload this method for specific `f` if better
 performance and/or precision is required.
 
-Note: both `x` and `f(x)` are expected to be of `SArray` type.
+Note: both `x` and `f(x)` are expected to be of `SVector` type.
 """
-function jacobian(f, x)
-    T = eltype(x)
-    N = length(x)
-    h = (eps())^(1 / 3)
-    partials = svector(N) do d
-        xp = SVector(ntuple(i -> i == d ? x[i] + h : x[i], N))
-        xm = SVector(ntuple(i -> i == d ? x[i] - h : x[i], N))
-        return (f(xp) - f(xm)) / (2h)
-    end
-    return hcat(partials...)
+function jacobian(f, s)
+    return ForwardDiff.jacobian(f, s)
 end
+jacobian(f, s::Real) = jacobian(f, SVector(s))
 
 domain(::ReferenceInterpolant{D,T}) where {D,T} = D()
 domain(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = D()
@@ -89,12 +82,6 @@ function (el::HyperRectangle)(u)
     hc = high_corner(el)
     v = @. lc + (hc - lc) * u
     return v
-end
-
-function jacobian(el::HyperRectangle, u)
-    lc = low_corner(el)
-    hc = high_corner(el)
-    return SDiagonal(hc - lc)
 end
 
 """
@@ -322,11 +309,6 @@ function (el::LagrangeLine{2})(u)
     return v[1] + (v[2] - v[1]) * u[1]
 end
 
-function jacobian(el::LagrangeLine{2}, u)
-    v = vals(el)
-    return hcat(v[2] - v[1])
-end
-
 # P2 for ReferenceLine
 function reference_nodes(::Type{<:LagrangeLine{3}})
     return SVector(SVector(0.0), SVector(1.0), SVector(0.5))
@@ -339,11 +321,6 @@ function (el::LagrangeLine{3})(u)
            2 * (v[2] + v[1] - 2 * v[3]) * u[1]^2
 end
 
-function jacobian(el::LagrangeLine{3}, u)
-    v = vals(el)
-    return hcat(4 * v[3] - 3 * v[1] - v[2] + 4 * (v[2] + v[1] - 2 * v[3]) * u[1])
-end
-
 # P1 for ReferenceTriangle
 function reference_nodes(::Type{<:LagrangeTriangle{3}})
     return SVector(SVector(0.0, 0.0), SVector(1.0, 0.0), SVector(0.0, 1.0))
@@ -352,12 +329,6 @@ end
 function (el::LagrangeTriangle{3})(u)
     v = vals(el)
     return v[1] + (v[2] - v[1]) * u[1] + (v[3] - v[1]) * u[2]
-end
-
-function jacobian(el::LagrangeTriangle{3}, u)
-    v = vals(el)
-    jac = hcat(v[2] - v[1], v[3] - v[1])
-    return jac
 end
 
 # P2 for ReferenceTriangle
@@ -378,20 +349,6 @@ function (el::LagrangeTriangle{6})(u)
            u[1] *
            (-v[2] + u[1] * (2v[2] - 4v[4]) + 4v[4] + u[2] * (-4v[4] + 4v[5] - 4v[6])) +
            u[2] * (-v[3] + u[2] * (2v[3] - 4v[6]) + 4v[6])
-end
-
-function jacobian(el::LagrangeTriangle{6}, u)
-    v = vals(el)
-    return hcat(
-        (-3 + 4u[1] + 4u[2]) * v[1] - v[2] +
-        u[1] * (4v[2] - 8v[4]) +
-        4v[4] +
-        u[2] * (-4v[4] + 4v[5] - 4v[6]),
-        (-3 + 4u[1] + 4u[2]) * v[1] - v[3] +
-        u[2] * (4v[3] - 8v[6]) +
-        u[1] * (-4v[4] + 4v[5] - 4v[6]) +
-        4v[6],
-    )
 end
 
 # P3 for ReferenceTriangle
@@ -438,36 +395,6 @@ function (el::LagrangeTriangle{10})(u)
            v[10] * ϕ₁₀
 end
 
-function jacobian(el::LagrangeTriangle{10,T}, u) where {T}
-    λ₁ = 1 - u[1] - u[2]
-    λ₂ = u[1]
-    λ₃ = u[2]
-    ∇λ₁ = SMatrix{1,2,eltype(T),2}(-1.0, -1.0)
-    ∇λ₂ = SMatrix{1,2,eltype(T),2}(1.0, 0.0)
-    ∇λ₃ = SMatrix{1,2,eltype(T),2}(0.0, 1.0)
-    ∇ϕ₁ = (13.5 * λ₁ * λ₁ - 9λ₁ + 1) * ∇λ₁
-    ∇ϕ₂ = (13.5 * λ₂ * λ₂ - 9λ₂ + 1) * ∇λ₂
-    ∇ϕ₃ = (13.5 * λ₃ * λ₃ - 9λ₃ + 1) * ∇λ₃
-    ∇ϕ₄ = 4.5 * ((3 * λ₁ * λ₁ - λ₁) * ∇λ₂ + λ₂ * (6λ₁ - 1) * ∇λ₁)
-    ∇ϕ₅ = 4.5 * ((3 * λ₂ * λ₂ - λ₂) * ∇λ₁ + λ₁ * (6λ₂ - 1) * ∇λ₂)
-    ∇ϕ₆ = 4.5 * ((3 * λ₂ * λ₂ - λ₂) * ∇λ₃ + λ₃ * (6λ₂ - 1) * ∇λ₂)
-    ∇ϕ₇ = 4.5 * ((3 * λ₃ * λ₃ - λ₃) * ∇λ₂ + λ₂ * (6λ₃ - 1) * ∇λ₃)
-    ∇ϕ₈ = 4.5 * ((3 * λ₃ * λ₃ - λ₃) * ∇λ₁ + λ₁ * (6λ₃ - 1) * ∇λ₃)
-    ∇ϕ₉ = 4.5 * ((3 * λ₁ * λ₁ - λ₁) * ∇λ₃ + λ₃ * (6λ₁ - 1) * ∇λ₁)
-    ∇ϕ₁₀ = 27 * (λ₁ * λ₂ * ∇λ₃ + λ₁ * λ₃ * ∇λ₂ + λ₃ * λ₂ * ∇λ₁)
-    v = vals(el)
-    return v[1] * ∇ϕ₁ +
-           v[2] * ∇ϕ₂ +
-           v[3] * ∇ϕ₃ +
-           v[4] * ∇ϕ₄ +
-           v[5] * ∇ϕ₅ +
-           v[6] * ∇ϕ₆ +
-           v[7] * ∇ϕ₇ +
-           v[8] * ∇ϕ₈ +
-           v[9] * ∇ϕ₉ +
-           v[10] * ∇ϕ₁₀
-end
-
 # P1 for ReferenceSquare
 function reference_nodes(::Type{<:LagrangeSquare{4}})
     return SVector(SVector(0, 0), SVector(1, 0), SVector(1, 1), SVector(0, 1))
@@ -481,14 +408,6 @@ function (el::LagrangeElement{ReferenceSquare,4})(u)
            (v[3] + v[1] - v[2] - v[4]) * u[1] * u[2]
 end
 
-function jacobian(el::LagrangeElement{ReferenceSquare,4}, u)
-    v = vals(el)
-    return hcat(
-        ((v[2] - v[1]) + (v[3] + v[1] - v[2] - v[4]) * u[2]),
-        ((v[4] - v[1]) + (v[3] + v[1] - v[2] - v[4]) * u[1]),
-    )
-end
-
 # P1 for ReferenceTetrahedron
 function reference_nodes(::LagrangeTetrahedron{4})
     return SVector(SVector(0, 0, 0), SVector(1, 0, 0), SVector(0, 1, 0), SVector(0, 0, 1))
@@ -497,11 +416,6 @@ end
 function (el::LagrangeElement{ReferenceTetrahedron,4})(u)
     v = vals(el)
     return v[1] + (v[2] - v[1]) * u[1] + (v[3] - v[1]) * u[2] + (v[4] - v[1]) * u[3]
-end
-
-function jacobian(el::LagrangeElement{ReferenceTetrahedron,4}, u)
-    v = vals(el)
-    return hcat((v[2] - v[1]), (v[3] - v[1]), (v[4] - v[1]))
 end
 
 """
