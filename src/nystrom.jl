@@ -238,8 +238,9 @@ function _farfield_distance(el, K, qrule, tol, maxiter)
         y   = el(ŷ)
         jac = jacobian(el, ŷ)
         ν   = _normal(jac)
+        νₓ  = (x - x₀) |> normalize
         τ′  = _integration_measure(jac)
-        return K(x, (coords = y, normal = ν)) * τ′
+        return K((coords = x, normal = νₓ), (coords = y, normal = ν)) * τ′
     end
     τ̂ = domain(el)
     N = length(x₀)
