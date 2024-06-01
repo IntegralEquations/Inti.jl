@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Poisson solver · Inti.jl</title><meta name="title" content="Poisson solver · Inti.jl"/><meta property="og:title" content="Poisson solver · Inti.jl"/><meta property="twitter:title" content="Poisson solver · Inti.jl"/><meta name="description" content="Documentation for Inti.jl."/><meta property="og:description" content="Documentation for Inti.jl."/><meta property="twitter:description" content="Documentation for Inti.jl."/><meta property="og:url" content="https://IntegralEquations.github.io/Inti.jl/examples/generated/poisson/"/><meta property="twitter:url" content="https://IntegralEquations.github.io/Inti.jl/examples/generated/poisson/"/><link rel="canonical" href="https://IntegralEquations.github.io/Inti.jl/examples/generated/poisson/"/><script data-outdated-warner src="../../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../../assets/documenter.js"></script><script src="../../../search_index.js"></script><script src="../../../siteinfo.js"></script><script src="../../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../../">Inti.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../../">Home</a></li><li><span class="tocitem">Helmholtz Example</span><ul><li><a class="tocitem" href="../helmholtz_scattering/">Helmholtz scattering</a></li></ul></li><li><span class="tocitem">Poisson Example</span><ul><li class="is-active"><a class="tocitem" href>Poisson solver</a><ul class="internal"><li><a class="tocitem" href="#Problem-definition"><span>Problem definition</span></a></li><li><a class="tocitem" href="#Meshing"><span>Meshing</span></a></li><li><a class="tocitem" href="#Manufactured-solution"><span>Manufactured solution</span></a></li><li><a class="tocitem" href="#Boundary-and-integral-operators"><span>Boundary and integral operators</span></a></li><li><a class="tocitem" href="#Visualize-the-solution-error-using-Gmsh"><span>Visualize the solution error using Gmsh</span></a></li></ul></li></ul></li><li><a class="tocitem" href="../../../references/">References</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Poisson Example</a></li><li class="is-active"><a href>Poisson solver</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Poisson solver</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl/blob/main/docs/src/examples/poisson.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="poisson"><a class="docs-heading-anchor" href="#poisson">Poisson solver</a><a id="poisson-1"></a><a class="docs-heading-anchor-permalink" href="#poisson" title="Permalink"></a></h1><p><a href="../poisson.ipynb"><img src="https://img.shields.io/badge/download-ipynb-blue" alt="ipynb"/></a> <a href="https://nbviewer.jupyter.org/github/IntegralEquations/Inti.jl/blob/gh-pages/previews/PR51/examples/generated/poisson.ipynb"><img src="https://img.shields.io/badge/show-nbviewer-blue.svg" alt="nbviewer"/></a></p><div class="admonition is-info"><header class="admonition-header">Important points covered in this example</header><div class="admonition-body"><ul><li>Solving a volumetric problem</li><li>Using the method of manufactured solutions</li><li>...</li></ul></div></div><pre><code class="language-julia hljs">using Inti</code></pre><h2 id="Problem-definition"><a class="docs-heading-anchor" href="#Problem-definition">Problem definition</a><a id="Problem-definition-1"></a><a class="docs-heading-anchor-permalink" href="#Problem-definition" title="Permalink"></a></h2><p>In this example we will solve the Poisson equation in a domain <span>$\Omega$</span> with Dirichlet boundary conditions on <span>$\Gamma := \partial \Omega$</span>:</p><p class="math-container">\[  \begin{align}
+      \Delta u &amp;= f  \quad \text{in } \Omega \\
+      u &amp;= g  \quad \text{on } \partial \Gamma
+  \end{align}\]</p><p>where <span>$f : \Omega \to \mathbb{R}$</span> and <span>$g : \Gamma \to \mathbb{R}$</span> are given functions.</p><p>Seeking for a solution <span>$u$</span> of the form ...</p><pre><code class="language-julia hljs">meshsize = 0.05</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">0.05</code></pre><p><code>n</code> in the VDIM paper</p><pre><code class="language-julia hljs">interpolation_order = 3
+qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)</code></pre><h2 id="Meshing"><a class="docs-heading-anchor" href="#Meshing">Meshing</a><a id="Meshing-1"></a><a class="docs-heading-anchor-permalink" href="#Meshing" title="Permalink"></a></h2><p>We now create the required meshes and quadratures for both <span>$\Omega$</span> and <span>$\Gamma$</span>:</p><pre><code class="language-julia hljs">using Gmsh # this will trigger the loading of Inti&#39;s Gmsh extension
+
+function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
+    try
+        gmsh.initialize()
+        gmsh.option.setNumber(&quot;General.Terminal&quot;, 0)
+        gmsh.model.add(&quot;circle-mesh&quot;)
+        gmsh.option.setNumber(&quot;Mesh.MeshSizeMax&quot;, meshsize)
+        gmsh.option.setNumber(&quot;Mesh.MeshSizeMin&quot;, meshsize)
+        gmsh.model.occ.addDisk(center[1], center[2], 0, paxis[1], paxis[2])
+        gmsh.model.occ.synchronize()
+        gmsh.model.mesh.generate(2)
+        gmsh.model.mesh.setOrder(order)
+        gmsh.write(name)
+    finally
+        gmsh.finalize()
+    end
+end
+
+name = joinpath(@__DIR__, &quot;disk.msh&quot;)
+gmsh_disk(; meshsize, order = 2, name)
+
+Inti.clear_entities!() # empty the entity cache
+Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 2)
+Γ = Inti.boundary(Ω)
+
+Ωₕ = view(msh, Ω)
+Γₕ = view(msh, Γ)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Inti.SubMesh{2, Float64} containing:
+	 194 elements of type Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 3, StaticArraysCore.SVector{2, Float64}}</code></pre><p>Use VDIM with the Vioreanu-Rokhlin quadrature rule</p><pre><code class="language-julia hljs">Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder);
+dict = Dict(E =&gt; Q for E in Inti.element_types(Ωₕ))
+Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
+Γₕ_quad = Inti.Quadrature(Γₕ; qorder)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1164-element Inti.Quadrature{2, Float64}:
+ Inti.QuadratureNode{2, Float64}([1.999999193998813, 0.0008515051397931395], 0.002965189101588837, [0.9999983929065215, 0.001792814651456313])
+ Inti.QuadratureNode{2, Float64}([1.9999460276661267, 0.0073169829206595075], 0.009435136367433615, [0.9998925957649899, 0.014655952181637195])
+ Inti.QuadratureNode{2, Float64}([1.9996572238731096, 0.01850570951186488], 0.012569886053405702, [0.9993169790955535, 0.036953691173374874])
+ Inti.QuadratureNode{2, Float64}([1.9990134503593195, 0.031409865238500284], 0.012569893551151892, [0.9980329347374522, 0.06269179515174617])
+ Inti.QuadratureNode{2, Float64}([1.9981872057178847, 0.04257179199460834], 0.00943515172670931, [0.9963864040030292, 0.08493605781946882])
+ Inti.QuadratureNode{2, Float64}([1.9975965985367805, 0.049010469940377374], 0.0029651956882984732, [0.9952114135192774, 0.09774580502999537])
+ Inti.QuadratureNode{2, Float64}([1.997427126804506, 0.05070499830106252], 0.0029650884972470645, [0.9948594784261822, 0.101265088681069])
+ Inti.QuadratureNode{2, Float64}([1.9967319408285302, 0.05713307486696478], 0.009435038575020337, [0.9935063513877384, 0.11377666611490987])
+ Inti.QuadratureNode{2, Float64}([1.9953372835046483, 0.06823834483500663], 0.012570057511931503, [0.9907873487284673, 0.13542684224190818])
+ Inti.QuadratureNode{2, Float64}([1.9934262922437305, 0.0810166748464779], 0.012570078449858893, [0.9870587918337791, 0.16035878979226736])
+ ⋮
+ Inti.QuadratureNode{2, Float64}([1.9953372835046488, -0.06823834483499853], 0.012570057511932175, [0.9907873487284694, -0.13542684224189236])
+ Inti.QuadratureNode{2, Float64}([1.9967319408285307, -0.05713307486695617], 0.009435038575020706, [0.993506351387738, -0.11377666611491277])
+ Inti.QuadratureNode{2, Float64}([1.9974271268045063, -0.050704998301053704], 0.002965088497247159, [0.9948594784261807, -0.10126508868108246])
+ Inti.QuadratureNode{2, Float64}([1.9975965985367812, -0.049010469940368666], 0.0029651956882979914, [0.9952114135192806, -0.0977458050299635])
+ Inti.QuadratureNode{2, Float64}([1.9981872057178849, -0.042571791994600656], 0.009435151726707749, [0.9963864040030314, -0.08493605781944441])
+ Inti.QuadratureNode{2, Float64}([1.9990134503593193, -0.03140986523849448], 0.012569893551149717, [0.9980329347374529, -0.06269179515173447])
+ Inti.QuadratureNode{2, Float64}([1.9996572238731096, -0.018505709511861368], 0.012569886053403406, [0.9993169790955533, -0.03695369117337748])
+ Inti.QuadratureNode{2, Float64}([1.999946027666127, -0.007316982920658095], 0.009435136367431807, [0.9998925957649897, -0.014655952181651825])
+ Inti.QuadratureNode{2, Float64}([1.9999991939988129, -0.0008515051397929797], 0.0029651891015882574, [0.9999983929065214, -0.0017928146514776782])</code></pre><h2 id="Manufactured-solution"><a class="docs-heading-anchor" href="#Manufactured-solution">Manufactured solution</a><a id="Manufactured-solution-1"></a><a class="docs-heading-anchor-permalink" href="#Manufactured-solution" title="Permalink"></a></h2><p>For the purpose of comparing our numerical results to an exact solution, we will use the method of manufactured solutions. For simplicity, we will take as an exact solution</p><pre><code class="language-julia hljs">uₑ = (x) -&gt; cos(2 * x[1]) * sin(2 * x[2])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">#4 (generic function with 1 method)</code></pre><p>which yields</p><pre><code class="language-julia hljs">fₑ = (x) -&gt; -8 * uₑ(x)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">#6 (generic function with 1 method)</code></pre><p>Here is what the solution looks like: qvals = map(Ωₕ_quad) do q     return uₑ(q.coords) end</p><p>ivals = Inti.quadrature<em>to</em>node<em>vals(Ωₕ</em>quad, qvals)</p><p>er = ivals - uₑ.(Ωₕ<em>quad.mesh.nodes) norm(er,Inf) Inti.write</em>gmsh_view(Ωₕ, uₑ.(Ωₕ.nodes))</p><h2 id="Boundary-and-integral-operators"><a class="docs-heading-anchor" href="#Boundary-and-integral-operators">Boundary and integral operators</a><a id="Boundary-and-integral-operators-1"></a><a class="docs-heading-anchor-permalink" href="#Boundary-and-integral-operators" title="Permalink"></a></h2><pre><code class="language-julia hljs">using FMM2D
+
+pde = Inti.Laplace(; dim = 2)
+
+# Boundary operators
+S_b2b, D_b2b = Inti.single_double_layer(;
+    pde,
+    target = Γₕ_quad,
+    source = Γₕ_quad,
+    compression = (method = :fmm, tol = 1e-12),
+    correction = (method = :dim,),
+)
+S_b2d, D_b2d = Inti.single_double_layer(;
+    pde,
+    target = Ωₕ_quad,
+    source = Γₕ_quad,
+    compression = (method = :fmm, tol = 1e-12),
+    correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
+)
+
+# Volume potentials
+V_d2d = Inti.volume_potential(;
+    pde,
+    target = Ωₕ_quad,
+    source = Ωₕ_quad,
+    compression = (method = :fmm, tol = 1e-12),
+    correction = (method = :dim, interpolation_order),
+)
+V_d2b = Inti.volume_potential(;
+    pde,
+    target = Γₕ_quad,
+    source = Ωₕ_quad,
+    compression = (method = :fmm, tol = 1e-12),
+    correction = (
+        method = :dim,
+        maxdist = 5 * meshsize,
+        interpolation_order,
+        target_location = :on,
+    ),
+)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1164×58940 LinearMaps.LinearCombination{Float64} with 2 maps:
+  1164×58940 LinearMaps.FunctionMap{Float64,true}(#3; issymmetric=false, ishermitian=false, isposdef=false)
+  1164×58940 LinearMaps.WrappedMap{Float64} of
+    1164×58940 SparseArrays.SparseMatrixCSC{Float64, Int64} with 11640 stored entries</code></pre><p>We can now solve a BIE for the unknown density <span>$\sigma$</span>:</p><pre><code class="language-julia hljs">f = map(Ωₕ_quad) do q
+    return fₑ(q.coords)
+end
+g = map(Γₕ_quad) do q
+    return uₑ(q.coords)
+end
+rhs = V_d2b * f + g
+
+using LinearAlgebra
+L = -I / 2 + D_b2b</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1164×1164 LinearMaps.LinearCombination{Float64} with 3 maps:
+  1164×1164 LinearMaps.UniformScalingMap{Float64} with scaling factor: -0.5
+  1164×1164 LinearMaps.FunctionMap{Float64,true}(#4; issymmetric=false, ishermitian=false, isposdef=false)
+  1164×1164 LinearMaps.WrappedMap{Float64} of
+    1164×1164 SparseArrays.SparseMatrixCSC{Float64, Int64} with 6984 stored entries</code></pre><p>If <code>compression=none</code> or <code>compresion=hmatrix</code> is used above for constructing <code>D_b2b</code>, we could alternately use dense linear algebra:</p><pre><code class="language-julia hljs">#F = lu(L)
+#σ = F \ rhs
+
+using IterativeSolvers
+σ, hist =
+    gmres(L, rhs; log = true, abstol = 1e-10, verbose = false, restart = 100, maxiter = 100)
+@show hist</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Converged after 4 iterations.</code></pre><p>To check the solution, lets evaluate it at the nodes <span>$\Omega$</span></p><pre><code class="language-julia hljs">uₕ_quad = -(V_d2d * f) + D_b2d * σ
+uₑ_quad = map(q -&gt; uₑ(q.coords), Ωₕ_quad)
+er = abs.(uₕ_quad - uₑ_quad)
+@show norm(er, Inf)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2.1462666144334008e-8</code></pre><h2 id="Visualize-the-solution-error-using-Gmsh"><a class="docs-heading-anchor" href="#Visualize-the-solution-error-using-Gmsh">Visualize the solution error using Gmsh</a><a id="Visualize-the-solution-error-using-Gmsh-1"></a><a class="docs-heading-anchor-permalink" href="#Visualize-the-solution-error-using-Gmsh" title="Permalink"></a></h2><pre><code class="language-julia hljs"># er_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, er)
+sol_nodes = uₑ.(Inti.nodes(Ωₕ))
+solₕ_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, uₑ_quad)
+er_nodes = abs.(sol_nodes - solₕ_nodes)
+
+gmsh.initialize()
+Inti.write_gmsh_model(msh)
+Inti.write_gmsh_view!(Ωₕ, er_nodes; name = &quot;error&quot;)
+Inti.write_gmsh_view!(Ωₕ, sol_nodes; name = &quot;solution&quot;)
+isinteractive() &amp;&amp; gmsh.fltk.run()
+gmsh.finalize()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../helmholtz_scattering/">« Helmholtz scattering</a><a class="docs-footer-nextpage" href="../../../references/">References »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Saturday 1 June 2024 14:14">Saturday 1 June 2024</span>. Using Julia version 1.10.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
