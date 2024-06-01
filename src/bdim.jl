@@ -18,6 +18,8 @@ returning a vector on of values on `X`), compute corrections `δS` and `δD` suc
 that `S + δS` and `D + δD` are more accurate approximations of the underlying
 single- and double-layer integral operators.
 
+See [faria2021general](@cite) for more details on the method.
+
 # Arguments
 
 ## Required:
@@ -43,6 +45,7 @@ single- and double-layer integral operators.
   so that no correction is needed. This is used to determine a threshold for
   nearly-singular corrections when `X` and `Y` are different surfaces. When `X
   === Y`, this is not needed.
+
 """
 function bdim_correction(
     pde,

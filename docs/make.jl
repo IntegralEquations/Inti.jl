@@ -1,5 +1,6 @@
 using Inti
 using Documenter
+using DocumenterCitations
 using Literate
 # packages needed for extensions
 using Gmsh
@@ -8,7 +9,9 @@ using Meshes
 using FMM2D
 using FMM3D
 
-draft = false
+bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style = :numeric)
+
+draft = true
 
 const ON_CI = get(ENV, "CI", "false") == "true"
 const GIT_HEAD = chomp(read(`git rev-parse HEAD`, String))
@@ -75,12 +78,14 @@ makedocs(;
         # "Helmholtz Example" => ["examples/generated/helmholtz_scattering.md"],
         # "Poisson Example" => ["examples/generated/poisson.md"],
         "References" => "references.md",
+        "Docstrings" => "docstrings.md",
     ],
     # warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),
     warnonly = true,
     pagesonly = true,
     checkdocs = :none,
     draft,
+    plugins = [bib],
 )
 
 deploydocs(;

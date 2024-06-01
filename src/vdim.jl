@@ -13,6 +13,8 @@ approximation of the volume potential `V`. The `green_multiplier` is a vector of
 the same length as `X` storing the value of `μ(x)` for `x ∈ X` in the Green
 identity (see [`_green_multiplier`](@ref)).
 
+See [anderson2024fast](@cite) for more details on the method.
+
 ## Optional `kwargs`:
 
 - `interpolation_order`: the order of the polynomial interpolation. By default,
