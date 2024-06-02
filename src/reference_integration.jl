@@ -412,8 +412,7 @@ function _adaptive_integration(f, quad::EmbeddedQuadrature, atol, rtol, maxsplit
         end
         nsplit += 1
     end
-    nsplit >= maxsplit && @warn "maximum number of steps reached"
-
+    # nsplit >= maxsplit && @warn "maximum number of steps reached"
     return I, E
 end
 
@@ -421,7 +420,7 @@ end
     allocate_buffer(f, quad::EmbeddedQuadrature)
 
 Create the `buffer` needed for the call [`adaptive_integration(f, τ̂; buffer,
-...)`](@ref).
+...)`](@ref adaptive_integration).
 """
 function allocate_buffer(f, quad::EmbeddedQuadrature)
     T = Float64 # TODO: make this a parameter so that we can do single precision?

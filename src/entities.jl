@@ -108,7 +108,7 @@ function Base.show(io::IO, ent::GeometricEntity)
     d = geometric_dimension(ent)
     t = tag(ent)
     l = labels(ent)
-    return print(io, "$T with (dim,tag)=($d,$t) and labels $l")
+    return print(io, "$T with labels $l")
 end
 
 """

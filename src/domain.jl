@@ -5,7 +5,7 @@ Representation of a geometrical domain formed by a set of entities with the same
 geometric dimension. For basic set operations on domains are supported (union,
 intersection, difference, etc), and they all return a new `Domain` object.
 
-The unlerlying entities are stored in a [`Set`](@ref) of [`EntityKey`](@ref)s;
+The unlerlying entities are stored in a set of [`EntityKey`](@ref)s;
 the underlying entities can be accessed with [`global_get_entity(key)`](@ref).
 """
 struct Domain
@@ -30,6 +30,7 @@ Note that all entities in a domain must have the same geometric dimension.
 function Domain(f::Function, ents)
     return Domain(filter(f, ents))
 end
+Domain(f::Function, Ω::Domain) = Domain(f, keys(Ω))
 Domain(ents::AbstractVector{EntityKey}) = Domain(Set(ents))
 
 Base.keys(Ω::Domain) = Ω.keys
@@ -60,7 +61,7 @@ function Base.show(io::IO, d::Domain)
     n == print(io, "Domain with $n ", n == 1 ? "entity" : "entities")
     for k in kk
         ent = global_get_entity(k)
-        print(io, "\n $(k) --> $ent")
+        print(io, "\n $(k)")
     end
     return io
 end

@@ -61,6 +61,8 @@ function radius(el::ReferenceInterpolant{D}) where {D}
     return maximum(x -> norm(x - xc), vertices(el))
 end
 
+vertices(el::ReferenceInterpolant{D}) where {D} = el.(vertices(D()))
+
 """
     struct HyperRectangle{N,T} <: ReferenceInterpolant{ReferenceHyperCube{N},T}
 

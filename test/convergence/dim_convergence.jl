@@ -9,7 +9,7 @@ Random.seed!(1)
 
 atol = 0
 rtol = 1e-8
-t = :interior
+t = :exterior
 σ = t == :interior ? 1 / 2 : -1 / 2
 N = 2
 pde = Inti.Laplace(; dim = N)
@@ -38,9 +38,9 @@ for h in hh
     gmsh.model.occ.addDisk(center[1], center[2], 0, 2 * radius, radius)
     gmsh.model.occ.synchronize()
     gmsh.model.mesh.generate(2)
-    Ω, M = Inti.import_mesh_from_gmsh_model(; dim = 2)
+    M = Inti.import_mesh(; dim = 2)
     gmsh.finalize()
-    Γ = Inti.external_boundary(Ω)
+    Γ = Inti.Domain(e -> Inti.geometric_dimension(e) == 1, Inti.entities(M))
     Q = Inti.Quadrature(view(M, Γ); qorder)
     @show Q
     xs = if t == :interior
