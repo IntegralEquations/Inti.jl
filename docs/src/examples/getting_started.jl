@@ -4,7 +4,7 @@ docsdir = joinpath(@__DIR__, "../..") #src
 Pkg.activate(docsdir)                 #src
 
 #nb ## Environment setup
-#nb const DEPENDENCIES = ["GLMakie", "LinearAlgebra"];
+#nb const DEPENDENCIES = ["GLMakie", "LinearAlgebra", "StaticArrays", "Meshes"];
 #nb ## __NOTEBOOK_SETUP__
 
 # # Getting started
