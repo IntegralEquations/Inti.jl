@@ -345,7 +345,7 @@ ta = gmsh.model.occ.addPlaneSurface([tl])
 gmsh.model.occ.synchronize()
 gmsh.model.mesh.generate(2)
 gmsh.model.mesh.setOrder(gorder)
-msh = Inti.import_mesh_from_gmsh_model(; dim = 2)
+msh = Inti.import_mesh(; dim = 2)
 gmsh.finalize()
 
 # ## [Three-dimensional scattering](@id helmholtz-scattering-3d)

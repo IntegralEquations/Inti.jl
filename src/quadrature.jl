@@ -155,6 +155,18 @@ end
 end
 
 """
+    Quadrature(Ω::Domain; meshsize, qorder)
+
+Construct a `Quadrature` over the domain `Ω` with a mesh of size `meshsize` and
+quadrature order `qorder`.
+"""
+function Quadrature(Ω::Domain; meshsize, qorder)
+    msh = meshgen(Ω; meshsize)
+    Q = Quadrature(view(msh, Ω); qorder)
+    return Q
+end
+
+"""
     domain(Q::Quadrature)
 
 The [`Domain`](@ref) over which `Q` performs integration.

@@ -7,7 +7,7 @@ Pkg.activate(docsdir)                 #src
 #nb const DEPENDENCIES = ["GLMakie", "LinearAlgebra"];
 #nb ## __NOTEBOOK_SETUP__
 
-# # [Getting started](@id getting_started)
+# # Getting started
 
 #md # [![ipynb](https://img.shields.io/badge/download-ipynb-blue)](getting_started.ipynb)
 #md # [![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](@__NBVIEWER_ROOT_URL__/examples/generated/getting_started.ipynb)
