@@ -161,15 +161,8 @@ rate of convergence.
 function adaptive_integration_singular(f, τ̂::ReferenceLine, x̂ₛ; kwargs...)
     τ₁, τ₂ = decompose(τ̂, x̂ₛ) # split τ̂ at x̂ₛ so that xₛ = τ₁(0) = τ₂(0)
     l₁, l₂ = integration_measure(τ₁), integration_measure(τ₂)
-    # Perform a simple xᵖ transformation, degenerate at the origin. Take a
-    # modest value of p to avoid rounding issues. TODO: field-test this
-    p  = 2
-    χ  = x -> x[1]^p
-    χ′ = x -> p * x[1]^(p - 1)
     return adaptive_integration(τ̂; kwargs...) do x
-        x̃ = χ(x)
-        μ = χ′(x)
-        return (f(τ₁(x̃)) * l₁ + f(τ₂(x̃)) * l₂) * μ
+        return (f(τ₁(x)) * l₁ + f(τ₂(x)) * l₂)
     end
 end
 
