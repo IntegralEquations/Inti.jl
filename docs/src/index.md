@@ -1,15 +1,38 @@
 # Inti
 
-## Installation instructions
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://IntegralEquations.github.io/Inti.jl/stable/)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://IntegralEquations.github.io/Inti.jl/dev/)
+[![Build Status](https://github.com/IntegralEquations/Inti.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/IntegralEquations/Inti.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![codecov](https://codecov.io/gh/IntegralEquations/Inti.jl/graph/badge.svg?token=2VF6BR8LA0)](https://codecov.io/gh/IntegralEquations/Inti.jl)
+[![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
-### Installing Julia
+[Inti.jl](https://github.com/IntegralEquations/Inti.jl) is a Julia library for
+the numerical solution of *boundary* and *volume integral equations*. It
+provides routines for *assembling* and *solving* the linear systems of equations
+that arise from applying a *Nyström* discretization method to an integral
+equation. The package is designed to be flexible and efficient, and supports the
+following features:
+
+- Specialized integration routines for computing singular and nearly-singular
+  integrals
+- Integrated support for acceleration routines such as the Fast Multipole Method (FMM) and
+  Hierarchical Matrices by the wrapping of external libraries.
+- Predefined kernels for some partial differential equations (PDEs) commonly
+  found in mathematical physics such as the Laplace, Helmholtz, and Stokes
+  equations.
+- Support for complex geometries in 2D and 3D, either through native parametric
+  representations or by importing complex meshes using *Gmsh*.
+- Efficient construction of complex integral operators from simpler ones through
+  lazy composition.
+
+## Installing Julia
 
 Download of Julia from [julialang.org](https://julialang.org/downloads/), or use
 [juliaup](https://github.com/JuliaLang/juliaup) installer. We recommend using
 the latest stable version of Julia, although `Inti.jl` should work with
 `>=v1.6`.
 
-### Installing Inti.jl
+## Installing Inti.jl
 
 Inti.jl is not yet registered in the Julia General registry. You can install it
 using by launching a Julia REPL and typing the following command:
@@ -21,49 +44,39 @@ using Pkg; Pkg.add("Inti"; rev = "main")
 This will download and install the latest version of Inti.jl from the `main`
 branch. Change `rev` if you need a different branch or specific commit hash.
 
-## Overview
+## Basic usage
 
-Inti.jl is a Julia package for the numerical solution of *boundary* and *volume
-integral equations*. It provides routines for *assembling* and *solving* the
-linear systems of equations that arise from applying a *Nyström* discretization
-method to an integral equation.
-
-The package comes with a set of specialized and high-order integration routines
-for computing the singular and nearly-singular integrals that commonly appear in
-the discretization of various integral operators arising in mathematical
-physics. Inti.jl also provides various backends for accelerating the forward map
-of the integral operators, including wrappers for the `FMM2D`, `FMM3D`, and
-`HMatrices.jl` libraries.
-
-While some familiarity with integral equations is assumed, the package strives
-to be accessible to users possessing only a basic understanding of integral
-equation methods. The most basic usage revolves around the four boundary
-integral operators of Calderon calculus, namely the *single-layer*, *double-layer*,
-*adjoint double-layer*, or *hypersingular* operators, for a given partial
-differential equation. For example, solving an interior Laplace equation in
-2D with Dirichlet boundary condition, i.e.,
+Inti.jl can be used to solve a variety of linear partial differential equations
+by recasting them as integral equations. As a simple example, consider an
+interior Laplace problem in two dimensions with Dirichlet boundary conditions:
 
 ```math
-\Delta u = 0 \quad \text{in } \Omega, \quad u = g \quad \text{on } \Gamma
+\begin{aligned}
+\Delta u &= 0 \quad \text{in } \Omega,\\ 
+u &= g \quad \text{on } \Gamma,
+\end{aligned}
 ```
 
-can be achieved e.g. by searching for the solution $u$ in the form of a
-single-layer potential:
+where ``\Omega \subset \mathbb{R}^2`` is a sufficiently smooth domain, and
+``\Gamma = \partial \Omega`` its boundary. A boundary integral reformulation can
+be achieved by e.g. searching for the solution $u$ in the form of a single-layer
+potential:
 
 ```math
 u(\boldsymbol{r}) = \int_\Gamma G(\boldsymbol{r},\boldsymbol{y})\sigma(\boldsymbol{y}) \ \mathrm{d}\Gamma(\boldsymbol{y}),
 ```
 
-where $\sigma$ is some (unknown) density function, and $G$ is the [fundamental
+where $\sigma : \Gamma \to \mathbb{R}$ is an unknown density function, and ``G``
+is the [fundamental
 solution](https://en.wikipedia.org/wiki/Fundamental_solution) of the Laplace
-equation. In this case, the integral equation for $\sigma$ reads
+equation. This *ansatz* is, by construction, an exact solution to the PDE.
+Imposing the boundary condition on $\Gamma$ leads to the following integral equation:
 
 ```math
     \int_\Gamma G(\boldsymbol{x},\boldsymbol{y})\sigma(\boldsymbol{y}) \ \mathrm{d}\Gamma(\boldsymbol{y}) = g(\boldsymbol{x}) \quad \forall \boldsymbol{x} \in \Gamma,
 ```
 
-which is a *Fredholm integral equation of the first kind*. In Inti.jl the
-problem above may look something like this:
+Formulating the problem above in Inti.jl looks like this:
 
 ```@example lap2d
 using Inti, LinearAlgebra, StaticArrays
@@ -104,7 +117,7 @@ println("Exact value at $pt:   ", uₑ(pt))
 println("Approx. value at $pt: ", uₕ(pt))
 ```
 
-Alternatively, we visualize it as follows:
+If we care about the solution on the entire domain, we can visualize it using:
 
 ```@example lap2d
 using Meshes, GLMakie # trigger the loading of some Inti extensions
@@ -122,9 +135,22 @@ viz!(msh; segmentsize = 3)
 fig # hide
 ```
 
+!!! note "Formulation of the problem as an integral equation"
+    Given a PDE and boundary conditions, there are often many ways to recast the
+    problem as an integral equation, and the choice of formulation plays an
+    important role in the unique solvability, efficiency, and accuracy of the
+    numerical solution. Inti.jl provides a flexible framework for experimenting
+    with different formulations, but it is up to the user to choose the most
+    appropriate one for their problem.
+
 While the example above is a simple one, Inti.jl can handle significantly more
-complex problems involving multiple domains, different PDEs, three-dimensional
-geometries, and possibly requiring the use of acceleration techniques such as
-the Fast Multipole Method. The best way to dive deeper into Inti.jl's
-capabilities is the [tutorials](@ref "Getting started") section. You can also
-find more advanced usage in the [examples](@ref Examples) section.
+complex problems involving multiple domains, heterogeneous coefficients,
+vector-valued PDEs, three-dimensional geometries, and possibly requiring the use
+of acceleration techniques such as the Fast Multipole Method. The best way to
+dive deeper into Inti.jl's capabilities is the [tutorials](@ref "Getting
+started") section. You can also find more advanced usage in the [examples](@ref
+Examples) section.
+
+## Contributing
+
+## Acknowledgements
