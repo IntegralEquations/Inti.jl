@@ -5,8 +5,9 @@ Representation of a geometrical domain formed by a set of entities with the same
 geometric dimension. For basic set operations on domains are supported (union,
 intersection, difference, etc), and they all return a new `Domain` object.
 
-The unlerlying entities are stored in a set of [`EntityKey`](@ref)s;
-the underlying entities can be accessed with [`global_get_entity(key)`](@ref).
+Calling `keys(Ω)` returns the set of [`EntityKey`](@ref)s that make up the
+domain; given a key, the underlying entities can be accessed with
+[`global_get_entity(key)`](@ref).
 """
 struct Domain
     keys::Set{EntityKey}

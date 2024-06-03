@@ -52,10 +52,10 @@ differential equation. For example, solving an interior Laplace equation in
 ```
 
 can be achieved e.g. by searching for the solution $u$ in the form of a
-double-layer potential:
+single-layer potential:
 
 ```math
-u(\boldsymbol{r}) = \int_\Gamma \nabla_{\boldsymbol{y}}G(\boldsymbol{r},\boldsymbol{y}) \cdot \boldsymbol{n}(\boldsymbol{y}) \sigma(\boldsymbol{y})d\Gamma(\boldsymbol{y}),
+u(\boldsymbol{r}) = \int_\Gamma G(\boldsymbol{r},\boldsymbol{y})\sigma(\boldsymbol{y}) \ \mathrm{d}\Gamma(\boldsymbol{y}),
 ```
 
 where $\sigma$ is some (unknown) density function, and $G$ is the [fundamental
@@ -63,11 +63,11 @@ solution](https://en.wikipedia.org/wiki/Fundamental_solution) of the Laplace
 equation. In this case, the integral equation for $\sigma$ reads
 
 ```math
-    -\frac{\sigma(\boldsymbol{x})}{2} + \int_\Gamma G(\boldsymbol{x},\boldsymbol{y})\sigma(\boldsymbol{y})d\Gamma(\boldsymbol{y}) = g(\boldsymbol{x}) \quad \forall \boldsymbol{x} \in \Gamma,
+    \int_\Gamma G(\boldsymbol{x},\boldsymbol{y})\sigma(\boldsymbol{y}) \ \mathrm{d}\Gamma(\boldsymbol{y}) = g(\boldsymbol{x}) \quad \forall \boldsymbol{x} \in \Gamma,
 ```
 
-which is a Fredholm equation of the second kind. In Inti.jl the problem above
-may look something like this:
+which is a *Fredholm integral equation of the first kind*. In Inti.jl the
+problem above may look something like this:
 
 ```@example lap2d
 using Inti, LinearAlgebra, StaticArrays
@@ -82,7 +82,7 @@ msh = Inti.meshgen(Γ; meshsize = 0.1)
 Q = Inti.Quadrature(msh; qorder = 5)
 # create the integral operators
 pde = Inti.Laplace(;dim=2)
-S, D = Inti.single_double_layer(;
+S, _ = Inti.single_double_layer(;
     pde, 
     target = Q,
     source = Q,
@@ -93,10 +93,10 @@ S, D = Inti.single_double_layer(;
 uₑ = x -> x[1] + x[2] + x[1]*x[2] + x[1]^2 - x[2]^2 + 0.5 * log(norm(x .- SVector(0.5, 1.5))) - 2 * log(norm(x .- SVector(-0.5, -1.5)))
 g = map(q -> uₑ(q.coords), Q) # value at quad nodes
 # solve for σ
-σ = (-I/2 + D) \ g
-# use the double-layer potential to evaluate the solution
+σ = S \ g
+# use the single-layer potential to evaluate the solution
 𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
-uₕ = x -> 𝒟[σ](x)
+uₕ = x -> 𝒮[σ](x)
 ```
 
 The function `uₕ` is now a numerical approximation of the solution to the
@@ -114,7 +114,7 @@ Alternatively, we visualize it as follows:
 using Meshes, GLMakie # trigger the loading of some Inti extensions
 xx = yy = range(-2, 2, length = 100)
 fig = Figure()
-inside = x -> Inti.isinside(x, Q)
+inside = x -> Inti.isinside(x, Q) 
 opts = (xlabel = "x", ylabel = "y", aspect = DataAspect())
 ax1 = Axis(fig[1, 1]; title = "Exact solution", opts...)
 h1 = heatmap!(ax1, xx,yy,(x, y) -> inside((x,y)) ? uₑ((x,y)) : NaN)
