@@ -71,9 +71,12 @@ gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
 gmsh.option.setNumber("Mesh.MeshSizeMax", 0.2)
 gmsh.model.occ.synchronize()
 gmsh.model.mesh.generate(2)
-Ω, msh = Inti.import_mesh_from_gmsh_model(; dim = 2)
+msh = Inti.import_mesh(; dim = 2)
 gmsh.finalize()
 
+Ω = Inti.Domain(Inti.entities(msh)) do ent
+    return Inti.geometric_dimension(ent) == 2
+end
 M = view(msh, Ω)
 viz(M; showsegments = true)
 M = view(msh, Inti.boundary(Ω))
@@ -89,9 +92,12 @@ gmsh.option.setNumber("Mesh.MeshSizeMax", 0.2)
 gmsh.model.occ.synchronize()
 gmsh.model.mesh.generate(3)
 ents = gmsh.model.getEntities()
-Ω, msh = Inti.import_mesh_from_gmsh_model(; dim = 3)
+msh = Inti.import_mesh(; dim = 3)
 gmsh.finalize()
 
+Ω = Inti.Domain(Inti.entities(msh)) do ent
+    return Inti.geometric_dimension(ent) == 3
+end
 Γ = Inti.boundary(Ω)
 viz(msh[Γ]; showsegments = true)
 viz(msh[Ω]; showsegments = true, alpha = 0.5)

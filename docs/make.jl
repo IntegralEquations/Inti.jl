@@ -1,5 +1,6 @@
 using Inti
 using Documenter
+using DocumenterCitations
 using Literate
 # packages needed for extensions
 using Gmsh
@@ -7,6 +8,8 @@ using HMatrices
 using Meshes
 using FMM2D
 using FMM3D
+
+bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style = :numeric)
 
 draft = false
 
@@ -29,11 +32,11 @@ end
 # Generate examples using Literate
 const examples_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples")
 const generated_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples", "generated")
-const examples = ["helmholtz_scattering.jl", "poisson.jl"]
-for example in examples
-    println("\n*** Generating $example example")
+const examples = ["toy_example.jl"]
+for t in examples
+    println("\n*** Generating $t example")
     @time begin
-        src = joinpath(examples_dir, example)
+        src = joinpath(examples_dir, t)
         Literate.markdown(src, generated_dir; mdstrings = true)
         # if draft, skip creation of notebooks
         Literate.notebook(
@@ -41,7 +44,7 @@ for example in examples
             generated_dir;
             mdstrings = true,
             preprocess = insert_setup,
-            # execute = !draft,
+            # execute = ON_CI,
             execute = false,
         )
     end
@@ -71,17 +74,17 @@ makedocs(;
     ),
     pages = [
         "Home" => "index.md",
-        # "Meshing" => "geo_and_meshes.md",
-        # "Toy example" => "examples/generated/toy_example.md",
-        "Helmholtz Example" => ["examples/generated/helmholtz_scattering.md"],
-        "Poisson Example" => ["examples/generated/poisson.md"],
+        "Tutorials" => ["tutorials/getting_started.md"],
+        # "Examples" => ["examples/generated/toy_example.md"],
         "References" => "references.md",
+        "Docstrings" => "docstrings.md",
     ],
     # warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),
     warnonly = true,
     pagesonly = true,
     checkdocs = :none,
     draft,
+    plugins = [bib],
 )
 
 deploydocs(;

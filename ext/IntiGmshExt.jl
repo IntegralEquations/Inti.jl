@@ -9,36 +9,33 @@ function __init__()
     @info "Loading Inti.jl Gmsh extension"
 end
 
-function Inti.import_mesh_from_gmsh_model(; dim = 3)
+function Inti.import_mesh(filename = nothing; dim = 3)
     @assert dim ∈ (2, 3) "only 2d and 3d meshes are supported"
-    gmsh.isInitialized() == 1 ||
-        error("gmsh is not initialized. Try gmsh.initialize() first.")
-    msh = Inti.LagrangeMesh{3,Float64}()
-    _import_mesh!(msh)
-    dim == 2 && (msh = Inti._convert_to_2d(msh))
-    # create a Domain with the entities of dimension `dim`
-    Ω = Inti.Domain(Inti.entities(msh)) do ent
-        return Inti.geometric_dimension(ent) == dim
+    if isnothing(filename)
+        gmsh.isInitialized() == 1 ||
+            error("gmsh is not initialized. Try gmsh.initialize() first.")
+        msh = Inti.LagrangeMesh{3,Float64}()
+        _import_mesh!(msh)
+        dim == 2 && (msh = Inti._convert_to_2d(msh))
+        # create iterators for the lagrange elements
+        for E in keys(msh.etype2mat)
+            @assert E <: Union{Inti.LagrangeElement,SVector}
+            msh.etype2els[E] = Inti.ElementIterator(msh, E)
+        end
+    elseif filename isa String
+        initialized = gmsh.isInitialized() == 1
+        try
+            initialized || gmsh.initialize()
+            gmsh.open(fname)
+        catch
+            @error "could not open $fname"
+        end
+        msh = Inti.import_mesh(; dim)
+        initialized || gmsh.finalize()
+    else
+        error("filename must be a string or nothing to import current gmsh model")
     end
-    # create iterators for the lagrange elements
-    for E in keys(msh.etype2mat)
-        @assert E <: Union{Inti.LagrangeElement,SVector}
-        msh.etype2els[E] = Inti.ElementIterator(msh, E)
-    end
-    return Ω, msh
-end
-
-function Inti.import_mesh_from_gmsh_file(fname; dim = 3)
-    initialized = gmsh.isInitialized() == 1
-    try
-        initialized || gmsh.initialize()
-        gmsh.open(fname)
-    catch
-        @error "could not open $fname"
-    end
-    Ω, msh = Inti.import_mesh_from_gmsh_model(; dim)
-    initialized || gmsh.finalize()
-    return Ω, msh
+    return msh
 end
 
 """

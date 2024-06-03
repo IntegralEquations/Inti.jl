@@ -13,9 +13,11 @@ using StaticArrays
     arc1 = Inti.parametric_curve(f, 0, 0.5)
     arc2 = Inti.parametric_curve(f, 0.5, 1)
     Γ = Inti.Domain(arc1, arc2)
-    msh = Inti.meshgen(Γ, (100,))
+    msh = Inti.meshgen(Γ, 100)
     quad = Inti.Quadrature(msh; qorder = 2)
     @test Inti.integrate(x -> 1, quad) ≈ 2 * π * r
+    @test Inti.measure(arc1) ≈ π * r
+    @test Inti.measure(arc2) ≈ π * r
 
     # transfinite patch
     Inti.clear_entities!()
@@ -30,5 +32,5 @@ using StaticArrays
     msh = Inti.meshgen(Ω, Dict(l1 => 10, l2 => 20))
     Γ = Inti.external_boundary(Ω)
     msh[Γ]
-    Γ_msh = Inti.meshgen(Γ, (100,))
+    Γ_msh = Inti.meshgen(Γ, 100)
 end

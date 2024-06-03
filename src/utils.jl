@@ -226,7 +226,7 @@ function _normalize_compression(compression, target, source)
 end
 
 function _normalize_correction(correction, target, source)
-    methods = (:dim, :hcubature, :none)
+    methods = (:dim, :adaptive, :none)
     # check that method is valid
     correction.method ∈ methods ||
         error("Unknown correction.method $(correction.method). Available options: $methods")
@@ -234,6 +234,7 @@ function _normalize_correction(correction, target, source)
     if correction.method == :dim
         haskey(correction, :target_location) &&
             target === source &&
+            correction.target_location != :on &&
             @warn("ignoring target_location field in correction since target === source")
         # target location required unless target === source
         haskey(correction, :target_location) ||

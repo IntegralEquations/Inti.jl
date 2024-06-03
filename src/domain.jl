@@ -5,8 +5,9 @@ Representation of a geometrical domain formed by a set of entities with the same
 geometric dimension. For basic set operations on domains are supported (union,
 intersection, difference, etc), and they all return a new `Domain` object.
 
-The unlerlying entities are stored in a [`Set`](@ref) of [`EntityKey`](@ref)s;
-the underlying entities can be accessed with [`global_get_entity(key)`](@ref).
+Calling `keys(Ω)` returns the set of [`EntityKey`](@ref)s that make up the
+domain; given a key, the underlying entities can be accessed with
+[`global_get_entity(key)`](@ref).
 """
 struct Domain
     keys::Set{EntityKey}
@@ -30,9 +31,23 @@ Note that all entities in a domain must have the same geometric dimension.
 function Domain(f::Function, ents)
     return Domain(filter(f, ents))
 end
+Domain(f::Function, Ω::Domain) = Domain(f, keys(Ω))
 Domain(ents::AbstractVector{EntityKey}) = Domain(Set(ents))
 
 Base.keys(Ω::Domain) = Ω.keys
+
+# helper function to get all keys in a domain recursively
+function all_keys(Ω::Domain)
+    k = Set{EntityKey}()
+    return _all_keys!(k, Ω)
+end
+function _all_keys!(k, Ω::Domain)
+    union!(k, Ω.keys)
+    sk = skeleton(Ω)
+    isempty(sk) && return k
+    _all_keys!(k, skeleton(Ω))
+    return k
+end
 
 """
     entities(Ω::Domain)
@@ -47,7 +62,7 @@ function Base.show(io::IO, d::Domain)
     n == print(io, "Domain with $n ", n == 1 ? "entity" : "entities")
     for k in kk
         ent = global_get_entity(k)
-        print(io, "\n $(k) --> $ent")
+        print(io, "\n $(k)")
     end
     return io
 end
@@ -124,3 +139,8 @@ Base.isempty(Ω::Domain) = isempty(entities(Ω))
 
 Base.in(ent::EntityKey, Ω::Domain) = in(ent, entities(Ω))
 Base.in(Ω1::Domain, Ω2::Domain) = all(ent ∈ Ω2 for ent in entities(Ω1))
+
+Base.union(Ω1::Domain, Ωs...) = Domain(union(Ω1.keys, map(ω -> keys(ω), Ωs)...))
+Base.union(e1::EntityKey, e2::EntityKey) = Domain(e1, e2)
+Base.union(e1::EntityKey, Ω::Domain) = Domain(e1, keys(Ω)...)
+Base.union(Ω::Domain, e::EntityKey) = Domain(keys(Ω)..., e)

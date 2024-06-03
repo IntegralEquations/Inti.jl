@@ -2,7 +2,7 @@ using Inti
 using Gmsh
 
 function gmsh_disk(; center, rx, ry, meshsize)
-    try
+    msh = try
         gmsh.initialize()
         gmsh.option.setNumber("General.Verbosity", 2)
         gmsh.model.add("disk")
@@ -12,14 +12,18 @@ function gmsh_disk(; center, rx, ry, meshsize)
         gmsh.model.occ.addDisk(center[1], center[2], 0, rx, ry)
         gmsh.model.occ.synchronize()
         gmsh.model.mesh.generate(2)
-        return Inti.import_mesh_from_gmsh_model(; dim = 2)
+        Inti.import_mesh(; dim = 2)
     finally
         gmsh.finalize()
     end
+    Ω = Inti.Domain(Inti.entities(msh)) do e
+        return Inti.geometric_dimension(e) == 2
+    end
+    return Ω, msh
 end
 
 function gmsh_ball(; center, radius, meshsize)
-    try
+    msh = try
         gmsh.initialize()
         gmsh.option.setNumber("General.Verbosity", 2)
         gmsh.model.add("ball")
@@ -29,8 +33,12 @@ function gmsh_ball(; center, radius, meshsize)
         gmsh.model.occ.addSphere(center[1], center[2], center[3], radius)
         gmsh.model.occ.synchronize()
         gmsh.model.mesh.generate(3)
-        return Inti.import_mesh_from_gmsh_model(; dim = 3)
+        Inti.import_mesh(; dim = 3)
     finally
         gmsh.finalize()
     end
+    Ω = Inti.Domain(Inti.entities(msh)) do e
+        return Inti.geometric_dimension(e) == 3
+    end
+    return Ω, msh
 end

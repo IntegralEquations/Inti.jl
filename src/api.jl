@@ -151,10 +151,18 @@ function single_double_layer(;
         derivative && error(
             "Adaptive quadrature not supported for derivative operators since they are not weakly singular.",
         )
-        δS =
-            adaptive_correction(Sop; correction.maxdist, correction.maxplit, correction.tol)
-        δD =
-            adaptive_correction(Dop; correction.maxdist, correction.maxplit, correction.tol)
+        δS = adaptive_correction(
+            Sop;
+            correction.maxdist,
+            correction.maxsplit,
+            correction.tol,
+        )
+        δD = adaptive_correction(
+            Dop;
+            correction.maxdist,
+            correction.maxsplit,
+            correction.tol,
+        )
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end

@@ -12,7 +12,7 @@ using Test
     gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
     gmsh.model.occ.synchronize()
     gmsh.model.mesh.generate(2)
-    Ω, msh = Inti.import_mesh_from_gmsh_model(; dim = 2)
+    msh = Inti.import_mesh(; dim = 2)
     gmsh.finalize()
     true == true
 end
@@ -27,7 +27,7 @@ end
     gmsh.model.occ.synchronize()
     gmsh.model.mesh.generate(3)
     ents = gmsh.model.getEntities()
-    Ω, msh = Inti.import_mesh_from_gmsh_model(; dim = 3)
+    msh = Inti.import_mesh(; dim = 3)
     gmsh.finalize()
     true == true
 end

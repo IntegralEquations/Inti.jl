@@ -17,7 +17,7 @@ function domain_and_mesh(; meshsize, meshorder = 1)
     gmsh.model.occ.synchronize()
     gmsh.model.mesh.generate()
     gmsh.model.mesh.setOrder(meshorder)
-    Ω, msh = Inti.import_mesh_from_gmsh_model(; dim = 3)
+    Ω, msh = Inti.import_mesh(; dim = 3)
     gmsh.finalize()
     return Ω, msh
 end

@@ -18,6 +18,7 @@ for N in (2, 3)
     else
         Ω, msh = gmsh_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = 0.2)
     end
+
     Γ    = Inti.external_boundary(Ω)
     quad = Inti.Quadrature(view(msh, Γ); qorder = 3)
     for t in (:interior, :exterior)
