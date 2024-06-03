@@ -7,4 +7,6 @@ Pkg.activate(docsdir)                 #src
 #nb const DEPENDENCIES = ["GLMakie"];
 #nb ## __NOTEBOOK_SETUP__
 
+# Toy example
+
 using GLMakie

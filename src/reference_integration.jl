@@ -490,6 +490,35 @@ function lagrange_basis(qrule::ReferenceQuadrature{D}) where {D}
     return lagrange_basis(nodes, sp)
 end
 
+"""
+    polynomial_space(qrule::ReferenceQuadrature)
+
+Return a [`PolynomialSpace`](@ref) associated with the
+[`interpolation_order`](@ref) of the quadrature nodes of `qrule`.
+"""
+function polynomial_space(qrule::ReferenceQuadrature{D}) where {D}
+    k = interpolation_order(qrule)
+    return PolynomialSpace{D,k}()
+end
+
+"""
+    interpolation_order(qrule::ReferenceQuadrature)
+
+The interpolation order of a quadrature rule is defined as the the smallest `k`
+such that there exists a unique polynomial in `PolynomialSpace{D,k}` that
+minimizes the error in approximating the function `f` at the quadrature nodes.
+
+For an `N`-point Gauss quadrature rule on the segment, the
+interpolation order is `N-1` since `N` points uniquely determine a polynomial of
+degree `N-1`.
+
+For a triangular reference domain, the interpolation order is more difficult to
+define. An unisolvent three-node quadrature on the triangular, for example, has
+an interpolation order `k=1` since the three nodes uniquely determine a linear
+polynomial, but a four-node quadrature may also have an interpolation order
+`k=1` since for `k=2` there are multiple polynomials that pass through the four
+nodes.
+"""
 function interpolation_order(qrule::ReferenceQuadrature{ReferenceLine})
     N = length(qrule)
     return N - 1

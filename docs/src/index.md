@@ -1,7 +1,3 @@
-```@meta
-CurrentModule = Inti
-```
-
 # Inti
 
 ## Installation instructions
