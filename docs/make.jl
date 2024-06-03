@@ -44,7 +44,8 @@ for t in examples
             generated_dir;
             mdstrings = true,
             preprocess = insert_setup,
-            execute = ON_CI,
+            # execute = ON_CI,
+            execute = false,
         )
     end
 end
@@ -74,10 +75,10 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         "Tutorials" => ["tutorials/getting_started.md"],
-        # "Helmholtz Example" => ["examples/generated/helmholtz_scattering.md"],
-        # "Poisson Example" => ["examples/generated/poisson.md"],
-        "Examples" => ["examples/generated/toy_example.md"],
-        "References" => "references.md",
+        # # "Helmholtz Example" => ["examples/generated/helmholtz_scattering.md"],
+        # # "Poisson Example" => ["examples/generated/poisson.md"],
+        # "Examples" => ["examples/generated/toy_example.md"],
+        # "References" => "references.md",
         "Docstrings" => "docstrings.md",
     ],
     # warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),

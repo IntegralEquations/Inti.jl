@@ -1,9 +1,5 @@
 # Inti
 
-```@meta
-CurrentModule = Inti
-```
-
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://IntegralEquations.github.io/Inti.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://IntegralEquations.github.io/Inti.jl/dev/)
 [![Build Status](https://github.com/IntegralEquations/Inti.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/IntegralEquations/Inti.jl/actions/workflows/CI.yml?query=branch%3Amain)
