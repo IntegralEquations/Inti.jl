@@ -74,7 +74,7 @@ makedocs(;
     ),
     pages = [
         "Home" => "index.md",
-        "Tutorials" => ["tutorials/getting_started.md"],
+        "Tutorials" => ["tutorials/getting_started.md", "tutorials/geo_and_meshes.md"],
         # "Examples" => ["examples/generated/toy_example.md"],
         "References" => "references.md",
         "Docstrings" => "docstrings.md",
