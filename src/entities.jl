@@ -70,6 +70,12 @@ function GeometricEntity(;
     d = geometric_dimension(domain)
     t = isnothing(tag) ? new_tag(d) : tag
     V = return_type(parametrization, SVector{N,T})
+    # try to evaluate to see if that errors
+    try
+        parametrization(center(domain))
+    catch
+        error("evaluating parametrization at the center of the domain failed")
+    end
     # the parametrization should maps SVector to SVector
     if !(V <: SVector)
         msg = """return_type of parametrization was $V (expected an SVector).
@@ -156,9 +162,9 @@ end
     parametric_curve(f, a::Real, b::Real)
 
 Create a [`GeometricEntity`] representing a parametric curve defined by the
-`{f(t) | a ≤ t ≤ b}`.
+`{f(t) | a ≤ t ≤ b}`. The function `f` should map a scalar to a `SVector`.
 """
-function parametric_curve(f, a::Real, b::Real)
+function parametric_curve(f::F, a::Real, b::Real) where {F}
     d = HyperRectangle(SVector(float(a)), SVector(float(b)))
     ent = GeometricEntity(; domain = d, parametrization = x -> f(x[1]))
     return key(ent)
