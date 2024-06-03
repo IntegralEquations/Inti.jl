@@ -67,7 +67,7 @@ name = joinpath(@__DIR__, "disk.msh")
 gmsh_disk(; meshsize, order = 2, name)
 
 Inti.clear_entities!() # empty the entity cache
-Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 2)
+msh = Inti.import_mesh(name; dim = 2)
 Γ = Inti.boundary(Ω)
 
 Ωₕ = view(msh, Ω)
