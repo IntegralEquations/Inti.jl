@@ -96,7 +96,8 @@ element_types(msh::LagrangeMesh) = keys(msh.etype2mat)
 
 elements(msh::LagrangeMesh, E::DataType) = msh.etype2els[E]
 
-function elements(msh::LagrangeMesh)
+# generic implementation
+function elements(msh::AbstractMesh)
     return Iterators.flatten(elements(msh, E) for E in element_types(msh))
 end
 
@@ -323,9 +324,9 @@ function _build_connectivity!(msh::LagrangeMesh{N,T}, tol = 1e-8) where {N,T}
         connect = Int[]
         E <: SVector && continue # skip points
         # map to equivalent Meshes type depending on the ReferenceShape
-        x̂ = Inti.vertices(Inti.domain(E))
+        x̂ = vertices(domain(E))
         nv = length(x̂)
-        map(Inti.elements(msh, E)) do el
+        map(elements(msh, E)) do el
             istart = length(nodes) + 1
             for i in 1:nv
                 push!(nodes, el(x̂[i]))

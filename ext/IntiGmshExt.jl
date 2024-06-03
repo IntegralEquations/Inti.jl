@@ -26,9 +26,9 @@ function Inti.import_mesh(filename = nothing; dim = 3)
         initialized = gmsh.isInitialized() == 1
         try
             initialized || gmsh.initialize()
-            gmsh.open(fname)
+            gmsh.open(filename)
         catch
-            @error "could not open $fname"
+            @error "could not open $filename"
         end
         msh = Inti.import_mesh(; dim)
         initialized || gmsh.finalize()

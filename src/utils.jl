@@ -78,10 +78,10 @@ Given a function-like object `f: Ω → R`, return `f(Ω)`.
 function image end
 
 """
-    integration_measure(f)
+    integration_measure(f, x̂)
 
-Given the Jacobian matrix `J` of a transformation `f : ℝᴹ → ℝᴺ` at the point
-`x`, compute the integration measure `√det(JᵀJ)`.
+Given the Jacobian matrix `J` of a transformation `f : ℝᴹ → ℝᴺ` compute the
+integration measure `√det(JᵀJ)` at the parametric coordinate `x̂`
 """
 function integration_measure(f, x)
     jac = jacobian(f, x)
@@ -98,6 +98,16 @@ function _integration_measure(jac::AbstractMatrix)
         g = max(g, 0)
         sqrt(g)
     end
+end
+
+"""
+    normal(el, x̂)
+
+Return the normal vector of `el` at the parametric coordinate `x̂`.
+"""
+function normal(el, x)
+    jac = jacobian(el, x)
+    return _normal(jac)
 end
 
 """
