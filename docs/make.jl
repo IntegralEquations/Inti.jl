@@ -75,10 +75,8 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         "Tutorials" => ["tutorials/getting_started.md"],
-        # # "Helmholtz Example" => ["examples/generated/helmholtz_scattering.md"],
-        # # "Poisson Example" => ["examples/generated/poisson.md"],
         # "Examples" => ["examples/generated/toy_example.md"],
-        # "References" => "references.md",
+        "References" => "references.md",
         "Docstrings" => "docstrings.md",
     ],
     # warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),

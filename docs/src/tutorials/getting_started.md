@@ -22,12 +22,12 @@ its boundary, we will solve the following Helmholtz problem:
 
 where ``g`` is a (given) boundary datum, ``\nu`` is the outward unit normal to
 ``\Gamma``, ``k`` is the constant wavenumber, and ``r = ||\boldsymbol{x}||`` is
-the radial coordinate. 
+the radial coordinate.
 
-!!! note "Sommerfeld radiation condition"
-    The last condition is the *Sommerfeld radiation condition, and is required
+!!! tip "Sommerfeld radiation condition"
+    The last condition is the *Sommerfeld radiation condition*, and is required
     to ensure the uniqueness of the solution; physically, it means that the
-    solution ``u`` *radiates energy towards infinity*.
+    solution sought should radiate energy towards infinity.
 
 Let us begin by specifying the partial differential equation, and creating the
 domain, mesh, and quadrature for the problem:
@@ -49,6 +49,7 @@ end
 Γ = kite ∪ circle
 # Create a mesh for the geometry
 msh = Inti.meshgen(Γ; meshsize = 2π / k / 10)
+# Create a quadrature
 Q = Inti.Quadrature(msh; qorder = 5)
 ```
 
