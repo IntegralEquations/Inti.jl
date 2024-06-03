@@ -73,7 +73,7 @@ makedocs(;
     ),
     pages = [
         "Home" => "index.md",
-        "Tutorials" => ["getting_started.md"],
+        "Tutorials" => ["tutorials/getting_started.md"],
         # "Helmholtz Example" => ["examples/generated/helmholtz_scattering.md"],
         # "Poisson Example" => ["examples/generated/poisson.md"],
         "Examples" => ["examples/generated/toy_example.md"],
