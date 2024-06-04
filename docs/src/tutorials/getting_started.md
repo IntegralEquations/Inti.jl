@@ -1,5 +1,9 @@
 # Getting started
 
+```@meta
+CurrentModule = Inti
+```
+
 !!! note "Important points covered in this tutorial"
       - Create a domain and its accompanying mesh
       - Solve a basic boundary integral equation
@@ -9,20 +13,19 @@ This first tutorial will guide you through the basic steps of setting up a
 boundary integral equation problem and solving it using Inti.jl. We will
 consider the classic Helmholtz scattering problem in 2D, and solve it using a
 *direct* boundary integral formulation. More precisely, letting ``\Omega \subset
-\mathbb{R}^d`` be a bounded domain, and denoting by ``\Gamma = \partial \Omega``
+\mathbb{R}^2`` be a bounded domain, and denoting by ``\Gamma = \partial \Omega``
 its boundary, we will solve the following Helmholtz problem:
 
 ```math
 \begin{aligned}
-    \Delta u + k^2 u  &= 0 \quad &&\text{in} \quad \mathbb{R}^d \setminus \bar{\Omega},\\
+    \Delta u + k^2 u  &= 0 \quad &&\text{in} \quad \mathbb{R}^2 \setminus \overline{\Omega},\\
     \partial_\nu u &= g \quad &&\text{on} \quad \Gamma,\\
-    \sqrt{r} \left( \frac{\partial u}{\partial r} - i k u \right) &= o(1) \quad &&\text{as} \quad r \to \infty,
+    \sqrt{r} \left( \frac{\partial u}{\partial r} - i k u \right) &= o(1) \quad &&\text{as} \quad r = |\boldsymbol{x}| \to \infty,
 \end{aligned}
 ```
 
 where ``g`` is a (given) boundary datum, ``\nu`` is the outward unit normal to
-``\Gamma``, ``k`` is the constant wavenumber, and ``r = ||\boldsymbol{x}||`` is
-the radial coordinate.
+``\Gamma``, and ``k`` is the constant wavenumber.
 
 !!! tip "Sommerfeld radiation condition"
     The last condition is the *Sommerfeld radiation condition*, and is required
@@ -73,8 +76,8 @@ Here ``S`` and ``D`` are the single- and double-layer operators, formally
 defined as:
 
 ```math
-    S[\sigma](\boldsymbol{x}) = \int_\Gamma G(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}\Gamma(\boldsymbol{y}), \quad
-    D[\sigma](\boldsymbol{x}) = \int_\Gamma \frac{\partial G}{\partial \nu_{\boldsymbol{y}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}\Gamma(\boldsymbol{y}),
+    S[\sigma](\boldsymbol{x}) = \int_\Gamma G(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}), \quad
+    D[\sigma](\boldsymbol{x}) = \int_\Gamma \frac{\partial G}{\partial \nu_{\boldsymbol{y}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}),
 ```
 
 where ``G`` is the fundamental solution of the Helmholtz equation. Note that
@@ -94,12 +97,21 @@ S, D = Inti.single_double_layer(;
 )
 ```
 
+!!! tip "Fast algorithms"
+    Inti.jl supports several acceleration methods for matrix-vector
+    multiplication, including so far:
+    - *Fast multipole method* (FMM): `correction = (method = :fmm, tol = 1e-8)`
+    - *Hierarchical matrix* (H-matrix): `correction = (method = :hmatrix, tol =
+    1e-8)`
+
+    Note that in such cases only the matrix-vector product is available, and therefore one must rely on iterative methods to solve the resulting linear system; see ...
+
 Much of the complexity involved in the numerical computation is hidden in the
-function above; later in the tutorial we will discuss in more details the
+function above; later in the tutorials we will discuss in more details the
 options available for the *compression* and *correction* methods, as well as how
 to define your own kernels and operators. For now, it suffices to know that `S`
 and `D` are matrix-like objects that can be used to solve the boundary integral
-equation. For that, we need to provide the boundary data ``g``. 
+equation. For that, we need to provide the boundary data ``g``.
 
 We are interested in the scattered field ``u`` produced by an incident plane
 wave ``u_i = e^{i k \boldsymbol{d} \cdot \boldsymbol{x}}``, where
@@ -134,6 +146,14 @@ Green's representation formula, i.e.,
         u(\boldsymbol{r}) & \text{if } \boldsymbol{r} \in \mathbb{R}^2 \setminus \overline{\Omega},\\
         0 & \text{if } \boldsymbol{r} \in \Omega,
     \end{cases}
+```
+
+where ``\mathcal{D}`` and ``\mathcal{S}`` are the double- and single-layer
+potentials defined as:
+
+```math
+    \mathcal{S}[\sigma](\boldsymbol{r}) = \int_{\Gamma} G(\boldsymbol{r}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}), \quad
+    \mathcal{D}[\sigma](\boldsymbol{r}) = \int_{\Gamma} \frac{\partial G}{\partial \nu_{\boldsymbol{y}}}(\boldsymbol{r}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}),
 ```
 
 to compute the solution ``u`` in the domain:

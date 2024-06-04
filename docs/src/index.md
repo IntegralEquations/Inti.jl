@@ -1,5 +1,9 @@
 # Inti
 
+```@meta
+CurrentModule = Inti
+```
+
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://IntegralEquations.github.io/Inti.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://IntegralEquations.github.io/Inti.jl/dev/)
 [![Build Status](https://github.com/IntegralEquations/Inti.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/IntegralEquations/Inti.jl/actions/workflows/CI.yml?query=branch%3Amain)
@@ -47,8 +51,28 @@ branch. Change `rev` if you need a different branch or specific commit hash.
 ## Basic usage
 
 Inti.jl can be used to solve a variety of linear partial differential equations
-by recasting them as integral equations. As a simple example, consider an
-interior Laplace problem in two dimensions with Dirichlet boundary conditions:
+by recasting them as integral equations. The general workflow for solving a
+problem consists of the following steps:
+
+```math
+    \underbrace{\fbox{Geometry} \rightarrow \fbox{Mesh}}_{\textbf{pre-processing}} \rightarrow \fbox{\color{red}{Solver}} \rightarrow \underbrace{\fbox{Visualization}}_{\textbf{post-processing}}
+```
+
+- **Geometry**: The first step is to define the domain of interest, which can be
+  done using a combination of simple shapes (e.g., circles, rectangles) or more
+  complex *CAD* models.
+- **Mesh**: The mesh is a collection of points and segments that approximate the
+  domain. The mesh is used to create a quadrature and discretize the boundary
+  integral equation.
+- **Solver**: Once a mesh and an accompanying quadrature are available, Inti.jl
+  provides routines for assembling and solving the linear system of equations
+  arising from the discretization of the integral operators. Once found, the
+  solution can be evaluated using an integral representation.
+- **Visualization**: Finally, the solution can be visualized using a plotting library, such
+  as `Makie.jl`, or exported to a file for further analysis.
+
+As a simple example, consider an interior Laplace problem in two dimensions with
+Dirichlet boundary conditions:
 
 ```math
 \begin{aligned}

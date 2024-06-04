@@ -122,6 +122,19 @@ function Base.setdiff(Ω1::Domain, Ω2::Domain)
     return Domain(setdiff(keys(Ω1), keys(Ω2)))
 end
 
+function Base.intersect(Ω1::Domain, Ω2::Domain)
+    if isempty(Ω1) || isempty(Ω2)
+        return Domain()
+    end
+    d1, d2 = map(geometric_dimension, (Ω1, Ω2))
+    d1 == d2 || error("domains have different dimensions: $d1 and $d2")
+    # try intersection at highest dimension, if empty, try on skeleton
+    Ωinter = Domain(intersect(keys(Ω1), keys(Ω2)))
+    return isempty(Ωinter) ? intersect(skeleton(Ω1), skeleton(Ω2)) : Ωinter
+end
+
+Base.:(==)(Ω1::Domain, Ω2::Domain) = (keys(Ω1) == keys(Ω2))
+
 function geometric_dimension(Ω::Domain)
     l, u = extrema(geometric_dimension(ent) for ent in entities(Ω))
     @assert l == u "geometric dimension of entities in a domain not equal"

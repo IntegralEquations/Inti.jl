@@ -22,6 +22,14 @@ Base.:(==)(e1::EntityKey, e2::EntityKey) = e1.dim == e2.dim && abs(e1.tag) == ab
 labels(e::EntityKey) = labels(global_get_entity(e))
 boundary(e::EntityKey) = boundary(global_get_entity(e))
 
+function (k::EntityKey)(x)
+    ent = global_get_entity(k)
+    hasparametrization(ent) || error("entity $(key(ent)) has no parametrization")
+    f = parametrization(ent)
+    s = tag(k) < 0 ? 1 - x : x
+    return f(s)
+end
+
 function Base.show(io::IO, k::EntityKey)
     e = global_get_entity(k)
     print(io, "EntityKey: ($(k.dim), $(k.tag)) => $e")
@@ -70,6 +78,12 @@ function GeometricEntity(;
     d = geometric_dimension(domain)
     t = isnothing(tag) ? new_tag(d) : tag
     V = return_type(parametrization, SVector{N,T})
+    # try to evaluate to see if that errors
+    try
+        parametrization(center(domain))
+    catch
+        error("evaluating parametrization at the center of the domain failed")
+    end
     # the parametrization should maps SVector to SVector
     if !(V <: SVector)
         msg = """return_type of parametrization was $V (expected an SVector).
@@ -156,16 +170,16 @@ end
     parametric_curve(f, a::Real, b::Real)
 
 Create a [`GeometricEntity`] representing a parametric curve defined by the
-`{f(t) | a ≤ t ≤ b}`.
+`{f(t) | a ≤ t ≤ b}`. The function `f` should map a scalar to a `SVector`.
 """
-function parametric_curve(f, a::Real, b::Real)
+function parametric_curve(f::F, a::Real, b::Real; kwargs...) where {F}
     d = HyperRectangle(SVector(float(a)), SVector(float(b)))
-    ent = GeometricEntity(; domain = d, parametrization = x -> f(x[1]))
+    ent = GeometricEntity(; domain = d, parametrization = x -> f(x[1]), kwargs...)
     return key(ent)
 end
 
 # https://www.ljll.fr/perronnet/transfini/transfini.html
-function transfinite_square(k1::T, k2::T, k3::T, k4::T) where {T<:EntityKey}
+function transfinite_square(k1::T, k2::T, k3::T, k4::T; kwargs...) where {T<:EntityKey}
     c1, c2, c3, c4 = map((k1, k2, k3, k4)) do k
         l = global_get_entity(k)
         hasparametrization(l) || error("entity $(key(l)) has no parametrization")
@@ -183,11 +197,24 @@ function transfinite_square(k1::T, k2::T, k3::T, k4::T) where {T<:EntityKey}
         end
         return f̂
     end
-    @assert c1(1) ≈ c2(0) && c2(1) ≈ c3(0) && c3(1) ≈ c4(0) && c4(1) ≈ c1(0)
+    same = (x, y) -> isapprox(x, y; atol = 1e-8)
+    if !(
+        same(c1(1), c2(0)) &&
+        same(c2(1), c3(0)) &&
+        same(c3(1), c4(0)) &&
+        same(c4(1), c1(0))
+    )
+        error("the curves do not form a square")
+    end
     # create a closure and compute the parametrization
     f2d = _transfinite_square(c1, c2, c3, c4)
     d = HyperRectangle(SVector(0.0, 0.0), SVector(1.0, 1.0))
-    ent = GeometricEntity(; domain = d, parametrization = f2d, boundary = [k1, k2, k3, k4])
+    ent = GeometricEntity(;
+        domain = d,
+        parametrization = f2d,
+        boundary = [k1, k2, k3, k4],
+        kwargs...,
+    )
     return key(ent)
 end
 
