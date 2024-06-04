@@ -78,6 +78,7 @@ makedocs(;
             "tutorials/getting_started.md",
             "tutorials/geo_and_meshes.md",
             "tutorials/integral_operators.md",
+            "tutorials/layer_potentials.md",
             "tutorials/compression_methods.md",
             "tutorials/correction_methods.md",
             "tutorials/solvers.md",
