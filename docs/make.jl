@@ -11,7 +11,7 @@ using FMM3D
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style = :numeric)
 
-draft = true
+draft = false
 
 const ON_CI = get(ENV, "CI", "false") == "true"
 const GIT_HEAD = chomp(read(`git rev-parse HEAD`, String))
@@ -78,6 +78,8 @@ makedocs(;
             "tutorials/getting_started.md",
             "tutorials/geo_and_meshes.md",
             "tutorials/integral_operators.md",
+            "tutorials/compression_methods.md",
+            "tutorials/correction_methods.md",
             "tutorials/solvers.md",
         ],
         "Examples" => ["examples/generated/toy_example.md"],

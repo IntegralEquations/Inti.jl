@@ -227,13 +227,7 @@ function Inti.write_gmsh_view(msh::Inti.SubMesh, data; viewname = "")
     return nothing
 end
 
-"""
-    gmsh_curve(f::Function, a, b; npts=100, tag=-1)
-
-Create a C² curve in the current `gmsh` model that approximates `{f(t) : t ∈ (a,b) }`
-where `f` is a function from `ℝ` to `ℝ²` or `ℝ³`. The curve is approximated by C²
-"""
-function Inti.gmsh_curve(f, a, b; npts = 100, tag = -1)
+function Inti.gmsh_curve(f, a, b; npts = 100, tag = -1, meshsize)
     isclosed = norm(f(a) .- f(b)) < 1e-8
     is2d = length(f(a)) == 2
     pt_tags = Int32[]
@@ -243,7 +237,7 @@ function Inti.gmsh_curve(f, a, b; npts = 100, tag = -1)
         coords = f(a + s * (b - a))
         x, y = coords[1], coords[2]
         z = is2d ? 0 : coords[3]
-        t = gmsh.model.occ.addPoint(x, y, z)
+        t = gmsh.model.occ.addPoint(x, y, z, meshsize)
         push!(pt_tags, t)
     end
     # close the curve by adding the first point again

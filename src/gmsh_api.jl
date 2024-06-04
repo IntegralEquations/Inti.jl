@@ -14,11 +14,12 @@ function import_mesh(args...; kwargs...)
 end
 
 """
-    gmsh_curve(f::Function, a, b; npts=100, tag=-1)
+    gmsh_curve(f::Function, a, b; npts=100, meshsize = 0, tag=-1)
 
-Create a curve in the current `gmsh` model given by `{f(t) : t ∈
-(a,b) }` where `f` is a function from `ℝ` to `ℝ^3`. The curve is approximated
-by C² b-splines passing through `npts` equispaced in parameter space.
+Create a curve in the current `gmsh` model given by `{f(t) : t ∈ (a,b) }` where
+`f` is a function from `ℝ` to `ℝ^3`. The curve is approximated by C² b-splines
+passing through `npts` equispaced in parameter space. If a `meshsize` is given,
+`gmsh` will use it when meshing the curve.
 """
 function gmsh_curve(args...; kwargs...)
     return error("Inti.gmsh_curve not found. Did you forget to load Gmsh.jl?")

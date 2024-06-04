@@ -1,4 +1,4 @@
-# Solvers
+# Compression methods
 
 ```@meta
 CurrentModule = Inti

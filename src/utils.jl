@@ -59,7 +59,6 @@ A functors of type `T` with a knonw return type should extend
 `return_type(::T,args...)` to avoid relying on `promote_op`.
 """
 function return_type(f, args...)
-    @debug "using `Base.promote_op` to infer return type. Consider defining `return_type(::typeof($f),args...)`."
     return Base.promote_op(f, args...)
 end
 
