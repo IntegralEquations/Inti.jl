@@ -1,5 +1,9 @@
 # Getting started
 
+```@meta
+CurrentModule = Inti
+```
+
 !!! note "Important points covered in this tutorial"
       - Create a domain and its accompanying mesh
       - Solve a basic boundary integral equation
