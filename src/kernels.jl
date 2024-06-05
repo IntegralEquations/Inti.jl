@@ -1,3 +1,4 @@
+const PREDEFINED_KERNELS = ["Laplace", "Helmholtz", "Stokes"]
 """
     abstract type AbstractKernel{T}
 

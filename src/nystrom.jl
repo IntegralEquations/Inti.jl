@@ -59,8 +59,8 @@ target(iop::IntegralOperator) = iop.target
 source(iop::IntegralOperator) = iop.source
 
 function IntegralOperator(k, X, Y::Quadrature = X)
-    T = return_type(k)
-    msg = """IntegralOperator of nonbits being created"""
+    T = return_type(k, eltype(X), eltype(Y))
+    msg = """IntegralOperator of nonbits being created: $T"""
     isbitstype(T) || (@warn msg)
     return IntegralOperator{T,typeof(k),typeof(X),typeof(Y)}(k, X, Y)
 end

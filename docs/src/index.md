@@ -173,7 +173,7 @@ vector-valued PDEs, three-dimensional geometries, and possibly requiring the use
 of acceleration techniques such as the Fast Multipole Method. The best way to
 dive deeper into Inti.jl's capabilities is the [tutorials](@ref "Getting
 started") section. You can also find more advanced usage in the [examples](@ref
-Examples) section.
+"Toy example") section.
 
 ## Contributing
 

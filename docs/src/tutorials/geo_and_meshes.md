@@ -50,14 +50,14 @@ fig # hide
 
 ```@example geo-and-meshes
 @assert isempty(Γ1 ∩ Γ2) # hide
-Γ = Γ1 ∩ Γ2 # empty
+Γ1 ∩ Γ2 # empty
 ```
 
 and `union`:
 
 ```@example geo-and-meshes
-@assert Γ1 ∪ Γ2 == Γ # hide
-Γ  = Γ1 ∪ Γ2
+@assert (Γ1 ∪ Γ2) == Inti.Domain(l1,l2,l3,l4) # hide
+Γ  = Γ1 ∪ Γ2 # the whole boundary
 ```
 
 ## Transfinite squares

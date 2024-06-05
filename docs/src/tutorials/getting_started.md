@@ -54,6 +54,7 @@ end
 msh = Inti.meshgen(Γ; meshsize = 2π / k / 10)
 # Create a quadrature
 Q = Inti.Quadrature(msh; qorder = 5)
+nothing # hide
 ```
 
 We can easily check the mesh by visualizing it using the `Meshes.jl` package:
@@ -95,6 +96,7 @@ S, D = Inti.single_double_layer(;
     compression = (method = :none,),
     correction = (method = :dim,),
 )
+nothing # hide
 ```
 
 !!! tip "Fast algorithms"
