@@ -4,7 +4,7 @@ docsdir = joinpath(@__DIR__, "../..") #src
 Pkg.activate(docsdir)                 #src
 
 #nb ## Environment setup
-#nb const DEPENDENCIES = ["CairoMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "FMM3D", "FMM2D"];
+#nb const DEPENDENCIES = ["CairoMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "FMM3D", "FMM2D", "Meshes"];
 #nb ## __NOTEBOOK_SETUP__
 
 # # [Poisson solver](@id poisson)
@@ -34,7 +34,7 @@ using Inti
 #
 # Seeking for a solution $u$ of the form ...
 
-meshsize = 0.05
+meshsize = 0.1
 # `n` in the VDIM paper
 interpolation_order = 3
 qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
@@ -68,6 +68,7 @@ gmsh_disk(; meshsize, order = 2, name)
 
 Inti.clear_entities!() # empty the entity cache
 msh = Inti.import_mesh(name; dim = 2)
+Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
 Γ = Inti.boundary(Ω)
 
 Ωₕ = view(msh, Ω)
@@ -177,9 +178,15 @@ sol_nodes = uₑ.(Inti.nodes(Ωₕ))
 solₕ_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, uₑ_quad)
 er_nodes = abs.(sol_nodes - solₕ_nodes)
 
-gmsh.initialize()
-Inti.write_gmsh_model(msh)
-Inti.write_gmsh_view!(Ωₕ, er_nodes; name = "error")
-Inti.write_gmsh_view!(Ωₕ, sol_nodes; name = "solution")
-isinteractive() && gmsh.fltk.run()
-gmsh.finalize()
+using Meshes
+##
+fig = Figure(; size = (1200, 400))
+ax1 = Axis(fig[1, 1]; aspect = DataAspect(), title = "solution")
+colorrange = extrema(sol_nodes)
+viz!(Ωₕ; showsegments = true, color = sol_nodes, colorrange)
+Colorbar(fig[1, 2]; colorrange = colorrange)
+ax2 = Axis(fig[1, 3]; aspect = DataAspect(), title = "error")
+colorrange = extrema(er_nodes)
+viz!(Ωₕ; showsegments = false, color = er_nodes, colorrange)
+Colorbar(fig[1, 4]; colorrange = colorrange)
+fig
