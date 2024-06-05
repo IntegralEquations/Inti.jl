@@ -173,17 +173,15 @@ er = abs.(uₕ_quad - uₑ_quad)
 @show norm(er, Inf)
 
 # ## Visualize the solution error using Gmsh
-## er_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, er)
-sol_nodes = uₑ.(Inti.nodes(Ωₕ))
-solₕ_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, uₑ_quad)
-er_nodes = abs.(sol_nodes - solₕ_nodes)
 
-using Meshes
-##
+er_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, er)
+uₕ_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, uₕ_quad)
+
+using GLMakie, Meshes
 fig = Figure(; size = (1200, 400))
 ax1 = Axis(fig[1, 1]; aspect = DataAspect(), title = "solution")
-colorrange = extrema(sol_nodes)
-viz!(Ωₕ; showsegments = true, color = sol_nodes, colorrange)
+colorrange = extrema(uₕ_nodes)
+viz!(Ωₕ; showsegments = true, color = uₕ_nodes, colorrange)
 Colorbar(fig[1, 2]; colorrange = colorrange)
 ax2 = Axis(fig[1, 3]; aspect = DataAspect(), title = "error")
 colorrange = extrema(er_nodes)
