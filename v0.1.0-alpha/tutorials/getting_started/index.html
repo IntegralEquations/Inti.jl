@@ -21,7 +21,7 @@ end
 msh = Inti.meshgen(Γ; meshsize = 2π / k / 10)
 # Create a quadrature
 Q = Inti.Quadrature(msh; qorder = 5)</code></pre><p>We can easily check the mesh by visualizing it using the <code>Meshes.jl</code> package:</p><pre><code class="language-julia hljs">using Meshes, GLMakie
-fig, ax, pl = viz(msh; segmentsize = 3, axis = (aspect = DataAspect(), ))</code></pre><img src="94608d72.png" alt="Example block output"/><p>Next we need to reformulate the Helmholtz problem as a boundary integral equation. Among the plethora of options, we will use in this tutorial a simple <em>direct</em> formulation, which uses Green&#39;s third identity to relate the values of <span>$u$</span> and <span>$\partial_{\nu} u$</span> on <span>$\Gamma$</span>:</p><p class="math-container">\[    -\frac{u(\boldsymbol{x})}{2} + D[u](\boldsymbol{x}) = S[\partial_\nu u](\boldsymbol{x}), \quad \boldsymbol{x} \in \Gamma.\]</p><p>Here <span>$S$</span> and <span>$D$</span> are the single- and double-layer operators, formally defined as:</p><p class="math-container">\[    S[\sigma](\boldsymbol{x}) = \int_\Gamma G(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}), \quad
+fig, ax, pl = viz(msh; segmentsize = 3, axis = (aspect = DataAspect(), ))</code></pre><img src="81a37ee8.png" alt="Example block output"/><p>Next we need to reformulate the Helmholtz problem as a boundary integral equation. Among the plethora of options, we will use in this tutorial a simple <em>direct</em> formulation, which uses Green&#39;s third identity to relate the values of <span>$u$</span> and <span>$\partial_{\nu} u$</span> on <span>$\Gamma$</span>:</p><p class="math-container">\[    -\frac{u(\boldsymbol{x})}{2} + D[u](\boldsymbol{x}) = S[\partial_\nu u](\boldsymbol{x}), \quad \boldsymbol{x} \in \Gamma.\]</p><p>Here <span>$S$</span> and <span>$D$</span> are the single- and double-layer operators, formally defined as:</p><p class="math-container">\[    S[\sigma](\boldsymbol{x}) = \int_\Gamma G(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}), \quad
     D[\sigma](\boldsymbol{x}) = \int_\Gamma \frac{\partial G}{\partial \nu_{\boldsymbol{y}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}),\]</p><p>where <span>$G$</span> is the fundamental solution of the Helmholtz equation. Note that <span>$G$</span> is typically singular when <span>$\boldsymbol{x} = \boldsymbol{y}$</span>, and therefore the numerical discretization of these integral operators requires special care.</p><p>To approximate <span>$S$</span> and <span>$D$</span> in Inti.jl we can proceed as follows:</p><pre><code class="language-julia hljs">S, D = Inti.single_double_layer(;
     pde,
     target = Q,
@@ -37,26 +37,26 @@ g = map(Q) do q
     return -im * k * exp(im * k * dot(x, d)) * dot(d, ν)
 end ## Neumann trace on boundary
 u = (-I / 2 + D) \ (S * g) # Dirichlet trace on boundary</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">942-element Vector{ComplexF64}:
-  -1.003948232142693 - 3.0741504761694247im
- -1.0085600790159717 - 3.0754979938043907im
-  -1.033633430551109 - 3.082811300140129im
- -1.0884819793992646 - 3.0987317014054767im
- -1.1566306013569607 - 3.1183556273676145im
- -1.2038029197863518 - 3.13183036152278im
- -1.2170934390076709 - 3.1356098368931202im
- -1.2706054323629623 - 3.150748077381259im
- -1.3732126784735994 - 3.179391862236483im
- -1.5033885227542632 - 3.214896447179599im
+  0.9187328380710671 + 0.23326666113075545im
+  0.9197893673542495 + 0.2311539453363505im
+  0.9255068912409347 + 0.21959641919677253im
+  0.9378508905044305 + 0.19388166216848923im
+  0.9528502909317692 + 0.16105889486228628im
+  0.9629921501223607 + 0.13773521319621995im
+  0.9658113564467891 + 0.13107009873130723im
+  0.9769807836842588 + 0.10379682277261049im
+  0.9974949024219231 + 0.04939037406582785im
+  1.0214630357533936 - 0.024210983799045824im
                      ⋮
-  0.9974949024513501 + 0.049390374067215484im
-  0.9769807837090205 + 0.10379682277382928im
-  0.9658113564687612 + 0.13107009873234318im
-  0.9629921501436887 + 0.13773521319719348im
-  0.9528502909502023 + 0.16105889486304104im
-  0.9378508905177855 + 0.19388166216884684im
-  0.9255068912483005 + 0.2195964191966246im
-  0.9197893673563476 + 0.23115394533575517im
-  0.9187328380701121 + 0.23326666112978275im</code></pre><p>Now that we know both the Dirichlet and Neumann data on the boundary, we can use Green&#39;s representation formula, i.e., </p><p class="math-container">\[    \mathcal{D}[u](\boldsymbol{r}) - \mathcal{S}[\partial_{\nu} u](\boldsymbol{r}) = \begin{cases}
+ -1.3732126783991097 - 3.1793918621288793im
+ -1.2706054323009113 - 3.150748077285865im
+ -1.2170934389524029 - 3.1356098368061702im
+  -1.203802919732877 - 3.131830361438346im
+  -1.156630601309938 - 3.1183556272927495im
+ -1.0884819793629061 - 3.098731701349147im
+  -1.033633430526623 - 3.0828113001074806im
+ -1.0085600790014444 - 3.075497993793488im
+ -1.0039482321338427 - 3.0741504761714493im</code></pre><p>Now that we know both the Dirichlet and Neumann data on the boundary, we can use Green&#39;s representation formula, i.e., </p><p class="math-container">\[    \mathcal{D}[u](\boldsymbol{r}) - \mathcal{S}[\partial_{\nu} u](\boldsymbol{r}) = \begin{cases}
         u(\boldsymbol{r}) &amp; \text{if } \boldsymbol{r} \in \mathbb{R}^2 \setminus \overline{\Omega},\\
         0 &amp; \text{if } \boldsymbol{r} \in \Omega,
     \end{cases}\]</p><p>where <span>$\mathcal{D}$</span> and <span>$\mathcal{S}$</span> are the double- and single-layer potentials defined as:</p><p class="math-container">\[    \mathcal{S}[\sigma](\boldsymbol{r}) = \int_{\Gamma} G(\boldsymbol{r}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}), \quad
@@ -87,4 +87,4 @@ u = (-I / 2 + D) \ (S * g)
 uₛ = x -&gt; 𝒟[u](x) - 𝒮[g](x)
 pts = [5*SVector(cos(θ), sin(θ)) for θ in range(0, 2π, length = 100)]
 er = norm(uₛ.(pts) - uₑ.(pts), Inf)
-println(&quot;maximum error on circle of radius 5: $er&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">maximum error on circle of radius 5: 5.734990669546002e-11</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../geo_and_meshes/">Geometry and meshes »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Wednesday 5 June 2024 15:34">Wednesday 5 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+println(&quot;maximum error on circle of radius 5: $er&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">maximum error on circle of radius 5: 5.198118667375668e-11</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../geo_and_meshes/">Geometry and meshes »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Wednesday 5 June 2024 16:01">Wednesday 5 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
