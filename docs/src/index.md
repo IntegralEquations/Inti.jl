@@ -42,7 +42,7 @@ Inti.jl is not yet registered in the Julia General registry. You can install it
 using by launching a Julia REPL and typing the following command:
 
 ```julia
-using Pkg; Pkg.add("Inti"; rev = "main")
+using Pkg; Pkg.add(;url = "https://github.com/IntegralEquations/Inti.jl", rev = "main")
 ```
 
 This will download and install the latest version of Inti.jl from the `main`
