@@ -107,7 +107,7 @@ Gmsh.jl is loaded. This extension allows you to import meshes from Gmsh files:
 
 ```@example geo-and-meshes
 using Gmsh
-filename = joinpath(@__DIR__, "piece.msh")
+filename = joinpath(Inti.PROJECT_ROOT,"docs", "assets", "piece.msh")
 msh = Inti.import_mesh(filename)
 ```
 
