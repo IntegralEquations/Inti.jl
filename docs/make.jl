@@ -83,7 +83,10 @@ makedocs(;
             "tutorials/correction_methods.md",
             "tutorials/solvers.md",
         ],
-        "Examples" => ["examples/generated/toy_example.md"],
+        "Examples" => [
+            "examples/generated/toy_example.md",
+            "examples/generated/helmholtz_scattering.md",
+        ],
         "References" => "references.md",
         "Docstrings" => "docstrings.md",
     ],

@@ -153,14 +153,12 @@ Inti.clear_entities!() # empty the entity cache
 msh = Inti.import_mesh(name; dim = 2)
 @show msh
 
-# The code above will parse all entities in the `name` of dimension `2` as a
-# [`Domain`](@ref Inti.Domain), and also import the underlying mesh (that, in
-# this case, is projected into two dimensions by ignoring the third component).
-# Note that in the example above, `Ω` is a two-dimensional domain containing a
-# single `GmshEntity` which represents the disk. To extract the boundary $\Gamma
-# = \partial \Omega$, we can use the [`boundary`](@ref Inti.boundary) function:
+# The code above will import the mesh with all of its geometrical entities. The
+# `dim=2` projects all points to two dimensions by ignoring the third
+# component. To extract the domain ``\Omega`` we need to filter the entities in
+# the mesh; here we will simply filter them based on the `geometric_dimension`:
 
-Γ = Inti.boundary(Ω)
+Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
 
 # To solve our boundary integral equation usign a Nyström method, we actually
 # need a quadrature of our curve/surface (and possibly the normal vectors at the
@@ -338,7 +336,7 @@ gmsh.initialize()
 gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
 gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
 ## parametrization of a kite-like shape
-tag = Inti.gmsh_curve(f, 0, 1; npts = 100)
+tag = Inti.gmsh_curve(f, 0, 1; npts = 100, meshsize)
 ## create a surface from the curve
 tl = gmsh.model.occ.addCurveLoop([tag])
 ta = gmsh.model.occ.addPlaneSurface([tl])
@@ -390,13 +388,17 @@ nothing #hide
 name = joinpath(@__DIR__, "sphere.msh")
 gmsh_sphere(; meshsize, order = gorder, name, visualize = false)
 Inti.clear_entities!()
-Ω, msh = Inti.import_mesh(name; dim = 3)
+msh = Inti.import_mesh(name; dim = 3)
+
+# Since we created physical groups in `Gmsh`, we can use them to extract the
+# relevant domains `Ω` and `Σ`:
+
+Ω = Inti.Domain(e -> "omega" ∈ Inti.labels(e), Inti.entities(msh))
+Σ = Inti.Domain(e -> "sigma" ∈ Inti.labels(e), Inti.entities(msh))
 Γ = Inti.boundary(Ω)
 nothing #hide
 
-# Note that for this example we relied instead on the labels to the entities in
-# order to extract the relevant domains `Ω` and `Σ`. We can now create a
-# quadrature as before
+# We can now create a quadrature as before
 
 Γ_msh = view(msh, Γ)
 Q = Inti.Quadrature(Γ_msh; qorder)
@@ -409,9 +411,9 @@ nothing #hide
 
 # !!! tip "Writing/reading a mesh from disk"
 #       Writing and reading a mesh to/from disk can be time consuming. You can
-#       avoid doing so by using [`import_mesh`](@ref Inti.import_mesh)
-#       and [`import_mesh`](@ref Inti.import_mesh) functions on an
-#       active `gmsh` model without writing it to disk.
+#       avoid doing so by using [`import_mesh`](@ref Inti.import_mesh) without a
+#       file name to import the mesh from the current `gmsh` session without the
+#       need to write it to disk.
 
 # We can now assemble the integral operators, indicating that we
 # wish to compress them using hierarchical matrices:
@@ -523,8 +525,6 @@ end
 # well. In the example below, we use the fast-multipole method:
 
 using FMM3D
-
-Σ = Inti.Domain(e -> "sigma" ∈ Inti.labels(e), Inti.entities(msh))
 Σ_msh = view(msh, Σ)
 target = Inti.nodes(Σ_msh)
 
@@ -553,4 +553,4 @@ colormap = :inferno
 fig, ax, pl = viz(Γ_msh; colorrange, colormap, color = zeros(nv))
 viz!(Σ_msh; colorrange, colormap, color = real(u_eval_msh))
 cb = Colorbar(fig[1, 2]; label = "real(u)", colormap, colorrange)
-fig
+fig # hide
