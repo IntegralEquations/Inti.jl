@@ -100,13 +100,13 @@ nothing # hide
 ```
 
 !!! tip "Fast algorithms"
-    Inti.jl supports several acceleration methods for matrix-vector
-    multiplication, including so far:
-    - *Fast multipole method* (FMM): `correction = (method = :fmm, tol = 1e-8)`
-    - *Hierarchical matrix* (H-matrix): `correction = (method = :hmatrix, tol =
+    Powered by external libraries, Inti.jl supports several acceleration methods
+    for matrix-vector multiplication, including so far:
+    - **Fast multipole method** (FMM) ``\mapsto`` `correction = (method = :fmm, tol = 1e-8)`
+    - **Hierarchical matrix** (H-matrix) ``\mapsto`` `correction = (method = :hmatrix, tol =
     1e-8)`
-
-    Note that in such cases only the matrix-vector product is available, and therefore one must rely on iterative methods to solve the resulting linear system; see ...
+    
+    Note that in such cases only the matrix-vector product may not be available, and therefore iterative solvers such as GMRES may be required for the solution of the resulting linear systems.
 
 Much of the complexity involved in the numerical computation is hidden in the
 function above; later in the tutorials we will discuss in more details the

@@ -32,7 +32,7 @@ end
 # Generate examples using Literate
 const examples_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples")
 const generated_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples", "generated")
-const examples = ["toy_example.jl"]
+const examples = ["toy_example.jl", "helmholtz_scattering.jl", "poisson.jl"]
 for t in examples
     println("\n*** Generating $t example")
     @time begin
@@ -54,7 +54,7 @@ println("\n*** Generating documentation")
 
 DocMeta.setdocmeta!(Inti, :DocTestSetup, :(using Inti); recursive = true)
 
-modules = [Inti, Meshes]
+modules = [Inti]
 for extension in
     [:IntiGmshExt, :IntiHMatricesExt, :IntiMeshesExt, :IntiFMM2DExt, :IntiFMM3DExt]
     ext = Base.get_extension(Inti, extension)
@@ -83,12 +83,16 @@ makedocs(;
             "tutorials/correction_methods.md",
             "tutorials/solvers.md",
         ],
-        "Examples" => ["examples/generated/toy_example.md"],
+        "Examples" => [
+            "examples/generated/toy_example.md",
+            "examples/generated/helmholtz_scattering.md",
+            "examples/generated/poisson.md",
+        ],
         "References" => "references.md",
         "Docstrings" => "docstrings.md",
     ],
-    # warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),
-    warnonly = true,
+    warnonly = ON_CI ? true : Documenter.except(:linkcheck_remotes),
+    # warnonly = true,
     pagesonly = true,
     checkdocs = :none,
     draft,
