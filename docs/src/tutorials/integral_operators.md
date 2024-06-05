@@ -45,7 +45,7 @@ construct the four integral operators of Calderón calculus:
 
 ```@example integral_operators
 Γ = Inti.parametric_curve(s -> SVector(cos(s), sin(s)), 0, 2π) |> Inti.Domain
-Q = Inti.Quadrature(Γ; meshsize = 0.01, qorder = 5)
+Q = Inti.Quadrature(Γ; meshsize = 0.1, qorder = 5)
 S, D = Inti.single_double_layer(; 
     pde, 
     target = Q, 
@@ -113,8 +113,8 @@ matrix-free way: the only thing *guaranteed* is that `S` and `D` can be applied
 to a vector:
 
 ```@example integral_operators
-x = rand(size(S,2))
-# @assert norm(Sfmm*x - S*x, Inf) / norm(S*x, Inf) < 1e-3 # hide
+x = map(q -> cos(q.coords[1] + q.coords[2]), Q)
+@assert norm(Sfmm*x - S*x, Inf) / norm(S*x, Inf) < 1e-8 # hide
 norm(Sfmm*x - S*x, Inf)
 ```
 
