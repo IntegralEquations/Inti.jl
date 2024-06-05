@@ -22,4 +22,4 @@ from the example's page.
 
 =#
 
-using GLMakie
+using Inti
