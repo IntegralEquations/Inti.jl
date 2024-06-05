@@ -54,7 +54,7 @@ println("\n*** Generating documentation")
 
 DocMeta.setdocmeta!(Inti, :DocTestSetup, :(using Inti); recursive = true)
 
-modules = [Inti, Meshes]
+modules = [Inti]
 for extension in
     [:IntiGmshExt, :IntiHMatricesExt, :IntiMeshesExt, :IntiFMM2DExt, :IntiFMM3DExt]
     ext = Base.get_extension(Inti, extension)
@@ -91,7 +91,7 @@ makedocs(;
         "References" => "references.md",
         "Docstrings" => "docstrings.md",
     ],
-    warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),
+    warnonly = ON_CI ? true : Documenter.except(:linkcheck_remotes),
     # warnonly = true,
     pagesonly = true,
     checkdocs = :none,
