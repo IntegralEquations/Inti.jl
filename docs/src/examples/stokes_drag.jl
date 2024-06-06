@@ -4,28 +4,44 @@ docsdir = joinpath(@__DIR__, "../..") #src
 Pkg.activate(docsdir)                 #src
 
 #nb ## Environment setup
-#nb const DEPENDENCIES = ["Meshes", "HMatrices", "Gmsh", "LinearAlgebra", "GLMakie"];
+#nb const DEPENDENCIES = ["Gmsh", "LinearAlgebra", "StaticArrays"];
 #nb ## __NOTEBOOK_SETUP__
 
 # # Stokes drag
 
 #md # [![ipynb](https://img.shields.io/badge/download-ipynb-blue)](stokes_drag.ipynb)
-#md # [![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](@__NBVIEWER_ROOT_URL__/examples/generated/stokes_drag.ipynb)
+#md #
+#[![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](@__NBVIEWER_ROOT_URL__/examples/generated/stokes_drag.ipynb)
+
+#=
+
+!!! note "Important points covered in this example"
+    - Solving a vector-value problem
+    - Usage of curved triangular mesh
+    - Post-processing integral quantities
+
+=#
 
 using Inti
 using StaticArrays
 using LinearAlgebra
-using HMatrices
 using Gmsh
+
+# parameters
+μ = 2.0
+R = 1.0
+v = 1.0
 
 # create a sphere using gmsh
 msh_file = joinpath(tempdir(), "stokes-drag.msh")
 gmsh.initialize()
 gmsh.model.add("stokes-drag")
+# set verbosity level to 0
+gmsh.option.setNumber("General.Verbosity", 2)
 # set max and min meshsize to meshsize
 meshsize = 0.2
 gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-gmsh.model.occ.addSphere(0, 0, 0, 1)
+gmsh.model.occ.addSphere(0, 0, 0, R)
 gmsh.model.occ.synchronize()
 gmsh.model.mesh.generate(2)
 gmsh.model.mesh.setOrder(2)
@@ -44,10 +60,10 @@ Q = Inti.Quadrature(Γ_msh; qorder = 4)
 
 # check error in surface area
 @show length(Q)
-@show Inti.integrate(x -> 1, Q) - 4π
+@show abs(Inti.integrate(x -> 1, Q) - 4π)
 
 # the pde and its integral kernels
-pde = Inti.Stokes(; dim = 3, μ = 1.0)
+pde = Inti.Stokes(; dim = 3, μ)
 G   = Inti.SingleLayerKernel(pde)
 dG  = Inti.DoubleLayerKernel(pde)
 
@@ -60,11 +76,13 @@ u = (x) -> 𝒟[σ](x) - 𝒮[σ](x)
 
 # Dirichlet trace on Q (constant velocity field)
 f = map(Q) do q
-    return T(1.0, 0.0, 0.0)
+    return T(v, 0.0, 0.0)
 end
 
+Sop = Inti.IntegralOperator(G, Q, Q)
+Smat = Inti.assemble_matrix(Sop)
+
 # integral operators defined on the boundary
-using FMM3D
 S, D = Inti.single_double_layer(;
     pde,
     target = Q,
@@ -73,36 +91,30 @@ S, D = Inti.single_double_layer(;
     correction = (method = :dim,),
 )
 
-# create a dense approximation of the integral operators
-t_dense = @elapsed begin
-    S = Inti.BlockMatrix(Sop)
-    D = Inti.BlockMatrix(Dop)
-end
-
-L0 = I / 2 + (D - S)
-
-# corrections using boundary DIM method
-t_sparse = @elapsed begin
-    δS, δD = Inti.bdim_correction(pde, Q, Q, S, D)
-end
-
-t_axpy = @elapsed begin
-    axpy!(1.0, δS, S)
-    axpy!(1.0, δD, D)
-end
-
 # combining the operators
-t_comb = @elapsed begin
-    L = axpy!(-1, S, D) # D <- D - S
-    foreach(i -> L[i, i] -= I / 2, 1:size(L, 1)) # L <- L + 0.5*I
+L = I / 2 + D + μ * S
+
+# HACK: to solve the resulting system using gmres we need to wrap L so that it
+# works on scalars
+using IterativeSolvers, LinearMaps
+
+L_ = LinearMap{Float64}(3 * size(L, 1)) do y, x
+    σ = reinterpret(T, x)
+    μ = reinterpret(T, y)
+    mul!(μ, L, σ)
+    return y
 end
 
-# solving the resulting system using gmres
-using IterativeSolvers
-gmres!(σ, L0, f; verbose = true, abstol = 1e-8)
-gmres!(σ, L, f; verbose = true, abstol = 1e-8)
+σ_ = reinterpret(Float64, σ)
+f_ = reinterpret(Float64, f)
 
-@show t_dense
-@show t_sparse
-@show t_axpy
-@show t_comb
+gmres!(σ_, L_, f_; verbose = true, abstol = 1e-8, maxiter = 200, restart = 200)
+
+# F = ∫ σ dS
+drag = μ * sum(eachindex(Q)) do i
+    return σ[i] * Q[i].weight
+end
+
+exact = 6π * μ * R * v
+
+@show (norm(drag) - exact) / exact
