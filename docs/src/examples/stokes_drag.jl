@@ -10,8 +10,7 @@ Pkg.activate(docsdir)                 #src
 # # Stokes drag
 
 #md # [![ipynb](https://img.shields.io/badge/download-ipynb-blue)](stokes_drag.ipynb)
-#md #
-#[![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](@__NBVIEWER_ROOT_URL__/examples/generated/stokes_drag.ipynb)
+#md # [![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](@__NBVIEWER_ROOT_URL__/examples/generated/stokes_drag.ipynb)
 
 #=
 
