@@ -11,23 +11,25 @@ with underlying data given by `A`.
 """
 struct BlockMatrix{T<:SMatrix,S} <: AbstractMatrix{T}
     data::Matrix{S}
-    function BlockMatrix(::Type{T}, data::Matrix{S}) where {T<:Union{SMatrix},S<:Number}
+    function BlockMatrix{T}(data::Matrix{S}) where {T<:Union{SMatrix},S<:Number}
         @assert S == eltype(T)
         @assert sum(rem.(size(data), size(T))) == 0
         return new{T,S}(data)
     end
 end
 
+Base.parent(A::BlockMatrix) = A.data
+
 """
     BlockMatrix(T::DataType, undef, m, n)
 
 Construct a `BlockMatrix{T}` of size m×n, initialized with missing entries.
 """
-function BlockMatrix(::Type{T}, ::UndefInitializer, m, n) where {T<:SMatrix}
+function BlockMatrix{T}(::UndefInitializer, m, n) where {T<:SMatrix}
     S = eltype(T)
     p, q = size(T)
     data = Matrix{S}(undef, m * p, n * q)
-    return BlockMatrix(T, data)
+    return BlockMatrix{T}(data)
 end
 
 blocksize(::BlockMatrix{T}) where {T} = size(T)
@@ -37,6 +39,7 @@ function Base.size(A::BlockMatrix)
 end
 
 function Base.getindex(A::BlockMatrix{T}, i::Int, j::Int) where {T}
+    # @warn "calling getindex on BlockMatrix is slow"
     p, q = size(T)
     I = ((i-1)*p+1):(i*p)
     J = ((j-1)*q+1):(j*q)
@@ -53,18 +56,39 @@ end
 # Base.similar methods for BlockMatrix
 Base.similar(A::BlockMatrix) = BlockMatrix(eltype(A), similar(A.data))
 function Base.similar(A::BlockMatrix, ::Type{T}) where {T}
-    return BlockMatrix(eltype(A), similar(A.data, T))
+    return BlockMatrix{T}(similar(A.data, T))
 end
 function Base.similar(A::BlockMatrix, ::Type{T}, dims::Dims) where {T<:SMatrix}
-    bsz = size(T)
+    bsz = size(T) # block size
+    sz  = ntuple(length(bsz)) do i
+        if i ≤ length(dims)
+            bsz[i] * dims[i]
+        else
+            bsz[i]
+        end
+    end
     @assert bsz == blocksize(A)
-    return BlockMatrix(T, similar(A.data, eltype(T), dims .* bsz))
+    @info dims, bsz, sz
+    return BlockMatrix{T}(similar(A.data, eltype(T), sz))
 end
 
 Base.BroadcastStyle(::Type{<:BlockMatrix}) = Broadcast.ArrayStyle{BlockMatrix}()
 
 function LinearAlgebra.mul!(C::T, A::T, B::T, a::Number, b::Number) where {T<:BlockMatrix}
     mul!(C.data, A.data, B.data, a, b)
+    return C
+end
+
+function LinearAlgebra.mul!(
+    C::Vector{<:SVector},
+    A::BlockMatrix,
+    B::Vector{<:SVector},
+    a::Number,
+    b::Number,
+)
+    C_ = reinterpret(eltype(eltype(C)), C)
+    B_ = reinterpret(eltype(eltype(B)), B)
+    mul!(C_, A.data, B_, a, b)
     return C
 end
 
