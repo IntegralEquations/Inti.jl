@@ -262,6 +262,7 @@ const LagrangeCube = LagrangeElement{ReferenceCube}
 
 """
     vertices_idxs(el::LagrangeElement)
+    vertices_idxs(::Type{LagrangeElement})
 
 The indices of the nodes in `el` that define the vertices of the element.
 """

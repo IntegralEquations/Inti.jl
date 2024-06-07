@@ -12,7 +12,7 @@ N = 2
 t = :interior
 pde = Inti.Laplace(; dim = N)
 Inti.clear_entities!()
-Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = 0.2)
+Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = 0.2, order = 2)
 Γ = Inti.external_boundary(Ω)
 
 Γ_msh = msh[Γ]
