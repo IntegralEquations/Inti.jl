@@ -181,22 +181,19 @@ end
 function local_bdim_correction(
     pde,
     target,
-    source::Quadrature,
-    Sop,
-    Dop;
+    source::Quadrature;
     green_multiplier::Vector{<:Real},
     parameters = DimParameters(),
     derivative::Bool = false,
     maxdist = Inf,
 )
     imat_cond = imat_norm = res_norm = rhs_norm = -Inf
-    T = eltype(Sop)
+    T = default_kernel_eltype(pde) # Float64
     N = ambient_dimension(source)
-    @assert eltype(Dop) == T "eltype of S and D must match"
     m, n = length(target), length(source)
     msh = source.mesh
     qnodes = source.qnodes
-    neighbors = topological_neighbors(msh)
+    # neighbors = topological_neighbors(msh)
     dict_near = etype_to_nearest_points(target, source; maxdist)
     # find first an appropriate set of source points to center the monopoles
     qmax = sum(size(mat, 1) for mat in values(source.etype2qtags)) # max number of qnodes per el
@@ -268,27 +265,27 @@ function local_bdim_correction(
             # quadrature for auxiliary surface. In global dim, this is the same
             # as the source quadrature, and independent of element. In local
             # dim, this is constructed for each element using its neighbors.
-            function translate(q::QuadratureNode, x, s)
-                return QuadratureNode(coords(q) + x, weight(q), s * normal(q))
-            end
-            nei = neighbors[(E, n)]
-            qtags_nei = Int[]
-            for (E, n) in nei
-                append!(qtags_nei, source.etype2qtags[E][:, n])
-            end
-            qnodes_nei = source.qnodes[qtags_nei]
-            jac        = jacobian(el, 0.5)
-            ν          = _normal(jac)
-            h          = sum(qnodes[i].weight for i in jglob)
-            qnodes_op  = map(q -> translate(q, h * ν, -1), qnodes_nei)
-            a, b       = external_boundary()
+            # function translate(q::QuadratureNode, x, s)
+            #     return QuadratureNode(coords(q) + x, weight(q), s * normal(q))
+            # end
+            # nei = neighbors[(E, n)]
+            # qtags_nei = Int[]
+            # for (E, n) in nei
+            #     append!(qtags_nei, source.etype2qtags[E][:, n])
+            # end
+            # qnodes_nei = source.qnodes[qtags_nei]
+            # jac        = jacobian(el, 0.5)
+            # ν          = _normal(jac)
+            # h          = sum(qnodes[i].weight for i in jglob)
+            # qnodes_op  = map(q -> translate(q, h * ν, -1), qnodes_nei)
+            # a, b       = external_boundary()
             # qnodes_aux = source.qnodes[jglob]
             qnodes_aux = source.qnodes # this is the global dim
             for i in near_list[n]
                 # integrate the monopoles/dipoles over the auxiliary surface
                 # with target x: Θₖ <-- S[γ₁Bₖ](x) - D[γ₀Bₖ](x) + μ * Bₖ(x)
                 x = target[i]
-                μ = green_multiplier[i]
+                μ = green_multiplier[i] # - 1/2
                 for k in 1:ns
                     Θi[k] = μ * K(x, xs[k])
                 end
