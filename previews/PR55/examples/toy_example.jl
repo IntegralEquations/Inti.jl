@@ -22,4 +22,10 @@ from the example's page.
 
 =#
 
+tinit = time() # hide
+
 using Inti
+
+tend = time() # hide
+
+@info "Toy example completed in $(tend - tinit) seconds"
