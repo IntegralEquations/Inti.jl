@@ -26,6 +26,6 @@ tinit = time() # hide
 
 using Inti
 
+#-
 tend = time() # hide
-
-@info "Toy example completed in $(tend - tinit) seconds"
+@info "Toy example completed in $(tend - tinit) seconds" # hide
