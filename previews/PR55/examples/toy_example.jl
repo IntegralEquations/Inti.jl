@@ -28,4 +28,6 @@ using Inti
 
 #-
 tend = time() # hide
-@info "Toy example completed in $(tend - tinit) seconds" # hide
+@info "Example completed in $(tend - tinit) seconds" # hide
+@time cos(1) # hide
+println(stdout, "Hello, world!")
