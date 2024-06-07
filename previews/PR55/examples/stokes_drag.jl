@@ -120,6 +120,6 @@ exact = 6π * μ * R * v
 
 @show (norm(drag) - exact) / exact
 
+#-
 tend = time() # hide
-
-println("Elapsed time: ", tend - tinit, " seconds")
+@info "Example completed in $(tend - tinit) seconds" # hide
