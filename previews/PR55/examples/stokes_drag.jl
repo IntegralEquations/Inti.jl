@@ -21,6 +21,8 @@ Pkg.activate(docsdir)                 #src
 
 =#
 
+tinit = time() # hide
+
 using Inti
 using StaticArrays
 using LinearAlgebra
@@ -117,3 +119,7 @@ end
 exact = 6π * μ * R * v
 
 @show (norm(drag) - exact) / exact
+
+tend = time() # hide
+
+println("Elapsed time: ", tend - tinit, " seconds")
