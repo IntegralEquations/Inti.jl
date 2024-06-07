@@ -151,10 +151,10 @@ function Base.getindex(msh::LagrangeMesh{N,T}, Ω::Domain) where {N,T}
     foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), keys(Ω))
     glob2loc = Dict{Int,Int}()
     for E in element_types(msh)
-        E <: Union{LagrangeElement,ParametricElement} || error()
+        E <: Union{LagrangeElement,SVector,ParametricElement} || error()
         els = elements(msh, E)
         # create new element iterator
-        els_new = etype2els[E] = E <: LagrangeElement ? ElementIterator(new_msh, E) : E[]
+        els_new = etype2els[E] = E <: ParametricElement ? E[] : ElementIterator(new_msh, E)
         # create new connectivity
         connect = msh.etype2mat[E]::Matrix{Int}
         np, _ = size(connect)
