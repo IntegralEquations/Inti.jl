@@ -29,5 +29,3 @@ using Inti
 #-
 tend = time() # hide
 @info "Example completed in $(tend - tinit) seconds" # hide
-@time cos(1) # hide
-println(stdout, "Hello, world!")

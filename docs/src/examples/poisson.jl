@@ -3,6 +3,8 @@ import Pkg                            #src
 docsdir = joinpath(@__DIR__, "../..") #src
 Pkg.activate(docsdir)                 #src
 
+tinit = time() # hide
+
 #nb ## Environment setup
 #nb const DEPENDENCIES = ["CairoMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "FMM3D", "FMM2D", "Meshes"];
 #nb ## __NOTEBOOK_SETUP__
@@ -188,3 +190,7 @@ colorrange = extrema(er_nodes)
 viz!(Ωₕ; showsegments = false, color = er_nodes, colorrange)
 Colorbar(fig[1, 4]; colorrange = colorrange)
 fig
+
+#-
+tend = time() # hide
+@info "Example completed in $(tend - tinit) seconds" # hide
