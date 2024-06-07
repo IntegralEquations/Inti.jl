@@ -75,12 +75,16 @@ end
 """
     assemble_matrix(iop::IntegralOperator; threads = true)
 
-Assemble the dense matrix representation of an `IntegralOperator`.
+Assemble a dense matrix representation of an `IntegralOperator`.
 """
 function assemble_matrix(iop::IntegralOperator; threads = true)
     T    = eltype(iop)
     m, n = size(iop)
-    out  = Matrix{T}(undef, m, n)
+    out  = if T <: SMatrix
+        BlockArray{T}(undef, m, n)
+    else
+        Array{T}(undef, m, n)
+    end
     K    = kernel(iop)
     # function barrier
     _assemble_matrix!(out, K, iop.target, iop.source, threads)
