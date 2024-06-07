@@ -1,18 +1,30 @@
 """
-    struct BlockArray{T<:SMatrix,S} <: AbstractMatrix{T}
+    struct BlockArray{T<:StaticArray,N,S} <: AbstractMatrix{T,N}
 
-A struct which behaves identically to a `Matrix{T}`, but with the underlying
-`data` stored as a `Matrix{S}`, where `S::Number = eltype(T)` is the scalar type
+A struct which behaves like an  `Array{T,N}`, but with the underlying `data`
+stored as a `Matrix{S}`, where `S::Number = eltype(T)` is the scalar type
 associated with `T`. This allows for the use of `blas` routines under-the-hood,
-while providing a convenient interface for handling matrices over tensors.
+while providing a convenient interface for handling matrices over
+`StaticArray`s.
 
-Use `BlockArray(T::DataType, A::Matrix{S})` to construct a `BlockArray{T,S}`
-with underlying data given by `A`.
+```jldoctest
+using StaticArrays
+T = SMatrix{2,2,Int,4}
+B = Inti.BlockArray{T}([i*j for i in 1:4, j in 1:4])
+
+# output
+
+2×2 Inti.BlockArray{SMatrix{2, 2, Int64, 4}, 2, Int64}:
+ [1 2; 2 4]  [3 4; 6 8]
+ [3 6; 4 8]  [9 12; 12 16]
+
+```
+
 """
 struct BlockArray{T<:SArray,N,S} <: AbstractArray{T,N}
     data::Array{S,N}
     function BlockArray{T,N}(data::Array{S,N}) where {T<:Union{SArray},N,S<:Number}
-        @assert S == eltype(T)
+        @assert S == eltype(T) "eltype of data must match eltype of T: $S != $(eltype(T))"
         bsz = size(T)
         sz = size(data)
         # check compatibility of block size
