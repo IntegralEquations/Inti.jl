@@ -51,11 +51,11 @@ for a given mesh).
 function elements end
 
 """
-    element_types(msh::AbstractMesh)
+    elements(msh::AbstractMesh,E::DataType)
 
-Return the element types present in the `msh`.
+Return an iterator for all elements of type `E` on a mesh `msh`.
 """
-function element_types end
+elements(msh::AbstractMesh, E::DataType) = ElementIterator{E,typeof(msh)}(msh)
 
 """
     struct LagrangeMesh{N,T} <: AbstractMesh{N,T}
@@ -547,4 +547,107 @@ end
 @noinline function _near_interaction_list(balltree, els, tol)
     centers = map(center, els)
     return inrange(balltree, centers, tol)
+end
+
+"""
+    topological_neighbors(msh::LagrangeMesh, k=1)
+
+Return the `k` neighbors of each element in `msh`. The one-neighbors are the
+elements that share a common vertex with the element, `k` neighbors are the
+one-neighbors of the `k-1` neighbors.
+"""
+function topological_neighbors(msh::LagrangeMesh, k = 1)
+    @assert k == 1
+    # dictionary mapping a node index to all elements containing it. Note
+    # that the elements are stored as a tuple (type, index)
+    T = Tuple{DataType,Int}
+    node2els = Dict{Int,Vector{T}}()
+    for E in element_types(msh)
+        mat = msh.etype2mat[E]::Matrix{Int} # connectivity matrix
+        np, Nel = size(mat)
+        for n in 1:Nel
+            for i in 1:np
+                idx = mat[i, n]
+                els = get!(node2els, idx, Vector{T}())
+                push!(els, (E, n))
+            end
+        end
+    end
+    # now revert the map to get the neighbors
+    one_neighbors = Dict{T,Set{T}}()
+    for (_, els) in node2els
+        for el in els
+            nei = get!(one_neighbors, el, Set{T}())
+            for el′ in els
+                push!(nei, el′)
+            end
+        end
+    end
+    #TODO: for k > 1, recursively compute the neighbors from the one-neighbors
+    return one_neighbors
+end
+
+"""
+    element_to_near_targets(X,Y::AbstractMesh; tol)
+
+For each element `el` of type `E` in `Y`, return the indices of the points in
+`X` which are closer than `tol` to the `center` of `el`.
+
+This function returns a dictionary where e.g. `dict[E][5] --> Vector{Int}` gives
+the indices of points in `X` which are closer than `tol` to the center of the
+fifth element of type `E`.
+
+If `tol` is a `Dict`, then `tol[E]` is the tolerance for elements of type `E`.
+"""
+function element_to_near_targets(
+    X::AbstractVector{<:SVector{N}},
+    Y::AbstractMesh{N};
+    tol,
+) where {N}
+    @assert isa(tol, Number) || isa(tol, Dict) "tol must be a number or a dictionary mapping element types to numbers"
+    # for each element type, build the list of targets close to a given element
+    dict = Dict{DataType,Vector{Vector{Int}}}()
+    balltree = BallTree(X)
+    for E in element_types(Y)
+        els = elements(Y, E)
+        tol_ = isa(tol, Number) ? tol : tol[E]
+        idxs = _element_to_near_targets(balltree, els, tol_)
+        dict[E] = idxs
+    end
+    return dict
+end
+
+@noinline function _element_to_near_targets(balltree, els, tol)
+    centers = map(center, els)
+    return inrange(balltree, centers, tol)
+end
+
+"""
+    target_to_near_elements(X::AbstractVector{<:SVector{N}}, Y::AbstractMesh{N};
+    tol)
+
+For each target `x` in `X`, return a vector of tuples `(E, i)` where `E` is the
+type of the element in `Y` and `i` is the index of the element in `Y` such that
+`x` is closer than `tol` to the center of the element.
+"""
+function target_to_near_elements(
+    X::AbstractVector{<:SVector{N}},
+    Y::AbstractMesh{N};
+    tol,
+) where {N}
+    @assert isa(tol, Number) || isa(tol, Dict) "tol must be a number or a dictionary mapping element types to numbers"
+    dict = Dict{Int,Vector{Tuple{DataType,Int}}}()
+    balltree = BallTree(X)
+    for E in element_types(Y)
+        els = elements(Y, E)
+        tol_ = isa(tol, Number) ? tol : tol[E]
+        idxs = _target_to_near_elements(balltree, els, tol_)
+        for (i, idx) in enumerate(idxs)
+            dict[i] = get!(dict, i, Vector{Tuple{DataType,Int}}())
+            for j in idx
+                push!(dict[i], (E, j))
+            end
+        end
+    end
+    return dict
 end
