@@ -151,8 +151,10 @@ function Base.getindex(msh::LagrangeMesh{N,T}, Ω::Domain) where {N,T}
     foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), keys(Ω))
     glob2loc = Dict{Int,Int}()
     for E in element_types(msh)
+        E <: Union{LagrangeElement,ParametricElement} || error()
+        els = elements(msh, E)
         # create new element iterator
-        etype2els[E] = ElementIterator(new_msh, E)
+        els_new = etype2els[E] = E <: LagrangeElement ? ElementIterator(new_msh, E) : E[]
         # create new connectivity
         connect = msh.etype2mat[E]::Matrix{Int}
         np, _ = size(connect)
@@ -175,12 +177,15 @@ function Base.getindex(msh::LagrangeMesh{N,T}, Ω::Domain) where {N,T}
                 end
                 # add new tag for the element
                 push!(etags_loc, etag_loc)
+                # push new element if not inferable from connectivity
+                isa(els_new, Vector) && push!(etype2els[E], els[iglob])
             end
         end
         isempty(mat) || (etype2mat[E] = reshape(mat, np, :))
     end
     return new_msh
 end
+Base.getindex(msh::LagrangeMesh, ent::EntityKey) = getindex(msh, Domain(ent))
 
 """
     meshgen(Ω::Domain, n)
