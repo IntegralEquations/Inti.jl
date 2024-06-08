@@ -30,8 +30,8 @@ using Gmsh
 
 # parameters
 μ = 2.0
-R = 1.0
-v = 1.0
+R = 2.0
+v = 2.0
 
 # create a sphere using gmsh
 msh_file = joinpath(tempdir(), "stokes-drag.msh")
@@ -40,7 +40,7 @@ gmsh.model.add("stokes-drag")
 # set verbosity level to 0
 gmsh.option.setNumber("General.Verbosity", 2)
 # set max and min meshsize to meshsize
-meshsize = 0.2
+meshsize = 1.0
 gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
 gmsh.model.occ.addSphere(0, 0, 0, R)
 gmsh.model.occ.synchronize()
@@ -49,33 +49,33 @@ gmsh.model.mesh.setOrder(2)
 gmsh.write(msh_file)
 gmsh.finalize()
 
-# import the geometry and mesh
+## import the geometry and mesh
 Inti.clear_entities!()
 msh = Inti.import_mesh(msh_file)
 Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 3, Inti.entities(msh))
 Γ = Inti.boundary(Ω)
 
-# create a quadrature
+## create a quadrature
 Γ_msh = view(msh, Γ)
-Q = Inti.Quadrature(Γ_msh; qorder = 4)
+Q = Inti.Quadrature(Γ_msh; qorder = 2)
 
-# check error in surface area
+## check error in surface area
 @show length(Q)
-@show abs(Inti.integrate(x -> 1, Q) - 4π)
+@show abs(Inti.integrate(x -> 1, Q) - 4π * R^2)
 
-# the pde and its integral kernels
+## the pde and its integral kernels
 pde = Inti.Stokes(; dim = 3, μ)
 G   = Inti.SingleLayerKernel(pde)
 dG  = Inti.DoubleLayerKernel(pde)
 
-# choice of a integral representation
+## choice of a integral representation
 T = SVector{3,Float64}
 σ = zeros(T, length(Q))
 𝒮 = Inti.IntegralPotential(G, Q)
 𝒟 = Inti.IntegralPotential(dG, Q)
 u = (x) -> 𝒟[σ](x) - 𝒮[σ](x)
 
-# Dirichlet trace on Q (constant velocity field)
+## Dirichlet trace on Q (constant velocity field)
 f = map(Q) do q
     return T(v, 0.0, 0.0)
 end
@@ -83,7 +83,7 @@ end
 Sop = Inti.IntegralOperator(G, Q, Q)
 Smat = Inti.assemble_matrix(Sop)
 
-# integral operators defined on the boundary
+## integral operators defined on the boundary
 S, D = Inti.single_double_layer(;
     pde,
     target = Q,
@@ -92,11 +92,11 @@ S, D = Inti.single_double_layer(;
     correction = (method = :dim,),
 )
 
-# combining the operators
+## combining the operators
 L = I / 2 + D + μ * S
 
-# HACK: to solve the resulting system using gmres we need to wrap L so that it
-# works on scalars
+## HACK: to solve the resulting system using gmres we need to wrap L so that it
+## works on scalars
 using IterativeSolvers, LinearMaps
 
 L_ = LinearMap{Float64}(3 * size(L, 1)) do y, x
@@ -109,9 +109,11 @@ end
 σ_ = reinterpret(Float64, σ)
 f_ = reinterpret(Float64, f)
 
-gmres!(σ_, L_, f_; verbose = true, abstol = 1e-8, maxiter = 200, restart = 200)
+_, hist = gmres!(σ_, L_, f_; abstol = 1e-8, maxiter = 200, restart = 200, log = true)
 
-# F = ∫ σ dS
+@show hist
+
+## F = ∫ σ dS
 drag = μ * sum(eachindex(Q)) do i
     return σ[i] * Q[i].weight
 end
