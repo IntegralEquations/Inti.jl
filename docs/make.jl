@@ -32,7 +32,8 @@ end
 # Generate examples using Literate
 const examples_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples")
 const generated_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples", "generated")
-const examples = ["toy_example.jl", "helmholtz_scattering.jl", "poisson.jl"]
+const examples =
+    ["toy_example.jl", "helmholtz_scattering.jl", "poisson.jl", "stokes_drag.jl"]
 for t in examples
     println("\n*** Generating $t example")
     @time begin
@@ -87,6 +88,7 @@ makedocs(;
             "examples/generated/toy_example.md",
             "examples/generated/helmholtz_scattering.md",
             "examples/generated/poisson.md",
+            "examples/generated/stokes_drag.md",
         ],
         "References" => "references.md",
         "Docstrings" => "docstrings.md",

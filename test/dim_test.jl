@@ -9,7 +9,6 @@ Random.seed!(1)
 
 atol = 5e-2
 
-# for t in (:interior,:exterior)
 for N in (2, 3)
     # create geometry
     Inti.clear_entities!()
@@ -26,7 +25,7 @@ for N in (2, 3)
         ops = (
             Inti.Laplace(; dim = N),
             Inti.Helmholtz(; k = 1.2, dim = N),
-            # Inti.Stokes(; μ = 1.2, dim = N),
+            Inti.Stokes(; μ = 1.2, dim = N),
         )
         for pde in ops
             @testset "Greens identity ($t) $(N)d $pde" begin

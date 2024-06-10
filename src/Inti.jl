@@ -21,6 +21,7 @@ import ElementaryPDESolutions
 
 # helper functions
 include("utils.jl")
+include("blockarray.jl")
 
 # basic interpolation and integration
 include("reference_shapes.jl")
