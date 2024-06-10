@@ -37,8 +37,8 @@ end
 
 name = joinpath(@__DIR__, "circle.msh")
 gmsh_circle(; meshsize, order = gorder, name)
-Ω, msh = Inti.import_mesh(name; dim = 2)
-
+msh = Inti.import_mesh(name; dim = 2)
+Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
 Γ = Inti.boundary(Ω)
 Γ_msh = view(msh, Γ)
 
@@ -148,7 +148,7 @@ end
 @assert er₂ < 1e-3 #hide
 @info "maximum error = $er₂"
 
-using CairoMakie
+using GLMakie
 xx = yy = range(-4; stop = 4, length = 200)
 vals = map(pt -> norm(pt) > 1 ? real(u₁(pt)) : real(u₂(pt)), Iterators.product(xx, yy))
 fig, ax, hm = heatmap(
