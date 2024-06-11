@@ -3,6 +3,8 @@ import Pkg                            #src
 docsdir = joinpath(@__DIR__, "../..") #src
 Pkg.activate(docsdir)                 #src
 
+tinit = time() # hide
+
 #nb ## Environment setup
 #nb const DEPENDENCIES = ["GLMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "FMM3D", "FMM2D", "Meshes"];
 #nb ## __NOTEBOOK_SETUP__
@@ -554,3 +556,7 @@ fig, ax, pl = viz(Γ_msh; colorrange, colormap, color = zeros(nv))
 viz!(Σ_msh; colorrange, colormap, color = real(u_eval_msh))
 cb = Colorbar(fig[1, 2]; label = "real(u)", colormap, colorrange)
 fig # hide
+
+#-
+tend = time() # hide
+@info "Example completed in $(tend - tinit) seconds" # hide
