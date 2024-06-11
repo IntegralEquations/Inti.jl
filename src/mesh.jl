@@ -591,7 +591,6 @@ the element `i` of type `E` in the mesh, and the value is a set of tuples
 `(Eⱼ,j)` where `Eⱼ` is the type of the element and `j` its index.
 """
 function topological_neighbors(msh::AbstractMesh, k = 1)
-    @assert k == 1
     # dictionary mapping a node index to all elements containing it. Note
     # that the elements are stored as a tuple (type, index)
     T = Tuple{DataType,Int}
@@ -617,6 +616,17 @@ function topological_neighbors(msh::AbstractMesh, k = 1)
             end
         end
     end
-    #TODO: for k > 1, recursively compute the neighbors from the one-neighbors
-    return one_neighbors
+    # Recursively compute the neighbors from the one-neighbors
+    k_neighbors = deepcopy(one_neighbors)
+    while k > 1
+        # update neighborhood of each element
+        for el in keys(one_neighbors)
+            knn = k_neighbors[el]
+            for el′ in copy(knn)
+                union!(knn, one_neighbors[el′])
+            end
+        end
+        k -= 1
+    end
+    return k_neighbors
 end
