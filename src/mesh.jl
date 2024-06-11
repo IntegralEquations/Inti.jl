@@ -590,14 +590,14 @@ This function returns a dictionary where the key is an `(Eᵢ,i)` tuple denoting
 the element `i` of type `E` in the mesh, and the value is a set of tuples
 `(Eⱼ,j)` where `Eⱼ` is the type of the element and `j` its index.
 """
-function topological_neighbors(msh::LagrangeMesh, k = 1)
+function topological_neighbors(msh::AbstractMesh, k = 1)
     @assert k == 1
     # dictionary mapping a node index to all elements containing it. Note
     # that the elements are stored as a tuple (type, index)
     T = Tuple{DataType,Int}
     node2els = Dict{Int,Vector{T}}()
     for E in element_types(msh)
-        mat = msh.etype2mat[E]::Matrix{Int} # connectivity matrix
+        mat = connectivity(msh, E)::Matrix{Int} # connectivity matrix
         np, Nel = size(mat)
         for n in 1:Nel
             for i in 1:np
