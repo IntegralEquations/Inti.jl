@@ -39,6 +39,7 @@ The first step is to define the PDE under consideration:
 
 ```@example getting_started
 using Inti
+Inti.stack_weakdeps_env!() # add weak dependencies 
 # PDE
 k = 2π
 pde = Inti.Helmholtz(; dim = 2, k)
@@ -71,6 +72,17 @@ create a mesh:
 msh = Inti.meshgen(Γ; meshsize = 2π / k / 10)
 ```
 
+To visualize the mesh, we can load
+[Meshes.jl](https://github.com/JuliaGeometry/Meshes.jl) and one of
+[Makie](https://github.com/MakieOrg/Makie.jl)'s backends:
+
+```@example getting_started
+using Meshes, GLMakie
+viz(msh; segmentsize = 3, axis = (aspect = DataAspect(), ), figure = (; size = (600,400)))
+```
+
+## Quadrature
+
 Once the mesh is created, we can define a quadrature to be used in the
 discretization of the integral operators:
 
@@ -87,14 +99,9 @@ objects:
 Q[1]
 ```
 
-To visualize the mesh, we can load
-[Meshes.jl](https://github.com/JuliaGeometry/Meshes.jl) and one of
-[Makie](https://github.com/MakieOrg/Makie.jl)'s backends:
-
-```@example getting_started
-using Meshes, GLMakie
-viz(msh; segmentsize = 3, axis = (aspect = DataAspect(), ), figure = (; size = (600,400)))
-```
+In the constructor above we specified a quadrature order of 5, and Inti.jl
+internally picked a [`ReferenceQuadrature`](@ref) suitable for the specified
+order; for a finer control, you can also specify a quadrature rule directly.
 
 ## Integral operators
 
@@ -115,19 +122,19 @@ defined as:
     D[\sigma](\boldsymbol{x}) = \int_\Gamma \frac{\partial G}{\partial \nu_{\boldsymbol{y}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}),
 ```
 
-where 
+where
 
 ```math
-G(\boldsymbol{x}, \boldsymbol{y}) = \frac{i}{4} H_0(k|\boldsymbol{x} -
+G(\boldsymbol{x}, \boldsymbol{y}) = \frac{i}{4} H^{(1)}_0(k|\boldsymbol{x} -
 \boldsymbol{y}|)
 ```
 
-is the fundamental solution of the Helmholtz equation, with ``H_0`` being the
+is the fundamental solution of the Helmholtz equation, with ``H^{(1)}_0`` being the
 Hankel function of the first kind. Note that ``G`` is singular when
 ``\boldsymbol{x} = \boldsymbol{y}``, and therefore the numerical discretization
 of ``S`` and ``D`` requires special care.
 
-To approximate ``S`` and ``D`` in Inti.jl we can proceed as follows:
+To approximate ``S`` and ``D``, we can proceed as follows:
 
 ```@example getting_started
 S, D = Inti.single_double_layer(;
@@ -140,6 +147,13 @@ S, D = Inti.single_double_layer(;
 nothing # hide
 ```
 
+Much of the complexity involved in the numerical computation is hidden in the
+function above; later in the tutorials we will discuss in more details the
+options available for the *compression* and *correction* methods, as well as how
+to define your own kernels and operators. For now, it suffices to know that `S`
+and `D` are matrix-like objects that can be used to solve the boundary integral
+equation. For that, we need to provide the boundary data ``g``.
+
 !!! tip "Fast algorithms"
     Powered by external libraries, Inti.jl supports several acceleration methods
     for matrix-vector multiplication, including so far:
@@ -148,12 +162,7 @@ nothing # hide
   
     Note that in such cases only the matrix-vector product may not be available, and therefore iterative solvers such as GMRES are required for the solution of the resulting linear systems.
 
-Much of the complexity involved in the numerical computation is hidden in the
-function above; later in the tutorials we will discuss in more details the
-options available for the *compression* and *correction* methods, as well as how
-to define your own kernels and operators. For now, it suffices to know that `S`
-and `D` are matrix-like objects that can be used to solve the boundary integral
-equation. For that, we need to provide the boundary data ``g``.
+## Source term and solution
 
 We are interested in the scattered field ``u`` produced by an incident plane
 wave ``u_i = e^{i k \boldsymbol{d} \cdot \boldsymbol{x}}``, where
