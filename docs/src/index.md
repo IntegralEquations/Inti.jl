@@ -50,23 +50,20 @@ branch. Change `rev` if you need a different branch or a specific commit hash.
 ## Installing weak dependencies
 
 Inti.jl comes with a set of optional dependencies that can be installed on
-demand. Each of these dependencies, while not required provide additional
-features which can be useful in certain scenarios. For convenience, we provide
-the [`stack_weakdeps_env!`](@ref) function to install all the weak dependencies at once:
+demand. These provide additional features which can be useful in certain
+scenarios (e.g. visualization, meshing, acceleration). For convenience, Inti.jl
+provides the [`stack_weakdeps_env!`](@ref) function to install all the weak
+dependencies at once:
 
-```@example
+```@example weakdeps
+using Inti
 Inti.stack_weakdeps_env!(; verbose = false, update = false)
 ```
 
 Note that the first time you run this command, it may take a while to download
-and compile the dependencies. Subsequent runs will be faster.
-
-If you prefer, you can manually control which extensions to install by
-`Pkg.add`ing the desired packages from the list below:
-
-```@eval
-keys(Inti.WEAKDEPS_PROJ["deps"])
-```
+and compile the dependencies. Subsequent runs will be faster. If you prefer, you
+can manually control which extensions to install by `Pkg.add`ing the desired
+packages from the list above.
 
 ## Basic usage
 

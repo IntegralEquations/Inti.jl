@@ -10,11 +10,14 @@ CurrentModule = Inti
       - Visualize the solution
 
 This first tutorial will guide you through the basic steps of setting up a
-boundary integral equation and solving it using Inti.jl. We will consider the
-classic Helmholtz scattering problem in 2D, and solve it using a *direct*
-boundary integral formulation. More precisely, letting ``\Omega \subset
-\mathbb{R}^2`` be a bounded domain, and denoting by ``\Gamma = \partial \Omega``
-its boundary, we will solve the following Helmholtz problem:
+boundary integral equation and solving it using Inti.jl. 
+
+## Mathematical formulation
+
+We will consider the classic Helmholtz scattering problem in 2D, and solve it
+using a *direct* boundary integral formulation. More precisely, letting ``\Omega
+\subset \mathbb{R}^2`` be a bounded domain, and denoting by ``\Gamma = \partial
+\Omega`` its boundary, we will solve the following Helmholtz problem:
 
 ```math
 \begin{aligned}
@@ -25,12 +28,12 @@ its boundary, we will solve the following Helmholtz problem:
 ```
 
 where ``g`` is the given boundary datum, ``\nu`` is the outward unit normal to
-``\Gamma``, and ``k`` is the constant wavenumber.
+``\Gamma``, and ``k`` is the constant wavenumber. The last condition is the
+*Sommerfeld radiation condition*, and is required to ensure the uniqueness of
+the solution; physically, it means that the solution sought should radiate
+energy towards infinity.
 
-!!! info "Sommerfeld radiation condition"
-    The last condition is the *Sommerfeld radiation condition*, and is required
-    to ensure the uniqueness of the solution; physically, it means that the
-    solution sought should radiate energy towards infinity.
+## PDE, geometry, and mesh
 
 The first step is to define the PDE under consideration:
 
@@ -41,7 +44,7 @@ k = 2π
 pde = Inti.Helmholtz(; dim = 2, k)
 ```
 
-Next, we defined the geometry of the problem. For this tutorial, we will
+Next, we generate the geometry of the problem. For this tutorial, we will
 manually create parametric curves representing the boundary of the domain using
 the [`parametric_curve`](@ref) function:
 
@@ -92,6 +95,8 @@ To visualize the mesh, we can load
 using Meshes, GLMakie
 viz(msh; segmentsize = 3, axis = (aspect = DataAspect(), ), figure = (; size = (600,400)))
 ```
+
+## Integral operators
 
 To continue, we need to reformulate the Helmholtz problem as a boundary integral
 equation. Among the plethora of options, we will use in this tutorial a simple
@@ -164,6 +169,7 @@ Sommerfeld radiation condition, we can write the boundary condition as:
 We can thus solve the boundary integral equation to find ``u`` on ``\Gamma``:
 
 ```@example getting_started
+using LinearAlgebra
 # define the incident field and compute its normal derivative
 θ = 0
 d = SVector(cos(θ), sin(θ))
@@ -173,10 +179,13 @@ g = map(Q) do q
     return -im * k * exp(im * k * dot(x, d)) * dot(d, ν)
 end ## Neumann trace on boundary
 u = (-I / 2 + D) \ (S * g) # Dirichlet trace on boundary
+nothing # hide
 ```
 
+## Integral representation and visualization
+
 Now that we know both the Dirichlet and Neumann data on the boundary, we can use
-Green's representation formula, i.e., 
+Green's representation formula, i.e.,
 
 ```math
     \mathcal{D}[u](\boldsymbol{r}) - \mathcal{S}[\partial_{\nu} u](\boldsymbol{r}) = \begin{cases}
@@ -220,8 +229,11 @@ Colorbar(fig[1, 2], hm; label = "real(u)")
 fig # hide
 ```
 
-!!! tip "Going further"
-    - ...
+## Accuracy check
+
+The scattering example above does not provide an easy way to check the accuracy
+of the solution. To do so, we can manufacture an exact solution and compare it
+to the solution obtained numerically, as illustrated below:
 
 ```@example getting_started
 # build an exact solution
