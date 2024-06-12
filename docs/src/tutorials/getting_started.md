@@ -10,9 +10,9 @@ CurrentModule = Inti
       - Visualize the solution
 
 This first tutorial will guide you through the basic steps of setting up a
-boundary integral equation problem and solving it using Inti.jl. We will
-consider the classic Helmholtz scattering problem in 2D, and solve it using a
-*direct* boundary integral formulation. More precisely, letting ``\Omega \subset
+boundary integral equation and solving it using Inti.jl. We will consider the
+classic Helmholtz scattering problem in 2D, and solve it using a *direct*
+boundary integral formulation. More precisely, letting ``\Omega \subset
 \mathbb{R}^2`` be a bounded domain, and denoting by ``\Gamma = \partial \Omega``
 its boundary, we will solve the following Helmholtz problem:
 
@@ -24,47 +24,76 @@ its boundary, we will solve the following Helmholtz problem:
 \end{aligned}
 ```
 
-where ``g`` is a (given) boundary datum, ``\nu`` is the outward unit normal to
+where ``g`` is the given boundary datum, ``\nu`` is the outward unit normal to
 ``\Gamma``, and ``k`` is the constant wavenumber.
 
-!!! tip "Sommerfeld radiation condition"
+!!! info "Sommerfeld radiation condition"
     The last condition is the *Sommerfeld radiation condition*, and is required
     to ensure the uniqueness of the solution; physically, it means that the
     solution sought should radiate energy towards infinity.
 
-Let us begin by specifying the partial differential equation, and creating the
-domain, mesh, and quadrature for the problem:
+The first step is to define the PDE under consideration:
 
 ```@example getting_started
-using Inti, LinearAlgebra, StaticArrays
-
+using Inti
 # PDE
 k = 2π
 pde = Inti.Helmholtz(; dim = 2, k)
+```
 
+Next, we defined the geometry of the problem. For this tutorial, we will
+manually create parametric curves representing the boundary of the domain using
+the [`parametric_curve`](@ref) function:
+
+```@example getting_started
+using StaticArrays # for SVector
 # Create the geometry as the union of a kite and a circle
-kite = Inti.parametric_curve(0.0, 1.0) do s
+kite = Inti.parametric_curve(0.0, 1.0; labels = ["kite"]) do s
     return SVector(2.5 + cos(2π * s[1]) + 0.65 * cos(4π * s[1]) - 0.65, 1.5 * sin(2π * s[1]))
 end
-circle = Inti.parametric_curve(0.0, 1.0) do s
+circle = Inti.parametric_curve(0.0, 1.0; labels = ["circle"]) do s
     return SVector(cos(2π * s[1]), sin(2π * s[1]))
 end
 Γ = kite ∪ circle
+```
+
+Inti.jl expects the parametrization of the curve to be a function mapping
+scalars to points in space represented by `SVector`s. The `labels` argument is
+optional, and can be used to identify the different parts of the boundary. The
+`Domain` object `Γ` represents the boundary of the geometry, and can be used to
+create a mesh:
+
+```@example getting_started
 # Create a mesh for the geometry
 msh = Inti.meshgen(Γ; meshsize = 2π / k / 10)
+```
+
+Once the mesh is created, we can define a quadrature to be used in the
+discretization of the integral operators:
+
+```@example getting_started
 # Create a quadrature
 Q = Inti.Quadrature(msh; qorder = 5)
 nothing # hide
 ```
 
-We can easily check the mesh by visualizing it using the `Meshes.jl` package:
+A [`Quadrature`](@ref) is simply a collection of [`QuadratureNode`](@ref)
+objects:
+
+```@example getting_started
+Q[1]
+```
+
+To visualize the mesh, we can load
+[Meshes.jl](https://github.com/JuliaGeometry/Meshes.jl) and one of
+[Makie](https://github.com/MakieOrg/Makie.jl)'s backends:
 
 ```@example getting_started
 using Meshes, GLMakie
-fig, ax, pl = viz(msh; segmentsize = 3, axis = (aspect = DataAspect(), ))
+viz(msh; segmentsize = 3, axis = (aspect = DataAspect(), ), figure = (; size = (600,400)))
 ```
 
-Next we need to reformulate the Helmholtz problem as a boundary integral
+To continue, we need to reformulate the Helmholtz problem as a boundary integral
 equation. Among the plethora of options, we will use in this tutorial a simple
 *direct* formulation, which uses Green's third identity to relate the values of
 ``u`` and ``\partial_{\nu} u`` on ``\Gamma``:
@@ -81,10 +110,17 @@ defined as:
     D[\sigma](\boldsymbol{x}) = \int_\Gamma \frac{\partial G}{\partial \nu_{\boldsymbol{y}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}),
 ```
 
-where ``G`` is the fundamental solution of the Helmholtz equation. Note that
-``G`` is typically singular when ``\boldsymbol{x} = \boldsymbol{y}``, and
-therefore the numerical discretization of these integral operators requires
-special care.
+where 
+
+```math
+G(\boldsymbol{x}, \boldsymbol{y}) = \frac{i}{4} H_0(k|\boldsymbol{x} -
+\boldsymbol{y}|)
+```
+
+is the fundamental solution of the Helmholtz equation, with ``H_0`` being the
+Hankel function of the first kind. Note that ``G`` is singular when
+``\boldsymbol{x} = \boldsymbol{y}``, and therefore the numerical discretization
+of ``S`` and ``D`` requires special care.
 
 To approximate ``S`` and ``D`` in Inti.jl we can proceed as follows:
 
@@ -103,10 +139,9 @@ nothing # hide
     Powered by external libraries, Inti.jl supports several acceleration methods
     for matrix-vector multiplication, including so far:
     - **Fast multipole method** (FMM) ``\mapsto`` `correction = (method = :fmm, tol = 1e-8)`
-    - **Hierarchical matrix** (H-matrix) ``\mapsto`` `correction = (method = :hmatrix, tol =
-    1e-8)`
-    
-    Note that in such cases only the matrix-vector product may not be available, and therefore iterative solvers such as GMRES may be required for the solution of the resulting linear systems.
+    - **Hierarchical matrix** (H-matrix) ``\mapsto`` `correction = (method = :hmatrix, tol = 1e-8)`
+  
+    Note that in such cases only the matrix-vector product may not be available, and therefore iterative solvers such as GMRES are required for the solution of the resulting linear systems.
 
 Much of the complexity involved in the numerical computation is hidden in the
 function above; later in the tutorials we will discuss in more details the
@@ -168,7 +203,6 @@ uₛ = x -> 𝒟[u](x) - 𝒮[g](x)
 To wrap things up, let's visualize the scattered field:
 
 ```@example getting_started
-using GLMakie # or your favorite plotting backend for Makie
 xx = yy = range(-5; stop = 5, length = 100)
 U = map(uₛ, Iterators.product(xx, yy))
 Ui = map(x -> exp(im*k*dot(x, d)), Iterators.product(xx, yy))

@@ -12,10 +12,13 @@ using ForwardDiff
 using LinearAlgebra
 using LinearMaps
 using NearestNeighbors
+using Pkg
+using Scratch
 using SparseArrays
 using StaticArrays
 using SpecialFunctions
 using Printf
+using TOML
 
 import ElementaryPDESolutions
 

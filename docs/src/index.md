@@ -47,6 +47,27 @@ using Pkg; Pkg.add(;url = "https://github.com/IntegralEquations/Inti.jl", rev = 
 This will download and install the latest version of Inti.jl from the `main`
 branch. Change `rev` if you need a different branch or a specific commit hash.
 
+## Installing weak dependencies
+
+Inti.jl comes with a set of optional dependencies that can be installed on
+demand. Each of these dependencies, while not required provide additional
+features which can be useful in certain scenarios. For convenience, we provide
+the [`stack_weakdeps_env!`](@ref) function to install all the weak dependencies at once:
+
+```@example
+Inti.stack_weakdeps_env!(; verbose = false, update = false)
+```
+
+Note that the first time you run this command, it may take a while to download
+and compile the dependencies. Subsequent runs will be faster.
+
+If you prefer, you can manually control which extensions to install by
+`Pkg.add`ing the desired packages from the list below:
+
+```@eval
+keys(Inti.WEAKDEPS_PROJ["deps"])
+```
+
 ## Basic usage
 
 Inti.jl can be used to solve a variety of linear partial differential equations
@@ -63,9 +84,10 @@ problem consists of the following steps:
   define a quadrature and discretize the boundary integral equation.
 - **Solver**: With a mesh and an accompanying quadrature, Inti.jl's routines
  provide ways to assemble and solve the system of equations arising from the
- discretization of the integral operators.
+ discretization of the integral operators. The core of the library lies in this
+ step.
 - **Visualization**: Visualize the solution using a plotting library such as
-Makie.jl, or export it to a file for further analysis. 
+  Makie.jl, or export it to a file for further analysis.
 
 As a simple example illustrating the steps above, consider an interior Laplace
 problem, in two dimensions, with Dirichlet boundary conditions:
