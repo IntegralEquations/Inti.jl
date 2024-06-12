@@ -133,6 +133,15 @@ function _normal(jac::SMatrix{N,M}) where {N,M}
 end
 
 """
+    curvature(el, x̂)
+
+Calculate the [mean curvature](https://en.wikipedia.org/wiki/Mean_curvature) of
+`el` at the parametric coordinate `x̂`. The mean curvature `H` is defined as the
+`H = - ∇ ⋅ ν / 2`, where `ν` is the normal vector.
+"""
+function curvature end
+
+"""
     uniform_points_circle(N,r,c)
 
 Return `N` points uniformly distributed on a circle of radius `r` centered at `c`.

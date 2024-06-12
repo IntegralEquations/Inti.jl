@@ -20,11 +20,14 @@ function (el::ReferenceInterpolant)(x)
     return interface_method(el)
 end
 
+geometric_dimension(::ReferenceInterpolant{D,T}) where {D,T} = geometric_dimension(D)
+ambient_dimension(el::ReferenceInterpolant{D,T}) where {D,T} = length(T)
+
 """
     jacobian(f,x)
 
 Given a (possibly vector-valued) functor `f : 𝐑ᵐ → 𝐅ⁿ`, return the `n × m`
-matrix `Aᵢⱼ = ∂fᵢ/∂xⱼ`. By default `ForwardDiff` is used to comptue the
+matrix `Aᵢⱼ = ∂fᵢ/∂xⱼ`. By default `ForwardDiff` is used to compute the
 jacobian, but you should overload this method for specific `f` if better
 performance and/or precision is required.
 
@@ -34,6 +37,40 @@ function jacobian(f, s)
     return ForwardDiff.jacobian(f, s)
 end
 jacobian(f, s::Real) = jacobian(f, SVector(s))
+
+"""
+    hesssian(el,x)
+
+Given a (possibly vector-valued) functor `f : 𝐑ᵐ → 𝐅ⁿ`, return the `n × m × m`
+matrix `Aᵢⱼⱼ = ∂²fᵢ/∂xⱼ∂xⱼ`. By default `ForwardDiff` is used to compute the
+hessian, but you should overload this method for specific `f` if better
+performance and/or precision is required.
+
+Note: both `x` and `f(x)` are expected to be of `SVector` type.
+"""
+function hessian(el::ReferenceInterpolant, s)
+    N = ambient_dimension(el)
+    M = geometric_dimension(el)
+    S = Tuple{N,M,M}
+    return SArray{S}(stack(i -> ForwardDiff.hessian(x -> el(x)[i], s), 1:N; dims = 1))
+end
+
+function curvature(el::ReferenceInterpolant, x̂)
+    jac = jacobian(el, x̂)
+    ν = _normal(jac)
+    # first fundamental form
+    E = dot(jac[:, 1], jac[:, 1])
+    F = dot(jac[:, 1], jac[:, 2])
+    G = dot(jac[:, 2], jac[:, 2])
+    # second fundamental form
+    hess = hessian(el, x̂)
+    L = dot(hess[:, 1, 1], ν)
+    M = dot(hess[:, 1, 2], ν)
+    N = dot(hess[:, 2, 2], ν)
+    # mean curvature
+    κ = (L * G - 2 * F * M + E * N) / (2 * (E * G - F^2))
+    return κ
+end
 
 domain(::ReferenceInterpolant{D,T}) where {D,T} = D()
 domain(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = D()
@@ -106,7 +143,6 @@ parametrization(el::ParametricElement) = el.parametrization
 domain(::ParametricElement{D,T,F}) where {D,T,F} = D()
 return_type(::ParametricElement{D,T,F}) where {D,T,F} = T
 
-geometric_dimension(p::ParametricElement) = geometric_dimension(domain(p))
 ambient_dimension(p::ParametricElement) = length(return_type(p))
 
 function (el::ParametricElement)(u)

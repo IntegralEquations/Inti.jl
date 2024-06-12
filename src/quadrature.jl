@@ -301,3 +301,26 @@ function quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
     end
     return ivals ./ areas
 end
+
+"""
+    curvature(Q::Quadrature)
+
+Compute the `curvature(q)` at each quadrature node `q` in `Q`.
+"""
+function curvature(Q::Quadrature)
+    msh = mesh(Q)
+    curv = zeros(length(Q))
+    for (E, tags) in Q.etype2qtags
+        qrule = quadrature_rule(Q, E)
+        q̂, _ = qrule()
+        els = elements(msh, E)
+        for n in 1:size(tags, 2)
+            el = els[n]
+            for i in 1:size(tags, 1)
+                qtag = tags[i, n]
+                curv[qtag] = curvature(el, q̂[i])
+            end
+        end
+    end
+    return curv
+end

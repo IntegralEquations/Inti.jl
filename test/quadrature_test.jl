@@ -34,7 +34,7 @@ using Inti
             # sum only weights corresponding to tetras
             @test V ≈ Inti.integrate(x -> 1, Ω_quad)
         end
-        @testset "Sphere" begin
+        @testset "Ball" begin
             r = 0.5
             Inti.clear_entities!()
             gmsh.initialize()
@@ -62,6 +62,34 @@ using Inti
             volume = Inti.integrate(x -> 1, quad)
             @test isapprox(volume, 4 / 3 * π * r^3, atol = 1e-2)
             exact = map(f, M[Ω].nodes)
+            approx = Inti.quadrature_to_node_vals(quad, map(q -> f(q.coords), quad))
+            @test exact ≈ approx
+        end
+        @testset "Sphere with P2" begin
+            r = 0.5
+            Inti.clear_entities!()
+            gmsh.initialize()
+            gmsh.option.setNumber("General.Verbosity", 2)
+            # meshsize
+            gmsh.option.setNumber("Mesh.MeshSizeMax", 0.025)
+            gmsh.model.occ.addSphere(0, 0, 0, r)
+            gmsh.model.occ.synchronize()
+            gmsh.model.mesh.generate(2)
+            gmsh.model.mesh.setOrder(2)
+            M = Inti.import_mesh(; dim = 3)
+            gmsh.finalize()
+            f = x -> x[1] + x[2] - 2 * x[3] + 1
+            Ω = Inti.Domain(Inti.entities(M)) do e
+                return Inti.geometric_dimension(e) == 3
+            end
+            Γ = Inti.external_boundary(Ω)
+            quad = Inti.Quadrature(M[Γ]; qorder = 4) # NystromMesh of surface Γ
+            area = Inti.integrate(x -> 1, quad)
+            curv = Inti.curvature(quad)
+            κ = -1 / r
+            @test all(x -> norm(x - κ) < 0.01, curv)
+            @test isapprox(area, 4 * π * r^2, atol = 1e-3)
+            exact = map(f, M[Γ].nodes)
             approx = Inti.quadrature_to_node_vals(quad, map(q -> f(q.coords), quad))
             @test exact ≈ approx
         end
