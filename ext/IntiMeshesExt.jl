@@ -75,10 +75,10 @@ function Meshes.viz!(el::Inti.ReferenceInterpolant, args...; kwargs...)
 end
 
 function Meshes.viz(els::AbstractVector{<:Inti.ReferenceInterpolant}, args...; kwargs...)
-    return viz([to_meshes(el) for el in els])
+    return viz([to_meshes(el) for el in els], args...; kwargs...)
 end
 function Meshes.viz!(els::AbstractVector{<:Inti.ReferenceInterpolant}, args...; kwargs...)
-    return viz!([to_meshes(el) for el in els])
+    return viz!([to_meshes(el) for el in els], args...; kwargs...)
 end
 
 function Meshes.viz(msh::Inti.AbstractMesh, args...; kwargs...)
