@@ -55,20 +55,40 @@ function hessian(el::ReferenceInterpolant, s)
     return SArray{S}(stack(i -> ForwardDiff.hessian(x -> el(x)[i], s), 1:N; dims = 1))
 end
 
-function curvature(el::ReferenceInterpolant, x̂)
+function first_fundamental_form(el::ReferenceInterpolant, x̂)
     jac = jacobian(el, x̂)
-    ν = _normal(jac)
     # first fundamental form
     E = dot(jac[:, 1], jac[:, 1])
     F = dot(jac[:, 1], jac[:, 2])
     G = dot(jac[:, 2], jac[:, 2])
+    return E,F,G
+end
+
+function second_fundamental_form(el::ReferenceInterpolant, x̂)
+    jac = jacobian(el, x̂)
+    ν = _normal(jac)
     # second fundamental form
     hess = hessian(el, x̂)
     L = dot(hess[:, 1, 1], ν)
     M = dot(hess[:, 1, 2], ν)
     N = dot(hess[:, 2, 2], ν)
+
+    return L,M,N
+end
+
+function mean_curvature(el::ReferenceInterpolant, x̂)
+    E,F,G = first_fundamental_form(el,x̂)
+    L,M,N = second_fundamental_form(el,x̂)
     # mean curvature
     κ = (L * G - 2 * F * M + E * N) / (2 * (E * G - F^2))
+    return κ
+end
+
+function gauss_curvature(el::ReferenceInterpolant, x̂)
+    E,F,G = first_fundamental_form(el,x̂)
+    L,M,N = second_fundamental_form(el,x̂)
+    # Guassian curvature
+    κ = (L*N-M^2)/(E*G-F^2);
     return κ
 end
 

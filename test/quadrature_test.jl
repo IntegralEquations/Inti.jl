@@ -85,7 +85,7 @@ using Inti
             Γ = Inti.external_boundary(Ω)
             quad = Inti.Quadrature(M[Γ]; qorder = 4) # NystromMesh of surface Γ
             area = Inti.integrate(x -> 1, quad)
-            curv = Inti.curvature(quad)
+            curv = Inti.mean_curvature(quad)
             κ = -1 / r
             @test all(x -> norm(x - κ) < 0.01, curv)
             @test isapprox(area, 4 * π * r^2, atol = 1e-3)
