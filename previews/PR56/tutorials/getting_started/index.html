@@ -37,26 +37,26 @@ g = map(Q) do q
     return -im * k * exp(im * k * dot(x, d)) * dot(d, ν)
 end ## Neumann trace on boundary
 u = (-I / 2 + D) \ (S * g) # Dirichlet trace on boundary</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">942-element Vector{ComplexF64}:
-  0.9187328380718743 + 0.23326666112757843im
-  0.9197893673550525 + 0.23115394533334652im
-  0.9255068912417129 + 0.2195964191940736im
-  0.9378508905051689 + 0.19388166216615552im
-   0.952850290932496 + 0.16105889486030256im
-  0.9629921501230633 + 0.13773521319446907im
-  0.9658113564474795 + 0.13107009872960265im
-  0.9769807836849166 + 0.10379682277114365im
-  0.9974949024225842 + 0.04939037406472352im
-  1.0214630357540857 - 0.02421098379967254im
+ -1.0039482321339088 - 3.0741504761996814im
+ -1.0085600790072689 - 3.0754979938344045im
+ -1.0336334305426018 - 3.0828113001697863im
+ -1.0884819793911007 - 3.0987317014347147im
+ -1.1566306013491707 - 3.118355627396493im
+ -1.2038029197788067 - 3.131830361551472im
+  -1.217093439000179 - 3.1356098369217498im
+ -1.2706054323556941 - 3.1507480774097427im
+  -1.373212678466852 - 3.1793918622646546im
+ -1.5033885227480237 - 3.2148964472074537im
                      ⋮
- -1.3732126784063725 - 3.1793918621570265im
-  -1.270605432308696 - 3.1507480773135885im
- -1.2170934389605912 - 3.1356098368335568im
-  -1.203802919741188 - 3.1318303614656693im
- -1.1566306013186454 - 3.1183556273197346im
- -1.0884819793724052 - 3.0987317013754208im
-  -1.033633430537107 - 3.0828113001327813im
- -1.0085600790128144 - 3.0754979938178626im
- -1.0039482321457573 - 3.0741504761952254im</code></pre><p>Now that we know both the Dirichlet and Neumann data on the boundary, we can use Green&#39;s representation formula, i.e., </p><p class="math-container">\[    \mathcal{D}[u](\boldsymbol{r}) - \mathcal{S}[\partial_{\nu} u](\boldsymbol{r}) = \begin{cases}
+   0.997494902454562 + 0.04939037406592218im
+  0.9769807837123708 + 0.10379682277249547im
+  0.9658113564721924 + 0.1310700987309781im
+   0.962992150147115 + 0.1377352131958348im
+  0.9528502909536961 + 0.16105889486165195im
+  0.9378508905213909 + 0.19388166216744285im
+  0.9255068912519986 + 0.2195964191951863im
+  0.9197893673600674 + 0.23115394533431327im
+  0.9187328380738357 + 0.2332666611283682im</code></pre><p>Now that we know both the Dirichlet and Neumann data on the boundary, we can use Green&#39;s representation formula, i.e., </p><p class="math-container">\[    \mathcal{D}[u](\boldsymbol{r}) - \mathcal{S}[\partial_{\nu} u](\boldsymbol{r}) = \begin{cases}
         u(\boldsymbol{r}) &amp; \text{if } \boldsymbol{r} \in \mathbb{R}^2 \setminus \overline{\Omega},\\
         0 &amp; \text{if } \boldsymbol{r} \in \Omega,
     \end{cases}\]</p><p>where <span>$\mathcal{D}$</span> and <span>$\mathcal{S}$</span> are the double- and single-layer potentials defined as:</p><p class="math-container">\[    \mathcal{S}[\sigma](\boldsymbol{r}) = \int_{\Gamma} G(\boldsymbol{r}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}), \quad
@@ -87,4 +87,4 @@ u = (-I / 2 + D) \ (S * g)
 uₛ = x -&gt; 𝒟[u](x) - 𝒮[g](x)
 pts = [5*SVector(cos(θ), sin(θ)) for θ in range(0, 2π, length = 100)]
 er = norm(uₛ.(pts) - uₑ.(pts), Inf)
-println(&quot;maximum error on circle of radius 5: $er&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">maximum error on circle of radius 5: 3.416597225771416e-11</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../geo_and_meshes/">Geometry and meshes »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Tuesday 11 June 2024 18:40">Tuesday 11 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+println(&quot;maximum error on circle of radius 5: $er&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">maximum error on circle of radius 5: 7.795894417902989e-11</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../geo_and_meshes/">Geometry and meshes »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Wednesday 12 June 2024 12:07">Wednesday 12 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
