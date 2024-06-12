@@ -78,7 +78,7 @@ To visualize the mesh, we can load
 
 ```@example getting_started
 using Meshes, GLMakie
-viz(msh; segmentsize = 3, axis = (aspect = DataAspect(), ), figure = (; size = (600,400)))
+viz(msh; segmentsize = 3, axis = (aspect = DataAspect(), ), figure = (; size = (400,300)))
 ```
 
 ## Quadrature
