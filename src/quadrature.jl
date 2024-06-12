@@ -303,29 +303,21 @@ function quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
 end
 
 """
-    curvature(Q::Quadrature)
+    mean_curvature(Q::Quadrature)
 
-Compute the `curvature(q)` at each quadrature node `q` in `Q`.
+Compute the `mean_curvature` at each quadrature node in `Q`.
 """
-function mean_curvature(Q::Quadrature)
-    msh = mesh(Q)
-    curv = zeros(length(Q))
-    for (E, tags) in Q.etype2qtags
-        qrule = quadrature_rule(Q, E)
-        q̂, _ = qrule()
-        els = elements(msh, E)
-        for n in 1:size(tags, 2)
-            el = els[n]
-            for i in 1:size(tags, 1)
-                qtag = tags[i, n]
-                curv[qtag] = mean_curvature(el, q̂[i])
-            end
-        end
-    end
-    return curv
-end
+mean_curvature(Q::Quadrature) = _curvature(mean_curvature, Q)
 
-function gauss_curvature(Q::Quadrature)
+"""
+    gauss_curvature(Q::Quadrature)
+
+Compute the `gauss_curvature` at each quadrature node in `Q`.
+"""
+gauss_curvature(Q::Quadrature) = _curvature(gauss_curvature, Q)
+
+# helper function for computing curvature
+function _curvature(f, Q)
     msh = mesh(Q)
     curv = zeros(length(Q))
     for (E, tags) in Q.etype2qtags
@@ -336,7 +328,7 @@ function gauss_curvature(Q::Quadrature)
             el = els[n]
             for i in 1:size(tags, 1)
                 qtag = tags[i, n]
-                curv[qtag] = gauss_curvature(el, q̂[i])
+                curv[qtag] = f(el, q̂[i])
             end
         end
     end

@@ -61,7 +61,7 @@ function first_fundamental_form(el::ReferenceInterpolant, x̂)
     E = dot(jac[:, 1], jac[:, 1])
     F = dot(jac[:, 1], jac[:, 2])
     G = dot(jac[:, 2], jac[:, 2])
-    return E,F,G
+    return E, F, G
 end
 
 function second_fundamental_form(el::ReferenceInterpolant, x̂)
@@ -73,22 +73,35 @@ function second_fundamental_form(el::ReferenceInterpolant, x̂)
     M = dot(hess[:, 1, 2], ν)
     N = dot(hess[:, 2, 2], ν)
 
-    return L,M,N
+    return L, M, N
 end
 
+"""
+    mean_curvature(τ, x̂)
+
+Calculate the [mean curvature](https://en.wikipedia.org/wiki/Mean_curvature) of
+the element `τ` at the parametric coordinate `x̂`.
+"""
 function mean_curvature(el::ReferenceInterpolant, x̂)
-    E,F,G = first_fundamental_form(el,x̂)
-    L,M,N = second_fundamental_form(el,x̂)
+    E, F, G = first_fundamental_form(el, x̂)
+    L, M, N = second_fundamental_form(el, x̂)
     # mean curvature
     κ = (L * G - 2 * F * M + E * N) / (2 * (E * G - F^2))
     return κ
 end
 
+"""
+    gauss_curvature(τ, x̂)
+
+Calculate the [Gaussian
+curvature](https://en.wikipedia.org/wiki/Gaussian_curvature) of the element `τ`
+at the parametric coordinate `x̂`.
+"""
 function gauss_curvature(el::ReferenceInterpolant, x̂)
-    E,F,G = first_fundamental_form(el,x̂)
-    L,M,N = second_fundamental_form(el,x̂)
+    E, F, G = first_fundamental_form(el, x̂)
+    L, M, N = second_fundamental_form(el, x̂)
     # Guassian curvature
-    κ = (L*N-M^2)/(E*G-F^2);
+    κ = (L * N - M^2) / (E * G - F^2)
     return κ
 end
 
