@@ -45,6 +45,8 @@ flip_normal(q::QuadratureNode) = QuadratureNode(q.coords, q.weight, -q.normal)
 
 weight(q::QuadratureNode) = q.weight
 
+translate(q::QuadratureNode, x) = QuadratureNode(coords(q) + x, weight(q), normal(q))
+
 # useful for using either a quadrature node or a just a simple point in
 # `IntegralOperators`.
 coords(x::Union{SVector,Tuple}) = SVector(x)

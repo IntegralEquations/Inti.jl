@@ -1,7 +1,7 @@
 using Inti
 using Gmsh
 
-function gmsh_disk(; center, rx, ry, meshsize)
+function gmsh_disk(; center, rx, ry, meshsize, order = 1)
     msh = try
         gmsh.initialize()
         gmsh.option.setNumber("General.Verbosity", 2)
@@ -12,6 +12,7 @@ function gmsh_disk(; center, rx, ry, meshsize)
         gmsh.model.occ.addDisk(center[1], center[2], 0, rx, ry)
         gmsh.model.occ.synchronize()
         gmsh.model.mesh.generate(2)
+        gmsh.model.mesh.setOrder(order)
         Inti.import_mesh(; dim = 2)
     finally
         gmsh.finalize()
