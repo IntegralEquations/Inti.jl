@@ -128,7 +128,7 @@ msh = Inti.meshgen(Γ; meshsize = 0.05)
 nothing # hide
 ```
 
-We can use the [`viz`](@ref) function to visualize the mesh, and use
+We can use the [`viz`](https://juliageometry.github.io/MeshesDocs/stable/visualization.html#Meshes.viz) function to visualize the mesh, and use
 domains to index the mesh:
 
 ```@example geo-and-meshes
