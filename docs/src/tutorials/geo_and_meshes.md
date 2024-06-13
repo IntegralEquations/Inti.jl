@@ -157,7 +157,7 @@ end
 patch = Inti.parametric_surface(f, lc, hc, labels = ["patch1"])
 Γ  = Inti.Domain(patch)
 msh = Inti.meshgen(Γ; meshsize = 0.1)
-viz(msh[Γ]; showsegments = true)
+viz(msh[Γ]; showsegments = true, figure = (; size = (400,400),))
 ```
 
 Since creating parametric surfaces that form a closed volume can be a bit more
@@ -169,6 +169,10 @@ torus = Inti.torus(; center = SVector(-3,0,0))
 Ω = bean ∪ torus
 Γ = Inti.boundary(Ω)
 msh = Inti.meshgen(Γ; meshsize = 0.1)
+fig = Figure(; size = (600,400))
+ax = Axis3(fig[1, 1]; aspect = :data)
+viz!(msh[Γ]; showsegments = true)
+fig # hide
 ```
 
 See [`SIMPLE_SHAPES`](@ref) for a list of predefined geometries, and the
