@@ -544,7 +544,9 @@ us_eval_msh = D * σ - im * k * S * σ
 u_eval_msh = ui_eval_msh + us_eval_msh
 nothing #hide
 
-# Finalize, we use [`viz`](@ref Meshes.viz) to visualize the scattered field:
+# Finalize, we use
+# [`viz`](https://juliageometry.github.io/MeshesDocs/stable/visualization.html#Meshes.viz)
+# to visualize the scattered field:
 
 using Meshes
 using GLMakie # or your preferred Makie backend
