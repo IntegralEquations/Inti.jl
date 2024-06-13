@@ -137,7 +137,7 @@ S, _ = Inti.single_double_layer(;
     compression = (method = :none,),
     correction = (method = :dim,)
 )
-# manufacture an harmonic function (exact solution) and take its trace on Γ
+# manufacture a harmonic function (exact solution) and take its trace on Γ
 uₑ = x -> x[1] + x[2] + x[1]*x[2] + x[1]^2 - x[2]^2  - 2 * log(norm(x .- SVector(-0.5, -1.5)))
 g = map(q -> uₑ(q.coords), Q) # value at quad nodes
 # solve for σ

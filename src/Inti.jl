@@ -36,6 +36,7 @@ include("reference_integration.jl")
 # geometry meshes, and quadratures
 include("entities.jl")
 include("domain.jl")
+include("simpleshapes.jl")
 include("mesh.jl")
 include("quadrature.jl")
 

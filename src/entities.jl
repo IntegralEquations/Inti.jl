@@ -21,6 +21,7 @@ Base.:(==)(e1::EntityKey, e2::EntityKey) = e1.dim == e2.dim && abs(e1.tag) == ab
 
 labels(e::EntityKey) = labels(global_get_entity(e))
 boundary(e::EntityKey) = boundary(global_get_entity(e))
+pushforward(e::EntityKey) = pushforward(global_get_entity(e))
 
 function (k::EntityKey)(x)
     ent = global_get_entity(k)
@@ -100,7 +101,7 @@ geometric_dimension(e::GeometricEntity) = e.dim
 tag(e::GeometricEntity)                 = e.tag
 boundary(e::GeometricEntity)            = e.boundary
 labels(e::GeometricEntity)              = e.labels
-push_forward(e::GeometricEntity)        = e.push_forward
+pushforward(e::GeometricEntity)         = e.pushforward
 domain(e::GeometricEntity)              = e.pushforward.domain
 function parametrization(e::GeometricEntity)
     hasparametrization(e) || error("entity $(key(e)) has no parametrization")
@@ -173,8 +174,10 @@ Create a [`GeometricEntity`] representing a parametric curve defined by the
 `{f(t) | a ≤ t ≤ b}`. The function `f` should map a scalar to a `SVector`.
 """
 function parametric_curve(f::F, a::Real, b::Real; kwargs...) where {F}
+    flip = a > b
     d = HyperRectangle(SVector(float(a)), SVector(float(b)))
-    ent = GeometricEntity(; domain = d, parametrization = x -> f(x[1]), kwargs...)
+    parametrization = flip ? x -> f(b + a - x[1]) : x -> f(x[1])
+    ent = GeometricEntity(; domain = d, parametrization, kwargs...)
     return key(ent)
 end
 
@@ -228,6 +231,44 @@ function _transfinite_square(c1, c2, c3, c4)
             (1 - u) * v * c4(0)
         )
     end
+end
+
+"""
+        parametric_surface(f, lc, hc, boundary = nothing; kwargs...)
+
+Create a parametric surface defined by the function `f` over the rectangular domain
+defined by the lower corner `lc` and the upper corner `hc`. The optional `boundary`
+argument can be used to specify the boundary curves of the surface.
+
+## Arguments
+- `f`: A function that takes two arguments `x` and `y` and returns a tuple `(u, v)`
+    representing the parametric coordinates of the surface at `(x, y)`.
+- `lc`: A 2-element array representing the lower corner of the rectangular domain.
+- `hc`: A 2-element array representing the upper corner of the rectangular domain.
+- `boundary`: An optional array of boundary curves that define the surface.
+
+## Keyword Arguments
+- `kwargs`: Additional keyword arguments that can be passed to the `GeometricEntity`
+    constructor.
+
+## Returns
+- The key of the created `GeometricEntity`.
+
+"""
+function parametric_surface(f, lc, hc, boundary = nothing; kwargs...)
+    @assert length(lc) == length(hc) == 2 "a and b should have length 2"
+    l1 = parametric_curve(x -> f(x, lc[2]), lc[1], hc[1])
+    l2 = parametric_curve(x -> f(hc[1], x), lc[2], hc[2])
+    l3 = parametric_curve(x -> f(x, hc[2]), hc[1], lc[1])
+    l4 = parametric_curve(x -> f(lc[1], x), hc[2], lc[2])
+    d = HyperRectangle(SVector(lc), SVector(hc))
+    ent = GeometricEntity(;
+        domain = d,
+        parametrization = x -> f(x[1], x[2]),
+        boundary = isnothing(boundary) ? [l1, l2, l3, l4] : boundary,
+        kwargs...,
+    )
+    return key(ent)
 end
 
 """

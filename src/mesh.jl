@@ -207,7 +207,7 @@ This function requires the entities forming `Ω` to have an explicit
 parametrization.
 
 !!! warning "Mesh quality"
-    The quality of the generated mesh created usign `meshgen` depends on
+    The quality of the generated mesh created using `meshgen` depends on
     the quality of the underlying parametrization. For complex surfaces, you are
     better off using a proper mesher such as `gmsh`.
 """
@@ -234,12 +234,28 @@ function meshgen!(msh::LagrangeMesh, Ω::Domain; meshsize::Real)
     # compute the length of each curve using an adaptive quadrature
     e1d = filter(k -> geometric_dimension(k) == 1, all_keys(Ω))
     dict = Dict(k => ceil(Int, measure(k) / meshsize) for k in e1d)
+    # curves which are opposite sides of a surface must have the same number of
+    # elements. If they differ, we take the maximum. Because there can be chains
+    # of dependencies (i.e. l1 is opposite to l2 and l2 is opposite to l3), we
+    # simple iterate until all are consistent.
+    e2d = filter(k -> geometric_dimension(k) == 2, all_keys(Ω))
+    while true
+        consistent = true
+        for k in e2d
+            b1, b2, b3, b4 = boundary(global_get_entity(k))
+            n1, n2, n3, n4 = map(b -> dict[b], (b1, b2, b3, b4))
+            if !(n1 == n3 && n2 == n4)
+                consistent = false
+                dict[b1] = dict[b3] = max(n1, n3)
+                dict[b2] = dict[b4] = max(n2, n4)
+            end
+        end
+        consistent && break
+    end
     return meshgen!(msh, Ω, dict)
 end
 function meshgen!(msh::LagrangeMesh, Ω::Domain, dict::Dict)
-    N = ambient_dimension(msh)
     d = geometric_dimension(Ω)
-    @assert N == 2 "meshgen! only supports 2d meshes for now"
     for k in keys(Ω)
         if d == 1
             haskey(dict, k) || error(msg1(k))
@@ -257,7 +273,7 @@ function meshgen!(msh::LagrangeMesh, Ω::Domain, dict::Dict)
                 if haskey(dict, l)
                     haskey(dict, op_l) &&
                         dict[l] != dict[op_l] &&
-                        error("num_elements for $l and $op_l must be the same")
+                        @warn "num_elements for $l and $op_l must be the same"
                     return dict[l]
                 elseif haskey(dict, l_op)
                     return dict[l_op]
@@ -272,6 +288,8 @@ function meshgen!(msh::LagrangeMesh, Ω::Domain, dict::Dict)
             b4 ∈ entities(msh) || _meshgen!(msh, b4, (n[2],))
             # mesh area
             _meshgen!(msh, k, n)
+        else
+            error("meshgen! not implemented volumes")
         end
     end
     _build_connectivity!(msh)
