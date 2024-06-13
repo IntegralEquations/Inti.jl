@@ -142,8 +142,8 @@ fig # hide
 
 ### Parametric surfaces
 
-Like parametric curves, parametric surfaces are defined by a function that a
-reference domain ``D \subset \mathbb{R}^2`` to a surface in 3D space. They can
+Like parametric curves, parametric surfaces are defined by a function that maps
+a reference domain ``D \subset \mathbb{R}^2`` to a surface in 3D space. They can
 be constructed using the [`parametric_surface`](@ref) function:
 
 ```@example geo-and-meshes
