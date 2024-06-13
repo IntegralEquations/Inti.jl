@@ -186,6 +186,7 @@ function local_bdim_correction(
     parameters = DimParameters(),
     derivative::Bool = false,
     maxdist = Inf,
+    kneighbor = 1,
 )
     imat_cond = imat_norm = res_norm = rhs_norm = -Inf
     T = default_kernel_eltype(pde) # Float64
@@ -193,7 +194,7 @@ function local_bdim_correction(
     m, n = length(target), length(source)
     msh = source.mesh
     qnodes = source.qnodes
-    neighbors = topological_neighbors(msh)
+    neighbors = topological_neighbors(msh, kneighbor)
     dict_near = etype_to_nearest_points(target, source; maxdist)
     # find first an appropriate set of source points to center the monopoles
     qmax = sum(size(mat, 1) for mat in values(source.etype2qtags)) # max number of qnodes per el
@@ -276,11 +277,11 @@ function local_bdim_correction(
             qnodes_nei = source.qnodes[qtags_nei]
             jac        = jacobian(el, 0.5)
             ν          = -_normal(jac)
-            h          = sum(qnodes[i].weight for i in jglob)
+            h          = sum(qnodes[i].weight for i in jglob)*4
             qnodes_op  = map(q -> translate(q, h * ν, -1), qnodes_nei)
             bindx      = boundary1d(nei, msh)
             l, r       = nodes(msh)[-bindx[1]], nodes(msh)[bindx[2]]
-            Q, W       = gauss(3nq, 0, h)
+            Q, W       = gauss(4nq, 0, h)
             qnodes_l   = [QuadratureNode(l.+q.*ν, w, SVector(-ν[2], ν[1])) for (q, w) in zip(Q, W)]
             qnodes_r   = [QuadratureNode(r.+q.*ν, w, SVector(ν[2], -ν[1])) for (q, w) in zip(Q, W)]
             qnodes_aux = append!(qnodes_nei, qnodes_op, qnodes_l, qnodes_r)

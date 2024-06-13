@@ -286,8 +286,8 @@ vertices(el::LagrangeElement) = view(vals(el), vertices_idxs(el))
 The indices of the nodes in `el` that define the boundary of the element.
 """
 
-function boundary_idxs(::Type{<:LagrangeLine{P}}) where {P}
-    return 1, P
+function boundary_idxs(::Type{<:LagrangeLine})
+    return 1, 2
 end
 
 function boundary_idxs(::Type{<:LagrangeTriangle{3}})
@@ -299,12 +299,12 @@ function boundary_idxs(::Type{<:LagrangeTriangle{6}})
 end
 
 function boundary1d(els, msh)
-    res = Set()
+    res = Set{Int}()
     E, _ = first(els)
     bdi = Inti.boundary_idxs(E)
     for (E, i) in els
         vertices = Inti.connectivity(msh, E)[:,i]
-        for bord in [-vertices[bdi[1]], vertices[bdi[2]]]
+        for bord in (-vertices[bdi[1]], vertices[bdi[2]])
             -bord in res ? delete!(res, -bord) : push!(res, bord)
         end
     end

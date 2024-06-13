@@ -12,14 +12,15 @@ N = 2
 t = :interior
 pde = Inti.Laplace(; dim = N)
 Inti.clear_entities!()
-Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = 0.2, order = 1)
+Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = 0.2, order = 2)
 # Ω, msh = gmsh_ball(; center = [0.0, 0.0, 0.0], radius=1.0, meshsize = 0.2)
 Γ = Inti.external_boundary(Ω)
 
+k = 2
 Γ_msh = msh[Γ]
 Ω_msh = msh[Ω]
 test_msh = Γ_msh
-nei = Inti.topological_neighbors(test_msh) |> collect
+nei = Inti.topological_neighbors(test_msh, k) |> collect
 function viz_neighbors(i, msh)
     k, v = nei[i]
     E, idx = k
@@ -61,9 +62,3 @@ for idxs in BD
 end
 
 viz_elements_bords(nei[I][1], test_els, bords, test_msh)
-
-for bord in bords
-    viz!(bord;color=4)
-end
-viz(bords)
-viz(first(bords))
