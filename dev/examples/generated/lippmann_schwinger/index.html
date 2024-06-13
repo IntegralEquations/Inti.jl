@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Lippmann Schwinger Solver · Inti.jl</title><meta name="title" content="Lippmann Schwinger Solver · Inti.jl"/><meta property="og:title" content="Lippmann Schwinger Solver · Inti.jl"/><meta property="twitter:title" content="Lippmann Schwinger Solver · Inti.jl"/><meta name="description" content="Documentation for Inti.jl."/><meta property="og:description" content="Documentation for Inti.jl."/><meta property="twitter:description" content="Documentation for Inti.jl."/><meta property="og:url" content="https://IntegralEquations.github.io/Inti.jl/examples/generated/lippmann_schwinger/"/><meta property="twitter:url" content="https://IntegralEquations.github.io/Inti.jl/examples/generated/lippmann_schwinger/"/><link rel="canonical" href="https://IntegralEquations.github.io/Inti.jl/examples/generated/lippmann_schwinger/"/><script data-outdated-warner src="../../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../../assets/documenter.js"></script><script src="../../../search_index.js"></script><script src="../../../siteinfo.js"></script><script src="../../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../../">Inti.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../../">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../../../tutorials/getting_started/">Getting started</a></li><li><a class="tocitem" href="../../../tutorials/geo_and_meshes/">Geometry and meshes</a></li><li><a class="tocitem" href="../../../tutorials/integral_operators/">Boundary integral operators</a></li><li><a class="tocitem" href="../../../tutorials/layer_potentials/">Layer potentials</a></li><li><a class="tocitem" href="../../../tutorials/compression_methods/">Compression methods</a></li><li><a class="tocitem" href="../../../tutorials/correction_methods/">Correction methods</a></li><li><a class="tocitem" href="../../../tutorials/solvers/">Solvers</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../toy_example/">Toy example</a></li><li><a class="tocitem" href="../helmholtz_scattering/">Helmholtz scattering</a></li><li class="is-active"><a class="tocitem" href>Lippmann Schwinger Solver</a><ul class="internal"><li><a class="tocitem" href="#Problem-definition"><span>Problem definition</span></a></li><li><a class="tocitem" href="#Meshing"><span>Meshing</span></a></li><li><a class="tocitem" href="#Volume-Integral-Operators-and-Volume-Integral-Equations"><span>Volume Integral Operators and Volume Integral Equations</span></a></li></ul></li><li><a class="tocitem" href="../poisson/">Poisson solver</a></li><li><a class="tocitem" href="../stokes_drag/">Stokes drag</a></li></ul></li><li><a class="tocitem" href="../../../references/">References</a></li><li><a class="tocitem" href="../../../docstrings/">Docstrings</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Lippmann Schwinger Solver</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Lippmann Schwinger Solver</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl/blob/main/docs/src/examples/lippmann_schwinger.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="lippmann_schwinger"><a class="docs-heading-anchor" href="#lippmann_schwinger">Lippmann Schwinger Solver</a><a id="lippmann_schwinger-1"></a><a class="docs-heading-anchor-permalink" href="#lippmann_schwinger" title="Permalink"></a></h1><p><a href="../lippmann_schwinger.ipynb"><img src="https://img.shields.io/badge/download-ipynb-blue" alt="ipynb"/></a> <a href="https://nbviewer.jupyter.org/github/IntegralEquations/Inti.jl/blob/gh-pages/dev/examples/generated/lippmann_schwinger.ipynb"><img src="https://img.shields.io/badge/show-nbviewer-blue.svg" alt="nbviewer"/></a></p><div class="admonition is-info"><header class="admonition-header">Important points covered in this example</header><div class="admonition-body"><ul><li>Using VDIM for volume integral operators</li><li>Solving a volume integral equation</li></ul></div></div><pre><code class="language-julia hljs">using Inti</code></pre><h2 id="Problem-definition"><a class="docs-heading-anchor" href="#Problem-definition">Problem definition</a><a id="Problem-definition-1"></a><a class="docs-heading-anchor-permalink" href="#Problem-definition" title="Permalink"></a></h2><p>In this example we will solve the Lippmann Schwinger Volume Integral Equation in a domain <span>$\Omega$</span>:</p><p class="math-container">\[  \begin{align}
+      u + k^2 \mathcal{V}_k[(1 - \eta) u] &amp;= u^{\textit{inc}}  \quad \text{in } \Omega \\
+  \end{align}\]</p><p>where <span>$u^{\textit{inc}} : \Omega \to \mathbb{C}$</span> is a given free-space Helmholtz solution.</p><pre><code class="language-julia hljs">interpolation_order = 2 # `interpolation_order` corresponds to `n` in the VDIM paper
+qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
+
+k₁ = 4π
+k₂ = 2π
+λ₁ = 2π / k₁
+λ₂ = 2π / k₂
+meshsize = min(λ₁, λ₂) / 7</code></pre><div class="admonition is-info"><header class="admonition-header">Refraction Index Perturbation</header><div class="admonition-body"><p>A VIE with piecewise-constant refraction index perturbation <span>$η$</span> can be   verified against a BIE formulation.  Generally, we will want to use a   VIE formulation for variable media e.g. <code>η = (x) -&gt; 1 +   .7*exp(-40*(x[1]^2 + x[2]^2))</code>.</p></div></div><pre><code class="language-julia hljs">η = (x) -&gt; (k₂ / k₁)^2</code></pre><h2 id="Meshing"><a class="docs-heading-anchor" href="#Meshing">Meshing</a><a id="Meshing-1"></a><a class="docs-heading-anchor-permalink" href="#Meshing" title="Permalink"></a></h2><p>We now create the required meshes and quadratures for both <span>$\Omega$</span> and <span>$\Gamma$</span>:</p><pre><code class="language-julia hljs">using Gmsh # this will trigger the loading of Inti&#39;s Gmsh extension
+
+function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (1, 1))
+    try
+        gmsh.initialize()
+        gmsh.option.setNumber(&quot;General.Terminal&quot;, 0)
+        gmsh.model.add(&quot;circle-mesh&quot;)
+        gmsh.option.setNumber(&quot;Mesh.MeshSizeMax&quot;, meshsize)
+        gmsh.option.setNumber(&quot;Mesh.MeshSizeMin&quot;, meshsize)
+        gmsh.model.occ.addDisk(center[1], center[2], 0, paxis[1], paxis[2])
+        gmsh.model.occ.synchronize()
+        gmsh.model.mesh.generate(2)
+        gmsh.model.mesh.setOrder(order)
+        gmsh.write(name)
+    finally
+        gmsh.finalize()
+    end
+end
+
+name = joinpath(@__DIR__, &quot;disk.msh&quot;)
+gmsh_disk(; meshsize, order = 2, name)
+
+msh = Inti.import_mesh(name; dim = 2)
+Ω = Inti.Domain(e -&gt; Inti.geometric_dimension(e) == 2, Inti.entities(msh))
+Γ = Inti.boundary(Ω)
+
+Ωₕ = view(msh, Ω)
+Γₕ = view(msh, Γ)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Inti.SubMesh{2, Float64} containing:
+	 88 elements of type Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 3, StaticArraysCore.SVector{2, Float64}}</code></pre><p>Use VDIM with the Vioreanu-Rokhlin quadrature rule</p><pre><code class="language-julia hljs">Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder);
+dict = Dict(E =&gt; Q for E in Inti.element_types(Ωₕ))
+Γₕ_quad = Inti.Quadrature(Γₕ; qorder)
+Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">8820-element Inti.Quadrature{2, Float64}:
+ Quadrature node:
+-- coords: [0.7085523185418651, -0.6957117234492228]
+-- normal: nothing
+-- weight: 0.00029959582378950747
+ Quadrature node:
+-- coords: [0.7438315432710618, -0.6578191617395827]
+-- normal: nothing
+-- weight: 0.00030066272014903577
+ Quadrature node:
+-- coords: [0.6834925452101541, -0.6422127025301838]
+-- normal: nothing
+-- weight: 0.0002965021190085747
+ Quadrature node:
+-- coords: [0.7135565334436431, -0.6510673764355404]
+-- normal: nothing
+-- weight: 0.0006066568092388471
+ Quadrature node:
+-- coords: [0.6971227859901199, -0.6687184669649734]
+-- normal: nothing
+-- weight: 0.0006056471261895246
+ Quadrature node:
+-- coords: [0.7254531908708148, -0.6761961849203815]
+-- normal: nothing
+-- weight: 0.0006095846112216931
+ Quadrature node:
+-- coords: [0.9269994063685345, 0.3560933246100717]
+-- normal: nothing
+-- weight: 0.0002980934947338545
+ Quadrature node:
+-- coords: [0.907186639451076, 0.4039255752103367]
+-- normal: nothing
+-- weight: 0.00029781241237974206
+ Quadrature node:
+-- coords: [0.866455585020041, 0.3601204063896579]
+-- normal: nothing
+-- weight: 0.00029432580059610364
+ Quadrature node:
+-- coords: [0.8877504481538487, 0.38143784208672393]
+-- normal: nothing
+-- weight: 0.000601597482905814
+ ⋮
+ Quadrature node:
+-- coords: [-0.5382244034078971, -0.756821597291346]
+-- normal: nothing
+-- weight: 0.00025373764677674433
+ Quadrature node:
+-- coords: [-0.5266810459419988, -0.7712763494943502]
+-- normal: nothing
+-- weight: 0.0002537376467767472
+ Quadrature node:
+-- coords: [-0.520382427747551, -0.7567003683130511]
+-- normal: nothing
+-- weight: 0.0002537376467767472
+ Quadrature node:
+-- coords: [-0.24007649757079888, 0.9069485932961029]
+-- normal: nothing
+-- weight: 0.00013003497473258998
+ Quadrature node:
+-- coords: [-0.2783804272197544, 0.9023405174031219]
+-- normal: nothing
+-- weight: 0.000130034974732589
+ Quadrature node:
+-- coords: [-0.25713199717664137, 0.8724145408248903]
+-- normal: nothing
+-- weight: 0.00013003497473259022
+ Quadrature node:
+-- coords: [-0.26712547277815746, 0.8878234961999375]
+-- normal: nothing
+-- weight: 0.00026418334447304403
+ Quadrature node:
+-- coords: [-0.24928275908021438, 0.889970027368159]
+-- normal: nothing
+-- weight: 0.0002641833444730471
+ Quadrature node:
+-- coords: [-0.25918069010882305, 0.9039101279560187]
+-- normal: nothing
+-- weight: 0.0002641833444730464</code></pre><h2 id="Volume-Integral-Operators-and-Volume-Integral-Equations"><a class="docs-heading-anchor" href="#Volume-Integral-Operators-and-Volume-Integral-Equations">Volume Integral Operators and Volume Integral Equations</a><a id="Volume-Integral-Operators-and-Volume-Integral-Equations-1"></a><a class="docs-heading-anchor-permalink" href="#Volume-Integral-Operators-and-Volume-Integral-Equations" title="Permalink"></a></h2><pre><code class="language-julia hljs">using FMMLIB2D
+
+pde = Inti.Helmholtz(; dim = 2, k = k₁)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Δu + k² u = 0</code></pre><p>With quadratures constructed on the volume, we can define a discrete approximation to the volume integral operator <span>$\mathcal{V}$</span> using VDIM.</p><pre><code class="language-julia hljs">V_d2d = Inti.volume_potential(;
+    pde,
+    target = Ωₕ_quad,
+    source = Ωₕ_quad,
+    compression = (method = :fmm, tol = 1e-7),
+    correction = (method = :dim, interpolation_order),
+)
+
+using LinearAlgebra
+using LinearMaps
+
+using SpecialFunctions
+uⁱ = (x) -&gt; exp(im * k₁ * x[2]) # plane-wave incident field
+rhs = map(Ωₕ_quad) do q
+    x = q.coords
+    return uⁱ(x)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">8820-element Vector{ComplexF64}:
+  -0.7761833301703072 - 0.6305072862114536im
+  -0.4008255293553406 - 0.916154405663702im
+ -0.21461848830071084 - 0.9766979596986561im
+ -0.32174538127272384 - 0.9468262299015958im
+  -0.5221606600892983 - 0.8528471404977027im
+  -0.5998792931374709 - 0.8000905159198478im
+ -0.23535935194499724 - 0.9719084192721199im
+  0.35553789229866795 - 0.9346618678109323im
+  -0.1858948299949908 - 0.9825696474963662im
+  0.08081209162412846 - 0.9967293543622228im
+                      ⋮
+  -0.9963280570569449 + 0.08561777105912662im
+  -0.9644699925952754 + 0.26419241734627674im
+  -0.9964573317017412 + 0.08409985789432771im
+  0.39077911940621873 - 0.9204844810403379im
+    0.336851605701448 - 0.9415577495493074im
+ -0.03248412251525768 - 0.9994722516330374im
+   0.1604482855076432 - 0.9870442480849873im
+   0.1870113255606387 - 0.9823577576993286im
+  0.35535645285038253 - 0.9347308657670367im</code></pre><p>The full VIO incorporates scalar point multiplication using the contrast function η, implemented as a composition of <code>LinearMap</code></p><pre><code class="language-julia hljs">refr_map_d = map(Ωₕ_quad) do q
+    x = q.coords
+    return 1 - η(x)
+end
+apply_refr!(y, x) = y .= refr_map_d .* x
+Lη = LinearMap{ComplexF64}(apply_refr!, length(refr_map_d), length(refr_map_d))
+L = I + k₁^2 * V_d2d * Lη</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">8820×8820 LinearMaps.LinearCombination{ComplexF64} with 2 maps:
+  8820×8820 LinearMaps.UniformScalingMap{Bool} with scaling factor: true
+  8820×8820 LinearMaps.ScaledMap{ComplexF64} with scale: 157.91367041742973 of
+    8820×8820 LinearMaps.CompositeMap{ComplexF64} with 2 maps:
+      8820×8820 LinearMaps.FunctionMap{ComplexF64,true}(apply_refr!; issymmetric=false, ishermitian=false, isposdef=false)
+      8820×8820 LinearMaps.LinearCombination{ComplexF64} with 2 maps:
+        8820×8820 LinearMaps.FunctionMap{ComplexF64,true}(#7; issymmetric=false, ishermitian=false, isposdef=false)
+        8820×8820 LinearMaps.WrappedMap{ComplexF64} of
+          8820×8820 SparseArrays.SparseMatrixCSC{ComplexF64, Int64} with 52920 stored entries</code></pre><p>The unknown volumetric field <span>$u$</span>:</p><pre><code class="language-julia hljs">using IterativeSolvers
+u, hist =
+    gmres(L, rhs; log = true, abstol = 1e-7, verbose = false, restart = 200, maxiter = 200)
+@show hist
+
+𝒱 = Inti.IntegralPotential(Inti.SingleLayerKernel(pde), Ωₕ_quad)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Inti.IntegralPotential{Inti.SingleLayerKernel{ComplexF64, Inti.Helmholtz{2, Float64}}, Inti.Quadrature{2, Float64}}(Inti.SingleLayerKernel{ComplexF64, Inti.Helmholtz{2, Float64}}(Δu + k² u = 0),  Quadrature with 8820 quadrature nodes)</code></pre><p>The representation formula gives the solution in <span>$\R^2 \setminus \Omega$</span>:</p><pre><code class="language-julia hljs">uˢ = (x) -&gt; uⁱ(x) - k₁^2 * 𝒱[refr_map_d.*u](x)</code></pre><p>To visualize the solution using Gmsh, let&#39;s query it at the triangle vertices  in <span>$\Omega$</span></p><pre><code class="language-julia hljs">solₕ_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, real(-u))
+
+gmsh.initialize()
+Inti.write_gmsh_model(msh)
+Inti.write_gmsh_view!(Ωₕ, solₕ_nodes; name = &quot;LS solution&quot;)
+isinteractive() &amp;&amp; gmsh.fltk.run()
+gmsh.finalize()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../helmholtz_scattering/">« Helmholtz scattering</a><a class="docs-footer-nextpage" href="../poisson/">Poisson solver »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Thursday 13 June 2024 22:51">Thursday 13 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
