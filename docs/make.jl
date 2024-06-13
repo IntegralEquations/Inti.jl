@@ -6,6 +6,7 @@ using Literate
 using Gmsh
 using HMatrices
 using Meshes
+using GLMakie
 using FMM2D
 using FMM3D
 
@@ -57,7 +58,7 @@ DocMeta.setdocmeta!(Inti, :DocTestSetup, :(using Inti); recursive = true)
 
 modules = [Inti]
 for extension in
-    [:IntiGmshExt, :IntiHMatricesExt, :IntiMeshesExt, :IntiFMM2DExt, :IntiFMM3DExt]
+    [:IntiGmshExt, :IntiHMatricesExt, :IntiMakieExt, :IntiFMM2DExt, :IntiFMM3DExt]
     ext = Base.get_extension(Inti, extension)
     isnothing(ext) && "error loading $ext"
     push!(modules, ext)

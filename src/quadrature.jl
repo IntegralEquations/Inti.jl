@@ -49,6 +49,13 @@ weight(q::QuadratureNode) = q.weight
 # `IntegralOperators`.
 coords(x::Union{SVector,Tuple}) = SVector(x)
 
+function Base.show(io::IO, q::QuadratureNode)
+    println(io, "Quadrature node:")
+    println(io, "-- coords: $(q.coords)")
+    println(io, "-- normal: $(q.normal)")
+    return print(io, "-- weight: $(q.weight)")
+end
+
 """
     struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
 

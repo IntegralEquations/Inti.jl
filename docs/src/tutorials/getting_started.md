@@ -10,11 +10,14 @@ CurrentModule = Inti
       - Visualize the solution
 
 This first tutorial will guide you through the basic steps of setting up a
-boundary integral equation problem and solving it using Inti.jl. We will
-consider the classic Helmholtz scattering problem in 2D, and solve it using a
-*direct* boundary integral formulation. More precisely, letting ``\Omega \subset
-\mathbb{R}^2`` be a bounded domain, and denoting by ``\Gamma = \partial \Omega``
-its boundary, we will solve the following Helmholtz problem:
+boundary integral equation and solving it using Inti.jl. 
+
+## Mathematical formulation
+
+We will consider the classic Helmholtz scattering problem in 2D, and solve it
+using a *direct* boundary integral formulation. More precisely, letting ``\Omega
+\subset \mathbb{R}^2`` be a bounded domain, and denoting by ``\Gamma = \partial
+\Omega`` its boundary, we will solve the following Helmholtz problem:
 
 ```math
 \begin{aligned}
@@ -24,47 +27,85 @@ its boundary, we will solve the following Helmholtz problem:
 \end{aligned}
 ```
 
-where ``g`` is a (given) boundary datum, ``\nu`` is the outward unit normal to
-``\Gamma``, and ``k`` is the constant wavenumber.
+where ``g`` is the given boundary datum, ``\nu`` is the outward unit normal to
+``\Gamma``, and ``k`` is the constant wavenumber. The last condition is the
+*Sommerfeld radiation condition*, and is required to ensure the uniqueness of
+the solution; physically, it means that the solution sought should radiate
+energy towards infinity.
 
-!!! tip "Sommerfeld radiation condition"
-    The last condition is the *Sommerfeld radiation condition*, and is required
-    to ensure the uniqueness of the solution; physically, it means that the
-    solution sought should radiate energy towards infinity.
+## PDE, geometry, and mesh
 
-Let us begin by specifying the partial differential equation, and creating the
-domain, mesh, and quadrature for the problem:
+The first step is to define the PDE under consideration:
 
 ```@example getting_started
-using Inti, LinearAlgebra, StaticArrays
-
+using Inti
+Inti.stack_weakdeps_env!() # add weak dependencies 
 # PDE
 k = 2π
 pde = Inti.Helmholtz(; dim = 2, k)
+```
 
+Next, we generate the geometry of the problem. For this tutorial, we will
+manually create parametric curves representing the boundary of the domain using
+the [`parametric_curve`](@ref) function:
+
+```@example getting_started
+using StaticArrays # for SVector
 # Create the geometry as the union of a kite and a circle
-kite = Inti.parametric_curve(0.0, 1.0) do s
+kite = Inti.parametric_curve(0.0, 1.0; labels = ["kite"]) do s
     return SVector(2.5 + cos(2π * s[1]) + 0.65 * cos(4π * s[1]) - 0.65, 1.5 * sin(2π * s[1]))
 end
-circle = Inti.parametric_curve(0.0, 1.0) do s
+circle = Inti.parametric_curve(0.0, 1.0; labels = ["circle"]) do s
     return SVector(cos(2π * s[1]), sin(2π * s[1]))
 end
 Γ = kite ∪ circle
+```
+
+Inti.jl expects the parametrization of the curve to be a function mapping
+scalars to points in space represented by `SVector`s. The `labels` argument is
+optional, and can be used to identify the different parts of the boundary. The
+`Domain` object `Γ` represents the boundary of the geometry, and can be used to
+create a mesh:
+
+```@example getting_started
 # Create a mesh for the geometry
 msh = Inti.meshgen(Γ; meshsize = 2π / k / 10)
+```
+
+To visualize the mesh, we can load
+[Meshes.jl](https://github.com/JuliaGeometry/Meshes.jl) and one of
+[Makie](https://github.com/MakieOrg/Makie.jl)'s backends:
+
+```@example getting_started
+using Meshes, GLMakie
+viz(msh; segmentsize = 3, axis = (aspect = DataAspect(), ), figure = (; size = (400,300)))
+```
+
+## Quadrature
+
+Once the mesh is created, we can define a quadrature to be used in the
+discretization of the integral operators:
+
+```@example getting_started
 # Create a quadrature
 Q = Inti.Quadrature(msh; qorder = 5)
 nothing # hide
 ```
 
-We can easily check the mesh by visualizing it using the `Meshes.jl` package:
+A [`Quadrature`](@ref) is simply a collection of [`QuadratureNode`](@ref)
+objects:
 
 ```@example getting_started
-using Meshes, GLMakie
-fig, ax, pl = viz(msh; segmentsize = 3, axis = (aspect = DataAspect(), ))
+Q[1]
 ```
 
-Next we need to reformulate the Helmholtz problem as a boundary integral
+In the constructor above we specified a quadrature order of 5, and Inti.jl
+internally picked a [`ReferenceQuadrature`](@ref) suitable for the specified
+order; for a finer control, you can also specify a quadrature rule directly.
+
+## Integral operators
+
+To continue, we need to reformulate the Helmholtz problem as a boundary integral
 equation. Among the plethora of options, we will use in this tutorial a simple
 *direct* formulation, which uses Green's third identity to relate the values of
 ``u`` and ``\partial_{\nu} u`` on ``\Gamma``:
@@ -81,12 +122,19 @@ defined as:
     D[\sigma](\boldsymbol{x}) = \int_\Gamma \frac{\partial G}{\partial \nu_{\boldsymbol{y}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}),
 ```
 
-where ``G`` is the fundamental solution of the Helmholtz equation. Note that
-``G`` is typically singular when ``\boldsymbol{x} = \boldsymbol{y}``, and
-therefore the numerical discretization of these integral operators requires
-special care.
+where
 
-To approximate ``S`` and ``D`` in Inti.jl we can proceed as follows:
+```math
+G(\boldsymbol{x}, \boldsymbol{y}) = \frac{i}{4} H^{(1)}_0(k|\boldsymbol{x} -
+\boldsymbol{y}|)
+```
+
+is the fundamental solution of the Helmholtz equation, with ``H^{(1)}_0`` being the
+Hankel function of the first kind. Note that ``G`` is singular when
+``\boldsymbol{x} = \boldsymbol{y}``, and therefore the numerical discretization
+of ``S`` and ``D`` requires special care.
+
+To approximate ``S`` and ``D``, we can proceed as follows:
 
 ```@example getting_started
 S, D = Inti.single_double_layer(;
@@ -99,21 +147,22 @@ S, D = Inti.single_double_layer(;
 nothing # hide
 ```
 
-!!! tip "Fast algorithms"
-    Powered by external libraries, Inti.jl supports several acceleration methods
-    for matrix-vector multiplication, including so far:
-    - **Fast multipole method** (FMM) ``\mapsto`` `correction = (method = :fmm, tol = 1e-8)`
-    - **Hierarchical matrix** (H-matrix) ``\mapsto`` `correction = (method = :hmatrix, tol =
-    1e-8)`
-    
-    Note that in such cases only the matrix-vector product may not be available, and therefore iterative solvers such as GMRES may be required for the solution of the resulting linear systems.
-
 Much of the complexity involved in the numerical computation is hidden in the
 function above; later in the tutorials we will discuss in more details the
 options available for the *compression* and *correction* methods, as well as how
 to define your own kernels and operators. For now, it suffices to know that `S`
 and `D` are matrix-like objects that can be used to solve the boundary integral
 equation. For that, we need to provide the boundary data ``g``.
+
+!!! tip "Fast algorithms"
+    Powered by external libraries, Inti.jl supports several acceleration methods
+    for matrix-vector multiplication, including so far:
+    - **Fast multipole method** (FMM) ``\mapsto`` `correction = (method = :fmm, tol = 1e-8)`
+    - **Hierarchical matrix** (H-matrix) ``\mapsto`` `correction = (method = :hmatrix, tol = 1e-8)`
+  
+    Note that in such cases only the matrix-vector product may not be available, and therefore iterative solvers such as GMRES are required for the solution of the resulting linear systems.
+
+## Source term and solution
 
 We are interested in the scattered field ``u`` produced by an incident plane
 wave ``u_i = e^{i k \boldsymbol{d} \cdot \boldsymbol{x}}``, where
@@ -129,6 +178,7 @@ Sommerfeld radiation condition, we can write the boundary condition as:
 We can thus solve the boundary integral equation to find ``u`` on ``\Gamma``:
 
 ```@example getting_started
+using LinearAlgebra
 # define the incident field and compute its normal derivative
 θ = 0
 d = SVector(cos(θ), sin(θ))
@@ -138,10 +188,13 @@ g = map(Q) do q
     return -im * k * exp(im * k * dot(x, d)) * dot(d, ν)
 end ## Neumann trace on boundary
 u = (-I / 2 + D) \ (S * g) # Dirichlet trace on boundary
+nothing # hide
 ```
 
+## Integral representation and visualization
+
 Now that we know both the Dirichlet and Neumann data on the boundary, we can use
-Green's representation formula, i.e., 
+Green's representation formula, i.e.,
 
 ```math
     \mathcal{D}[u](\boldsymbol{r}) - \mathcal{S}[\partial_{\nu} u](\boldsymbol{r}) = \begin{cases}
@@ -168,7 +221,6 @@ uₛ = x -> 𝒟[u](x) - 𝒮[g](x)
 To wrap things up, let's visualize the scattered field:
 
 ```@example getting_started
-using GLMakie # or your favorite plotting backend for Makie
 xx = yy = range(-5; stop = 5, length = 100)
 U = map(uₛ, Iterators.product(xx, yy))
 Ui = map(x -> exp(im*k*dot(x, d)), Iterators.product(xx, yy))
@@ -186,8 +238,11 @@ Colorbar(fig[1, 2], hm; label = "real(u)")
 fig # hide
 ```
 
-!!! tip "Going further"
-    - ...
+## Accuracy check
+
+The scattering example above does not provide an easy way to check the accuracy
+of the solution. To do so, we can manufacture an exact solution and compare it
+to the solution obtained numerically, as illustrated below:
 
 ```@example getting_started
 # build an exact solution

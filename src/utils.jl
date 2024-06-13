@@ -302,3 +302,59 @@ end
 
 Base.:<(a::MultiIndex, b::MultiIndex) = all(a.indices .< b.indices)
 Base.:<=(a::MultiIndex, b::MultiIndex) = all(a.indices .<= b.indices)
+
+const WEAKDEPS_PROJ = let
+    deps = TOML.parse(read(joinpath(PROJECT_ROOT, "Project.toml"), String))["weakdeps"]
+    compat = Dict{String,Any}()
+    for (pkg, bound) in
+        TOML.parse(read(joinpath(PROJECT_ROOT, "Project.toml"), String))["compat"]
+        haskey(deps, pkg) || continue
+        compat[pkg] = bound
+    end
+    Dict("deps" => deps, "compat" => compat)
+end
+
+# adapted from DataFlowTasks.jl (code by François Févotte)
+"""
+    stack_weakdeps_env!(; verbose = false, update = false)
+
+Push to the load stack an environment providing the weak dependencies of
+Inti.jl. This allows benefiting from additional functionalities of Inti.jl which
+are powered by weak dependencies without having to manually install them in your
+environment.
+
+Set `update=true` if you want to update the `weakdeps` environment.
+
+!!! warning
+    Calling this function can take quite some time, especially the first time
+    around, if packages have to be installed or precompiled. Run in `verbose`
+    mode to see what is happening.
+
+## Examples:
+```example
+Inti.stack_weakdeps_env!()
+using HMatrices
+```
+"""
+function stack_weakdeps_env!(; verbose = false, update = false)
+    weakdeps_env = Scratch.@get_scratch!("weakdeps-$(VERSION.major).$(VERSION.minor)")
+    open(joinpath(weakdeps_env, "Project.toml"), "w") do f
+        return TOML.print(f, WEAKDEPS_PROJ)
+    end
+
+    cpp = Pkg.project().path
+    io = verbose ? stderr : devnull
+
+    try
+        Pkg.activate(weakdeps_env; io)
+        update && Pkg.update(; io)
+        Pkg.resolve(; io)
+        Pkg.instantiate(; io)
+        Pkg.status()
+    finally
+        Pkg.activate(cpp; io)
+    end
+
+    push!(LOAD_PATH, weakdeps_env)
+    return nothing
+end
