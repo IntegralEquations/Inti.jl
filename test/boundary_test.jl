@@ -19,8 +19,9 @@ Inti.clear_entities!()
 k = 2
 Γ_msh = msh[Γ]
 Ω_msh = msh[Ω]
-test_msh = Γ_msh
-nei = Inti.topological_neighbors(test_msh, k) |> collect
+test_msh = Ω_msh
+nei = Inti.topological_neighbors(test_msh, 1)
+E = first(Inti.element_types(test_msh))
 function viz_neighbors(i, msh)
     k, v = nei[i]
     E, idx = k
@@ -33,8 +34,15 @@ function viz_neighbors(i, msh)
     return display(fig)
 end
 
+function viz_elements(els, msh)
+    Els = [Inti.elements(msh, E)[i] for (E, i) in els]
+    fig, _, _ = viz(Els)
+    viz!(msh; color = 0, showsegments = true,alpha=0.3)
+    display(fig)
+end
+
 function viz_elements_bords(Ei, els, bords, msh)
-    el = el = Inti.elements(msh, Ei[1])[Ei[2]]
+    el = Inti.elements(msh, Ei[1])[Ei[2]]
     fig, _, _ = viz(msh; color = 0, showsegments = true,alpha=0.3)
     viz!(el; color = 0, showsegments = true,alpha=0.5)
     for (E, i) in els
@@ -47,12 +55,14 @@ end
 
 # el_in_set(el, set) = any(x->sort(x) == sort(el), set)
 
-I = 10
-test_els = copy(nei[I][2])
-push!(test_els, nei[I][1])
+I, J = 1, 3
+test_els = union(copy(nei[(E,1)]), nei[(E,2)], nei[(E,3)], nei[(E,4)])
+viz_elements(test_els, test_msh)
 
-BD = Inti.boundary1d(test_els, test_msh)
-bords = [Inti.nodes(test_msh)[abs(i)] for i in BD]
+components = Inti.connected_components(test_els, nei)
+
+BD = Inti.boundarynd(test_els, test_msh)
+# bords = [Inti.nodes(test_msh)[abs(i)] for i in BD]
 
 bords = Inti.LagrangeElement[]
 for idxs in BD
