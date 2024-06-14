@@ -187,9 +187,9 @@ A tensor-product of one-dimension quadrature rules. Integrates over `[0,1]^N`.
 
 # Examples
 ```julia
-qx = Fejer(10)
-qy = TrapezoidalOpen(15)
-q  = TensorProductQuadrature(qx,qy)
+qx = Inti.Fejer(10)
+qy = Inti.Fejer(15)
+q  = Inti.TensorProductQuadrature(qx,qy)
 ```
 """
 struct TensorProductQuadrature{N,Q} <: ReferenceQuadrature{ReferenceHyperCube{N}}
@@ -208,8 +208,8 @@ function (q::TensorProductQuadrature{N})() where {N}
         return map(x -> x[1], x1d) # convert the `SVector{1,T}` to just `T`
     end
     weights1d = map(q -> q()[2], q.quads1d)
-    nodes_iter = (SVector(x) for x in Iterators.product(nodes1d...))
-    weights_iter = (prod(w) for w in Iterators.product(weights1d...))
+    nodes_iter = [SVector(x) for x in Iterators.product(nodes1d...)]
+    weights_iter = [prod(w) for w in Iterators.product(weights1d...)]
     return nodes_iter, weights_iter
 end
 
