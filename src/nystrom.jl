@@ -137,8 +137,8 @@ end
 Assemble an H-matrix representation of the discretized integral operator `iop`
 using the `HMatrices.jl` library.
 
-See the `assemble_hmatrix` function from `HMatrices.jl` for more details on the
-keyword arguments.
+See the [`HMatrices.assemble_hmatrix`](@extref) function from `HMatrices.jl` for
+more details on the keyword arguments.
 """
 function assemble_hmatrix(args...; kwargs...)
     return error("Inti.assemble_hmatrix not found. Did you forget to import HMatrices?")

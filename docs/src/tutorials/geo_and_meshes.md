@@ -85,7 +85,7 @@ viz!(Γ_msh; showsegments = true, alpha = 0.5)
 fig
 ```
 
-## `meshgen` and parametric entities
+## Parametric entities and `meshgen`
 
 In the previous section we saw an example of how to import a mesh from a file,
 and how to extract the entities from the mesh. For simple geometries for which
@@ -128,7 +128,7 @@ msh = Inti.meshgen(Γ; meshsize = 0.05)
 nothing # hide
 ```
 
-We can use the [`viz`](https://juliageometry.github.io/MeshesDocs/stable/visualization.html#Meshes.viz) function to visualize the mesh, and use
+We can use the [`Meshes.viz`](@extref) function to visualize the mesh, and use
 domains to index the mesh:
 
 ```@example geo-and-meshes
@@ -166,7 +166,7 @@ involved, Inti.jl provide a few helper functions to create simple shapes:
 ```@example geo-and-meshes
 bean = Inti.bean()
 torus = Inti.torus(; center = SVector(-3,0,0))
-Ω = bean ∪ torus
+Ω = Inti.Domain(bean,torus)
 Γ = Inti.boundary(Ω)
 msh = Inti.meshgen(Γ; meshsize = 0.1)
 fig = Figure(; size = (600,400))

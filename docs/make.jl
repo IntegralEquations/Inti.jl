@@ -1,6 +1,7 @@
 using Inti
 using Documenter
 using DocumenterCitations
+using DocumenterInterLinks
 using Literate
 # packages needed for extensions
 using Gmsh
@@ -10,9 +11,14 @@ using GLMakie
 using FMM2D
 using FMM3D
 
+links = InterLinks(
+    "Meshes" => "https://juliageometry.github.io/MeshesDocs/dev/objects.inv",
+    "HMatrices" => "https://integralequations.github.io/HMatrices.jl/stable/objects.inv",
+)
+
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style = :numeric)
 
-draft = false
+draft = true
 
 const ON_CI = get(ENV, "CI", "false") == "true"
 const GIT_HEAD = chomp(read(`git rev-parse HEAD`, String))
@@ -99,7 +105,7 @@ makedocs(;
     pagesonly = true,
     checkdocs = :none,
     draft,
-    plugins = [bib],
+    plugins = [bib, links],
 )
 
 deploydocs(;

@@ -545,7 +545,7 @@ u_eval_msh = ui_eval_msh + us_eval_msh
 nothing #hide
 
 # Finalize, we use
-# [`viz`](https://juliageometry.github.io/MeshesDocs/stable/visualization.html#Meshes.viz)
+# [`Meshes.viz`](@extref)
 # to visualize the scattered field:
 
 using Meshes
