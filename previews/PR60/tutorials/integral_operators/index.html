@@ -99,16 +99,16 @@ Sop = Inti.IntegralOperator(K, Q, Q)</code></pre><pre class="documenter-example-
   8.85522e-5+5.79443e-5im      9.74649e-5+5.80337e-5im
  0.000148196+5.79811e-5im  …          0.0+0.0im</code></pre><div class="admonition is-info"><header class="admonition-header">Signature of custom kernels</header><div class="admonition-body"><p>Kernel functions passed to <code>IntegralOperator</code> should always take two arguments, <code>target</code> and <code>source</code>, which are both of <a href="../../docstrings/#Inti.QuadratureNode"><code>QuadratureNode</code></a>. This allows for extracting not only the <a href="../../docstrings/#Inti.coords-Tuple{T} where T"><code>coords</code></a> of the nodes, but also the <a href="../../docstrings/#Inti.normal-Tuple{Any, Any}"><code>normal</code></a> vector if needed (e.g. for double-layer or hypersingular kernels).</p></div></div><p>The approximation of <code>Sop</code> now involves two steps:</p><ul><li>build a dense operator <code>S₀</code> that efficiently computes the matrix-vector product <code>Sop * x</code> for any vector <code>x</code></li><li>correct for the inaccuracies of <code>S₀</code> due to singular/nearly-singular interactions by adding to it a correction matrix <code>δS</code></li></ul><p>For the first step, we will use a hierarchical matrix:</p><pre><code class="language-julia hljs">using HMatrices
 S₀ = Inti.assemble_hmatrix(Sop; rtol = 1e-4)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">HMatrix of ComplexF64 with range 1:9426 × 1:9426
-	 number of nodes in tree: 3061
-	 number of leaves: 2296 (760 admissible + 1536 full)
+	 number of nodes in tree: 2893
+	 number of leaves: 2170 (690 admissible + 1480 full)
 	 min rank of sparse blocks : 4
-	 max rank of sparse blocks : 23
-	 min length of dense blocks : 1296
-	 max length of dense blocks : 1369
-	 min number of elements per leaf: 1296
-	 max number of elements per leaf: 1390041
-	 depth of tree: 8
-	 compression ratio: 16.320198
+	 max rank of sparse blocks : 30
+	 min length of dense blocks : 625
+	 max length of dense blocks : 3936
+	 min number of elements per leaf: 625
+	 max number of elements per leaf: 2468041
+	 depth of tree: 0
+	 compression ratio: 15.271402
 </code></pre><p>The correction matrix <code>δS</code> will be constructed using <a href="../../docstrings/#Inti.adaptive_correction-Tuple{Inti.IntegralOperator}"><code>adaptive_correction</code></a>:</p><pre><code class="language-julia hljs">δS = Inti.adaptive_correction(Sop; tol = 1e-4, maxdist = 5*meshsize)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">9426×9426 SparseArrays.SparseMatrixCSC{ComplexF64, Int64} with 565560 stored entries:
 ⎡⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⎤
 ⎢⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
@@ -135,25 +135,25 @@ S = LinearMap(S₀) + LinearMap(δS)</code></pre><pre class="documenter-example-
     9426×9426 HMatrix{ClusterTree{2, Float64}, ComplexF64}
   9426×9426 LinearMaps.WrappedMap{ComplexF64} of
     9426×9426 SparseArrays.SparseMatrixCSC{ComplexF64, Int64} with 565560 stored entries</code></pre><p>You can add <code>δS</code> to <code>S₀</code> to create a new object:</p><pre><code class="language-julia hljs">S = S₀ + δS</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">HMatrix of ComplexF64 with range 1:9426 × 1:9426
-	 number of nodes in tree: 3061
-	 number of leaves: 2296 (760 admissible + 1536 full)
+	 number of nodes in tree: 2893
+	 number of leaves: 2170 (690 admissible + 1480 full)
 	 min rank of sparse blocks : 4
-	 max rank of sparse blocks : 23
-	 min length of dense blocks : 1296
-	 max length of dense blocks : 1369
-	 min number of elements per leaf: 1296
-	 max number of elements per leaf: 1390041
-	 depth of tree: 8
-	 compression ratio: 16.320198
+	 max rank of sparse blocks : 30
+	 min length of dense blocks : 625
+	 max length of dense blocks : 3936
+	 min number of elements per leaf: 625
+	 max number of elements per leaf: 2468041
+	 depth of tree: 0
+	 compression ratio: 15.271402
 </code></pre><p>or if performance/memory is a concern, you may want to directly add <code>δS</code> to <code>S₀</code> in-place:</p><pre><code class="language-julia hljs">axpy!(1.0, δS, S₀)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">HMatrix of ComplexF64 with range 1:9426 × 1:9426
-	 number of nodes in tree: 3061
-	 number of leaves: 2296 (760 admissible + 1536 full)
+	 number of nodes in tree: 2893
+	 number of leaves: 2170 (690 admissible + 1480 full)
 	 min rank of sparse blocks : 4
-	 max rank of sparse blocks : 23
-	 min length of dense blocks : 1296
-	 max length of dense blocks : 1369
-	 min number of elements per leaf: 1296
-	 max number of elements per leaf: 1390041
-	 depth of tree: 8
-	 compression ratio: 16.320198
-</code></pre><p>All of these should give an identical matrix-vector product, but the later two allow e.g. for the use of direct solvers though an LU factorization.</p><div class="admonition is-warning"><header class="admonition-header">Limitations</header><div class="admonition-body"><p>Integral operators defined from custom kernel functions do not support all the features of the predefined ones. In particular, some singular integration methods (e.g. the Density Interpolation Method) and acceleration routines (e.g. Fast Multipole Method) used to correct for singular and nearly singular integral operators, and to accelerate the matrix vector products, are only available for specific kernels. Check the <a href="../correction_methods/#Correction-methods">corrections</a> and <a href="../compression_methods/#Compression-methods">compression</a> for more details concerning which methods are compatible with custom kernels.</p></div></div></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../geo_and_meshes/">« Geometry and meshes</a><a class="docs-footer-nextpage" href="../layer_potentials/">Layer potentials »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Sunday 16 June 2024 16:16">Sunday 16 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+	 max rank of sparse blocks : 30
+	 min length of dense blocks : 625
+	 max length of dense blocks : 3936
+	 min number of elements per leaf: 625
+	 max number of elements per leaf: 2468041
+	 depth of tree: 0
+	 compression ratio: 15.271402
+</code></pre><p>All of these should give an identical matrix-vector product, but the later two allow e.g. for the use of direct solvers though an LU factorization.</p><div class="admonition is-warning"><header class="admonition-header">Limitations</header><div class="admonition-body"><p>Integral operators defined from custom kernel functions do not support all the features of the predefined ones. In particular, some singular integration methods (e.g. the Density Interpolation Method) and acceleration routines (e.g. Fast Multipole Method) used to correct for singular and nearly singular integral operators, and to accelerate the matrix vector products, are only available for specific kernels. Check the <a href="../correction_methods/#Correction-methods">corrections</a> and <a href="../compression_methods/#Compression-methods">compression</a> for more details concerning which methods are compatible with custom kernels.</p></div></div></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../geo_and_meshes/">« Geometry and meshes</a><a class="docs-footer-nextpage" href="../layer_potentials/">Layer potentials »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Sunday 16 June 2024 18:00">Sunday 16 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
