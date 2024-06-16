@@ -72,14 +72,14 @@ function single_double_layer(;
     Dop         = IntegralOperator(dG, target, source)
     # handle compression
     if compression.method == :hmatrix
-        Smat = assemble_hmatrix(Sop; atol = compression.tol)
-        Dmat = assemble_hmatrix(Dop; atol = compression.tol)
+        Smat = assemble_hmatrix(Sop; rtol = compression.tol)
+        Dmat = assemble_hmatrix(Dop; rtol = compression.tol)
     elseif compression.method == :none
         Smat = assemble_matrix(Sop)
         Dmat = assemble_matrix(Dop)
     elseif compression.method == :fmm
-        Smat = assemble_fmm(Sop; atol = compression.tol)::LinearMap
-        Dmat = assemble_fmm(Dop; atol = compression.tol)::LinearMap
+        Smat = assemble_fmm(Sop; rtol = compression.tol)::LinearMap
+        Dmat = assemble_fmm(Dop; rtol = compression.tol)::LinearMap
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
@@ -107,14 +107,14 @@ function single_double_layer(;
             Dop_dim = IntegralOperator(dG, target[glob_near_trgs], source)
             # compress 'em
             if compression.method == :hmatrix
-                Sop_dim_mat = assemble_hmatrix(Sop_dim; atol = compression.tol)
-                Dop_dim_mat = assemble_hmatrix(Dop_dim; atol = compression.tol)
+                Sop_dim_mat = assemble_hmatrix(Sop_dim; rtol = compression.tol)
+                Dop_dim_mat = assemble_hmatrix(Dop_dim; rtol = compression.tol)
             elseif compression.method == :none
                 Sop_dim_mat = assemble_matrix(Sop_dim)
                 Dop_dim_mat = assemble_matrix(Dop_dim)
             elseif compression.method == :fmm
-                Sop_dim_mat = assemble_fmm(Sop_dim; atol = compression.tol)::LinearMap
-                Dop_dim_mat = assemble_fmm(Dop_dim; atol = compression.tol)::LinearMap
+                Sop_dim_mat = assemble_fmm(Sop_dim; rtol = compression.tol)::LinearMap
+                Dop_dim_mat = assemble_fmm(Dop_dim; rtol = compression.tol)::LinearMap
             else
                 error("Unknown compression method. Available options: $COMPRESSION_METHODS")
             end
@@ -234,9 +234,9 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
     if compression.method == :none
         Vmat = assemble_matrix(V)
     elseif compression.method == :hmatrix
-        Vmat = assemble_hmatrix(V; atol = compression.tol)
+        Vmat = assemble_hmatrix(V; rtol = compression.tol)
     elseif compression.method == :fmm
-        Vmat = assemble_fmm(V; atol = compression.tol)
+        Vmat = assemble_fmm(V; rtol = compression.tol)
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
