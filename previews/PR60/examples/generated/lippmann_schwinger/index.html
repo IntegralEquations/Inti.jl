@@ -118,7 +118,7 @@ dict = Dict(E =&gt; Q for E in Inti.element_types(Ωₕ))
 -- normal: nothing
 -- weight: 0.0002641833444730464</code></pre><h2 id="Volume-Integral-Operators-and-Volume-Integral-Equations"><a class="docs-heading-anchor" href="#Volume-Integral-Operators-and-Volume-Integral-Equations">Volume Integral Operators and Volume Integral Equations</a><a id="Volume-Integral-Operators-and-Volume-Integral-Equations-1"></a><a class="docs-heading-anchor-permalink" href="#Volume-Integral-Operators-and-Volume-Integral-Equations" title="Permalink"></a></h2><pre><code class="language-julia hljs">using FMMLIB2D
 
-pde = Inti.Helmholtz(; dim = 2, k = k₁)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Δu + k² u = 0</code></pre><p>With quadratures constructed on the volume, we can define a discrete approximation to the volume integral operator <span>$\mathcal{V}$</span> using VDIM.</p><pre><code class="language-julia hljs">V_d2d = Inti.volume_potential(;
+pde = Inti.Helmholtz(; dim = 2, k = k₁)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Δu + k² u = 0</code></pre><p>With quadratures constructed on the volume, we can define a discrete approximation to the volume integral operator <span>$\mathcal{V}$</span> using VDIM.</p><pre><code class="language- hljs">V_d2d = Inti.volume_potential(;
     pde,
     target = Ωₕ_quad,
     source = Ωₕ_quad,
@@ -134,49 +134,22 @@ uⁱ = (x) -&gt; exp(im * k₁ * x[2]) # plane-wave incident field
 rhs = map(Ωₕ_quad) do q
     x = q.coords
     return uⁱ(x)
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">8820-element Vector{ComplexF64}:
-  -0.7761833301703072 - 0.6305072862114536im
-  -0.4008255293553406 - 0.916154405663702im
- -0.21461848830071084 - 0.9766979596986561im
- -0.32174538127272384 - 0.9468262299015958im
-  -0.5221606600892983 - 0.8528471404977027im
-  -0.5998792931374709 - 0.8000905159198478im
- -0.23535935194499724 - 0.9719084192721199im
-  0.35553789229866795 - 0.9346618678109323im
-  -0.1858948299949908 - 0.9825696474963662im
-  0.08081209162412846 - 0.9967293543622228im
-                      ⋮
-  -0.9963280570569449 + 0.08561777105912662im
-  -0.9644699925952754 + 0.26419241734627674im
-  -0.9964573317017412 + 0.08409985789432771im
-  0.39077911940621873 - 0.9204844810403379im
-    0.336851605701448 - 0.9415577495493074im
- -0.03248412251525768 - 0.9994722516330374im
-   0.1604482855076432 - 0.9870442480849873im
-   0.1870113255606387 - 0.9823577576993286im
-  0.35535645285038253 - 0.9347308657670367im</code></pre><p>The full VIO incorporates scalar point multiplication using the contrast function η, implemented as a composition of <code>LinearMap</code></p><pre><code class="language-julia hljs">refr_map_d = map(Ωₕ_quad) do q
+end</code></pre><p>The full VIO incorporates scalar point multiplication using the contrast function η, implemented as a composition of <code>LinearMap</code></p><pre><code class="language- hljs">refr_map_d = map(Ωₕ_quad) do q
     x = q.coords
     return 1 - η(x)
 end
 apply_refr!(y, x) = y .= refr_map_d .* x
 Lη = LinearMap{ComplexF64}(apply_refr!, length(refr_map_d), length(refr_map_d))
-L = I + k₁^2 * V_d2d * Lη</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">8820×8820 LinearMaps.LinearCombination{ComplexF64} with 2 maps:
-  8820×8820 LinearMaps.UniformScalingMap{Bool} with scaling factor: true
-  8820×8820 LinearMaps.ScaledMap{ComplexF64} with scale: 157.91367041742973 of
-    8820×8820 LinearMaps.CompositeMap{ComplexF64} with 2 maps:
-      8820×8820 LinearMaps.FunctionMap{ComplexF64,true}(apply_refr!; issymmetric=false, ishermitian=false, isposdef=false)
-      8820×8820 LinearMaps.LinearCombination{ComplexF64} with 2 maps:
-        8820×8820 LinearMaps.FunctionMap{ComplexF64,true}(#7; issymmetric=false, ishermitian=false, isposdef=false)
-        8820×8820 LinearMaps.WrappedMap{ComplexF64} of
-          8820×8820 SparseArrays.SparseMatrixCSC{ComplexF64, Int64} with 52920 stored entries</code></pre><p>The unknown volumetric field <span>$u$</span>:</p><pre><code class="language-julia hljs">using IterativeSolvers
+L = I + k₁^2 * V_d2d * Lη</code></pre><p>The unknown volumetric field <span>$u$</span>:</p><pre><code class="language- hljs">using IterativeSolvers
 u, hist =
     gmres(L, rhs; log = true, abstol = 1e-7, verbose = false, restart = 200, maxiter = 200)
 @show hist
 
-𝒱 = Inti.IntegralPotential(Inti.SingleLayerKernel(pde), Ωₕ_quad)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Inti.IntegralPotential{Inti.SingleLayerKernel{ComplexF64, Inti.Helmholtz{2, Float64}}, Inti.Quadrature{2, Float64}}(Inti.SingleLayerKernel{ComplexF64, Inti.Helmholtz{2, Float64}}(Δu + k² u = 0),  Quadrature with 8820 quadrature nodes)</code></pre><p>The representation formula gives the solution in <span>$\R^2 \setminus \Omega$</span>:</p><pre><code class="language-julia hljs">uˢ = (x) -&gt; uⁱ(x) - k₁^2 * 𝒱[refr_map_d.*u](x)</code></pre><p>To visualize the solution using Gmsh, let&#39;s query it at the triangle vertices  in <span>$\Omega$</span></p><pre><code class="language-julia hljs">solₕ_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, real(-u))
+𝒱 = Inti.IntegralPotential(Inti.SingleLayerKernel(pde), Ωₕ_quad)</code></pre><p>The representation formula gives the solution in <span>$\R^2 \setminus \Omega$</span>:</p><pre><code class="language-julia hljs">uˢ = (x) -&gt; uⁱ(x) - k₁^2 * 𝒱[refr_map_d.*u](x)</code></pre><p>To visualize the solution using Gmsh, let&#39;s query it at the triangle vertices  in <span>$\Omega$</span></p><pre><code class="language- hljs">solₕ_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, real(-u))
 
 gmsh.initialize()
 Inti.write_gmsh_model(msh)
 Inti.write_gmsh_view!(Ωₕ, solₕ_nodes; name = &quot;LS solution&quot;)
 isinteractive() &amp;&amp; gmsh.fltk.run()
-gmsh.finalize()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../helmholtz_scattering/">« Helmholtz scattering</a><a class="docs-footer-nextpage" href="../poisson/">Poisson solver »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Sunday 16 June 2024 18:16">Sunday 16 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+gmsh.finalize()
+nothing # hide</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../helmholtz_scattering/">« Helmholtz scattering</a><a class="docs-footer-nextpage" href="../poisson/">Poisson solver »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Sunday 16 June 2024 18:28">Sunday 16 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
