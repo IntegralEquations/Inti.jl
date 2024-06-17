@@ -54,7 +54,7 @@ using Inti
             Γ = Inti.external_boundary(Ω)
             quad = Inti.Quadrature(M[Γ]; qorder = 4) # NystromMesh of surface Γ
             area = Inti.integrate(x -> 1, quad)
-            @test isapprox(area, 4 * π * r^2, atol = 5e-2)
+            @test isapprox(area, 4 * π * r^2, rtol = 5e-2)
             exact = map(f, M[Γ].nodes)
             approx = Inti.quadrature_to_node_vals(quad, map(q -> f(q.coords), quad))
             @test exact ≈ approx

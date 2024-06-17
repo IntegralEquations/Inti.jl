@@ -1,6 +1,7 @@
 using Inti
 using Documenter
 using DocumenterCitations
+using DocumenterInterLinks
 using Literate
 # packages needed for extensions
 using Gmsh
@@ -9,6 +10,11 @@ using Meshes
 using GLMakie
 using FMM2D
 using FMM3D
+
+links = InterLinks(
+    "Meshes" => "https://juliageometry.github.io/MeshesDocs/dev/objects.inv",
+    "HMatrices" => "https://integralequations.github.io/HMatrices.jl/stable/objects.inv",
+)
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style = :numeric)
 
@@ -100,7 +106,7 @@ makedocs(;
     pagesonly = true,
     checkdocs = :none,
     draft,
-    plugins = [bib],
+    plugins = [bib, links],
 )
 
 deploydocs(;

@@ -26,13 +26,13 @@ for pde in (Inti.Laplace(; dim = 3), Inti.Helmholtz(; dim = 3, k = 1.2))
         )
             for Γ_quad in (Γ₁_quad, Γ₂_quad)
                 iop = Inti.IntegralOperator(K, Γ₁_quad, Γ_quad)
-                iop_fmm = Inti.assemble_fmm(iop; atol = 1e-8)
+                iop_fmm = Inti.assemble_fmm(iop; rtol = 1e-8)
                 x = rand(eltype(iop), size(iop, 2))
                 yapprox = iop_fmm * x
                 # test on a given index set
                 idx_test = rand(1:size(iop, 1), 10)
                 exact = iop[idx_test, :] * x
-                @test yapprox[idx_test] ≈ exact atol = 1e-7
+                @test yapprox[idx_test] ≈ exact rtol = 1e-7
             end
         end
     end

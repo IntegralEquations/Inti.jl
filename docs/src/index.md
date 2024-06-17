@@ -80,9 +80,9 @@ problem consists of the following steps:
 - **Mesh**: Create a mesh to approximate the geometry. The mesh is used to
   define a quadrature and discretize the boundary integral equation.
 - **Solver**: With a mesh and an accompanying quadrature, Inti.jl's routines
- provide ways to assemble and solve the system of equations arising from the
- discretization of the integral operators. The core of the library lies in this
- step.
+  provide ways to assemble and solve the system of equations arising from the
+  discretization of the integral operators. The core of the library lies in this
+  step.
 - **Visualization**: Visualize the solution using a plotting library such as
   Makie.jl, or export it to a file for further analysis.
 
