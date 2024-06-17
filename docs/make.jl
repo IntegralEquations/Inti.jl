@@ -39,8 +39,13 @@ end
 # Generate examples using Literate
 const examples_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples")
 const generated_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples", "generated")
-const examples =
-    ["toy_example.jl", "helmholtz_scattering.jl", "lippmann_schwinger.jl", "poisson.jl", "stokes_drag.jl"]
+const examples = [
+    "toy_example.jl",
+    "helmholtz_scattering.jl",
+    "lippmann_schwinger.jl",
+    "poisson.jl",
+    "stokes_drag.jl",
+]
 for t in examples
     println("\n*** Generating $t example")
     @time begin
@@ -101,7 +106,7 @@ makedocs(;
         "References" => "references.md",
         "Docstrings" => "docstrings.md",
     ],
-    warnonly = ON_CI ? true : Documenter.except(:linkcheck_remotes),
+    warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),
     # warnonly = true,
     pagesonly = true,
     checkdocs = :none,
