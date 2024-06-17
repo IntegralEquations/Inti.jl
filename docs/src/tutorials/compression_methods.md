@@ -26,7 +26,7 @@ of the operator. The following methods are available:
     Acceleration methods do not correct for singular or nearly-singular
     interactions. When the underlying kernel is singular, a *correction* is
     usually necessary in order to obtain accurate results (see the [section on
-    correction methods](@ref "Correction mehods") for more details).
+    correction methods](@ref "Correction methods") for more details).
   
 To illustrate the use of compression methods, we will use the following problem
 as an example. Note that for such a small problem, compression methods are not
@@ -36,7 +36,7 @@ likely not necessary, but they are useful for larger problems.
 using Inti
 using LinearAlgebra
 # define the quadrature
-geo = Inti.ball()
+geo = Inti.GeometricEntity("ellipsoid")
 Ω = Inti.Domain(geo)
 Γ = Inti.boundary(Ω)
 Q = Inti.Quadrature(Γ; meshsize = 0.4, qorder = 5)

@@ -358,3 +358,53 @@ function stack_weakdeps_env!(; verbose = false, update = false)
     push!(LOAD_PATH, weakdeps_env)
     return nothing
 end
+
+"""
+    cart2sph(x,y,z)
+
+Map cartesian coordinates `x,y,z` to spherical ones `r, θ, φ` representing the
+radius, elevation, and azimuthal angle respectively. The convention followed is
+that `0 ≤ θ ≤ π` and ` -π < φ ≤ π`. Same as the `cart2sph` function in MATLAB.
+"""
+function cart2sph(x, y, z)
+    azimuth = atan(y, x)
+    a = x^2 + y^2
+    elevation = atan(z, sqrt(a))
+    r = sqrt(a + z^2)
+    return azimuth, elevation, r
+end
+
+"""
+    rotation_matrix(rot)
+
+Constructs a rotation matrix given the rotation angles around the x, y, and z
+axes.
+
+# Arguments
+- `rot`: A tuple or vector containing the rotation angles in radians for each
+  axis.
+
+# Returns
+- `R::SMatrix`: The resulting rotation matrix.
+"""
+function rotation_matrix(rot)
+    dim = length(rot)
+    dim == 1 ||
+        dim == 3 ||
+        throw(
+            ArgumentError(
+                "rot must have 1 or 3 elements for a 2D or 3D rotation, respectively.",
+            ),
+        )
+    return dim == 1 ? _rotation_matrix_2d(rot) : _rotation_matrix_3d(rot)
+end
+function _rotation_matrix_2d(rot)
+    R = @SMatrix [cos(rot[1]) -sin(rot[1]); sin(rot) cos(rot[1])]
+    return R
+end
+function _rotation_matrix_3d(rot)
+    Rx = @SMatrix [1 0 0; 0 cos(rot[1]) sin(rot[1]); 0 -sin(rot[1]) cos(rot[1])]
+    Ry = @SMatrix [cos(rot[2]) 0 -sin(rot[2]); 0 1 0; sin(rot[2]) 0 cos(rot[2])]
+    Rz = @SMatrix [cos(rot[3]) sin(rot[3]) 0; -sin(rot[3]) cos(rot[3]) 0; 0 0 1]
+    return Rz * Ry * Rx
+end

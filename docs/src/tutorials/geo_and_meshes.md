@@ -164,19 +164,21 @@ Since creating parametric surfaces that form a closed volume can be a bit more
 involved, Inti.jl provide a few helper functions to create simple shapes:
 
 ```@example geo-and-meshes
-bean = Inti.bean()
-torus = Inti.torus(; center = SVector(-3,0,0))
-Ω = Inti.Domain(bean,torus)
-Γ = Inti.boundary(Ω)
-msh = Inti.meshgen(Γ; meshsize = 0.1)
 fig = Figure(; size = (600,400))
-ax = Axis3(fig[1, 1]; aspect = :data)
-viz!(msh[Γ]; showsegments = true)
+nshapes = Inti.length(Inti.PREDEFINED_SHAPES)
+ncols = 3; nrows = ceil(Int, nshapes/ncols)
+for (n,shape) in enumerate(Inti.PREDEFINED_SHAPES)
+      Ω = Inti.GeometricEntity(shape) |> Inti.Domain
+      Γ = Inti.boundary(Ω)
+      msh = Inti.meshgen(Γ; meshsize = 0.1)
+      i,j = (n-1) ÷ ncols + 1, (n-1) % ncols + 1
+      ax = Axis3(fig[i,j]; aspect = :data, title = shape)
+      viz!(msh; showsegments = true)
+end
 fig # hide
 ```
 
-See [`SIMPLE_SHAPES`](@ref) for a list of predefined geometries, and the
-`simple_shapes.jl` file for the corresponding implementation.
+See [`GeometricEntity(shape::String)`](@ref) for a list of predefined geometries.
 
 !!! warning "Mesh quality"
       The quality of the generated mesh created through `meshgen` depends

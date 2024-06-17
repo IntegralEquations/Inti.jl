@@ -1,30 +1,58 @@
+const PREDEFINED_SHAPES = ["ellipsoid", "torus", "bean", "cushion", "acorn"]
+
 """
-    const SIMPLE_SHAPES
+    GeometricEntity(shape::String [; translation, rotation, scaling, kwargs...])
 
-Available predefined shapes:
+Constructs a geometric entity with the specified shape and optional parameters,
+and returns its `key`.
 
-- [`ball`](@ref)
-- [`torus`](@ref)
+## Arguments
+- `shape::String`: The shape of the geometric entity.
+- `translation`: The translation vector of the geometric entity. Default is `SVector(0, 0, 0)`.
+- `rotation`: The rotation vector of the geometric entity. Default is `SVector(0, 0, 0)`.
+- `scaling`: The scaling vector of the geometric entity. Default is `SVector(1, 1, 1)`.
+- `kwargs...`: Additional keyword arguments to be passed to the shape constructor.
+
+## Supported shapes
 - [`ellipsoid`](@ref)
+- [`torus`](@ref)
 - [`bean`](@ref)
 - [`acorn`](@ref)
 - [`cushion`](@ref)
-"""
-const SIMPLE_SHAPES = ["ball", "torus", "ellipsoid", "bean", "acorn", "cushion"]
 
 """
-    ball(; center = SVector(0, 0, 0), radius = 1, labels = String[])
+function GeometricEntity(
+    shape::String;
+    translation = SVector(0, 0, 0),
+    rotation = SVector(0, 0, 0),
+    scaling = SVector(1, 1, 1),
+    kwargs...,
+)
+    shape ∈ PREDEFINED_SHAPES ||
+        throw(ArgumentError("shape must be one of $PREDEFINED_SHAPES"))
+    f = getfield(Inti, Symbol(shape))
+    return f(; translation, rotation, scaling, kwargs...)
+end
 
-Create an `GeometricEntity` representing the ball.
 """
-function ball(; center = SVector(0, 0, 0), radius = 1, labels = String[])
+    ellipsoid(; translation, rotation, scaling, labels)
+
+Create an ellipsoid entity in 3D, and apply optional transformations. Returns the key
+of the created entity.
+"""
+function ellipsoid(;
+    translation = SVector(0, 0, 0),
+    rotation = SVector(0, 0, 0),
+    scaling = SVector(1, 1, 1),
+    labels = String[],
+)
     lc = SVector(-1.0, -1.0)
     hc = SVector(1.0, 1.0)
     bnd = EntityKey[]
+    rot = rotation_matrix(rotation)
     for i in 1:6
-        # TODO: the curves shared by patches should be created only once.
         patch = parametric_surface(
-            (u, v) -> _sphere_parametrization(u, v, i, radius, center),
+            (u, v) -> _ellipsoid_parametrization(u, v, i, translation, rot, scaling),
             lc,
             hc,
         )
@@ -32,13 +60,17 @@ function ball(; center = SVector(0, 0, 0), radius = 1, labels = String[])
     end
     dim = 3
     tag = new_tag(dim)
-    # TODO: add transfinite volume parametrization
-    pushforward = nothing # no volume parametrization for now
-    sph = GeometricEntity(dim, tag, bnd, labels, pushforward)
-    return key(sph)
+    pushforward = nothing
+    ellipsoid = GeometricEntity(dim, tag, bnd, labels, pushforward)
+    return key(ellipsoid)
 end
 
-function _sphere_parametrization(u, v, id, rad = 1, center = SVector(0, 0, 0))
+function _ellipsoid_parametrization(u, v, id, trans, rot, scal)
+    x = _unit_sphere_parametrization(u, v, id)
+    return rot * (scal .* x) .+ trans
+end
+
+function _unit_sphere_parametrization(u, v, id)
     # parametrization of 6 patches. First gets a point on the cube [-1,1] ×
     # [-1,1] × [-1,1], the maps it onto the sphere
     if id == 1
@@ -54,28 +86,32 @@ function _sphere_parametrization(u, v, id, rad = 1, center = SVector(0, 0, 0))
     elseif id == 6
         x = SVector(-u, v, -1.0)
     end
-    return center .+ rad .* x ./ sqrt(u^2 + v^2 + 1)
+    return x ./ sqrt(u^2 + v^2 + 1)
 end
 
 """
-    torus(; center = SVector(0, 0, 0), r = 0.5, R = 1, labels = String[])
+    torus(; r, R, translation, rotation, scaling, labels)
 
-Create a torus geometric entity.
-
-## Arguments
-- `center`: The center of the torus. Default is `SVector(0, 0, 0)`.
-- `r`: The radius of the tube of the torus. Default is `0.5`.
-- `R`: The radius of the torus itself. Default is `1`.
-- `labels`: An array of labels for the torus. Default is an empty array.
-
-## Returns
-The key of the created ellipsoid.
+Create a torus entity in 3D, and apply optional transformations. Returns the
+key. The parameters `r` and `R` are the inner and outer radii of the torus.
 """
-function torus(; center = SVector(0, 0, 0), r = 0.5, R = 1, labels = String[])
+function torus(;
+    r = 0.5,
+    R = 1,
+    translation = SVector(0, 0, 0),
+    rotation = SVector(0, 0, 0),
+    scaling = SVector(1, 1, 1),
+    labels = String[],
+)
     lc = π * SVector(-1.0, -1.0)
     hc = π * SVector(1.0, 1.0)
     bnd = EntityKey[]
-    patch = parametric_surface((u, v) -> _torus_parametrization(u, v, r, R, center), lc, hc)
+    rot = rotation_matrix(rotation)
+    patch = parametric_surface(lc, hc) do u, v
+        # parametrization of a torus
+        x = SVector((R + r * cos(v)) * cos(u), (R + r * cos(v)) * sin(u), r * sin(v))
+        return rot * (scaling .* x) .+ translation
+    end
     push!(bnd, patch)
     dim = 3
     tag = new_tag(dim)
@@ -84,70 +120,24 @@ function torus(; center = SVector(0, 0, 0), r = 0.5, R = 1, labels = String[])
     return key(torus)
 end
 
-function _torus_parametrization(u, v, r, R, center)
-    x = SVector((R + r * cos(v)) * cos(u), (R + r * cos(v)) * sin(u), r * sin(v))
-    return x .+ center
-end
-
 """
-    ellipsoid(; center = SVector(0, 0, 0), paxis = SVector(1, 1, 1), labels = String[])
+    bean(; translation, rotation, scaling, labels)
 
-Create an ellipsoid geometric entity.
-
-## Arguments
-- `center`: The center of the ellipsoid. Default is `SVector(0, 0, 0)`.
-- `paxis`: The principal axis lengths of the ellipsoid. Default is `SVector(1, 1, 1)`.
-- `labels`: Optional labels for the ellipsoid.
-
-## Returns
-The key of the created ellipsoid.
-
+Create a bean entity in 3D, and apply optional transformations. Returns the key.
 """
-function ellipsoid(; center = SVector(0, 0, 0), paxis = SVector(1, 1, 1), labels = String[])
+function bean(;
+    translation = SVector(0, 0, 0),
+    rotation = SVector(0, 0, 0),
+    scaling = SVector(1, 1, 1),
+    labels = String[],
+)
     lc = SVector(-1.0, -1.0)
     hc = SVector(1.0, 1.0)
     bnd = EntityKey[]
+    rot = rotation_matrix(rotation)
     for i in 1:6
         patch = parametric_surface(
-            (u, v) -> _ellipsoid_parametrization(u, v, i, paxis, center),
-            lc,
-            hc,
-        )
-        push!(bnd, patch)
-    end
-    dim = 3
-    tag = new_tag(dim)
-    pushforward = nothing
-    ellipsoid = GeometricEntity(dim, tag, bnd, labels, pushforward)
-    return key(ellipsoid)
-end
-
-function _ellipsoid_parametrization(u, v, id, paxis, center)
-    x = _sphere_parametrization(u, v, id)
-    return x .* paxis .+ center
-end
-
-"""
-    bean(; center = SVector(0, 0, 0), paxis = SVector(1, 1, 1), labels = String[])
-
-Constructs a bean-shaped geometric entity.
-
-## Arguments
-- `center`: The center of the bean shape. Default is `SVector(0, 0, 0)`.
-- `paxis`: The principal axis of the bean shape. Default is `SVector(1, 1, 1)`.
-- `labels`: An array of labels for the bean shape. Default is an empty array.
-
-## Returns
-The key of the constructed bean-shaped geometric entity.
-
-"""
-function bean(; center = SVector(0, 0, 0), paxis = SVector(1, 1, 1), labels = String[])
-    lc = SVector(-1.0, -1.0)
-    hc = SVector(1.0, 1.0)
-    bnd = EntityKey[]
-    for i in 1:6
-        patch = parametric_surface(
-            (u, v) -> _bean_parametrization(u, v, i, paxis, center),
+            (u, v) -> _bean_parametrization(u, v, i, translation, rot, scaling),
             lc,
             hc,
         )
@@ -160,8 +150,8 @@ function bean(; center = SVector(0, 0, 0), paxis = SVector(1, 1, 1), labels = St
     return key(bean)
 end
 
-function _bean_parametrization(u, v, id, paxis, center)
-    x̂ = _sphere_parametrization(u, v, id)
+function _bean_parametrization(u, v, id, trans, rot, scal)
+    x̂ = _unit_sphere_parametrization(u, v, id)
     a = 0.8
     b = 0.8
     alpha1 = 0.3
@@ -172,30 +162,28 @@ function _bean_parametrization(u, v, id, paxis, center)
         -alpha1 * cospi(x̂[3]) + b * sqrt(1.0 - alpha2 * cospi(x̂[3])) .* x̂[2],
         x̂[3],
     )
-    return x .* paxis .+ center
+    return rot * (scal .* x) .+ trans
 end
 
 """
-    acorn(; center = SVector(0, 0, 0), radius = 1, labels = String[])
+    acorn(; translation, rotation, scaling, labels)
 
-Create a geometric entity representing an acorn shape.
-
-## Arguments
-- `center`: The center of the acorn shape. Default is `SVector(0, 0, 0)`.
-- `radius`: The radius of the acorn shape. Default is `1`.
-- `labels`: An array of labels for the acorn shape. Default is an empty array.
-
-## Returns
-The key of the created geometric entity.
-
+Create an acorn entity in 3D, and apply optional transformations. Returns the
+key.
 """
-function acorn(; center = SVector(0, 0, 0), radius = 1, labels = String[])
+function acorn(;
+    translation = SVector(0, 0, 0),
+    rotation = SVector(0, 0, 0),
+    scaling = SVector(1, 1, 1),
+    labels = String[],
+)
     lc = SVector(-1.0, -1.0)
     hc = SVector(1.0, 1.0)
     bnd = EntityKey[]
+    rot = rotation_matrix(rotation)
     for i in 1:6
         patch = parametric_surface(
-            (u, v) -> _acorn_parametrization(u, v, i, radius, center),
+            (u, v) -> _acorn_parametrization(u, v, i, translation, rot, scaling),
             lc,
             hc,
         )
@@ -208,42 +196,30 @@ function acorn(; center = SVector(0, 0, 0), radius = 1, labels = String[])
     return key(acorn)
 end
 
-function _acorn_parametrization(u, v, id, radius, center, rot)
-    Rx = @SMatrix [1 0 0; 0 cos(rot[1]) sin(rot[1]); 0 -sin(rot[1]) cos(rot[1])]
-    Ry = @SMatrix [cos(rot[2]) 0 -sin(rot[2]); 0 1 0; sin(rot[2]) 0 cos(rot[2])]
-    Rz = @SMatrix [cos(rot[3]) sin(rot[3]) 0; -sin(rot[3]) cos(rot[3]) 0; 0 0 1]
-    R = Rz * Ry * Rx
-    x = _sphere_parametrization(u, v, id)
-    th, phi, _ = cart2sph(x...)
+function _acorn_parametrization(u, v, id, trans, rot, scal)
+    x̂ = _unit_sphere_parametrization(u, v, id)
+    th, phi, _ = cart2sph(x̂...)
     r = 0.6 + sqrt(4.25 + 2 * cos(3 * (phi + pi / 2)))
-    x[1] = r .* cos(th) .* cos(phi)
-    x[2] = r .* sin(th) .* cos(phi)
-    x[3] = r .* sin(phi)
-    x = R * x
-    return radius .* x .+ center
+    x1 = r .* cos(th) .* cos(phi)
+    x2 = r .* sin(th) .* cos(phi)
+    x3 = r .* sin(phi)
+    x = SVector(x1, x2, x3)
+    return rot * (scal .* x) .+ trans
 end
 
 """
-    cushion(; center = SVector(0, 0, 0), radius = 1, labels = String[])
+    cushion(; translation, rotation, scaling, labels)
 
-Constructs a cushion shape centered at the specified `center` with the given `radius`.
-
-## Arguments
-- `center`: The center coordinates of the cushion. Default is `SVector(0, 0, 0)`.
-- `radius`: The radius of the cushion. Default is `1`.
-- `labels`: An array of labels for the cushion. Default is an empty array.
-
-## Returns
-The key of the constructed cushion.
-
+Create a cushion entity in 3D, and apply optional transformations. Returns the key.
 """
-function cushion(; center = SVector(0, 0, 0), radius = 1, labels = String[])
+function cushion(; translation, rotation, scaling, labels = String[])
     lc = SVector(-1.0, -1.0)
     hc = SVector(1.0, 1.0)
     bnd = EntityKey[]
+    rot = rotation_matrix(rotation)
     for i in 1:6
         patch = parametric_surface(
-            (u, v) -> _cushion_parametrization(u, v, i, radius, center),
+            (u, v) -> _cushion_parametrization(u, v, i, translation, rot, scaling),
             lc,
             hc,
         )
@@ -256,17 +232,10 @@ function cushion(; center = SVector(0, 0, 0), radius = 1, labels = String[])
     return key(cushion)
 end
 
-function _cushion_parametrization(u, v, id, radius, center, rot)
-    Rx = @SMatrix [1 0 0; 0 cos(rot[1]) sin(rot[1]); 0 -sin(rot[1]) cos(rot[1])]
-    Ry = @SMatrix [cos(rot[2]) 0 -sin(rot[2]); 0 1 0; sin(rot[2]) 0 cos(rot[2])]
-    Rz = @SMatrix [cos(rot[3]) sin(rot[3]) 0; -sin(rot[3]) cos(rot[3]) 0; 0 0 1]
-    R = Rz * Ry * Rx
-    x = _sphere_parametrization(u, v, id)
-    th, phi, _ = cart2sph(x...)
+function _cushion_parametrization(u, v, id, trans, rot, scal)
+    x̂ = _unit_sphere_parametrization(u, v, id)
+    th, phi, _ = cart2sph(x̂...)
     r = sqrt(0.8 + 0.5 * (cos(2 * th) - 1) .* (cos(4 * phi) - 1))
-    x[1] = r .* cos(th) .* cos(phi)
-    x[2] = r .* sin(th) .* cos(phi)
-    x[3] = r .* sin(phi)
-    x = R * x
-    return radius .* x .+ center
+    x = r * SVector(cos(th) .* cos(phi), sin(th) .* cos(phi), sin(phi))
+    return rot * (scal .* x) .+ trans
 end
