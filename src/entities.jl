@@ -305,7 +305,7 @@ end
 Return a new tag for an entity of dimension `dim` so that `EntityKey(dim, tag)`
 is not already in `ENTITIES`.
 """
-function new_tag(dim::Int)
+function new_tag(dim::Integer)
     tag = 1
     while haskey(ENTITIES, EntityKey(dim, tag))
         tag += 1
