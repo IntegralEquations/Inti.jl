@@ -173,6 +173,7 @@ for (n,shape) in enumerate(Inti.PREDEFINED_SHAPES)
       msh = Inti.meshgen(Γ; meshsize = 0.1)
       i,j = (n-1) ÷ ncols + 1, (n-1) % ncols + 1
       ax = Axis3(fig[i,j]; aspect = :data, title = shape)
+      hidedecorations!(ax)
       viz!(msh; showsegments = true)
 end
 fig # hide

@@ -154,6 +154,7 @@ x = [u; v]
 # compute the error in the projector identity
 e₊ = norm(C₊*(C₊*x) - C₊*x, Inf)
 e₋ = norm(C₋*(C₋*x) - C₋*x, Inf)
+@assert e₊ < 1e-5 && e₋ < 1e-5 # hide
 println("projection error for C₊: $e₊")
 println("projection error for C₋: $e₋")
 ```

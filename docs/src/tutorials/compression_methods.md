@@ -4,6 +4,11 @@
 CurrentModule = Inti
 ```
 
+!!! note "Important points covered in this tutorial"
+    - Overview of the compression methods available in Inti.jl
+    - Details and limitations of the various compression methods
+    - Guideline on how to choose a compression method
+
 Inti.jl wraps several external libraries providing acceleration routines for
 integral operators. In general, acceleration routines have the signature
 `assemble_*(iop, args...; kwargs...)`, and take an [`IntegralOperator`](@ref) as
