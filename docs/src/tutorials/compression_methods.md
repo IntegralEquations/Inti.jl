@@ -5,7 +5,7 @@ CurrentModule = Inti
 ```
 
 !!! note "Important points covered in this tutorial"
-    - Compressing integral operators
+    - Overview of the compression methods available in Inti.jl
     - Details and limitations of the various compression methods
     - Guideline on how to choose a compression method
 
