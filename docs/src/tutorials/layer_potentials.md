@@ -6,8 +6,7 @@ CurrentModule = Inti
 
 !!! note "Important points covered in this tutorial"
     - Nearly singular evaluation of layer potentials
-    - Creating a smooth domain with splines using [Gmsh](https://gmsh.info/)'s
-    API
+    - Creating a smooth domain with splines using [Gmsh](https://gmsh.info/)'s API
     - Plotting values on a mesh
 
 In this tutorial we focus on **evaluating** the layer potentials given a source
@@ -23,16 +22,21 @@ target points are close to the boundary (nearly-singular integrals).
 \mathcal{P}[\sigma](\boldsymbol{r}) = \int_{\Gamma} K(\boldsymbol{r}, \boldsymbol{r'}) \sigma(\boldsymbol{r'}) \, d\boldsymbol{r'}
 ```
 
-where ``K`` is the kernel of the operator, ``\Gamma`` is source the boundary,
-``\boldsymbol{r} \not \in \Gamma`` is a target point, and `σ` is the source
-density.
+where ``K`` is the kernel of the operator, ``\Gamma`` is the source's boundary,
+``\boldsymbol{r} \not \in \Gamma`` is a target point, and ``\sigma`` is the
+source density.
 
-Here is a simple example of how to create one:
+Here is a simple example of how to create a kernel representing Laplace's
+double-layer potential:
 
 ```@example layer_potentials
 using Inti, StaticArrays, LinearAlgebra
 # define a kernel function
-K = (target, source) -> 1 / norm(Inti.coords(target) - Inti.coords(source))
+function K(target,source)
+    r = Inti.coords(target) - Inti.coords(source)
+    ny = Inti.normal(source)
+    return 1 / (2π * norm(r)^2) * dot(r, ny)
+end
 # define a domain
 Γ = Inti.parametric_curve(s -> SVector(cos(2π * s), sin(2π * s)), 0, 1) |> Inti.Domain
 # and a quadrature of Γ
@@ -49,10 +53,11 @@ arbitrary point:
 u = 𝒮[σ]
 ```
 
-`u` is now an anonymous function that evaluates the layer potential at any point:g
+`u` is now an anonymous function that evaluates the layer potential at any point:
 
 ```@example layer_potentials
 r = SVector(0.1, 0.2)
+@assert u(r) ≈ -1 # hide
 u(r)
 ```
 
@@ -64,6 +69,8 @@ with a supported PDE, e.g.:
 pde = Inti.Laplace(; dim = 2)
 𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
 ```
+
+creates the single and double layer potentials for the Laplace equation in 2D.
 
 ## Direct evaluation of layer potentials
 
@@ -94,11 +101,11 @@ msh = Inti.import_mesh(; dim = 2)
 gmsh.finalize()
 ```
 
-!!! tip "Gmsh API
+!!! tip
     The GMSH API is a powerful tool to create complex geometries and meshes
-    directly from Julia, and the `gmsh_curve` function above is a simple wrapper
-    around the Gmsh API to create a smooth curve using splines. For more
-    information, see the [official
+    directly from Julia (the `gmsh_curve` function above is just a simple
+    wrapper around some spline functionality). For more information, see the
+    [official
     documentation](https://gmsh.info/doc/texinfo/gmsh.html#Gmsh-application-programming-interface).
 
 We can visualize the triangular mesh using:
@@ -134,9 +141,9 @@ representation holds:
 u(\boldsymbol{r}) = \mathcal{S}[\gamma_1 u](\boldsymbol{r}) - \mathcal{D}[\gamma_0 u](\boldsymbol{r}), \quad \boldsymbol{r} \in \Omega
 ```
 
-where `γ₀u` and `γ₁u` are the Dirichlet and Neumann traces of `u`, and
-``\mathcal{S}`` and ``\mathcal{D}`` are the single and double layer potentials
-over ``\Gamma = \partial \Omega``.
+where ``\gamma_0 u`` and ``\gamma_1 u`` are the Dirichlet and Neumann traces of
+``u``, and ``\mathcal{S}`` and ``\mathcal{D}`` are the single and double layer
+potentials over ``\Gamma := \partial \Omega``.
 
 Let's compare next the exact solution with the layer potential evaluation, based
 on a quadrature of ``\Gamma``:
