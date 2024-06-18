@@ -73,8 +73,8 @@ function _import_mesh!(msh)
         # set it to nothing.
         push_forward = nothing
         # create a new tag for the entity, possibly different from the gmsh one
-        tag = Inti.new_tag(dim)
-        gmsh2loc_ent_tags[gmsh_ent_tag] = abs(tag)
+        tag = sign(gmsh_ent_tag) * Inti.new_tag(dim)
+        gmsh2loc_ent_tags[abs(gmsh_ent_tag)] = abs(tag)
         Inti.GeometricEntity(dim, tag, bnd, labels, push_forward)
         key = Inti.EntityKey(dim, tag) # key for the entity
         _ent_to_mesh!(
