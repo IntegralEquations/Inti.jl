@@ -57,7 +57,7 @@ dependencies at once:
 
 ```@example weakdeps
 using Inti
-Inti.stack_weakdeps_env!(; verbose = false, update = false)
+Inti.stack_weakdeps_env!(; verbose = false, update = true)
 ```
 
 Note that the first time you run this command, it may take a while to download
