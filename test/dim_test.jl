@@ -2,31 +2,37 @@ using Test
 using LinearAlgebra
 using Inti
 using Random
+using StaticArrays
 
 include("test_utils.jl")
 
 Random.seed!(1)
 
+## parameters for testing
 rtol1 = 1e-2 # single and double layer
-rtol2 = 1e-1 # hypersingular (higher tolerance to avoid use of fine mesh + long unit tests)
+rtol2 = 5e-2 # hypersingular (higher tolerance to avoid use of fine mesh + long unit tests)
+dims = (2, 3)
+types = (:interior, :exterior)
 
-for N in (2, 3)
+for N in dims
     # create geometry
     Inti.clear_entities!()
     if N == 2
-        Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = 0.2)
+        Γ = Inti.parametric_curve(x -> SVector(cos(x), sin(x)), 0.0, 2π) |> Inti.Domain
+        quad = Inti.Quadrature(Γ; meshsize = 0.5, qorder = 3)
     else
-        Ω, msh = gmsh_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = 0.2)
+        # Ω, msh = gmsh_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = 0.2)
+        Ω = Inti.GeometricEntity("ellipsoid") |> Inti.Domain
+        Γ = Inti.external_boundary(Ω)
+        quad = Inti.Quadrature(Γ; meshsize = 0.5, qorder = 3)
     end
-
-    Γ    = Inti.external_boundary(Ω)
-    quad = Inti.Quadrature(view(msh, Γ); qorder = 3)
-    for t in (:interior, :exterior)
+    for t in types
         σ = t == :interior ? 1 / 2 : -1 / 2
         ops = (
             Inti.Laplace(; dim = N),
             Inti.Helmholtz(; k = 1.2, dim = N),
             Inti.Stokes(; μ = 1.2, dim = N),
+            Inti.Elastostatic(; λ = 1, μ = 1, dim = N),
         )
         for pde in ops
             @testset "Greens identity ($t) $(N)d $pde" begin

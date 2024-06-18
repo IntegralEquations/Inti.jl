@@ -59,7 +59,7 @@ function bdim_correction(
     maxdist = Inf,
     filter_target_params = nothing,
 )
-    imat_cond = imat_norm = res_norm = rhs_norm = -Inf
+    imat_cond = imat_norm = res_norm = rhs_norm = theta_norm = -Inf
     T = eltype(Sop)
     # determine type for dense matrices
     Dense = T <: SMatrix ? BlockArray : Array
@@ -141,6 +141,8 @@ function bdim_correction(
             jglob = @view qtags[:, n]
             M[1:nq, :] .= γ₀B[jglob, :]
             M[nq+1:2nq, :] .= γ₁B[jglob, :]
+            # TODO: get ride of all this transposing mumble jumble by assembling
+            # the matrix in the correct orientation in the first place
             F = qr!(transpose(Mdata))
             @debug (imat_cond = max(cond(Mdata), imat_cond)) maxlog = 0
             @debug (imat_norm = max(norm(Mdata), imat_norm)) maxlog = 0
@@ -149,13 +151,17 @@ function bdim_correction(
                 Θi .= Θ[j:j, :]
                 @debug (rhs_norm = max(rhs_norm, norm(Θidata))) maxlog = 0
                 ldiv!(Wdata, F, transpose(Θidata))
-                @debug (res_norm = max(norm(Matrix(F) * Wdata - transpose(Θi)), res_norm)) maxlog =
-                    0
+                @debug (
+                    res_norm = max(norm(Matrix(F) * Wdata - transpose(Θidata)), res_norm)
+                ) maxlog = 0
+                @debug (theta_norm = max(theta_norm, norm(Wdata))) maxlog = 0
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
-                    push!(Ss, -W[nq+k]) # single layer corresponds to α=0,β=-1
-                    push!(Ds, W[k])       # double layer corresponds to α=1,β=0
+                    # Since we actually computed the tranpose of the weights, we
+                    # need to transpose it again. This matters for e.g. elasticity
+                    push!(Ss, -transpose(W[nq+k])) # single layer corresponds to α=0,β=-1
+                    push!(Ds, transpose(W[k]))     # double layer corresponds to α=1,β=0
                 end
             end
         end
@@ -164,6 +170,7 @@ function bdim_correction(
     |-- max interp. matrix cond.: $imat_cond
     |-- max interp. matrix norm : $imat_norm
     |-- max residual error:       $res_norm
+    |-- max correction norm:      $theta_norm
     |-- max norm of source term:  $rhs_norm
     """
     δS = sparse(Is, Js, Ss, num_trgs, n)
