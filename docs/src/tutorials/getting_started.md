@@ -191,6 +191,13 @@ u = (-I / 2 + D) \ (S * g) # Dirichlet trace on boundary
 nothing # hide
 ```
 
+!!! note "Iterating over a quadrature"
+      In computing `g` above, we used `map` to evaluate the incident field at
+      all quadrature nodes. When iterating over `Q`, the iterator returns a
+      [`QuadratureNode`](@ref QuadratureNode), and not simply the *coordinate*
+      of the quadrature node. This is so that you can access additional
+      information, such as the `normal` vector, at the quadrature node.
+
 ## Integral representation and visualization
 
 Now that we know both the Dirichlet and Neumann data on the boundary, we can use

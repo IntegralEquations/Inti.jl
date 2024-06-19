@@ -198,10 +198,9 @@ end
 Base.getindex(msh::LagrangeMesh, ent::EntityKey) = getindex(msh, Domain(ent))
 
 """
-    meshgen(Ω::Domain, n)
-    meshgen(Ω::Domain, n_dict)
-    meshgen(Ω::Domain; meshsize)
-
+    meshgen(Ω, n)
+    meshgen(Ω, n_dict)
+    meshgen(Ω; meshsize)
 
 Generate a `LagrangeMesh` for the domain `Ω` where each curve is meshed using
 `n` elements. Passing a dictionary allows for a finer control; in such cases,
@@ -230,6 +229,8 @@ function meshgen(Ω::Domain, args...; kwargs...)
     meshgen!(mesh, Ω, args...; kwargs...)
     return mesh
 end
+
+meshgen(e::EntityKey, args...; kwargs...) = meshgen(Domain(e), args...; kwargs...)
 
 """
     meshgen!(mesh,Ω,sz)
