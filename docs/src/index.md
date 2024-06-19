@@ -33,7 +33,7 @@ efficiency, the package currently supports the following features:
 Download of Julia from [julialang.org](https://julialang.org/downloads/), or use
 [juliaup](https://github.com/JuliaLang/juliaup) installer. We recommend using
 the latest stable version of Julia, although `Inti.jl` should work with
-`>=v1.6`.
+`>=v1.9`.
 
 ## Installing Inti.jl
 
