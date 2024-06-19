@@ -34,6 +34,13 @@ end
 Domain(f::Function, Ω::Domain) = Domain(f, keys(Ω))
 Domain(ents::AbstractVector{EntityKey}) = Domain(Set(ents))
 
+"""
+    entities(Ω::Domain)
+
+Return all entities making up a domain (as a set of [`EntityKey`](@ref)s).
+"""
+entities(Ω::Domain) = Ω.keys
+
 Base.keys(Ω::Domain) = Ω.keys
 
 # helper function to get all keys in a domain recursively
@@ -48,13 +55,6 @@ function _all_keys!(k, Ω::Domain)
     _all_keys!(k, skeleton(Ω))
     return k
 end
-
-"""
-    entities(Ω::Domain)
-
-Return all entities making up a domain.
-"""
-entities(Ω::Domain) = (global_get_entity(k) for k in Ω.keys)
 
 function Base.show(io::IO, d::Domain)
     kk = keys(d)

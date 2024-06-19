@@ -101,7 +101,17 @@ function elements(msh::AbstractMesh)
     return Iterators.flatten(elements(msh, E) for E in element_types(msh))
 end
 
-nodes(msh::LagrangeMesh)     = msh.nodes
+nodes(msh::LagrangeMesh) = msh.nodes
+
+"""
+    ent2etags(msh::LagrangeMesh)
+    ent2etags(msh::SubMesh)
+
+Return a dictionary mapping entities to a dictionary of element types to element
+tags.
+
+For a `SubMesh`, the tags are relative to the parent mesh.
+"""
 ent2etags(msh::LagrangeMesh) = msh.ent2etags
 etype2mat(msh::LagrangeMesh) = msh.etype2mat
 etype2els(msh::LagrangeMesh) = msh.etype2els
@@ -139,7 +149,7 @@ Compute the element indices `idxs` of the elements of type `E` composing `Ω`.
 function dom2elt(m::AbstractMesh, Ω::Domain, E::DataType)
     idxs = Int[]
     for k in keys(Ω)
-        tags = get(m.ent2etags[k], E, Int[])
+        tags = get(ent2etags(m)[k], E, Int[])
         append!(idxs, tags)
     end
     return idxs
@@ -482,10 +492,13 @@ struct SubMesh{N,T} <: AbstractMesh{N,T}
         return new{N,T}(mesh, Ω, etype2etags)
     end
 end
+
 Base.view(m::LagrangeMesh, Ω::Domain) = SubMesh(m, Ω)
 Base.view(m::LagrangeMesh, ent::EntityKey) = SubMesh(m, Domain(ent))
 
 Base.collect(msh::SubMesh) = msh.parent[msh.domain]
+
+Base.parent(msh::SubMesh) = msh.parent
 
 ambient_dimension(::SubMesh{N}) where {N} = N
 
@@ -493,6 +506,8 @@ geometric_dimension(msh::AbstractMesh) = geometric_dimension(domain(msh))
 
 domain(msh::SubMesh) = msh.domain
 entities(msh::SubMesh) = entities(domain(msh))
+
+ent2etags(msh::SubMesh) = ent2etags(parent(msh))
 
 element_types(msh::SubMesh) = keys(msh.etype2etags)
 
@@ -512,7 +527,7 @@ Return the tags of the nodes in the parent mesh belonging to the submesh.
 function nodetags(msh::SubMesh)
     tags = Int[]
     for ent in entities(msh)
-        append!(tags, ent2nodetags(msh, key(ent)))
+        append!(tags, ent2nodetags(msh, ent))
     end
     return unique!(tags)
 end

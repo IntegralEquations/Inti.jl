@@ -61,8 +61,7 @@ function ellipsoid(;
     dim = 3
     tag = new_tag(dim)
     pushforward = nothing
-    ellipsoid = GeometricEntity(dim, tag, bnd, labels, pushforward)
-    return key(ellipsoid)
+    return GeometricEntity(dim, tag, bnd, labels, pushforward)
 end
 
 function _ellipsoid_parametrization(u, v, id, trans, rot, scal)
@@ -116,8 +115,7 @@ function torus(;
     dim = 3
     tag = new_tag(dim)
     pushforward = nothing
-    torus = GeometricEntity(dim, tag, bnd, labels, pushforward)
-    return key(torus)
+    return GeometricEntity(dim, tag, bnd, labels, pushforward)
 end
 
 """
@@ -146,8 +144,7 @@ function bean(;
     dim = 3
     tag = new_tag(dim)
     pushforward = nothing
-    bean = GeometricEntity(dim, tag, bnd, labels, pushforward)
-    return key(bean)
+    return GeometricEntity(dim, tag, bnd, labels, pushforward)
 end
 
 function _bean_parametrization(u, v, id, trans, rot, scal)
@@ -192,8 +189,7 @@ function acorn(;
     dim = 3
     tag = new_tag(dim)
     pushforward = nothing
-    acorn = GeometricEntity(dim, tag, bnd, labels, pushforward)
-    return key(acorn)
+    return GeometricEntity(dim, tag, bnd, labels, pushforward)
 end
 
 function _acorn_parametrization(u, v, id, trans, rot, scal)
@@ -228,8 +224,7 @@ function cushion(; translation, rotation, scaling, labels = String[])
     dim = 3
     tag = new_tag(dim)
     pushforward = nothing
-    cushion = GeometricEntity(dim, tag, bnd, labels, pushforward)
-    return key(cushion)
+    return GeometricEntity(dim, tag, bnd, labels, pushforward)
 end
 
 function _cushion_parametrization(u, v, id, trans, rot, scal)
