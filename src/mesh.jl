@@ -104,13 +104,10 @@ end
 nodes(msh::LagrangeMesh) = msh.nodes
 
 """
-    ent2etags(msh::LagrangeMesh)
-    ent2etags(msh::SubMesh)
+    ent2etags(msh::AbstractMesh)
 
 Return a dictionary mapping entities to a dictionary of element types to element
 tags.
-
-For a `SubMesh`, the tags are relative to the parent mesh.
 """
 ent2etags(msh::LagrangeMesh) = msh.ent2etags
 etype2mat(msh::LagrangeMesh) = msh.etype2mat
@@ -508,7 +505,24 @@ geometric_dimension(msh::AbstractMesh) = geometric_dimension(domain(msh))
 domain(msh::SubMesh) = msh.domain
 entities(msh::SubMesh) = entities(domain(msh))
 
-ent2etags(msh::SubMesh) = ent2etags(parent(msh))
+function ent2etags(msh::SubMesh)
+    par_ent2etags = ent2etags(parent(msh))
+    g2l = Dict{Int,Int}() # global (parent) to local element index
+    for (E, tags) in msh.etype2etags
+        for (iloc, iglob) in enumerate(tags)
+            g2l[iglob] = iloc
+        end
+    end
+    new_ent2etags = empty(par_ent2etags)
+    for ent in entities(msh)
+        par_etags = par_ent2etags[ent]
+        new_ent2etags[ent] = etags = empty(par_etags)
+        for (E, tags) in par_etags
+            etags[E] = [g2l[t] for t in tags]
+        end
+    end
+    return new_ent2etags
+end
 
 element_types(msh::SubMesh) = keys(msh.etype2etags)
 
