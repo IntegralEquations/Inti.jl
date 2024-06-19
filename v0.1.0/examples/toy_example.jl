@@ -4,7 +4,7 @@ docsdir = joinpath(@__DIR__, "../..") #src
 Pkg.activate(docsdir)                 #src
 
 #nb ## Environment setup
-#nb const DEPENDENCIES = ["GLMakie"];
+#nb const DEPENDENCIES = [];
 #nb ## __NOTEBOOK_SETUP__
 
 # # Toy example
