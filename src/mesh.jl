@@ -101,7 +101,14 @@ function elements(msh::AbstractMesh)
     return Iterators.flatten(elements(msh, E) for E in element_types(msh))
 end
 
-nodes(msh::LagrangeMesh)     = msh.nodes
+nodes(msh::LagrangeMesh) = msh.nodes
+
+"""
+    ent2etags(msh::AbstractMesh)
+
+Return a dictionary mapping entities to a dictionary of element types to element
+tags.
+"""
 ent2etags(msh::LagrangeMesh) = msh.ent2etags
 etype2mat(msh::LagrangeMesh) = msh.etype2mat
 etype2els(msh::LagrangeMesh) = msh.etype2els
@@ -139,7 +146,7 @@ Compute the element indices `idxs` of the elements of type `E` composing `Ω`.
 function dom2elt(m::AbstractMesh, Ω::Domain, E::DataType)
     idxs = Int[]
     for k in keys(Ω)
-        tags = get(m.ent2etags[k], E, Int[])
+        tags = get(ent2etags(m)[k], E, Int[])
         append!(idxs, tags)
     end
     return idxs
@@ -188,10 +195,9 @@ end
 Base.getindex(msh::LagrangeMesh, ent::EntityKey) = getindex(msh, Domain(ent))
 
 """
-    meshgen(Ω::Domain, n)
-    meshgen(Ω::Domain, n_dict)
-    meshgen(Ω::Domain; meshsize)
-
+    meshgen(Ω, n)
+    meshgen(Ω, n_dict)
+    meshgen(Ω; meshsize)
 
 Generate a `LagrangeMesh` for the domain `Ω` where each curve is meshed using
 `n` elements. Passing a dictionary allows for a finer control; in such cases,
@@ -220,6 +226,8 @@ function meshgen(Ω::Domain, args...; kwargs...)
     meshgen!(mesh, Ω, args...; kwargs...)
     return mesh
 end
+
+meshgen(e::EntityKey, args...; kwargs...) = meshgen(Domain(e), args...; kwargs...)
 
 """
     meshgen!(mesh,Ω,sz)
@@ -482,10 +490,13 @@ struct SubMesh{N,T} <: AbstractMesh{N,T}
         return new{N,T}(mesh, Ω, etype2etags)
     end
 end
+
 Base.view(m::LagrangeMesh, Ω::Domain) = SubMesh(m, Ω)
 Base.view(m::LagrangeMesh, ent::EntityKey) = SubMesh(m, Domain(ent))
 
 Base.collect(msh::SubMesh) = msh.parent[msh.domain]
+
+Base.parent(msh::SubMesh) = msh.parent
 
 ambient_dimension(::SubMesh{N}) where {N} = N
 
@@ -493,6 +504,25 @@ geometric_dimension(msh::AbstractMesh) = geometric_dimension(domain(msh))
 
 domain(msh::SubMesh) = msh.domain
 entities(msh::SubMesh) = entities(domain(msh))
+
+function ent2etags(msh::SubMesh)
+    par_ent2etags = ent2etags(parent(msh))
+    g2l = Dict{Int,Int}() # global (parent) to local element index
+    for (E, tags) in msh.etype2etags
+        for (iloc, iglob) in enumerate(tags)
+            g2l[iglob] = iloc
+        end
+    end
+    new_ent2etags = empty(par_ent2etags)
+    for ent in entities(msh)
+        par_etags = par_ent2etags[ent]
+        new_ent2etags[ent] = etags = empty(par_etags)
+        for (E, tags) in par_etags
+            etags[E] = [g2l[t] for t in tags]
+        end
+    end
+    return new_ent2etags
+end
 
 element_types(msh::SubMesh) = keys(msh.etype2etags)
 
@@ -512,7 +542,7 @@ Return the tags of the nodes in the parent mesh belonging to the submesh.
 function nodetags(msh::SubMesh)
     tags = Int[]
     for ent in entities(msh)
-        append!(tags, ent2nodetags(msh, key(ent)))
+        append!(tags, ent2nodetags(msh, ent))
     end
     return unique!(tags)
 end

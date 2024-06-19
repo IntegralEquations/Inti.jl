@@ -19,14 +19,14 @@ tag(k::EntityKey) = k.tag
 Base.hash(ent::EntityKey, h::UInt) = hash((ent.dim, abs(ent.tag)), h)
 Base.:(==)(e1::EntityKey, e2::EntityKey) = e1.dim == e2.dim && abs(e1.tag) == abs(e2.tag)
 
-labels(e::EntityKey) = labels(global_get_entity(e))
-boundary(e::EntityKey) = boundary(global_get_entity(e))
-pushforward(e::EntityKey) = pushforward(global_get_entity(e))
+# defer some functions on EntityKey to the corresponding GeometricEntity
+for f in (:labels, :boundary, :pushforward, :ambient_dimension)
+    @eval $f(k::EntityKey) = $f(global_get_entity(k))
+end
 
 function (k::EntityKey)(x)
-    ent = global_get_entity(k)
-    hasparametrization(ent) || error("entity $(key(ent)) has no parametrization")
-    f = parametrization(ent)
+    hasparametrization(k) || error("$k has no parametrization")
+    f = parametrization(k)
     s = tag(k) < 0 ? 1 - x : x
     return f(s)
 end
@@ -40,14 +40,19 @@ end
 """
     struct GeometricEntity
 
-Used to represent geometrical objects such as lines, surfaces, and volumes.
+Geometrical objects such as lines, surfaces, and volumes.
 
 Geometrical entities are stored in a global [`ENTITIES`](@ref) dictionary
-mapping [`EntityKey`](@ref) to the corresponding `GeometricEntity`.
+mapping [`EntityKey`](@ref) to the corresponding `GeometricEntity`, and usually
+entities are manipulated through their keys.
 
 A `GeometricEntity` can also contain a `pushforward` field used to
 parametrically represent the entry as the image of a reference domain
 (`pushforward.domain`) under some function (`pushforward.parametrization`).
+
+Note that entities are manipulated through their keys, and the `GeometricEntity`
+constructor returns the key of the created entity; to retrieve the entity, use
+the [`global_get_entity`](@ref) function.
 """
 struct GeometricEntity
     dim::Integer
@@ -65,7 +70,7 @@ struct GeometricEntity
         # ensure the (d,t) pair is a UUID for an entity, and to easily retrieve
         # different entities.
         global_add_entity!(ent)
-        return ent
+        return key(ent)
     end
 end
 
@@ -163,8 +168,7 @@ function line(a, b)
     a, b = SVector(a), SVector(b)
     f = (u) -> a + u[1] * (b - a)
     d = HyperRectangle(SVector(0.0), SVector(1.0))
-    ent = GeometricEntity(; domain = d, parametrization = f)
-    return key(ent)
+    return GeometricEntity(; domain = d, parametrization = f)
 end
 
 """
@@ -177,8 +181,7 @@ function parametric_curve(f::F, a::Real, b::Real; kwargs...) where {F}
     flip = a > b
     d = HyperRectangle(SVector(float(a)), SVector(float(b)))
     parametrization = flip ? x -> f(b + a - x[1]) : x -> f(x[1])
-    ent = GeometricEntity(; domain = d, parametrization, kwargs...)
-    return key(ent)
+    return GeometricEntity(; domain = d, parametrization, kwargs...)
 end
 
 # https://www.ljll.fr/perronnet/transfini/transfini.html
@@ -212,13 +215,12 @@ function transfinite_square(k1::T, k2::T, k3::T, k4::T; kwargs...) where {T<:Ent
     # create a closure and compute the parametrization
     f2d = _transfinite_square(c1, c2, c3, c4)
     d = HyperRectangle(SVector(0.0, 0.0), SVector(1.0, 1.0))
-    ent = GeometricEntity(;
+    return GeometricEntity(;
         domain = d,
         parametrization = f2d,
         boundary = [k1, k2, k3, k4],
         kwargs...,
     )
-    return key(ent)
 end
 
 function _transfinite_square(c1, c2, c3, c4)
@@ -262,13 +264,12 @@ function parametric_surface(f, lc, hc, boundary = nothing; kwargs...)
     l3 = parametric_curve(x -> f(x, hc[2]), hc[1], lc[1])
     l4 = parametric_curve(x -> f(lc[1], x), hc[2], lc[2])
     d = HyperRectangle(SVector(lc), SVector(hc))
-    ent = GeometricEntity(;
+    return GeometricEntity(;
         domain = d,
         parametrization = x -> f(x[1], x[2]),
         boundary = isnothing(boundary) ? [l1, l2, l3, l4] : boundary,
         kwargs...,
     )
-    return key(ent)
 end
 
 """

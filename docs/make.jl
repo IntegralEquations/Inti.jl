@@ -99,9 +99,9 @@ makedocs(;
         "Examples" => [
             "examples/generated/toy_example.md",
             "examples/generated/helmholtz_scattering.md",
-            "examples/generated/lippmann_schwinger.md",
-            "examples/generated/poisson.md",
-            "examples/generated/stokes_drag.md",
+            # "examples/generated/lippmann_schwinger.md",
+            # "examples/generated/poisson.md",
+            # "examples/generated/stokes_drag.md",
         ],
         "References" => "references.md",
         "Docstrings" => "docstrings.md",
