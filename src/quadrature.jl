@@ -279,6 +279,62 @@ function _etype_to_nearest_points(X, Y::Quadrature, maxdist)
 end
 
 """
+    etype_to_nearest_elements(X,Y::Quadrature; tol)
+
+Return `Nl = [[el in Y.mesh && dist(x, el) ≤ tol] for x in X]`
+"""
+function etype_to_near_elements(X,Y::Quadrature; tol)
+    y = [coords(q) for q in Y]
+    tree = BallTree(y)
+    etype2nearlist = Dict{DataType,Vector{Set{Int}}}()
+    for (E, Q) in Y.etype2qtags
+        P, _ = size(Q)
+        etype2nearlist[E] = source2el = [Set{Int}() for _ in 1:length(X)]
+        for (l, x) in enumerate(X)
+            for q in inrange(tree, x, tol)
+                push!(source2el[l], ceil(Int, q/P))
+            end
+        end
+    end
+    return etype2nearlist
+end
+
+"""
+    etype_to_nearest_elements(Y::Quadrature; tol)
+
+Return `Nl = [[el_j in Y.mesh && dist(el_j, el_i) ≤ tol] for el_i in Y.mesh]`
+"""
+function etype_to_near_elements(Y::Quadrature; tol)
+    y = [coords(q) for q in Y]
+    tree = BallTree(y)
+    etype2nearlist = Dict{DataType,Vector{Set{Int}}}()
+    for (E, Q) in Y.etype2qtags
+        P, N = size(Q)
+        etype2nearlist[E] = el2el = [Set{Int}() for _ in 1:N]
+        for n in 1:N
+            for i in 1:P
+                for q in inrange(tree, coords(qnodes(Y)[Q[i,n]]), tol)
+                    push!(el2el[n], ceil(Int, q/P))
+                end    
+            end
+        end
+    end
+    return etype2nearlist
+end
+
+# function _geometric_center_circum_radius(Y::Quadrature, E, Q, P, N)
+#     C = [(sum(1:P) do i
+#             coords(qnodes(Y)[Q[i,n]]) .* weight(qnodes(Y)[Q[i,n]])
+#           end) /
+#          (sum(1:P) do i
+#             weight(qnodes(Y)[Q[i,n]])
+#           end) for n in 1:N]
+#     r = [maximum(i->norm(C[n]-nodes(mesh(Y))[i]), connectivity(mesh(Y), E)[:,n]) for n in 1:N]
+#     return C, r
+# end
+
+
+"""
     quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
 
 Given a vector `qvals` of scalar values at the quadrature nodes of `Q`, return a

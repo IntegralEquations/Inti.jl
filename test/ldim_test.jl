@@ -10,7 +10,7 @@ Random.seed!(1)
 
 N = 2
 t = :interior
-pde = Inti.Stokes(; dim = N, μ=1.2)
+pde = Inti.Laplace(; dim = N)
 
 K = 5:5
 H = [0.2*2.0^(-i) for i in 0:0]
