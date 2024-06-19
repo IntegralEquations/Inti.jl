@@ -371,7 +371,7 @@ fig
     In the example above we employed a naive evaluation of the integral
     potentials, and therefore the computed solution is expected to become
     innacurate near the obstacles. See the [layer potential tutorial](@ref
-    "Layer potential") for more information on how to correct for this.
+    "Layer potentials") for more information on how to correct for this.
 
 =#
 
