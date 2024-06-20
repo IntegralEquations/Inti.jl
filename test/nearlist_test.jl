@@ -18,7 +18,7 @@ Inti.clear_entities!()
 Γ = Inti.external_boundary(Ω)
 quad = Inti.Quadrature(msh[Γ]; qorder = 3)
 
-Nl = Inti.etype_to_near_elements(quad;tol=1)
+Nl = Inti.etype_to_near_elements(quad;tol=0.01)
 fig, _, _ = viz(msh;showsegments = false,alpha=0.3)
 
 for (E, nl) in Nl

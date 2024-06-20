@@ -288,11 +288,19 @@ function etype_to_near_elements(X,Y::Quadrature; tol)
     tree = BallTree(y)
     etype2nearlist = Dict{DataType,Vector{Set{Int}}}()
     for (E, Q) in Y.etype2qtags
-        P, _ = size(Q)
+        P, N = size(Q)
         etype2nearlist[E] = source2el = [Set{Int}() for _ in 1:length(X)]
+        quad2source = [Set{Int}() for _ in 1:length(y)]
         for (l, x) in enumerate(X)
             for q in inrange(tree, x, tol)
-                push!(source2el[l], ceil(Int, q/P))
+                push!(quad2source[q], l)
+            end
+        end
+        for n in 1:N
+            for i in 1:P
+                for l in quad2source[Q[i,n]]
+                    push!(source2el[l], n)
+                end
             end
         end
     end
@@ -311,11 +319,19 @@ function etype_to_near_elements(Y::Quadrature; tol)
     for (E, Q) in Y.etype2qtags
         P, N = size(Q)
         etype2nearlist[E] = el2el = [Set{Int}() for _ in 1:N]
+        quad2el = [Set{Int}() for _ in 1:length(y)]
         for n in 1:N
             for i in 1:P
                 for q in inrange(tree, coords(qnodes(Y)[Q[i,n]]), tol)
-                    push!(el2el[n], ceil(Int, q/P))
+                    push!(quad2el[q], n)
                 end    
+            end
+        end
+        for n in 1:N
+            for i in 1:P
+                for m in quad2el[Q[i,n]]
+                    push!(el2el[n], m)
+                end
             end
         end
     end
