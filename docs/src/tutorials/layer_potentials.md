@@ -26,7 +26,7 @@ where ``K`` is the kernel of the operator, ``\Gamma`` is the source's boundary,
 ``\boldsymbol{r} \not \in \Gamma`` is a target point, and ``\sigma`` is the
 source density.
 
-Here is a simple example of how to create a kernel representing Laplace's
+Here is a simple example of how to create a kernel representing a Laplace
 double-layer potential:
 
 ```@example layer_potentials
@@ -44,8 +44,8 @@ Q = Inti.Quadrature(Γ; meshsize = 0.1, qorder = 5)
 𝒮 = Inti.IntegralPotential(K, Q)
 ```
 
-If you have a source density ``\sigma``, defined on the quadrature nodes of
-``\Gamma``, you can create a function that evaluates the layer potential at an
+If we have a source density ``\sigma``, defined on the quadrature nodes of
+``\Gamma``, we can create a function that evaluates the layer potential at an
 arbitrary point:
 
 ```@example layer_potentials
@@ -141,9 +141,9 @@ representation holds:
 u(\boldsymbol{r}) = \mathcal{S}[\gamma_1 u](\boldsymbol{r}) - \mathcal{D}[\gamma_0 u](\boldsymbol{r}), \quad \boldsymbol{r} \in \Omega
 ```
 
-where ``\gamma_0 u`` and ``\gamma_1 u`` are the Dirichlet and Neumann traces of
-``u``, and ``\mathcal{S}`` and ``\mathcal{D}`` are the single and double layer
-potentials over ``\Gamma := \partial \Omega``.
+where ``\gamma_0 u`` and ``\gamma_1 u`` are the respective Dirichlet and
+Neumann traces of ``u``, and ``\mathcal{S}`` and ``\mathcal{D}`` are the respective
+single and double layer potentials over ``\Gamma := \partial \Omega``.
 
 Let's compare next the exact solution with the layer potential evaluation, based
 on a quadrature of ``\Gamma``:
@@ -185,10 +185,11 @@ recommended:
 2. When you wish to evaluate the layer potential at many target points and take
    advantage of an acceleration routine.
 
-In such cases, it is recommended to use the `single_double_layer` function, (or
-to directly assemble an `IntegralOperator`) with a correction method. Here is an
-example of how to use the FMM acceleration with a near-field correction to
-evaluate the layer potentials::
+In such cases, it is recommended to use the `single_double_layer` function
+(alternately, one can directly assemble an `IntegralOperator`) with a
+correction and/or compression method as appropriate. Here is an example of how
+to use the FMM acceleration with a near-field correction to evaluate the layer
+potentials::
 
 ```@example layer_potentials
 using FMM2D

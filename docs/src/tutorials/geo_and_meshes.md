@@ -28,7 +28,7 @@ function that maps points from a [`ReferenceShape`](@ref) to the physical space.
 In most applications involving complex three-dimensional surfaces, an external
 meshing software is used to generate a mesh, and the mesh is imported using the
 `import_mesh` function (which relies on [Gmsh](https://gmsh.info)). The entities
-can then the extracted from the mesh based on e.g. their dimension or label.
+can then be extracted from the mesh based on e.g. their dimension or label.
 Here is an example of how to import a mesh from a file:
 
 ```@example geo-and-meshes
@@ -54,7 +54,7 @@ nothing # hide
 ```
 
 You can filter entities satisfying a certain condition, e.g., entities of a
-given dimension of containing a certain label, in order to construct a domain:
+given dimension or containing a certain label, in order to construct a domain:
 
 ```@example geo-and-meshes
 filter = e -> Inti.geometric_dimension(e) == 3
@@ -213,7 +213,7 @@ including the boundary segments:
 Inti.entities(msh)
 ```
 
-This allows you into the `msh` object to extract e.g. the boundary mesh:
+This allows you to probe the `msh` object to extract e.g. the boundary mesh:
 
 ```@example geo-and-meshes
 viz(msh[Inti.boundary(Ω)]; color = :red)

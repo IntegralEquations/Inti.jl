@@ -101,7 +101,7 @@ Q[1]
 
 In the constructor above we specified a quadrature order of 5, and Inti.jl
 internally picked a [`ReferenceQuadrature`](@ref) suitable for the specified
-order; for a finer control, you can also specify a quadrature rule directly.
+order; for finer control, you can also specify a quadrature rule directly.
 
 ## Integral operators
 
@@ -167,9 +167,10 @@ equation. For that, we need to provide the boundary data ``g``.
 We are interested in the scattered field ``u`` produced by an incident plane
 wave ``u_i = e^{i k \boldsymbol{d} \cdot \boldsymbol{x}}``, where
 ``\boldsymbol{d}`` is a unit vector denoting the direction of the plane wave.
-Assuming that the total field ``u_t = u_i + u`` satisfies a homogenous Neumann
-condition on ``\Gamma``, and that the scattered field ``u`` satisfies the
-Sommerfeld radiation condition, we can write the boundary condition as:
+Assuming that the total field ``u_t = u_i + u``, unique up to a constant,
+satisfies a homogenous Neumann condition on ``\Gamma``, and that the scattered
+field ``u`` satisfies the Sommerfeld radiation condition, we can write the
+boundary condition as:
 
 ```math
     \partial_\nu u = -\partial_\nu u_i, \quad \boldsymbol{x} \in \Gamma.

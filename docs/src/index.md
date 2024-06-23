@@ -37,15 +37,20 @@ the latest stable version of Julia, although `Inti.jl` should work with
 
 ## Installing Inti.jl
 
-Inti.jl is not yet registered in the Julia General registry. You can install it
-by launching a Julia REPL and typing the following command:
+Inti.jl is registered in the Julia General registry and can be installed by 
+launching a Julia REPL and typing the following command:
+
+```julia
+]add Inti
+```
+
+Alternatively, you can install the latest version of Inti.jl from the `main` branch using:
 
 ```julia
 using Pkg; Pkg.add(;url = "https://github.com/IntegralEquations/Inti.jl", rev = "main")
 ```
 
-This will download and install the latest version of Inti.jl from the `main`
-branch. Change `rev` if you need a different branch or a specific commit hash.
+Change `rev` if you need a different branch or a specific commit hash.
 
 ## Installing weak dependencies
 
