@@ -23,7 +23,7 @@ of the operator. The following methods are available:
   [`HMatrices`](https://github.com/IntegralEquations/HMatrices.jl) library.
 - [`assemble_fmm`](@ref): return a `LinearMap` object that represents the
   operator using the fast multipole method. This method is powered by the
-  [`FMM2D`](https://github.com/flatironinstitute/fmm2d/) and
+  [`FMM2D`](https://github.com/flatironinstitute/fmm2d/), [`FMMLIB2D`](https://github.com/zgimbutas/fmmlib2d) and
   [`FMM3D`](https://fmm3d.readthedocs.io) libraries, and is only available for
   certain kernels.
 
@@ -98,7 +98,7 @@ println("Forward map error: $er")
 
 Note that `HMatrices` are said to be *kernel-independent*, meaning that they
 efficiently compress a wide range of integral operators provided they satisfy a
-certain asymptotically smooth criterion (see e.g. [bebendorf2008hierarchical,
+certain asymptotic smoothness criterion (see e.g. [bebendorf2008hierarchical,
 hackbusch2015hierarchical](@cite)).
 
 The `HMatrix` object can be used to solve linear systems, both iteratively

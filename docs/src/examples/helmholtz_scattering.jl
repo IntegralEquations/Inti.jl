@@ -56,7 +56,7 @@ Pkg.activate(docsdir)                 #src
 # and the *Sommerfeld radiation condition* at infinity
 
 # ```math
-#     \lim_{|\boldsymbol{x}| \to \infty} \|\boldsymbol{x}|^{(d-1)/2} \left( \frac{\partial u}{\partial |\boldsymbol{x}|} - i k u \right) = 0.
+#     \lim_{|\boldsymbol{x}| \to \infty} |\boldsymbol{x}|^{(d-1)/2} \left( \frac{\partial u}{\partial |\boldsymbol{x}|} - i k u \right) = 0.
 # ```
 
 # Here ``g`` is a (given) boundary datum, and ``k`` is the constant wavenumber.
