@@ -29,9 +29,9 @@ using LinearAlgebra
 using Gmsh
 
 # parameters
-μ = 2.0
-R = 2.0
-v = 2.0
+μ = 5.0
+R = 4.0
+v = 1.0
 
 # create a sphere using gmsh
 msh_file = joinpath(tempdir(), "stokes-drag.msh")
