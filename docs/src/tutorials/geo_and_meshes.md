@@ -46,15 +46,16 @@ Inti.element_types(msh)
 ```
 
 Note that the `msh` object contains all entities used to construct the mesh,
-usually defined in a `.geo` file, and you can extract them using the `entities`:
+usually defined in a `.geo` file, which can be extracted using the `entities`:
 
 ```@example geo-and-meshes
 ents = Inti.entities(msh)
 nothing # hide
 ```
 
-You can filter entities satisfying a certain condition, e.g., entities of a
-given dimension or containing a certain label, in order to construct a domain:
+Filtering of entities satisfying a certain condition, e.g., entities of a given
+dimension or containing a certain label, can also be performed in order to
+construct a domain:
 
 ```@example geo-and-meshes
 filter = e -> Inti.geometric_dimension(e) == 3
@@ -75,7 +76,7 @@ or a [`SubMesh`](@ref) containing a view of the mesh:
 Γ_msh = view(msh, Γ)
 ```
 
-Finally, you can visualize the mesh using:
+Finally, we can visualize the mesh using:
 
 ```@example geo-and-meshes
 using Meshes, GLMakie
@@ -184,7 +185,7 @@ See [`GeometricEntity(shape::String)`](@ref) for a list of predefined geometries
 !!! warning "Mesh quality"
       The quality of the generated mesh created through `meshgen` depends
       heavily on the quality of the underlying parametrization. For surfaces
-      containing a degenerate parametrization, or for complex shapes, you are
+      containing a degenerate parametrization, or for complex shapes, one is
       better off using a suitable CAD (Computer-Aided Design) software in
       conjunction with a mesh generator.
 
@@ -213,7 +214,7 @@ including the boundary segments:
 Inti.entities(msh)
 ```
 
-This allows you to probe the `msh` object to extract e.g. the boundary mesh:
+This allows us to probe the `msh` object to extract e.g. the boundary mesh:
 
 ```@example geo-and-meshes
 viz(msh[Inti.boundary(Ω)]; color = :red)
@@ -243,12 +244,12 @@ fig # hide
 ```
 
 This example shows how to extract the centers of the tetrahedral elements in the
-mesh; and of course you can perform any computation you like on the elements.
+mesh; and of course we can perform any desired computation on the elements.
 
 !!! tip "Type-stable iteration over elements"
       Since a mesh in Inti.jl can contain elements of various types, the
       `elements` function above is not type-stable. For a type-stable iterator
-      approach, you should first iterate over the element types using
+      approach, one should first iterate over the element types using
       [`element_types`](@ref), and then use `elements(msh, E)` to iterate over a
       specific element type `E`.
 
@@ -261,5 +262,5 @@ x̂ = SVector(1/3,1/3, 1/3)
 el(x̂)
 ```
 
-Likewise, you can compute the [`jacobian`](@ref) of the element, or its
+Likewise, we can compute the [`jacobian`](@ref) of the element, or its
 [`normal`](@ref) at a given parametric coordinate.

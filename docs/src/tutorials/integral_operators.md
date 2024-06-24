@@ -169,12 +169,12 @@ formulation with an operator preconditioner.
 So far we have focused on problems for which Inti.jl provides predefined
 kernels, and used the high-level syntax of e.g. `single_double_layer` to
 construct the integral operators. We will now dig into the details of how to set
-up your own kernel function, and how to build an integral operator from it.
+up a custom kernel function, and how to build an integral operator from it.
 
 !!! note "Integral operators coming from PDEs"
-    If your integral operator arises from a PDE, it is recommended to define a
-    new [`AbstractPDE`](@ref) type, and implement the required methods for
-    [`SingleLayerKernel`](@ref), [`DoubleLayerKernel`](@ref),
+    If the integral operator of interest arises from a PDE, it is recommended
+    to define a new [`AbstractPDE`](@ref) type, and implement the required
+    methods for [`SingleLayerKernel`](@ref), [`DoubleLayerKernel`](@ref),
     [`AdjointDoubleLayerKernel`](@ref), and [`HyperSingularKernel`](@ref). This
     will enable the use of the high-level syntax for constructing boundary
     integral operators, as well as the use of the compression and correction
@@ -250,8 +250,8 @@ The correction matrix `δS` will be constructed using [`adaptive_correction`](@r
 δS = Inti.adaptive_correction(Sop; tol = 1e-4, maxdist = 5*meshsize)
 ```
 
-How exactly you add `S₀` and `δS` to get the final operator depends on the usage
-that you have in mind. For instance, you can use the `LinearMap` type to simply
+How exactly one adds `S₀` and `δS` to get the final operator depends on the intended
+usage. For instance, one can use the `LinearMap` type to simply
 add them lazily:
 
 ```@example integral_operators
@@ -259,19 +259,19 @@ using LinearMaps
 S = LinearMap(S₀) + LinearMap(δS)
 ```
 
-You can add `δS` to `S₀` to create a new object:
+Or, one can add `δS` to `S₀` to create a new object:
 
 ```@example integral_operators
 S = S₀ + δS
 ```
 
-or if performance/memory is a concern, you may want to directly add `δS` to `S₀` in-place:
+or if performance/memory is a concern, one may want to directly add `δS` to `S₀` in-place:
 
 ```@example integral_operators
 axpy!(1.0, δS, S₀)
 ```
 
-All of these should give an identical matrix-vector product, but the later two
+All of these should give an identical matrix-vector product, but the latter two
 allow e.g. for the use of direct solvers though an LU factorization.
 
 !!! warning "Limitations"

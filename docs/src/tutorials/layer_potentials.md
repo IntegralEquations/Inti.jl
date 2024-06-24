@@ -12,7 +12,7 @@ CurrentModule = Inti
 In this tutorial we focus on **evaluating** the layer potentials given a source
 density. This is a common post-processing task in boundary integral equation
 methods, and while most of it is straightforward, some subtleties arise when the
-target points are close to the boundary (nearly-singular integrals). 
+target points are close to the boundary (nearly-singular integrals).
 
 ## Integral potentials
 
@@ -89,7 +89,7 @@ kite using splines:
 
 ```@example layer_potentials
 gmsh.initialize()
-meshsize = 2π / k / 4 
+meshsize = 2π / k / 4
 kite = Inti.gmsh_curve(0, 1; meshsize) do s
     SVector(0.25, 0.0) + SVector(cos(2π * s) + 0.65 * cos(4π * s[1]) - 0.65, 1.5 * sin(2π * s))
 end
@@ -163,7 +163,7 @@ fig, ax, pl = viz(Ω_msh;
     color = er_log10,
     colormap = :viridis,
     colorrange,
-    axis = (aspect = DataAspect(),), 
+    axis = (aspect = DataAspect(),),
     interpolate=true
 )
 Colorbar(fig[1, 2]; label = "log₁₀(error)", colorrange)
@@ -182,14 +182,14 @@ There are two cases where the direct evaluation of layer potentials is not
 recommended:
 
 1. When the target point is close to the boundary (nearly-singular integrals).
-2. When you wish to evaluate the layer potential at many target points and take
-   advantage of an acceleration routine.
+2. When evaluation at many target points is desired (computationally
+   burdensome)and take advantage of an acceleration routine.
 
-In such cases, it is recommended to use the `single_double_layer` function
+In such contexts, it is recommended to use the `single_double_layer` function
 (alternately, one can directly assemble an `IntegralOperator`) with a
-correction and/or compression method as appropriate. Here is an example of how
-to use the FMM acceleration with a near-field correction to evaluate the layer
-potentials::
+correction, for the first case, and/or a compression (acceleration) method, for
+the latter case, as appropriate. Here is an example of how to use the FMM
+acceleration with a near-field correction to evaluate the layer potentials::
 
 ```@example layer_potentials
 using FMM2D

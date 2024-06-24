@@ -9,7 +9,7 @@ CurrentModule = Inti
       - Solve a basic boundary integral equation
       - Visualize the solution
 
-This first tutorial will guide you through the basic steps of setting up a
+This first tutorial will be a guided tour through the basic steps of setting up a
 boundary integral equation and solving it using Inti.jl. 
 
 ## Mathematical formulation
@@ -101,7 +101,7 @@ Q[1]
 
 In the constructor above we specified a quadrature order of 5, and Inti.jl
 internally picked a [`ReferenceQuadrature`](@ref) suitable for the specified
-order; for finer control, you can also specify a quadrature rule directly.
+order; for finer control, a quadrature rule can be specified directly.
 
 ## Integral operators
 
@@ -150,7 +150,7 @@ nothing # hide
 Much of the complexity involved in the numerical computation is hidden in the
 function above; later in the tutorials we will discuss in more details the
 options available for the *compression* and *correction* methods, as well as how
-to define your own kernels and operators. For now, it suffices to know that `S`
+to define custom kernels and operators. For now, it suffices to know that `S`
 and `D` are matrix-like objects that can be used to solve the boundary integral
 equation. For that, we need to provide the boundary data ``g``.
 
@@ -167,10 +167,9 @@ equation. For that, we need to provide the boundary data ``g``.
 We are interested in the scattered field ``u`` produced by an incident plane
 wave ``u_i = e^{i k \boldsymbol{d} \cdot \boldsymbol{x}}``, where
 ``\boldsymbol{d}`` is a unit vector denoting the direction of the plane wave.
-Assuming that the total field ``u_t = u_i + u``, unique up to a constant,
-satisfies a homogenous Neumann condition on ``\Gamma``, and that the scattered
-field ``u`` satisfies the Sommerfeld radiation condition, we can write the
-boundary condition as:
+Assuming that the total field ``u_t = u_i + u`` satisfies a homogenous Neumann
+condition on ``\Gamma``, and that the scattered field ``u`` satisfies the
+Sommerfeld radiation condition, we can write the boundary condition as:
 
 ```math
     \partial_\nu u = -\partial_\nu u_i, \quad \boldsymbol{x} \in \Gamma.
@@ -196,7 +195,7 @@ nothing # hide
       In computing `g` above, we used `map` to evaluate the incident field at
       all quadrature nodes. When iterating over `Q`, the iterator returns a
       [`QuadratureNode`](@ref QuadratureNode), and not simply the *coordinate*
-      of the quadrature node. This is so that you can access additional
+      of the quadrature node. This is so that we can access additional
       information, such as the `normal` vector, at the quadrature node.
 
 ## Integral representation and visualization
