@@ -308,7 +308,7 @@ function etype_to_near_elements(X,Y::Quadrature; tol)
 end
 
 """
-    etype_to_near_elements(Y::Quadrature; tol)
+    near_elements(Y::Quadrature; tol)
 
 Return `Nl = [[el_j in Y.mesh && dist(el_j, el_i) ≤ tol] for el_i in Y.mesh]`
 """
@@ -338,6 +338,17 @@ function near_elements(Y::Quadrature; tol)
         end
     end
     return el2el
+end
+
+"""
+    near_components(Y::Quadrature; tol)
+
+Calculate the connected components of each near_elements
+"""
+function near_components(Y::Quadrature; tol)
+    topo_neighbor = topological_neighbors(Y.mesh)
+    dist_neighbor = near_elements(Y; tol)
+    return Dict(E => connected_components(nl, topo_neighbor) for (E, nl) in dist_neighbor)
 end
 
 # function _geometric_center_circum_radius(Y::Quadrature, E, Q, P, N)
