@@ -18,14 +18,20 @@ Inti.clear_entities!()
 Γ = Inti.external_boundary(Ω)
 quad = Inti.Quadrature(msh[Γ]; qorder = 3)
 
-Nl = Inti.etype_to_near_elements(quad;tol=0.01)
+Nl = Inti.near_elements(quad;tol=0.2)
 fig, _, _ = viz(msh;showsegments = false,alpha=0.3)
 
-for (E, nl) in Nl
-    i = 1
-    viz!(Inti.elements(msh[Γ], E)[i];color=:red)
-    for j in nl[i]
-        viz!(Inti.elements(msh[Γ], E)[j];color=:blue,alpha=0.3)
-    end  
+E = first(keys(Nl))[1]; i = 1
+viz!(Inti.elements(msh[Γ], E)[i];color=:red)
+for (E_, j) in Nl[(E, i)]
+    viz!(Inti.elements(msh[Γ], E_)[j];color=:blue,alpha=0.3)
 end
+
+# for (E, nl) in Nl
+#     i = 1
+#     viz!(Inti.elements(msh[Γ], E)[i];color=:red)
+#     for j in nl[i]
+#         viz!(Inti.elements(msh[Γ], E)[j];color=:blue,alpha=0.3)
+#     end  
+# end
 display(fig)

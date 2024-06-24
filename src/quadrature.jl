@@ -279,7 +279,7 @@ function _etype_to_nearest_points(X, Y::Quadrature, maxdist)
 end
 
 """
-    etype_to_nearest_elements(X,Y::Quadrature; tol)
+    etype_to_near_elements(X,Y::Quadrature; tol)
 
 Return `Nl = [[el in Y.mesh && dist(x, el) ≤ tol] for x in X]`
 """
@@ -308,34 +308,36 @@ function etype_to_near_elements(X,Y::Quadrature; tol)
 end
 
 """
-    etype_to_nearest_elements(Y::Quadrature; tol)
+    etype_to_near_elements(Y::Quadrature; tol)
 
 Return `Nl = [[el_j in Y.mesh && dist(el_j, el_i) ≤ tol] for el_i in Y.mesh]`
 """
-function etype_to_near_elements(Y::Quadrature; tol)
+function near_elements(Y::Quadrature; tol)
     y = [coords(q) for q in Y]
     tree = BallTree(y)
-    etype2nearlist = Dict{DataType,Vector{Set{Int}}}()
+    el2el = Dict{Tuple{DataType,Int},Set{Tuple{DataType,Int}}}()
+    quad2el = [Set{Tuple{DataType,Int}}() for _ in 1:length(y)]
+    # for each element, loop over its qnodes, find q∈y close to one of its qnodes, add the element to quad2el[q]
+    # quad2el[q] is the set of elements whose qnodes are close to q 
     for (E, Q) in Y.etype2qtags
         P, N = size(Q)
-        etype2nearlist[E] = el2el = [Set{Int}() for _ in 1:N]
-        quad2el = [Set{Int}() for _ in 1:length(y)]
         for n in 1:N
             for i in 1:P
                 for q in inrange(tree, coords(qnodes(Y)[Q[i,n]]), tol)
-                    push!(quad2el[q], n)
+                    push!(quad2el[q], (E, n))
                 end    
             end
         end
+    end
+    # for each element, the set of elements close to it is the 
+    # union of the sets of elements close to its qnodes
+    for (E, Q) in Y.etype2qtags
+        P, N = size(Q)
         for n in 1:N
-            for i in 1:P
-                for m in quad2el[Q[i,n]]
-                    push!(el2el[n], m)
-                end
-            end
+            el2el[(E, n)] = union([quad2el[Q[i,n]] for i in 1:P]...)
         end
     end
-    return etype2nearlist
+    return el2el
 end
 
 # function _geometric_center_circum_radius(Y::Quadrature, E, Q, P, N)
