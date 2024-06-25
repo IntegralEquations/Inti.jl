@@ -3,6 +3,7 @@ module IntiFMM3DExt
 import Inti
 import FMM3D
 import LinearMaps
+using StaticArrays # For Stokes types
 
 function __init__()
     @info "Loading Inti.jl FMM3D extension"
@@ -130,6 +131,33 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             end
             out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 2)
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
+        end
+        # Stokes
+    elseif K isa Inti.SingleLayerKernel{SMatrix{3,3,Float64,9},<:Inti.Stokes{3,Float64}}
+        T = SVector{3,Float64}
+        stoklet = Matrix{Float64}(undef, 3, n)
+        return LinearMaps.LinearMap{SVector{3,Float64}}(m, n) do y, x
+            # multiply by weights and constant
+            stoklet[:] = 1 / (4 * π * K.pde.μ) .* reinterpret(Float64, weights .* x)
+            out = FMM3D.stfmm3d(rtol, sources; stoklet, targets, ppregt = 1)
+            return copyto!(y, reinterpret(T, out.pottarg))
+        end
+    elseif K isa Inti.DoubleLayerKernel{SMatrix{3,3,Float64,9},<:Inti.Stokes{3,Float64}}
+        T = SVector{3,Float64}
+        normals = Matrix{Float64}(undef, 3, n)
+        for j in 1:n
+            normals[:, j] = Inti.normal(iop.source[j])
+        end
+        strsvec = similar(normals, Float64)
+        strslet = similar(normals, Float64)
+        # multiply by weights and constant
+        for j in 1:n
+            strsvec[:, j] = -1 / (4 * π) * view(normals, :, j) .* weights[j]
+        end
+        return LinearMaps.LinearMap{SVector{3,Float64}}(m, n) do y, x
+            strslet[:] = reinterpret(Float64, x)
+            out = FMM3D.stfmm3d(rtol, sources; strslet, strsvec, targets, ppregt = 1)
+            return copyto!(y, reinterpret(T, out.pottarg))
         end
     else
         error("integral operator not supported by Inti's FMM3D wrapper")
