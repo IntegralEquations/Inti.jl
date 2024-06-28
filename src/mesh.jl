@@ -601,3 +601,10 @@ end
     centers = map(center, els)
     return inrange(balltree, centers, tol)
 end
+
+"""
+    Domain(f::Function, msh::AbstractMesh)
+
+Call `Domain(f, ents)` on `ents = entities(msh).`
+"""
+Domain(f::Function, msh::AbstractMesh) = Domain(f, entities(msh))
