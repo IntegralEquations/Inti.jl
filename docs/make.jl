@@ -84,6 +84,7 @@ makedocs(;
         canonical = "https://IntegralEquations.github.io/Inti.jl",
         size_threshold = 2 * 2^20, # 2 MiB
         size_threshold_warn = 1 * 2^20, # 1 MiB
+        sidebar_sitename = false,
     ),
     pages = [
         "Home" => "index.md",

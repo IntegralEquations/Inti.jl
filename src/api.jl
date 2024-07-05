@@ -172,13 +172,8 @@ function single_double_layer(;
         S = axpy!(true, δS, Smat)
         D = axpy!(true, δD, Dmat)
     elseif compression.method == :hmatrix
-        if target === source
-            S = axpy!(true, δS, Smat)
-            D = axpy!(true, δD, Dmat)
-        else
-            S = LinearMap(Smat) + LinearMap(δS)
-            D = LinearMap(Dmat) + LinearMap(δD)
-        end
+        S = LinearMap(Smat) + LinearMap(δS)
+        D = LinearMap(Dmat) + LinearMap(δD)
     elseif compression.method == :fmm
         S = Smat + LinearMap(δS)
         D = Dmat + LinearMap(δD)

@@ -10,6 +10,7 @@
 .vscode
 /docs/src/examples/generated/
 /sandbox/*
+/talks/*
 
 .markdownlint.json
 Inti.code-workspace
