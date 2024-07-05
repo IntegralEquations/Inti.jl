@@ -423,7 +423,7 @@ end
 """
     kress_change_of_variables_periodic(P)
 
-Like [`Kress`](@ref), this change of variables maps the interval `[0,1]` onto
+Like [`kress_change_of_variables`](@ref), this change of variables maps the interval `[0,1]` onto
 itself, but the first `P` derivatives of the transformation vanish at **both**
 endpoints (thus making it a periodic function).
 
