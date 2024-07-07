@@ -28,7 +28,7 @@ To solve this problem using integral equations, we split the solution ``u`` into
 a particular solution ``u_p`` and a homogeneous solution ``u_h``:
 
 ```math
-  u = u_p + u_h
+  u = u_p + u_h.
 ```
 
 The function ``u_p`` is given by
@@ -43,8 +43,8 @@ The function ``u_h`` satisfies the homogeneous problem
 
 ```math
   \begin{align*}
-      \Delta u_h &= 0  \quad &&\text{in } \quad \Omega \\
-      u_h &= g - u_p  \quad &&\text{on }  \quad \Gamma
+      \Delta u_h &= 0,  \quad &&\text{in } \quad \Omega, \\
+      u_h &= g - u_p,  \quad &&\text{on }  \quad \Gamma,
   \end{align*}
 ```
 
@@ -52,21 +52,20 @@ which can be solved using the integral equation method. In particular, for this
 example, we employ a double-layer formulation:
 
 ```math
-u_h(\boldsymbol{r}) = \int_{\Gamma} G(\boldsymbol{r}, \boldsymbol{r'}) \sigma(\boldsymbol{r}') d\boldsymbol{r'}.
+u_h(\boldsymbol{r}) = \int_{\Gamma} G(\boldsymbol{r}, \boldsymbol{r'}) \sigma(\boldsymbol{r}') d\boldsymbol{r'},
 ```
 
-where the density function ``\sigma`` solves the following integral equation:
+where the density function ``\sigma`` solves the integral equation
 
 ```math
   -\frac{\sigma(\boldsymbol{x})}{2} + \int_{\Gamma} \partial_{\nu_{\boldsymbol{y}}}G(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d} s_{\boldsymbol{y}} = g(\boldsymbol{x}) - u_p(\boldsymbol{x}).
 ```
 
-In what follows we will illustrate how to solve the problem above using integral
-equations.
+In what follows we illustrate how to solve the problem in this manner.
 
 ## Geometry and mesh
 
-We use the *Gmsh API* to create a jellyfish shaped domain and to generate a
+We use the *Gmsh API* to create a jellyfish-shaped domain and to generate a
 second order mesh of its interior and boundary:
 
 ```@example poisson
@@ -87,7 +86,8 @@ msh = Inti.import_mesh(; dim = 2)
 gmsh.finalize()
 ```
 
-We can now extract ``\Omega`` and ``\Gamma`` from the mesh:
+We can now extract components of the mesh corresponding to the ``\Omega`` and
+``\Gamma`` domains:
 
 ```@example poisson
 Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, msh)
@@ -117,7 +117,9 @@ nothing # hide
 
 ## Integral operators
 
-We can now assemble the required volume potential:
+We can now assemble the required volume potential. To obtain the value of the particular solution
+``u_p`` on the boundary for the modified integral equation above we will need the volume integral
+operator mapping to points on the boundary, i.e. operator:
 
 ```@example poisson
 using FMM2D #to accelerate the maps
@@ -136,7 +138,8 @@ V_d2b = Inti.volume_potential(;
 )
 ```
 
-as well as the boundary integral operators
+We require also the boundary integral operators for the ensuing integral
+equation:
 
 ```@example poisson
 # Single and double layer operators on Γ
@@ -179,7 +182,7 @@ rhs = g - V_d2b*f
 nothing # hide
 ```
 
-and solve the integral equation for the density function ``σ``:
+and solve the integral equation for the integral density function ``σ``:
 
 ```@example poisson
 using IterativeSolvers, LinearAlgebra
@@ -209,9 +212,10 @@ println("error at $x: ", u(x)-uₑ(x))
 Although we have "solved" the problem in the previous section, using the
 anonymous function `u` to evaluate the field is neither efficient nor accurate
 when there are either many points to evaluate, or when they lie close to the
-boundary ``\Gamma``. The fundamental reason for this is the usual: our
-integral operators are dense matrices, and their evaluation near ``\Gamma``
-suffers from the so-called "near-singularity" problem.
+boundary ``\Gamma``. The fundamental reason for this is the usual: the integral
+operators in the function `u` are dense matrices, and their evaluation inside
+or near to ``\Omega`` suffers from inaccurate singular and near-singular
+quadrature.
 
 To address this issue, we need to assemble *accelerated* and *corrected*
 versions of the integral operators. Let us suppose we wish to evaluate the
