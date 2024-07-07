@@ -212,7 +212,7 @@ println("error at $x: ", u(x)-uₑ(x))
 Although we have "solved" the problem in the previous section, using the
 anonymous function `u` to evaluate the field is neither efficient nor accurate
 when there are either many points to evaluate, or when they lie close to the
-boundary ``\Gamma``. The fundamental reason for this is the usual: the integral
+domain ``\Omega``. The fundamental reason for this is the usual: the integral
 operators in the function `u` are dense matrices, and their evaluation inside
 or near to ``\Omega`` suffers from inaccurate singular and near-singular
 quadrature.
@@ -257,7 +257,7 @@ We now evaluate the solution at all mesh nodes and compare it to the manufacture
 ```@example poisson
 u_nodes = V_d2d*f + D_b2d*σ
 er = u_nodes - map(uₑ, target)
-println("maximum error at all mesh nodes:", norm(er, Inf))
+println("maximum error at all mesh nodes: ", norm(er, Inf))
 ```
 
 Lastly, let us visualize the solution and the error:
