@@ -86,6 +86,12 @@ viz!(Γ_msh; showsegments = true, alpha = 0.5)
 fig
 ```
 
+!!! warning "Mesh visualization"
+    Note that although the mesh may be of high order and/or conforming, the
+    *visualization* of a mesh is always performed on the underlying first order
+    mesh, and therefore elements may look flat even if the problem is solved on
+    a curved mesh.
+
 ## Parametric entities and `meshgen`
 
 In the previous section we saw an example of how to import a mesh from a file,
