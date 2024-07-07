@@ -219,6 +219,7 @@ solution ``u`` at all mesh nodes of ``\Omega``, which will be our `target`:
 
 ```@example poisson
 target = Inti.nodes(Ω_msh)
+nothing # hide
 ```
 
 We now create a volume operator mapping densities from our domain quadrature to our
@@ -255,25 +256,20 @@ er = u_nodes - map(uₑ, target)
 println("maximum error at all mesh nodes:", norm(er, Inf))
 ```
 
-Lastly, let us visualize the solution:
+Lastly, let us visualize the solution and the error:
 
 ```@example poisson
 colorrange = extrema(u_nodes)
-fig = Figure(; size = (800, 500))
+fig = Figure(; size = (800, 300))
 ax = Axis(fig[1, 1]; aspect = DataAspect())
 viz!(Ω_msh; colorrange, color = u_nodes, interpolate = true)
 cb = Colorbar(fig[1, 2]; label = "u", colorrange)
-fig # hide
-```
-
-as well as the error:
-
-```@example poisson
-colorrange = extrema(er)
+# plot error
+log_er = log10.(abs.(er))
+colorrange = extrema(log_er)
 colormap = :inferno
-fig = Figure(; size = (800, 500))
-ax = Axis(fig[1, 1]; aspect = DataAspect())
-viz!(Ω_msh; colorrange, colormap, color = er, interpolate = true)
-cb = Colorbar(fig[1, 2]; label = "u - uₑ", colormap, colorrange)
+ax = Axis(fig[1, 3]; aspect = DataAspect())
+viz!(Ω_msh; colorrange, colormap, color = log_er, interpolate = true)
+cb = Colorbar(fig[1, 4]; label = "log₁₀|u - uₑ|", colormap, colorrange)
 fig # hide
 ```
