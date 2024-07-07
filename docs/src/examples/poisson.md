@@ -219,23 +219,15 @@ quadrature.
 
 To address this issue, we need to assemble *accelerated* and *corrected*
 versions of the integral operators. Let us suppose we wish to evaluate the
-solution ``u`` at all mesh nodes of ``\Omega``, which will be our `target`:
-
-```@example poisson
-target = Inti.nodes(Ω_msh)
-nothing # hide
-```
-
-We now create a volume operator mapping densities from our domain quadrature to our
-mesh nodes:
+solution ``u`` at all the quadrature nodes of ``\Omega``:
 
 ```@example poisson
 V_d2d = Inti.volume_potential(;
     pde,
-    target = target,
+    target = Ω_quad,
     source = Ω_quad,
     compression = (method = :fmm, tol = 1e-8),
-    correction = (method = :dim, target_location = :inside, maxdist = meshsize),
+    correction = (method = :dim, ),
 )
 ```
 
@@ -245,24 +237,28 @@ our mesh nodes:
 ```@example poisson
 S_b2d, D_b2d = Inti.single_double_layer(;
     pde,
-    target = target,
+    target = Ω_quad,
     source = Γ_quad,
     compression = (method = :fmm, tol = 1e-8),
-    correction = (method = :dim, maxdist = meshsize, target_location = :inside),
+    correction = (method = :dim, maxdist = 2*meshsize, target_location = :inside),
 )
 ```
 
-We now evaluate the solution at all mesh nodes and compare it to the manufactured:
+We now evaluate the solution at all quadrature nodes and compare it to the
+manufactured:
 
 ```@example poisson
-u_nodes = V_d2d*f + D_b2d*σ
-er = u_nodes - map(uₑ, target)
-println("maximum error at all mesh nodes: ", norm(er, Inf))
+u_quad = V_d2d*f + D_b2d*σ
+er = u_quad - map(q -> uₑ(q.coords), Ω_quad)
+println("maximum error at all quadrature nodes: ", norm(er, Inf))
 ```
 
-Lastly, let us visualize the solution and the error:
+Lastly, let us visualize the solution and the error on the mesh nodes using [`quadrature_to_node_vals`](@ref):
 
 ```@example poisson
+nodes = Inti.nodes(Ω_msh)
+u_nodes = Inti.quadrature_to_node_vals(Ω_quad, u_quad)
+er = u_nodes - map(uₑ, nodes)
 colorrange = extrema(u_nodes)
 fig = Figure(; size = (800, 300))
 ax = Axis(fig[1, 1]; aspect = DataAspect())
