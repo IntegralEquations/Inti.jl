@@ -267,7 +267,7 @@ function _farfield_distance(el, K, qrule, tol, maxiter)
         @debug n, er
         (er < tol / 2) && break # attained desired tolerance
     end
-    msg = """failed to attained desired tolerance when computing maxdist. Your
+    msg = """failed to attain desired tolerance when computing maxdist. Your
     quadrature may not be accurate enough, or your meshsize not small enough, to
     achieve the requested tolerance on the far field."""
     er > tol / 2 && @warn msg
