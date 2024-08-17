@@ -1,4 +1,4 @@
-# # High-order convergence of vdim
+# # Testing local vdim
 
 using Inti
 using StaticArrays
@@ -7,8 +7,9 @@ using LinearAlgebra
 using HMatrices
 using FMMLIB2D
 using GLMakie
+using Meshes
 
-meshsize = 0.1
+meshsize = 0.01
 interpolation_order = 4
 VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
 bdry_qorder = 2 * VR_qorder
@@ -41,18 +42,18 @@ msh = Inti.import_mesh(name; dim = 2)
 
 Ωₕ = msh[Ω]
 Γₕ = msh[Γ]
-Ωₕ_sub = view(msh, Ω)
-Γₕ_sub = view(msh, Γ)
+Ωₕ_Sub = view(msh, Ω)
+Γₕ_Sub = view(msh, Γ)
 
 tquad = @elapsed begin
     # Use VDIM with the Vioreanu-Rokhlin quadrature rule for Ωₕ
     Q = Inti.VioreanuRokhlin(; domain = :triangle, order = VR_qorder)
     dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
     Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
-    Ωₕ_sub_quad = Inti.Quadrature(Ωₕ_sub, dict)
+    Ωₕ_Sub_quad = Inti.Quadrature(Ωₕ_Sub, dict)
     # Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorders[1])
     Γₕ_quad = Inti.Quadrature(Γₕ; qorder = bdry_qorder)
-    Γₕ_sub_quad = Inti.Quadrature(Γₕ_sub; qorder = bdry_qorder)
+    Γₕ_Sub_quad = Inti.Quadrature(Γₕ_Sub; qorder = bdry_qorder)
 end
 @info "Quadrature generation time: $tquad"
 
@@ -74,36 +75,48 @@ pde = k == 0 ? Inti.Laplace(; dim = 2) : Inti.Helmholtz(; dim = 2, k)
 
 ## Boundary operators
 tbnd = @elapsed begin
-    S_b2d, D_b2d = Inti.single_double_layer(;
-        pde,
-        target = Ωₕ_sub_quad,
-        source = Γₕ_sub_quad,
-        compression = (method = :fmm, tol = 1e-14),
-        correction = (method = :dim, maxdist = 5 * meshsize, target_location = :on),
-    )
+S_b2d, D_b2d = Inti.single_double_layer(;
+    pde,
+    target = Ωₕ_quad,
+    source = Γₕ_quad,
+    compression = (method = :fmm, tol = 1e-14),
+    correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
+)
 end
 @info "Boundary operators time: $tbnd"
 
 ## Volume potentials
-tvol = @elapsed begin
-    V_d2d = Inti.volume_potential(;
-        pde,
-        target = Ωₕ_sub_quad,
-        source = Ωₕ_sub_quad,
-        compression = (method = :fmm, tol = 1e-14),
-        correction = (
-            method = :dim,
-            interpolation_order,
-            maxdist = 5 * meshsize,
-            S_b2d = S_b2d,
-            D_b2d = D_b2d,
-        ),
-    )
-end
-@info "Volume potential time: $tvol"
+#tvol = @elapsed begin
+V_d2d = Inti.volume_potential(;
+    pde,
+    target = Ωₕ_quad,
+    source = Ωₕ_quad,
+    compression = (method = :fmm, tol = 1e-14),
+    correction = (
+        method = :ldim,
+        mesh = Ωₕ,
+        interpolation_order,
+        maxdist = 5 * meshsize,
+    ),
+)
+Vglob_d2d = Inti.volume_potential(;
+    pde,
+    target = Ωₕ_Sub_quad,
+    source = Ωₕ_Sub_quad,
+    compression = (method = :fmm, tol = 1e-14),
+    correction = (
+        method = :dim,
+        mesh = Ωₕ_Sub,
+        interpolation_order,
+        maxdist = 5 * meshsize,
+    ),
+)
+#end
+#@info "Volume potential time: $tvol"
 
 vref    = -u_d - D_b2d * u_b + S_b2d * du_b
 vapprox = V_d2d * f_d
+vglobapprox = Vglob_d2d * f_d
 er      = vref - vapprox
 
 ndofs = length(er)

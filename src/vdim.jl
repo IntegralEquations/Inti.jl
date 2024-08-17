@@ -27,6 +27,9 @@ See [anderson2024fast](@cite) for more details on the method.
 - `shift`: a boolean indicating whether the basis functions should be shifted
   and rescaled to each element.
 """
+
+import GLMakie as Mke
+
 function vdim_correction(
     pde,
     target,
@@ -111,6 +114,104 @@ function vdim_correction(
                 end
                 for k in 1:nq
                     push!(Is, i)
+                    push!(Js, jglob[k])
+                    push!(Vs, wei[k])
+                end
+            end
+        end
+    end
+    @debug """Condition properties of vdim correction:
+    |-- max interp. matrix condition: $vander_cond
+    |-- max norm of source term:      $rhs_norm
+    |-- max residual error:           $res_norm
+    |-- max interp. matrix norm :     $vander_norm
+    |-- max shift norm :              $shift_norm
+    """
+    δV = sparse(Is, Js, Vs, m, n)
+    return δV
+end
+
+function local_vdim_correction(
+    pde,
+    Eltype,
+    target,
+    source::Quadrature,
+    mesh::AbstractMesh;
+    green_multiplier::Vector{<:Real},
+    interpolation_order = nothing,
+    maxdist = Inf,
+    center = nothing,
+    shift::Val{SHIFT} = Val(false),
+) where {SHIFT}
+    # variables for debugging the condition properties of the method
+    vander_cond = vander_norm = rhs_norm = res_norm = shift_norm = -Inf
+    # figure out if we are dealing with a scalar or vector PDE
+    m, n = length(target), length(source)
+    N = ambient_dimension(pde)
+    @assert ambient_dimension(source) == N "vdim only works for volume potentials"
+    m, n = length(target), length(source)
+    # a reasonable interpolation_order if not provided
+    isnothing(interpolation_order) &&
+        (interpolation_order = maximum(order, values(source.etype2qrule)))
+    # by default basis centered at origin
+    center = isnothing(center) ? zero(SVector{N,Float64}) : center
+    p, P, γ₁P, multiindices = polynomial_solutions_vdim(pde, interpolation_order, center)
+    dict_near = etype_to_nearest_points(target, source; maxdist)
+    # compute sparse correction
+    Is = Int[]
+    Js = Int[]
+    Vs = Eltype[]
+    for (E, qtags) in source.etype2qtags
+        els = elements(source.mesh, E)
+        near_list = dict_near[E]
+        nq, ne = size(qtags)
+        @assert length(near_list) == ne
+        topo_neighs = 1
+        neighbors = Inti.topological_neighbors(mesh, topo_neighs)
+        for n in 1:ne
+            # indices of nodes in element `n`
+            isempty(near_list[n]) && continue
+            R = _local_vdim_auxiliary_quantities(
+                pde,
+                mesh,
+                neighbors,
+                n,
+                p,
+                P,
+                γ₁P,
+                target[near_list[n]],
+                green_multiplier;
+            )
+            jglob = @view qtags[:, n]
+            # compute translation and scaling
+            c, r = translation_and_scaling(els[n])
+            if SHIFT
+                iszero(center) || error("SHIFT is not implemented for non-zero center")
+                L̃ = [f((q.coords - c) / r) for f in p, q in view(source, jglob)]
+                S = change_of_basis(multiindices, p, c, r)
+                F = lu(L̃)
+                @debug (vander_cond = max(vander_cond, cond(L̃))) maxlog = 0
+                @debug (shift_norm = max(shift_norm, norm(S))) maxlog = 0
+                @debug (vander_norm = max(vander_norm, norm(L̃))) maxlog = 0
+            else
+                L = [f(q.coords) for f in p, q in view(source, jglob)]
+                F = lu(L)
+                @debug (vander_cond = max(vander_cond, cond(L))) maxlog = 0
+                @debug (shift_norm = max(shift_norm, 1)) maxlog = 0
+                @debug (vander_norm = max(vander_norm, norm(L))) maxlog = 0
+            end
+            # correct each target near the current element
+            for i in 1:length(near_list[n])
+                b = @views R[i, :]
+                wei = SHIFT ? F \ (S * b) : F \ b # weights for the current element and target i
+                rhs_norm = max(rhs_norm, norm(b))
+                res_norm = if SHIFT
+                    max(res_norm, norm(L̃ * wei - S * b))
+                else
+                    max(res_norm, norm(L * wei - b))
+                end
+                for k in 1:nq
+                    push!(Is, near_list[n][i])
                     push!(Js, jglob[k])
                     push!(Vs, wei[k])
                 end
@@ -240,6 +341,75 @@ function translation_and_scaling(el::LagrangeTetrahedron)
         end
     end
     return center, R
+end
+
+function _local_vdim_auxiliary_quantities(
+    pde,
+    mesh,
+    neighbors,
+    el,
+    p,
+    P,
+    γ₁P,
+    X,
+    μ;
+)
+    # construct the local region
+    Etype = first(Inti.element_types(mesh))
+    el_neighs = copy(neighbors[(Etype,el)])
+
+    loc_bdry = Inti.boundarynd(el_neighs, mesh)
+    # TODO handle curved boundary of Γ??
+    bords = typeof(Inti.LagrangeLine(Inti.nodes(mesh)[first(loc_bdry)]...))[]
+    for idxs in loc_bdry
+        vtxs = Inti.nodes(mesh)[idxs]
+        bord = Inti.LagrangeLine(vtxs...)
+        push!(bords, bord)
+    end
+
+    # build O(h) volume neighbors
+    els_idxs = [i[2] for i in collect(el_neighs)]
+    els_list = mesh.etype2els[Etype][els_idxs]
+    Yvol = Inti.Quadrature(mesh, els_list; qorder = 7)
+    # TODO Need DIM corrections when X is close to Γ
+    Ybdry = Inti.Quadrature(mesh, bords; qorder = 8)
+    # TODO handle derivative case
+    G  = SingleLayerKernel(pde)
+    dG = DoubleLayerKernel(pde)
+    Sop = IntegralOperator(G, X, Ybdry)
+    Dop = IntegralOperator(dG, X, Ybdry)
+    Vop = IntegralOperator(G, X, Yvol)
+    Smat = assemble_matrix(Sop)
+    Dmat = assemble_matrix(Dop)
+    Vmat = assemble_matrix(Vop)
+    #sleep(2)
+    #Inti.viz_elements_bords(neighbors, el_neighs, (Etype, el), bords, mesh; quad = Ybdry)
+    #qnodesx = [qnode.coords[1] for qnode in Yvol]
+    #qnodesy = [qnode.coords[2] for qnode in Yvol]
+    #Mke.scatter!(qnodesx, qnodesy)
+    #trgsx = [qnode.coords[1] for qnode in X]
+    #trgsy = [qnode.coords[2] for qnode in X]
+    #Mke.scatter!(trgsx, trgsy)
+
+    num_basis = length(p)
+    num_targets = length(X)
+    b = [f(q) for q in Yvol, f in p]
+    γ₀B = [f(q) for q in Ybdry, f in P]
+    γ₁B = [f(q) for q in Ybdry, f in γ₁P]
+    if isdefined(Main, :Infiltrator)
+        Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+    end
+    Θ = zeros(eltype(Vop), num_targets, num_basis)
+    # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
+    for n in 1:num_basis
+        @views mul!(Θ[:, n], Smat, γ₁B[:, n])
+        @views mul!(Θ[:, n], Dmat, γ₀B[:, n], -1, 1)
+        @views mul!(Θ[:, n], Vmat, b[:, n], -1, 1)
+        for i in 1:num_targets
+            Θ[i, n] += μ[i] * P[n](X[i])
+        end
+    end
+    return Θ
 end
 
 function _vdim_auxiliary_quantities(

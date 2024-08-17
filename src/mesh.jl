@@ -630,3 +630,7 @@ function topological_neighbors(msh::AbstractMesh, k = 1)
     end
     return k_neighbors
 end
+
+function viz_elements(args...; kwargs...) end
+
+function viz_elements_bords(args...; kwargs...) end

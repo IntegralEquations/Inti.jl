@@ -235,12 +235,12 @@ function _normalize_compression(compression, target, source)
 end
 
 function _normalize_correction(correction, target, source)
-    methods = (:dim, :adaptive, :none)
+    methods = (:dim, :ldim, :adaptive, :none)
     # check that method is valid
     correction.method ∈ methods ||
         error("Unknown correction.method $(correction.method). Available options: $methods")
     # set default values if absent
-    if correction.method == :dim
+    if correction.method == :dim || correction.method == :ldim
         haskey(correction, :target_location) &&
             target === source &&
             correction.target_location != :on &&
@@ -252,6 +252,9 @@ function _normalize_correction(correction, target, source)
         haskey(correction, :maxdist) ||
             target === source ||
             @warn("missing maxdist field in correction: setting to Inf")
+        if correction.method == :ldim
+            haskey(correction, :mesh) || error("missing mesh information needed for local dim")
+        end
         correction = merge(
             (maxdist = Inf, interpolation_order = nothing, center = nothing),
             correction,

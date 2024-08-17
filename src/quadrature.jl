@@ -121,6 +121,44 @@ function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
     return quad
 end
 
+# Quadrature constructor for list of volume elements for local vdim
+function Quadrature(msh::AbstractMesh{N,T}, elementlist::AbstractVector{E}; qorder) where {N,T,E}
+    #FIXME Ideally we would like to use Gauss quadrature on the local region (fewer points for same order of accuracy) but to do so we need to subtract away the contribution from the global quadrature rule on the local region (typically, these are VR nodes). So, for now, using the global quadrature rule on the local region gives better accuracy since it cancels these (inaccurate) computations out.
+    #etype2qrule =
+    #    Dict(E => _qrule_for_reference_shape(domain(E), qorder))
+    if domain(E) isa Inti.ReferenceSimplex
+        Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder)
+        etype2qrule = Dict(E => Q)
+    else
+        etype2qrule =
+            Dict(E => _qrule_for_reference_shape(domain(E), qorder))
+    end
+
+    # initialize mesh with empty fields
+    quad = Quadrature{N,T}(
+        msh,
+        etype2qrule,
+        QuadratureNode{N,T}[],
+        Dict{DataType,Matrix{Int}}(),
+    )
+    # loop element types and generate quadrature for each
+    qrule = etype2qrule[E]
+    _build_quadrature!(quad, elementlist, qrule)
+
+    # check for entities with negative orientation and flip normal vectors if
+    # present
+    for ent in entities(msh)
+        if (sign(tag(ent)) < 0) && (N - geometric_dimension(ent) == 1)
+            @debug "Flipping normals of $ent"
+            tags = dom2qtags(quad, Domain(ent))
+            for i in tags
+                quad[i] = flip_normal(quad[i])
+            end
+        end
+    end
+    return quad
+end
+
 function Quadrature(msh::AbstractMesh; qorder)
     etype2qrule =
         Dict(E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(msh))
