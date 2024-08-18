@@ -9,7 +9,7 @@ using FMMLIB2D
 using GLMakie
 using Meshes
 
-meshsize = 0.01
+meshsize = 0.1
 interpolation_order = 4
 VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
 bdry_qorder = 2 * VR_qorder
@@ -96,6 +96,7 @@ V_d2d = Inti.volume_potential(;
         method = :ldim,
         mesh = Ωₕ,
         interpolation_order,
+        bdry_nodes = Γₕ.nodes,
         maxdist = 5 * meshsize,
     ),
 )
@@ -107,7 +108,6 @@ Vglob_d2d = Inti.volume_potential(;
     correction = (
         method = :dim,
         mesh = Ωₕ_Sub,
-        bdry_nodes = Γₕ.nodes,
         interpolation_order,
         maxdist = 5 * meshsize,
     ),

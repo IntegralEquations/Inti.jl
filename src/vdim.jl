@@ -178,6 +178,7 @@ function local_vdim_correction(
                 mesh,
                 neighbors,
                 n,
+                interpolation_order,
                 p,
                 P,
                 γ₁P,
@@ -351,6 +352,7 @@ function _local_vdim_auxiliary_quantities(
     mesh,
     neighbors,
     el,
+    interpolation_order,
     p,
     P,
     γ₁P,
@@ -381,9 +383,15 @@ function _local_vdim_auxiliary_quantities(
     # build O(h) volume neighbors
     els_idxs = [i[2] for i in collect(el_neighs)]
     els_list = mesh.etype2els[Etype][els_idxs]
-    Yvol = Inti.Quadrature(mesh, els_list; qorder = 7)
-    # TODO Need DIM corrections when X is close to Γ
-    Ybdry = Inti.Quadrature(mesh, bords; qorder = 8)
+    qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
+    bdry_qorder = 2 * qorder
+    Yvol = Inti.Quadrature(mesh, els_list; qorder)
+    if need_layer_corr
+        Ybdry = Inti.Quadrature(mesh, bords; qorder = bdry_qorder)
+    else
+        Ybdry = Inti.Quadrature(mesh, bords; qorder = bdry_qorder)
+    end
+    #Ybdry = Inti.Quadrature(mesh, bords; qorder = 8)
     # TODO handle derivative case
     G  = SingleLayerKernel(pde)
     dG = DoubleLayerKernel(pde)
