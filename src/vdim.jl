@@ -136,7 +136,8 @@ function local_vdim_correction(
     Eltype,
     target,
     source::Quadrature,
-    mesh::AbstractMesh;
+    mesh::AbstractMesh,
+    bdry_nodes;
     green_multiplier::Vector{<:Real},
     interpolation_order = nothing,
     maxdist = Inf,
@@ -157,6 +158,7 @@ function local_vdim_correction(
     center = isnothing(center) ? zero(SVector{N,Float64}) : center
     p, P, γ₁P, multiindices = polynomial_solutions_vdim(pde, interpolation_order, center)
     dict_near = etype_to_nearest_points(target, source; maxdist)
+    bdry_kdtree = KDTree(bdry_nodes)
     # compute sparse correction
     Is = Int[]
     Js = Int[]
@@ -180,7 +182,8 @@ function local_vdim_correction(
                 P,
                 γ₁P,
                 target[near_list[n]],
-                green_multiplier;
+                green_multiplier,
+                bdry_kdtree;
             )
             jglob = @view qtags[:, n]
             # compute translation and scaling
@@ -352,7 +355,8 @@ function _local_vdim_auxiliary_quantities(
     P,
     γ₁P,
     X,
-    μ;
+    μ,
+    bdry_kdtree;
 )
     # construct the local region
     Etype = first(Inti.element_types(mesh))
@@ -366,6 +370,13 @@ function _local_vdim_auxiliary_quantities(
         bord = Inti.LagrangeLine(vtxs...)
         push!(bords, bord)
     end
+
+    # Check if we need to do near-singular layer potential evaluation
+    vertices = mesh.etype2els[Etype][el].vals[1:3]
+    diam = max(norm(vertices[1] - vertices[2]),
+               norm(vertices[2] - vertices[3]),
+               norm(vertices[3] - vertices[1]))
+    need_layer_corr = sum(inrangecount(bdry_kdtree, vertices, diam/2)) > 0
 
     # build O(h) volume neighbors
     els_idxs = [i[2] for i in collect(el_neighs)]
@@ -383,22 +394,38 @@ function _local_vdim_auxiliary_quantities(
     Dmat = assemble_matrix(Dop)
     Vmat = assemble_matrix(Vop)
     #sleep(2)
-    #Inti.viz_elements_bords(neighbors, el_neighs, (Etype, el), bords, mesh; quad = Ybdry)
+    #Inti.viz_elements_bords(neighbors, el_neighs, (Etype, el), bords, mesh)
     #qnodesx = [qnode.coords[1] for qnode in Yvol]
     #qnodesy = [qnode.coords[2] for qnode in Yvol]
     #Mke.scatter!(qnodesx, qnodesy)
     #trgsx = [qnode.coords[1] for qnode in X]
     #trgsy = [qnode.coords[2] for qnode in X]
     #Mke.scatter!(trgsx, trgsy)
+    if need_layer_corr
+        μloc = _green_multiplier(:inside)
+        green_multiplier = fill(μloc, length(X))
+        δS, δD = bdim_correction(
+            pde,
+            X,
+            Ybdry,
+            Smat,
+            Dmat;
+            green_multiplier,
+            maxdist = diam,
+            derivative=false,
+        )
+        Smat += δS
+        Dmat += δD
+        #if isdefined(Main, :Infiltrator) && need_layer_corr == true
+        #    Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+        #end
+    end
 
     num_basis = length(p)
     num_targets = length(X)
     b = [f(q) for q in Yvol, f in p]
     γ₀B = [f(q) for q in Ybdry, f in P]
     γ₁B = [f(q) for q in Ybdry, f in γ₁P]
-    if isdefined(Main, :Infiltrator)
-        Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-    end
     Θ = zeros(eltype(Vop), num_targets, num_basis)
     # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
     for n in 1:num_basis

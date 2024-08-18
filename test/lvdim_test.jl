@@ -107,6 +107,7 @@ Vglob_d2d = Inti.volume_potential(;
     correction = (
         method = :dim,
         mesh = Ωₕ_Sub,
+        bdry_nodes = Γₕ.nodes,
         interpolation_order,
         maxdist = 5 * meshsize,
     ),

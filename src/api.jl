@@ -296,7 +296,8 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
             eltype(V),
             target,
             source,
-            correction.mesh;
+            correction.mesh,
+            correction.bdry_nodes;
             green_multiplier,
             correction.maxdist,
             correction.interpolation_order,
