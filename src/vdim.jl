@@ -367,7 +367,12 @@ function _local_vdim_auxiliary_quantities(
     loc_bdry = Inti.boundarynd(el_neighs, mesh)
     # TODO handle curved boundary of Γ??
     bords = typeof(Inti.LagrangeLine(Inti.nodes(mesh)[first(loc_bdry)]...))[]
+    # TODO possible performance improvement
+    #bords = Inti.LagrangeElement{Inti.ReferenceHyperCube{N-1}, 3, SVector{N, Float64}}[]
     for idxs in loc_bdry
+        # TODO possible performance improvement
+        #vtxs = SVector{3, SVector{2, Float64}}(Inti.nodes(mesh)[idxs])
+        #bord = Inti.LagrangeLine(vtxs)
         vtxs = Inti.nodes(mesh)[idxs]
         bord = Inti.LagrangeLine(vtxs...)
         push!(bords, bord)
@@ -424,9 +429,6 @@ function _local_vdim_auxiliary_quantities(
         )
         Smat += δS
         Dmat += δD
-        #if isdefined(Main, :Infiltrator) && need_layer_corr == true
-        #    Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-        #end
     end
 
     num_basis = length(p)
