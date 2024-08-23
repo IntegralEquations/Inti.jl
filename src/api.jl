@@ -301,6 +301,7 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
             green_multiplier,
             correction.maxdist,
             correction.interpolation_order,
+            correction.quadrature_order,
             shift,
         )
     else

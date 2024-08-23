@@ -9,9 +9,9 @@ using FMMLIB2D
 using GLMakie
 using Meshes
 
-meshsize = 0.1
+meshsize = 0.02
 interpolation_order = 4
-VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
+VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(5)
 bdry_qorder = 2 * VR_qorder
 
 function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
@@ -96,6 +96,7 @@ V_d2d = Inti.volume_potential(;
         method = :ldim,
         mesh = Ωₕ,
         interpolation_order,
+        quadrature_order = VR_qorder,
         bdry_nodes = Γₕ.nodes,
         maxdist = 5 * meshsize,
     ),

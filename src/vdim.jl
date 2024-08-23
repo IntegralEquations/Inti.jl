@@ -140,6 +140,7 @@ function local_vdim_correction(
     bdry_nodes;
     green_multiplier::Vector{<:Real},
     interpolation_order = nothing,
+    quadrature_order = nothing,
     maxdist = Inf,
     center = nothing,
     shift::Val{SHIFT} = Val(false),
@@ -168,6 +169,9 @@ function local_vdim_correction(
         near_list = dict_near[E]
         nq, ne = size(qtags)
         @assert length(near_list) == ne
+        sizehint!(Is, ne * nq * nq)
+        sizehint!(Js, ne * nq * nq)
+        sizehint!(Vs, ne * nq * nq)
         topo_neighs = 1
         neighbors = Inti.topological_neighbors(mesh, topo_neighs)
         for n in 1:ne
@@ -179,6 +183,7 @@ function local_vdim_correction(
                 neighbors,
                 n,
                 interpolation_order,
+                quadrature_order,
                 p,
                 P,
                 γ₁P,
@@ -201,24 +206,9 @@ function local_vdim_correction(
                 wei = R * Linv
             end
             # correct each target near the current element
-            push!(Is, repeat(near_list[n], inner = nq)...)
-            push!(Js, repeat(jglob, outer = length(near_list[n]))...)
-            push!(Vs, transpose(wei)...)
-            if isdefined(Main, :Infiltrator)
-                Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-            end
-            #for i in 1:length(near_list[n])
-            #    #for k in 1:nq
-            #    #    push!(Is, near_list[n][i])
-            #    #    push!(Js, jglob[k])
-            #    #    push!(Vs, wei[i, k])
-            #    #end
-            #    for k in 1:nq
-            #        push!(Is, near_list[n][i])
-            #        push!(Js, jglob[k])
-            #        push!(Vs, wei[i, k])
-            #    end
-            #end
+            append!(Is, repeat(near_list[n], inner = nq)...)
+            append!(Js, repeat(jglob, outer = length(near_list[n]))...)
+            append!(Vs, transpose(wei)...)
         end
     end
     @debug """Condition properties of vdim correction:
@@ -352,6 +342,7 @@ function _local_vdim_auxiliary_quantities(
     neighbors,
     el,
     interpolation_order,
+    quadrature_order,
     p,
     P,
     γ₁P,
@@ -387,9 +378,8 @@ function _local_vdim_auxiliary_quantities(
     # build O(h) volume neighbors
     els_idxs = [i[2] for i in collect(el_neighs)]
     els_list = mesh.etype2els[Etype][els_idxs]
-    qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
-    bdry_qorder = 2 * qorder
-    Yvol = Inti.Quadrature(mesh, els_list; qorder)
+    bdry_qorder = 2 * quadrature_order
+    Yvol = Inti.Quadrature(mesh, els_list; qorder = quadrature_order)
     if need_layer_corr
         Ybdry = Inti.Quadrature(mesh, bords; qorder = bdry_qorder)
     else
