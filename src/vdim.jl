@@ -193,33 +193,32 @@ function local_vdim_correction(
                 iszero(center) || error("SHIFT is not implemented for non-zero center")
                 L̃ = [f((q.coords - c) / r) for f in p, q in view(source, jglob)]
                 S = change_of_basis(multiindices, p, c, r)
-                F = lu(L̃)
-                @debug (vander_cond = max(vander_cond, cond(L̃))) maxlog = 0
-                @debug (shift_norm = max(shift_norm, norm(S))) maxlog = 0
-                @debug (vander_norm = max(vander_norm, norm(L̃))) maxlog = 0
+                Linv = pinv(transpose(L̃))
+                wei = R * transpose(S) * Linv
             else
                 L = [f(q.coords) for f in p, q in view(source, jglob)]
-                F = lu(L)
-                @debug (vander_cond = max(vander_cond, cond(L))) maxlog = 0
-                @debug (shift_norm = max(shift_norm, 1)) maxlog = 0
-                @debug (vander_norm = max(vander_norm, norm(L))) maxlog = 0
+                Linv = pinv(transpose(L))
+                wei = R * Linv
             end
             # correct each target near the current element
-            for i in 1:length(near_list[n])
-                b = @views R[i, :]
-                wei = SHIFT ? F \ (S * b) : F \ b # weights for the current element and target i
-                rhs_norm = max(rhs_norm, norm(b))
-                res_norm = if SHIFT
-                    max(res_norm, norm(L̃ * wei - S * b))
-                else
-                    max(res_norm, norm(L * wei - b))
-                end
-                for k in 1:nq
-                    push!(Is, near_list[n][i])
-                    push!(Js, jglob[k])
-                    push!(Vs, wei[k])
-                end
+            push!(Is, repeat(near_list[n], inner = nq)...)
+            push!(Js, repeat(jglob, outer = length(near_list[n]))...)
+            push!(Vs, transpose(wei)...)
+            if isdefined(Main, :Infiltrator)
+                Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
             end
+            #for i in 1:length(near_list[n])
+            #    #for k in 1:nq
+            #    #    push!(Is, near_list[n][i])
+            #    #    push!(Js, jglob[k])
+            #    #    push!(Vs, wei[i, k])
+            #    #end
+            #    for k in 1:nq
+            #        push!(Is, near_list[n][i])
+            #        push!(Js, jglob[k])
+            #        push!(Vs, wei[i, k])
+            #    end
+            #end
         end
     end
     @debug """Condition properties of vdim correction:

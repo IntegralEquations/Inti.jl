@@ -290,7 +290,7 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
         loc = target === source ? :inside : correction.target_location
         μ = _green_multiplier(loc)
         green_multiplier = fill(μ, length(target))
-        shift = Val(false)
+        shift = Val(true)
         δV = local_vdim_correction(
             pde,
             eltype(V),
