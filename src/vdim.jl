@@ -182,7 +182,6 @@ function local_vdim_correction(
                 mesh,
                 neighbors,
                 n,
-                interpolation_order,
                 quadrature_order,
                 p,
                 P,
@@ -341,7 +340,6 @@ function _local_vdim_auxiliary_quantities(
     mesh,
     neighbors,
     el,
-    interpolation_order,
     quadrature_order,
     p,
     P,
@@ -359,6 +357,7 @@ function _local_vdim_auxiliary_quantities(
     bords = typeof(Inti.LagrangeLine(Inti.nodes(mesh)[first(loc_bdry)]...))[]
     # TODO possible performance improvement
     #bords = Inti.LagrangeElement{Inti.ReferenceHyperCube{N-1}, 3, SVector{N, Float64}}[]
+
     for idxs in loc_bdry
         # TODO possible performance improvement
         #vtxs = SVector{3, SVector{2, Float64}}(Inti.nodes(mesh)[idxs])
@@ -385,7 +384,7 @@ function _local_vdim_auxiliary_quantities(
     else
         Ybdry = Inti.Quadrature(mesh, bords; qorder = bdry_qorder)
     end
-    #Ybdry = Inti.Quadrature(mesh, bords; qorder = 8)
+
     # TODO handle derivative case
     G  = SingleLayerKernel(pde)
     dG = DoubleLayerKernel(pde)
@@ -395,14 +394,6 @@ function _local_vdim_auxiliary_quantities(
     Smat = assemble_matrix(Sop)
     Dmat = assemble_matrix(Dop)
     Vmat = assemble_matrix(Vop)
-    #sleep(2)
-    #Inti.viz_elements_bords(neighbors, el_neighs, (Etype, el), bords, mesh)
-    #qnodesx = [qnode.coords[1] for qnode in Yvol]
-    #qnodesy = [qnode.coords[2] for qnode in Yvol]
-    #Mke.scatter!(qnodesx, qnodesy)
-    #trgsx = [qnode.coords[1] for qnode in X]
-    #trgsy = [qnode.coords[2] for qnode in X]
-    #Mke.scatter!(trgsx, trgsy)
     if need_layer_corr
         μloc = _green_multiplier(:inside)
         green_multiplier = fill(μloc, length(X))

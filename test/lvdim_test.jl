@@ -9,7 +9,7 @@ using FMMLIB2D
 using GLMakie
 using Meshes
 
-meshsize = 0.02
+meshsize = 0.1
 interpolation_order = 4
 VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(5)
 bdry_qorder = 2 * VR_qorder
@@ -101,24 +101,11 @@ V_d2d = Inti.volume_potential(;
         maxdist = 5 * meshsize,
     ),
 )
-Vglob_d2d = Inti.volume_potential(;
-    pde,
-    target = Ωₕ_Sub_quad,
-    source = Ωₕ_Sub_quad,
-    compression = (method = :fmm, tol = 1e-14),
-    correction = (
-        method = :dim,
-        mesh = Ωₕ_Sub,
-        interpolation_order,
-        maxdist = 5 * meshsize,
-    ),
-)
 #end
 #@info "Volume potential time: $tvol"
 
 vref    = -u_d - D_b2d * u_b + S_b2d * du_b
 vapprox = V_d2d * f_d
-vglobapprox = Vglob_d2d * f_d
 er      = vref - vapprox
 
 ndofs = length(er)
