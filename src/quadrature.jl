@@ -126,8 +126,11 @@ function Quadrature(msh::AbstractMesh{N,T}, elementlist::AbstractVector{E}; qord
     #FIXME Ideally we would like to use Gauss quadrature on the local region (fewer points for same order of accuracy) but to do so we need to subtract away the contribution from the global quadrature rule on the local region (typically, these are VR nodes). So, for now, using the global quadrature rule on the local region gives better accuracy since it cancels these (inaccurate) computations out.
     #etype2qrule =
     #    Dict(E => _qrule_for_reference_shape(domain(E), qorder))
-    if domain(E) isa Inti.ReferenceSimplex
+    if domain(E) isa Inti.ReferenceTriangle
         Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder)
+        etype2qrule = Dict(E => Q)
+    elseif domain(E) isa Inti.ReferenceTetrahedron
+        Q = Inti.VioreanuRokhlin(; domain = :tetrahedron, order = qorder)
         etype2qrule = Dict(E => Q)
     else
         etype2qrule =

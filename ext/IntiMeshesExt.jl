@@ -113,9 +113,11 @@ function Inti.viz_elements_bords(Ei, els, ell, bords, msh; quad = nothing)
     if !isnothing(quad)
         xs = [qnode.coords[1] for qnode in quad.qnodes]
         ys = [qnode.coords[2] for qnode in quad.qnodes]
+        zs = [qnode.coords[3] for qnode in quad.qnodes]
         nx = [Inti.normal(qnode)[1] for qnode in quad.qnodes]
         ny = [Inti.normal(qnode)[2] for qnode in quad.qnodes]
-        Mke.arrows!(xs, ys, nx, ny; lengthscale = 0.15)
+        nz = [Inti.normal(qnode)[3] for qnode in quad.qnodes]
+        Mke.arrows!(xs, ys, zs, nx, ny, nz; lengthscale = 0.05, linewidth = 0.01, arrowsize = 0.01)
     end
     display(fig)
 end

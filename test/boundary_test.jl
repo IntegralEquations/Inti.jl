@@ -82,12 +82,3 @@ els_list = test_msh.etype2els[E][els_idxs]
 newquad = Inti.Quadrature(test_msh, els_list; qorder = 2)
 
 Inti.viz_elements_bords(nei, test_els, (E, I), bords, test_msh)
-#Inti.viz_elements_bords(nei, test_els, collect(test_els)[3], bords, test_msh)
-#sleep(2)
-#Inti.viz_elements_bords(neighbors, el_neighs, (Etype, el), bords, mesh)
-#qnodesx = [qnode.coords[1] for qnode in Yvol]
-#qnodesy = [qnode.coords[2] for qnode in Yvol]
-#Mke.scatter!(qnodesx, qnodesy)
-#trgsx = [qnode.coords[1] for qnode in X]
-#trgsy = [qnode.coords[2] for qnode in X]
-#Mke.scatter!(trgsx, trgsy)

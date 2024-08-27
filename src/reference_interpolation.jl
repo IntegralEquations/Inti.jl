@@ -298,6 +298,10 @@ function boundary_idxs(::Type{<:LagrangeTriangle{6}})
     return (1, 2, 4), (2, 3, 5), (3, 1, 6)
 end
 
+function boundary_idxs(::Type{<:LagrangeTetrahedron{4}})
+    return (3, 2, 1), (1, 4, 3), (2, 3, 4), (1, 2, 4)
+end
+
 function boundary1d(els, msh)
     res = Set{Int}()
     E, _ = first(els)

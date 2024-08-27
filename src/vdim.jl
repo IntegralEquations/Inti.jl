@@ -336,7 +336,7 @@ function translation_and_scaling(el::LagrangeTetrahedron)
 end
 
 function _local_vdim_auxiliary_quantities(
-    pde,
+    pde::AbstractPDE{N},
     mesh,
     neighbors,
     el,
@@ -347,37 +347,52 @@ function _local_vdim_auxiliary_quantities(
     X,
     μ,
     bdry_kdtree;
-)
+) where {N}
     # construct the local region
     Etype = first(Inti.element_types(mesh))
     el_neighs = copy(neighbors[(Etype,el)])
 
     loc_bdry = Inti.boundarynd(el_neighs, mesh)
     # TODO handle curved boundary of Γ??
-    bords = typeof(Inti.LagrangeLine(Inti.nodes(mesh)[first(loc_bdry)]...))[]
-    # TODO possible performance improvement
-    #bords = Inti.LagrangeElement{Inti.ReferenceHyperCube{N-1}, 3, SVector{N, Float64}}[]
+    #bords = typeof(Inti.LagrangeLine(Inti.nodes(mesh)[first(loc_bdry)]...))[]
+    # TODO possible performance improvement over prev line
+    if N == 2
+        bords = Inti.LagrangeElement{Inti.ReferenceHyperCube{N-1}, 3, SVector{N, Float64}}[]
+    else
+        bords = Inti.LagrangeElement{Inti.ReferenceSimplex{N-1}, 3, SVector{N, Float64}}[]
+    end
 
     for idxs in loc_bdry
         # TODO possible performance improvement
         #vtxs = SVector{3, SVector{2, Float64}}(Inti.nodes(mesh)[idxs])
         #bord = Inti.LagrangeLine(vtxs)
         vtxs = Inti.nodes(mesh)[idxs]
-        bord = Inti.LagrangeLine(vtxs...)
+        if N === 2
+            bord = Inti.LagrangeElement{Inti.ReferenceHyperCube{N-1}}(vtxs...)
+        else
+            bord = Inti.LagrangeElement{Inti.ReferenceSimplex{N-1}}(vtxs...)
+        end
         push!(bords, bord)
     end
 
     # Check if we need to do near-singular layer potential evaluation
-    vertices = mesh.etype2els[Etype][el].vals[1:3]
-    diam = max(norm(vertices[1] - vertices[2]),
-               norm(vertices[2] - vertices[3]),
-               norm(vertices[3] - vertices[1]))
+    vertices = mesh.etype2els[Etype][el].vals[vertices_idxs(Etype)]
+    if N == 2
+        diam = max(norm(vertices[1] - vertices[2]),
+                   norm(vertices[2] - vertices[3]),
+                   norm(vertices[3] - vertices[1]))
+    else
+        diam = max(norm(vertices[1] - vertices[2]),
+                   norm(vertices[2] - vertices[3]),
+                   norm(vertices[3] - vertices[4]),
+                   norm(vertices[4] - vertices[1]))
+    end
     need_layer_corr = sum(inrangecount(bdry_kdtree, vertices, diam/2)) > 0
 
     # build O(h) volume neighbors
     els_idxs = [i[2] for i in collect(el_neighs)]
     els_list = mesh.etype2els[Etype][els_idxs]
-    bdry_qorder = 2 * quadrature_order
+    bdry_qorder = 2 * quadrature_order + 1
     Yvol = Inti.Quadrature(mesh, els_list; qorder = quadrature_order)
     if need_layer_corr
         Ybdry = Inti.Quadrature(mesh, bords; qorder = bdry_qorder)
