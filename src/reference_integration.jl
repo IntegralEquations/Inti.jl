@@ -364,7 +364,7 @@ domain(qrule)`. The following optional keyword arguments are available:
 - `maxsplit::Int=1000`: maximum number of times to split the domain
 - `norm::Function=LinearAlgebra.norm`: norm to use for error estimates
 - `buffer::BinaryHeap`: a pre-allocated buffer to use for the adaptive procedure
-  (see [allocate_buffer](@ref))
+  (see [`allocate_buffer`](@ref))
 """
 function adaptive_integration(
     f,
