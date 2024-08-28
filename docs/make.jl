@@ -1,13 +1,20 @@
 using Inti
 using Documenter
 using DocumenterCitations
+using DocumenterInterLinks
 using Literate
 # packages needed for extensions
 using Gmsh
 using HMatrices
 using Meshes
+using GLMakie
 using FMM2D
 using FMM3D
+
+links = InterLinks(
+    "Meshes" => "https://juliageometry.github.io/MeshesDocs/dev/objects.inv",
+    "HMatrices" => "https://integralequations.github.io/HMatrices.jl/stable/objects.inv",
+)
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style = :numeric)
 
@@ -32,7 +39,7 @@ end
 # Generate examples using Literate
 const examples_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples")
 const generated_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples", "generated")
-const examples = ["toy_example.jl", "helmholtz_scattering.jl", "poisson.jl"]
+const examples = ["toy_example.jl", "helmholtz_scattering.jl"]
 for t in examples
     println("\n*** Generating $t example")
     @time begin
@@ -56,7 +63,7 @@ DocMeta.setdocmeta!(Inti, :DocTestSetup, :(using Inti); recursive = true)
 
 modules = [Inti]
 for extension in
-    [:IntiGmshExt, :IntiHMatricesExt, :IntiMeshesExt, :IntiFMM2DExt, :IntiFMM3DExt]
+    [:IntiGmshExt, :IntiHMatricesExt, :IntiMakieExt, :IntiFMM2DExt, :IntiFMM3DExt]
     ext = Base.get_extension(Inti, extension)
     isnothing(ext) && "error loading $ext"
     push!(modules, ext)
@@ -71,6 +78,7 @@ makedocs(;
         canonical = "https://IntegralEquations.github.io/Inti.jl",
         size_threshold = 2 * 2^20, # 2 MiB
         size_threshold_warn = 1 * 2^20, # 1 MiB
+        sidebar_sitename = false,
     ),
     pages = [
         "Home" => "index.md",
@@ -86,17 +94,20 @@ makedocs(;
         "Examples" => [
             "examples/generated/toy_example.md",
             "examples/generated/helmholtz_scattering.md",
-            "examples/generated/poisson.md",
+            "examples/poisson.md",
+            # "examples/generated/lippmann_schwinger.md",
+            # "examples/generated/poisson.md",
+            # "examples/generated/stokes_drag.md",
         ],
         "References" => "references.md",
         "Docstrings" => "docstrings.md",
     ],
-    warnonly = ON_CI ? true : Documenter.except(:linkcheck_remotes),
+    warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),
     # warnonly = true,
     pagesonly = true,
     checkdocs = :none,
     draft,
-    plugins = [bib],
+    plugins = [bib, links],
 )
 
 deploydocs(;

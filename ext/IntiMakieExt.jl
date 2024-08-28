@@ -1,11 +1,12 @@
-module IntiMeshesExt
+module IntiMakieExt
 
 using Meshes
+using Makie
 import Inti
 using StaticArrays
 
 function __init__()
-    @info "Loading Inti.jl Meshes extension"
+    @info "Loading Inti.jl Makie extension"
 end
 
 ## Coversion to Meshes.jl equivalent formates for visualization
@@ -19,7 +20,7 @@ counterparts.
 """
 function to_meshes end
 
-to_point(x::SVector) = Point(x...)
+to_point(x::SVector) = Meshes.Point(x...)
 # LagrangeLine
 to_meshes(el::Inti.LagrangeLine) = Segment(to_point.(Inti.vertices(el))...)
 # LagrangeTriangle

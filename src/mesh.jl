@@ -101,7 +101,14 @@ function elements(msh::AbstractMesh)
     return Iterators.flatten(elements(msh, E) for E in element_types(msh))
 end
 
-nodes(msh::LagrangeMesh)     = msh.nodes
+nodes(msh::LagrangeMesh) = msh.nodes
+
+"""
+    ent2etags(msh::AbstractMesh)
+
+Return a dictionary mapping entities to a dictionary of element types to element
+tags.
+"""
 ent2etags(msh::LagrangeMesh) = msh.ent2etags
 etype2mat(msh::LagrangeMesh) = msh.etype2mat
 etype2els(msh::LagrangeMesh) = msh.etype2els
@@ -139,7 +146,7 @@ Compute the element indices `idxs` of the elements of type `E` composing `Ω`.
 function dom2elt(m::AbstractMesh, Ω::Domain, E::DataType)
     idxs = Int[]
     for k in keys(Ω)
-        tags = get(m.ent2etags[k], E, Int[])
+        tags = get(ent2etags(m)[k], E, Int[])
         append!(idxs, tags)
     end
     return idxs
@@ -151,8 +158,10 @@ function Base.getindex(msh::LagrangeMesh{N,T}, Ω::Domain) where {N,T}
     foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), keys(Ω))
     glob2loc = Dict{Int,Int}()
     for E in element_types(msh)
+        E <: Union{LagrangeElement,SVector,ParametricElement} || error()
+        els = elements(msh, E)
         # create new element iterator
-        etype2els[E] = ElementIterator(new_msh, E)
+        els_new = etype2els[E] = E <: ParametricElement ? E[] : ElementIterator(new_msh, E)
         # create new connectivity
         connect = msh.etype2mat[E]::Matrix{Int}
         np, _ = size(connect)
@@ -175,18 +184,20 @@ function Base.getindex(msh::LagrangeMesh{N,T}, Ω::Domain) where {N,T}
                 end
                 # add new tag for the element
                 push!(etags_loc, etag_loc)
+                # push new element if not inferable from connectivity
+                isa(els_new, Vector) && push!(etype2els[E], els[iglob])
             end
         end
         isempty(mat) || (etype2mat[E] = reshape(mat, np, :))
     end
     return new_msh
 end
+Base.getindex(msh::LagrangeMesh, ent::EntityKey) = getindex(msh, Domain(ent))
 
 """
-    meshgen(Ω::Domain, n)
-    meshgen(Ω::Domain, n_dict)
-    meshgen(Ω::Domain; meshsize)
-
+    meshgen(Ω, n)
+    meshgen(Ω, n_dict)
+    meshgen(Ω; meshsize)
 
 Generate a `LagrangeMesh` for the domain `Ω` where each curve is meshed using
 `n` elements. Passing a dictionary allows for a finer control; in such cases,
@@ -202,7 +213,7 @@ This function requires the entities forming `Ω` to have an explicit
 parametrization.
 
 !!! warning "Mesh quality"
-    The quality of the generated mesh created usign `meshgen` depends on
+    The quality of the generated mesh created using `meshgen` depends on
     the quality of the underlying parametrization. For complex surfaces, you are
     better off using a proper mesher such as `gmsh`.
 """
@@ -215,6 +226,8 @@ function meshgen(Ω::Domain, args...; kwargs...)
     meshgen!(mesh, Ω, args...; kwargs...)
     return mesh
 end
+
+meshgen(e::EntityKey, args...; kwargs...) = meshgen(Domain(e), args...; kwargs...)
 
 """
     meshgen!(mesh,Ω,sz)
@@ -229,12 +242,28 @@ function meshgen!(msh::LagrangeMesh, Ω::Domain; meshsize::Real)
     # compute the length of each curve using an adaptive quadrature
     e1d = filter(k -> geometric_dimension(k) == 1, all_keys(Ω))
     dict = Dict(k => ceil(Int, measure(k) / meshsize) for k in e1d)
+    # curves which are opposite sides of a surface must have the same number of
+    # elements. If they differ, we take the maximum. Because there can be chains
+    # of dependencies (i.e. l1 is opposite to l2 and l2 is opposite to l3), we
+    # simple iterate until all are consistent.
+    e2d = filter(k -> geometric_dimension(k) == 2, all_keys(Ω))
+    while true
+        consistent = true
+        for k in e2d
+            b1, b2, b3, b4 = boundary(global_get_entity(k))
+            n1, n2, n3, n4 = map(b -> dict[b], (b1, b2, b3, b4))
+            if !(n1 == n3 && n2 == n4)
+                consistent = false
+                dict[b1] = dict[b3] = max(n1, n3)
+                dict[b2] = dict[b4] = max(n2, n4)
+            end
+        end
+        consistent && break
+    end
     return meshgen!(msh, Ω, dict)
 end
 function meshgen!(msh::LagrangeMesh, Ω::Domain, dict::Dict)
-    N = ambient_dimension(msh)
     d = geometric_dimension(Ω)
-    @assert N == 2 "meshgen! only supports 2d meshes for now"
     for k in keys(Ω)
         if d == 1
             haskey(dict, k) || error(msg1(k))
@@ -252,7 +281,7 @@ function meshgen!(msh::LagrangeMesh, Ω::Domain, dict::Dict)
                 if haskey(dict, l)
                     haskey(dict, op_l) &&
                         dict[l] != dict[op_l] &&
-                        error("num_elements for $l and $op_l must be the same")
+                        @warn "num_elements for $l and $op_l must be the same"
                     return dict[l]
                 elseif haskey(dict, l_op)
                     return dict[l_op]
@@ -267,6 +296,8 @@ function meshgen!(msh::LagrangeMesh, Ω::Domain, dict::Dict)
             b4 ∈ entities(msh) || _meshgen!(msh, b4, (n[2],))
             # mesh area
             _meshgen!(msh, k, n)
+        else
+            error("meshgen! not implemented volumes")
         end
     end
     _build_connectivity!(msh)
@@ -459,10 +490,13 @@ struct SubMesh{N,T} <: AbstractMesh{N,T}
         return new{N,T}(mesh, Ω, etype2etags)
     end
 end
+
 Base.view(m::LagrangeMesh, Ω::Domain) = SubMesh(m, Ω)
 Base.view(m::LagrangeMesh, ent::EntityKey) = SubMesh(m, Domain(ent))
 
 Base.collect(msh::SubMesh) = msh.parent[msh.domain]
+
+Base.parent(msh::SubMesh) = msh.parent
 
 ambient_dimension(::SubMesh{N}) where {N} = N
 
@@ -470,6 +504,25 @@ geometric_dimension(msh::AbstractMesh) = geometric_dimension(domain(msh))
 
 domain(msh::SubMesh) = msh.domain
 entities(msh::SubMesh) = entities(domain(msh))
+
+function ent2etags(msh::SubMesh)
+    par_ent2etags = ent2etags(parent(msh))
+    g2l = Dict{Int,Int}() # global (parent) to local element index
+    for (E, tags) in msh.etype2etags
+        for (iloc, iglob) in enumerate(tags)
+            g2l[iglob] = iloc
+        end
+    end
+    new_ent2etags = empty(par_ent2etags)
+    for ent in entities(msh)
+        par_etags = par_ent2etags[ent]
+        new_ent2etags[ent] = etags = empty(par_etags)
+        for (E, tags) in par_etags
+            etags[E] = [g2l[t] for t in tags]
+        end
+    end
+    return new_ent2etags
+end
 
 element_types(msh::SubMesh) = keys(msh.etype2etags)
 
@@ -489,7 +542,7 @@ Return the tags of the nodes in the parent mesh belonging to the submesh.
 function nodetags(msh::SubMesh)
     tags = Int[]
     for ent in entities(msh)
-        append!(tags, ent2nodetags(msh, key(ent)))
+        append!(tags, ent2nodetags(msh, ent))
     end
     return unique!(tags)
 end
@@ -548,6 +601,13 @@ end
     centers = map(center, els)
     return inrange(balltree, centers, tol)
 end
+
+"""
+    Domain(f::Function, msh::AbstractMesh)
+
+Call `Domain(f, ents)` on `ents = entities(msh).`
+"""
+Domain(f::Function, msh::AbstractMesh) = Domain(f, entities(msh))
 
 """
     target_to_near_elements(X::AbstractVector{<:SVector{N}}, Y::AbstractMesh{N};

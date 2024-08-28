@@ -9,4 +9,5 @@
 A package for efficient and high-order discretization and application of
 boundary and volume integral operators in complex geometries in 2D and 3D.
 
-Documentation and detailed examples can currently be found in the devdocs.
+Documentation and detailed examples can currently be found in the docs linked above;
+Inti's capabilities and behavior can quickly change so devdocs are recommended.

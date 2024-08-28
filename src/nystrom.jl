@@ -76,12 +76,16 @@ end
 """
     assemble_matrix(iop::IntegralOperator; threads = true)
 
-Assemble the dense matrix representation of an `IntegralOperator`.
+Assemble a dense matrix representation of an `IntegralOperator`.
 """
 function assemble_matrix(iop::IntegralOperator; threads = true)
     T    = eltype(iop)
     m, n = size(iop)
-    out  = Matrix{T}(undef, m, n)
+    out  = if T <: SMatrix
+        BlockArray{T}(undef, m, n)
+    else
+        Array{T}(undef, m, n)
+    end
     K    = kernel(iop)
     # function barrier
     _assemble_matrix!(out, K, iop.target, iop.source, threads)
@@ -134,8 +138,9 @@ end
 Assemble an H-matrix representation of the discretized integral operator `iop`
 using the `HMatrices.jl` library.
 
-See the `assemble_hmatrix` function from `HMatrices.jl` for more details on the
-keyword arguments.
+See the documentation of
+[`HMatrices`](https://github.com/IntegralEquations/HMatrices.jl) for more
+details on usage and other keyword arguments.
 """
 function assemble_hmatrix(args...; kwargs...)
     return error("Inti.assemble_hmatrix not found. Did you forget to import HMatrices?")
@@ -263,7 +268,7 @@ function _farfield_distance(el, K, qrule, tol, maxiter)
         @debug n, er
         (er < tol / 2) && break # attained desired tolerance
     end
-    msg = """failed to attained desired tolerance when computing maxdist. Your
+    msg = """failed to attain desired tolerance when computing maxdist. Your
     quadrature may not be accurate enough, or your meshsize not small enough, to
     achieve the requested tolerance on the far field."""
     er > tol / 2 && @warn msg

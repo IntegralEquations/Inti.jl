@@ -103,7 +103,8 @@ function lagrange_basis(nodes, sp::PolynomialSpace)
     # compute the matrix of coefficients of the lagrange polynomials over the
     # monomomial basis
     V = hcat([basis(x) for x in nodes]...)
-    C = SArray(MArray(V) \ I)
+    # convert to an array to use the backslash operator
+    C = typeof(V)(Matrix(V) \ I)
     lag_basis = x -> C * basis(x)
     return lag_basis
 end

@@ -51,6 +51,13 @@ translate(q::QuadratureNode, x) = QuadratureNode(coords(q) + x, weight(q), norma
 # `IntegralOperators`.
 coords(x::Union{SVector,Tuple}) = SVector(x)
 
+function Base.show(io::IO, q::QuadratureNode)
+    println(io, "Quadrature node:")
+    println(io, "-- coords: $(q.coords)")
+    println(io, "-- normal: $(q.normal)")
+    return print(io, "-- weight: $(q.weight)")
+end
+
 """
     struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
 
@@ -428,4 +435,37 @@ function quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
         end
     end
     return ivals ./ areas
+end
+
+"""
+    mean_curvature(Q::Quadrature)
+
+Compute the `mean_curvature` at each quadrature node in `Q`.
+"""
+mean_curvature(Q::Quadrature) = _curvature(mean_curvature, Q)
+
+"""
+    gauss_curvature(Q::Quadrature)
+
+Compute the `gauss_curvature` at each quadrature node in `Q`.
+"""
+gauss_curvature(Q::Quadrature) = _curvature(gauss_curvature, Q)
+
+# helper function for computing curvature
+function _curvature(f, Q)
+    msh = mesh(Q)
+    curv = zeros(length(Q))
+    for (E, tags) in Q.etype2qtags
+        qrule = quadrature_rule(Q, E)
+        q̂, _ = qrule()
+        els = elements(msh, E)
+        for n in 1:size(tags, 2)
+            el = els[n]
+            for i in 1:size(tags, 1)
+                qtag = tags[i, n]
+                curv[qtag] = f(el, q̂[i])
+            end
+        end
+    end
+    return curv
 end

@@ -89,13 +89,13 @@ function vdim_correction(
                 iszero(center) || error("SHIFT is not implemented for non-zero center")
                 L̃ = [f((q.coords - c) / r) for f in p, q in view(source, jglob)]
                 S = change_of_basis(multiindices, p, c, r)
-                F = lu(L̃)
+                F = svd(L̃)
                 @debug (vander_cond = max(vander_cond, cond(L̃))) maxlog = 0
                 @debug (shift_norm = max(shift_norm, norm(S))) maxlog = 0
                 @debug (vander_norm = max(vander_norm, norm(L̃))) maxlog = 0
             else
                 L = [f(q.coords) for f in p, q in view(source, jglob)]
-                F = lu(L)
+                F = svd(L)
                 @debug (vander_cond = max(vander_cond, cond(L))) maxlog = 0
                 @debug (shift_norm = max(shift_norm, 1)) maxlog = 0
                 @debug (vander_norm = max(vander_norm, norm(L))) maxlog = 0

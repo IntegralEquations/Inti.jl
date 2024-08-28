@@ -8,7 +8,7 @@ function __init__()
     @info "Loading Inti.jl FMM2D extension"
 end
 
-function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
+function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
     # unpack the necessary fields in the appropriate format
     m, n = size(iop)
     sources = Matrix{Float64}(undef, 2, n)
@@ -33,14 +33,14 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
             @. charges = -1 / (2 * π) * weights * x
             if same_surface
                 out =
-                    FMM2D.rfmm2d(; sources = sources, charges = charges, eps = atol, pg = 1)
+                    FMM2D.rfmm2d(; sources = sources, charges = charges, eps = rtol, pg = 1)
                 return copyto!(y, out.pot)
             else
                 out = FMM2D.rfmm2d(;
                     sources = sources,
                     charges = charges,
                     targets = targets,
-                    eps     = atol,
+                    eps     = rtol,
                     pgt     = 1,
                 )
                 return copyto!(y, out.pottarg)
@@ -66,7 +66,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     sources = sources,
                     dipstr  = dipstr,
                     dipvecs = dipvecs,
-                    eps     = atol,
+                    eps     = rtol,
                     pg      = 1,
                 )
                 return copyto!(y, out.pot)
@@ -76,7 +76,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     targets = targets,
                     dipstr  = dipstr,
                     dipvecs = dipvecs,
-                    eps     = atol,
+                    eps     = rtol,
                     pgt     = 1,
                 )
                 return copyto!(y, out.pottarg)
@@ -93,14 +93,14 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
             @. charges = -1 / (2 * π) * weights * x
             if same_surface
                 out =
-                    FMM2D.rfmm2d(; charges = charges, sources = sources, eps = atol, pg = 2)
+                    FMM2D.rfmm2d(; charges = charges, sources = sources, eps = rtol, pg = 2)
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
             else
                 out = FMM2D.rfmm2d(;
                     charges = charges,
                     sources = sources,
                     targets = targets,
-                    eps     = atol,
+                    eps     = rtol,
                     pgt     = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
@@ -130,7 +130,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     dipvecs = dipvecs,
                     dipstr  = dipstrs,
                     sources = sources,
-                    eps     = atol,
+                    eps     = rtol,
                     pg      = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
@@ -140,7 +140,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     dipstr  = dipstrs,
                     sources = sources,
                     targets = targets,
-                    eps     = atol,
+                    eps     = rtol,
                     pgt     = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
@@ -158,7 +158,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     zk      = zk,
                     sources = sources,
                     charges = charges,
-                    eps     = atol,
+                    eps     = rtol,
                     pg      = 1,
                 )
                 return copyto!(y, out.pot)
@@ -168,7 +168,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     sources = sources,
                     charges = charges,
                     targets = targets,
-                    eps     = atol,
+                    eps     = rtol,
                     pgt     = 1,
                 )
                 return copyto!(y, out.pottarg)
@@ -196,7 +196,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     sources = sources,
                     dipstr  = dipstrs,
                     dipvecs = dipvecs,
-                    eps     = atol,
+                    eps     = rtol,
                     pg      = 1,
                 )
                 return copyto!(y, out.pot)
@@ -207,7 +207,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     targets = targets,
                     dipstr  = dipstrs,
                     dipvecs = dipvecs,
-                    eps     = atol,
+                    eps     = rtol,
                     pgt     = 1,
                 )
                 return copyto!(y, out.pottarg)
@@ -228,7 +228,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     zk      = zk,
                     charges = charges,
                     sources = sources,
-                    eps     = atol,
+                    eps     = rtol,
                     pg      = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
@@ -238,7 +238,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     charges = charges,
                     sources = sources,
                     targets = targets,
-                    eps     = atol,
+                    eps     = rtol,
                     pgt     = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
@@ -270,7 +270,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     dipvecs = dipvecs,
                     dipstr  = dipstrs,
                     sources = sources,
-                    eps     = atol,
+                    eps     = rtol,
                     pg      = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
@@ -281,7 +281,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     dipstr  = dipstrs,
                     sources = sources,
                     targets = targets,
-                    eps     = atol,
+                    eps     = rtol,
                     pgt     = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)

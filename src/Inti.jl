@@ -12,15 +12,19 @@ using ForwardDiff
 using LinearAlgebra
 using LinearMaps
 using NearestNeighbors
+using Pkg
+using Scratch
 using SparseArrays
 using StaticArrays
 using SpecialFunctions
 using Printf
+using TOML
 
 import ElementaryPDESolutions
 
 # helper functions
 include("utils.jl")
+include("blockarray.jl")
 
 # basic interpolation and integration
 include("reference_shapes.jl")
@@ -32,6 +36,7 @@ include("reference_integration.jl")
 # geometry meshes, and quadratures
 include("entities.jl")
 include("domain.jl")
+include("simpleshapes.jl")
 include("mesh.jl")
 include("quadrature.jl")
 

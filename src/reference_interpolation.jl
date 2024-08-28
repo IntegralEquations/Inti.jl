@@ -20,11 +20,14 @@ function (el::ReferenceInterpolant)(x)
     return interface_method(el)
 end
 
+geometric_dimension(::ReferenceInterpolant{D,T}) where {D,T} = geometric_dimension(D)
+ambient_dimension(el::ReferenceInterpolant{D,T}) where {D,T} = length(T)
+
 """
     jacobian(f,x)
 
 Given a (possibly vector-valued) functor `f : 𝐑ᵐ → 𝐅ⁿ`, return the `n × m`
-matrix `Aᵢⱼ = ∂fᵢ/∂xⱼ`. By default `ForwardDiff` is used to comptue the
+matrix `Aᵢⱼ = ∂fᵢ/∂xⱼ`. By default `ForwardDiff` is used to compute the
 jacobian, but you should overload this method for specific `f` if better
 performance and/or precision is required.
 
@@ -34,6 +37,73 @@ function jacobian(f, s)
     return ForwardDiff.jacobian(f, s)
 end
 jacobian(f, s::Real) = jacobian(f, SVector(s))
+
+"""
+    hesssian(el,x)
+
+Given a (possibly vector-valued) functor `f : 𝐑ᵐ → 𝐅ⁿ`, return the `n × m × m`
+matrix `Aᵢⱼⱼ = ∂²fᵢ/∂xⱼ∂xⱼ`. By default `ForwardDiff` is used to compute the
+hessian, but you should overload this method for specific `f` if better
+performance and/or precision is required.
+
+Note: both `x` and `f(x)` are expected to be of `SVector` type.
+"""
+function hessian(el::ReferenceInterpolant, s)
+    N = ambient_dimension(el)
+    M = geometric_dimension(el)
+    S = Tuple{N,M,M}
+    return SArray{S}(stack(i -> ForwardDiff.hessian(x -> el(x)[i], s), 1:N; dims = 1))
+end
+
+function first_fundamental_form(el::ReferenceInterpolant, x̂)
+    jac = jacobian(el, x̂)
+    # first fundamental form
+    E = dot(jac[:, 1], jac[:, 1])
+    F = dot(jac[:, 1], jac[:, 2])
+    G = dot(jac[:, 2], jac[:, 2])
+    return E, F, G
+end
+
+function second_fundamental_form(el::ReferenceInterpolant, x̂)
+    jac = jacobian(el, x̂)
+    ν = _normal(jac)
+    # second fundamental form
+    hess = hessian(el, x̂)
+    L = dot(hess[:, 1, 1], ν)
+    M = dot(hess[:, 1, 2], ν)
+    N = dot(hess[:, 2, 2], ν)
+
+    return L, M, N
+end
+
+"""
+    mean_curvature(τ, x̂)
+
+Calculate the [mean curvature](https://en.wikipedia.org/wiki/Mean_curvature) of
+the element `τ` at the parametric coordinate `x̂`.
+"""
+function mean_curvature(el::ReferenceInterpolant, x̂)
+    E, F, G = first_fundamental_form(el, x̂)
+    L, M, N = second_fundamental_form(el, x̂)
+    # mean curvature
+    κ = (L * G - 2 * F * M + E * N) / (2 * (E * G - F^2))
+    return κ
+end
+
+"""
+    gauss_curvature(τ, x̂)
+
+Calculate the [Gaussian
+curvature](https://en.wikipedia.org/wiki/Gaussian_curvature) of the element `τ`
+at the parametric coordinate `x̂`.
+"""
+function gauss_curvature(el::ReferenceInterpolant, x̂)
+    E, F, G = first_fundamental_form(el, x̂)
+    L, M, N = second_fundamental_form(el, x̂)
+    # Guassian curvature
+    κ = (L * N - M^2) / (E * G - F^2)
+    return κ
+end
 
 domain(::ReferenceInterpolant{D,T}) where {D,T} = D()
 domain(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = D()
@@ -106,7 +176,6 @@ parametrization(el::ParametricElement) = el.parametrization
 domain(::ParametricElement{D,T,F}) where {D,T,F} = D()
 return_type(::ParametricElement{D,T,F}) where {D,T,F} = T
 
-geometric_dimension(p::ParametricElement) = geometric_dimension(domain(p))
 ambient_dimension(p::ParametricElement) = length(return_type(p))
 
 function (el::ParametricElement)(u)

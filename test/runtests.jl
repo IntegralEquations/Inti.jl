@@ -6,6 +6,8 @@ using Aqua
 
 @safetestset "Utility functions" include("utils_test.jl")
 
+@safetestset "Block array" include("blockarray_test.jl")
+
 @safetestset "Reference shapes" include("reference_shapes_test.jl")
 
 @safetestset "Polynomials" include("polynomials_test.jl")

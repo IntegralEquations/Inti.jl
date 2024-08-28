@@ -49,28 +49,42 @@ function _import_mesh!(msh)
     # tag 1, the second node has tag 2, etc. This is not always the case in
     # gmsh, where the global node tags are not necessarily consecutive (AFAIU
     # they the tags need not even be a permutation of 1:N). Below we use a Dict
-    # to map from the gmsh tags to the consecutive tags, but it would be
+    # to map from the gmsh node tags to the consecutive tags, but it would be
     # probably better to force gmsh to use consecutive tags in the first place.
-    tags, coords, _ = gmsh.model.mesh.getNodes()
-    tags_dict = Dict(zip(tags, collect(1:length(tags))))
+    node_tags, coords, _ = gmsh.model.mesh.getNodes()
+    gmsh2loc_node_tags = Dict(zip(node_tags, collect(1:length(node_tags))))
     gmsh_nodes = reinterpret(SVector{3,Float64}, coords) |> collect
     shift = length(msh.nodes) # gmsh node tags need to be shifted in case msh was not empty
     append!(msh.nodes, gmsh_nodes)
     gmsh_dim_tags = gmsh.model.getEntities()
-    for (dim, tag) in gmsh_dim_tags
-        pgroups = gmsh.model.getPhysicalGroupsForEntity(dim, tag)
+    gmsh2loc_ent_tags = Dict{Int,Int}() # local to gmsh entity tags
+    for (dim, gmsh_ent_tag) in gmsh_dim_tags
+        pgroups = gmsh.model.getPhysicalGroupsForEntity(dim, gmsh_ent_tag)
         labels = map(t -> gmsh.model.getPhysicalName(dim, t), pgroups)
         combined, oriented, recursive = true, true, false
-        bnd_dim_tags = gmsh.model.getBoundary((dim, tag), combined, oriented, recursive)
-        bnd = map(t -> Inti.EntityKey(t[1], t[2]), bnd_dim_tags)
+        bnd_dim_tags =
+            gmsh.model.getBoundary((dim, gmsh_ent_tag), combined, oriented, recursive)
+        bnd = map(bnd_dim_tags) do t
+            return Inti.EntityKey(t[1], sign(t[2]) * gmsh2loc_ent_tags[abs(t[2])])
+        end
         # add entity to global dictionary. The sign of tag is ignored,
         # orientation information is stored in the key. The underlying
         # parametrizatio of the entity is not (easily) available in gmsh, so we
         # set it to nothing.
         push_forward = nothing
-        Inti.GeometricEntity(dim, abs(tag), bnd, labels, push_forward)
+        # create a new tag for the entity, possibly different from the gmsh one
+        tag = sign(gmsh_ent_tag) * Inti.new_tag(dim)
+        gmsh2loc_ent_tags[abs(gmsh_ent_tag)] = abs(tag)
+        Inti.GeometricEntity(dim, tag, bnd, labels, push_forward)
         key = Inti.EntityKey(dim, tag) # key for the entity
-        _ent_to_mesh!(msh.etype2mat, msh.ent2etags, key, shift, tags_dict)
+        _ent_to_mesh!(
+            msh.etype2mat,
+            msh.ent2etags,
+            key,
+            shift,
+            gmsh2loc_node_tags,
+            gmsh_ent_tag,
+        )
     end
     return msh
 end
@@ -90,15 +104,15 @@ where:
 - `etags::Vector{Int}` gives the tags of the elements of type `etype` used to
   mesh the entity with the given `key`.
 """
-function _ent_to_mesh!(etype2mat, ent2etags, key, shift, tags_dict)
+function _ent_to_mesh!(etype2mat, ent2etags, key, shift, gmsh2loc_node_tags, tgmsh)
     d, t = key.dim, key.tag
     haskey(ent2etags, key) && error("entity $key already in ent2etags")
     etype2etags = ent2etags[key] = Dict{DataType,Vector{Int}}()
     # Loop on GMSH element types (integer)
-    type_tags, _, ntagss = gmsh.model.mesh.getElements(d, t)
+    type_tags, _, ntagss = gmsh.model.mesh.getElements(d, tgmsh)
     for (type_tag, ntags) in zip(type_tags, ntagss)
         _, _, _, Np, _ = gmsh.model.mesh.getElementProperties(type_tag)
-        ntags = map(i -> tags_dict[i], reshape(ntags, Int(Np), :))
+        ntags = map(i -> gmsh2loc_node_tags[i], reshape(ntags, Int(Np), :))
         etype = _type_tag_to_etype(type_tag)
         if etype in keys(etype2mat)
             etag = size(etype2mat[etype], 2) .+ collect(1:size(ntags, 2))

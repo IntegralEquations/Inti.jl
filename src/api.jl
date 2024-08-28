@@ -72,14 +72,14 @@ function single_double_layer(;
     Dop         = IntegralOperator(dG, target, source)
     # handle compression
     if compression.method == :hmatrix
-        Smat = assemble_hmatrix(Sop; atol = compression.tol)
-        Dmat = assemble_hmatrix(Dop; atol = compression.tol)
+        Smat = assemble_hmatrix(Sop; rtol = compression.tol)
+        Dmat = assemble_hmatrix(Dop; rtol = compression.tol)
     elseif compression.method == :none
         Smat = assemble_matrix(Sop)
         Dmat = assemble_matrix(Dop)
     elseif compression.method == :fmm
-        Smat = assemble_fmm(Sop; atol = compression.tol)::LinearMap
-        Dmat = assemble_fmm(Dop; atol = compression.tol)::LinearMap
+        Smat = assemble_fmm(Sop; rtol = compression.tol)::LinearMap
+        Dmat = assemble_fmm(Dop; rtol = compression.tol)::LinearMap
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
@@ -107,14 +107,14 @@ function single_double_layer(;
             Dop_dim = IntegralOperator(dG, target[glob_near_trgs], source)
             # compress 'em
             if compression.method == :hmatrix
-                Sop_dim_mat = assemble_hmatrix(Sop_dim; atol = compression.tol)
-                Dop_dim_mat = assemble_hmatrix(Dop_dim; atol = compression.tol)
+                Sop_dim_mat = assemble_hmatrix(Sop_dim; rtol = compression.tol)
+                Dop_dim_mat = assemble_hmatrix(Dop_dim; rtol = compression.tol)
             elseif compression.method == :none
                 Sop_dim_mat = assemble_matrix(Sop_dim)
                 Dop_dim_mat = assemble_matrix(Dop_dim)
             elseif compression.method == :fmm
-                Sop_dim_mat = assemble_fmm(Sop_dim; atol = compression.tol)::LinearMap
-                Dop_dim_mat = assemble_fmm(Dop_dim; atol = compression.tol)::LinearMap
+                Sop_dim_mat = assemble_fmm(Sop_dim; rtol = compression.tol)::LinearMap
+                Dop_dim_mat = assemble_fmm(Dop_dim; rtol = compression.tol)::LinearMap
             else
                 error("Unknown compression method. Available options: $COMPRESSION_METHODS")
             end
@@ -172,13 +172,8 @@ function single_double_layer(;
         S = axpy!(true, δS, Smat)
         D = axpy!(true, δD, Dmat)
     elseif compression.method == :hmatrix
-        if target === source
-            S = axpy!(true, δS, Smat)
-            D = axpy!(true, δD, Dmat)
-        else
-            S = LinearMap(Smat) + LinearMap(δS)
-            D = LinearMap(Dmat) + LinearMap(δD)
-        end
+        S = LinearMap(Smat) + LinearMap(δS)
+        D = LinearMap(Dmat) + LinearMap(δD)
     elseif compression.method == :fmm
         S = Smat + LinearMap(δS)
         D = Dmat + LinearMap(δD)
@@ -225,6 +220,60 @@ function single_double_layer_potential(; pde, source)
     return 𝒮, 𝒟
 end
 
+"""
+    volume_potential(; pde, target, source::Quadrature, compression, correction)
+
+Compute the volume potential operator for a given PDE.
+
+## Arguments
+- `pde`: The PDE (Partial Differential Equation) to solve.
+- `target`: The target domain where the potential is computed.
+- `source`: The source domain where the potential is generated.
+- `compression`: The compression method to use for the potential operator.
+- `correction`: The correction method to use for the potential operator.
+
+## Returns
+
+The volume potential operator `V` that represents the interaction between the
+target and source domains.
+
+## Compression
+
+The `compression` argument is a named tuple with a `method` field followed by
+method-specific fields. It specifies how the dense linear operators should be
+compressed. The available options are:
+
+  - `(method = :none, )`: no compression is performed, the resulting matrices
+    are dense.
+  - `(method =:hmatrix, tol)`: the resulting operators are compressed using
+    hierarchical matrices with an absolute tolerance `tol` (defaults to `1e-8`).
+  - `(method = :fmm, tol)`: the resulting operators are compressed using the
+    fast multipole method with an absolute tolerance `tol` (defaults to `1e-8`).
+
+## Correction
+
+The `correction` argument is a named tuple with a `method` field followed by
+method-specific fields. It specifies how the singular and nearly-singular
+integrals should be computed. The available options are:
+
+  - `(method = :none, )`: no correction is performed. This is not recommented,
+    as the resulting approximation will be inaccurate if the source and target
+    are not sufficiently far apart.
+  - `(method = :dim, maxdist, target_location)`: use the density interpolation
+    method to compute the correction. `maxdist` specifies the distance between
+    source and target points above which no correction is performed (defaults to
+    `Inf`). `target_location` should be either `:inside`, `:outside`, or `:on`,
+    and specifies where the `target`` points lie relative to the to the
+    `source`'s boundary. When `target === source`, `target_location` is not
+    needed.
+
+## Details
+The volume potential operator is computed by assembling the integral operator
+`V` using the single-layer kernel `G`. The operator `V` is then compressed using
+the specified compression method. If no compression is specified, the operator
+is returned as is. If a correction method is specified, the correction is
+computed and added to the compressed operator.
+"""
 function volume_potential(; pde, target, source::Quadrature, compression, correction)
     correction = _normalize_correction(correction, target, source)
     compression = _normalize_compression(compression, target, source)
@@ -234,9 +283,9 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
     if compression.method == :none
         Vmat = assemble_matrix(V)
     elseif compression.method == :hmatrix
-        Vmat = assemble_hmatrix(V; atol = compression.tol)
+        Vmat = assemble_hmatrix(V; rtol = compression.tol)
     elseif compression.method == :fmm
-        Vmat = assemble_fmm(V; atol = compression.tol)
+        Vmat = assemble_fmm(V; rtol = compression.tol)
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end

@@ -11,6 +11,7 @@ atol = 0
 rtol = 1e-8
 t = :exterior
 σ = t == :interior ? 1 / 2 : -1 / 2
+# For N = 3 one needs to use compression, e.g. `compression = :fmm`, for the operators below
 N = 2
 pde = Inti.Laplace(; dim = N)
 # pde = Inti.Helmholtz(; dim = N, k = 2π)
@@ -35,12 +36,16 @@ for h in hh
     gmsh.option.setNumber("General.Verbosity", 2)
     gmsh.model.mesh.setOrder(2)
     Inti.clear_entities!()
-    gmsh.model.occ.addDisk(center[1], center[2], 0, 2 * radius, radius)
+    if N == 2
+        gmsh.model.occ.addDisk(center[1], center[2], 0, 2 * radius, radius)
+    else
+        gmsh.model.occ.addSphere(center[1], center[2], center[3], radius)
+    end
     gmsh.model.occ.synchronize()
     gmsh.model.mesh.generate(2)
-    M = Inti.import_mesh(; dim = 2)
+    M = Inti.import_mesh(; dim = N)
     gmsh.finalize()
-    Γ = Inti.Domain(e -> Inti.geometric_dimension(e) == 1, Inti.entities(M))
+    Γ = Inti.Domain(e -> Inti.geometric_dimension(e) == N - 1, Inti.entities(M))
     Q = Inti.Quadrature(view(M, Γ); qorder)
     @show Q
     xs = if t == :interior
@@ -83,10 +88,16 @@ end
 order = n + 1
 fig = Figure()
 ax = Axis(fig[1, 1]; xscale = log10, yscale = log10, xlabel = "h", ylabel = "error")
-scatterlines!(ax, hh, ee0; m = :x, label = "nocorrection")
-scatterlines!(ax, hh, ee1; m = :x, label = "dim correction")
+scatterlines!(ax, hh, ee0; marker = :x, label = "nocorrection")
+scatterlines!(ax, hh, ee1; marker = :x, label = "dim correction")
 ref = hh .^ order
 iref = length(ref)
-lines!(ax, hh, ee1[iref] / ref[iref] * ref; label = L"\mathcal{O}(h^%$order)", ls = :dash)
+lines!(
+    ax,
+    hh,
+    ee1[iref] / ref[iref] * ref;
+    label = L"\mathcal{O}(h^%$order)",
+    linestyle = :dash,
+)
 axislegend(ax)
 fig

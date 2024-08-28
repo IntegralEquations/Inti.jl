@@ -39,7 +39,7 @@ jobs:
       # - uses: julia-actions/julia-buildpkg@v1
       # - uses: julia-actions/julia-runtest@v1
       - name: Run tests
-        run: DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project -e 'using Pkg; Pkg.status(); Pkg.test("Inti"; coverage=true)'
+        run: DISPLAY=:1 xvfb-run -s '-screen 1 1024x768x24' julia --project -e 'using Pkg; Pkg.status(); Pkg.test("Inti"; coverage=true)'
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v4
         with:
