@@ -14,7 +14,6 @@ using LinearMaps
 using NearestNeighbors
 using SparseArrays
 using StaticArrays
-using QuadGK
 using SpecialFunctions
 using Printf
 

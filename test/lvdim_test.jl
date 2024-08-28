@@ -39,7 +39,6 @@ msh = Inti.import_mesh(name; dim = 2)
 Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
 Γ = Inti.boundary(Ω)
 
-
 Ωₕ = msh[Ω]
 Γₕ = msh[Γ]
 Ωₕ_Sub = view(msh, Ω)
@@ -75,13 +74,13 @@ pde = k == 0 ? Inti.Laplace(; dim = 2) : Inti.Helmholtz(; dim = 2, k)
 
 ## Boundary operators
 tbnd = @elapsed begin
-S_b2d, D_b2d = Inti.single_double_layer(;
-    pde,
-    target = Ωₕ_quad,
-    source = Γₕ_quad,
-    compression = (method = :fmm, tol = 1e-14),
-    correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
-)
+    S_b2d, D_b2d = Inti.single_double_layer(;
+        pde,
+        target = Ωₕ_quad,
+        source = Γₕ_quad,
+        compression = (method = :fmm, tol = 1e-14),
+        correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
+    )
 end
 @info "Boundary operators time: $tbnd"
 

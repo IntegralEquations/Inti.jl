@@ -28,8 +28,6 @@ See [anderson2024fast](@cite) for more details on the method.
   and rescaled to each element.
 """
 
-import GLMakie as Mke
-
 function vdim_correction(
     pde,
     target,
@@ -205,8 +203,8 @@ function local_vdim_correction(
                 wei = R * Linv
             end
             # correct each target near the current element
-            append!(Is, repeat(near_list[n], inner = nq)...)
-            append!(Js, repeat(jglob, outer = length(near_list[n]))...)
+            append!(Is, repeat(near_list[n]; inner = nq)...)
+            append!(Js, repeat(jglob; outer = length(near_list[n]))...)
             append!(Vs, transpose(wei)...)
         end
     end
@@ -350,16 +348,16 @@ function _local_vdim_auxiliary_quantities(
 ) where {N}
     # construct the local region
     Etype = first(Inti.element_types(mesh))
-    el_neighs = copy(neighbors[(Etype,el)])
+    el_neighs = copy(neighbors[(Etype, el)])
 
     loc_bdry = Inti.boundarynd(el_neighs, mesh)
     # TODO handle curved boundary of Γ??
     #bords = typeof(Inti.LagrangeLine(Inti.nodes(mesh)[first(loc_bdry)]...))[]
     # TODO possible performance improvement over prev line
     if N == 2
-        bords = Inti.LagrangeElement{Inti.ReferenceHyperCube{N-1}, 3, SVector{N, Float64}}[]
+        bords = Inti.LagrangeElement{Inti.ReferenceHyperCube{N - 1},3,SVector{N,Float64}}[]
     else
-        bords = Inti.LagrangeElement{Inti.ReferenceSimplex{N-1}, 3, SVector{N, Float64}}[]
+        bords = Inti.LagrangeElement{Inti.ReferenceSimplex{N - 1},3,SVector{N,Float64}}[]
     end
 
     for idxs in loc_bdry
@@ -368,9 +366,9 @@ function _local_vdim_auxiliary_quantities(
         #bord = Inti.LagrangeLine(vtxs)
         vtxs = Inti.nodes(mesh)[idxs]
         if N === 2
-            bord = Inti.LagrangeElement{Inti.ReferenceHyperCube{N-1}}(vtxs...)
+            bord = Inti.LagrangeElement{Inti.ReferenceHyperCube{N - 1}}(vtxs...)
         else
-            bord = Inti.LagrangeElement{Inti.ReferenceSimplex{N-1}}(vtxs...)
+            bord = Inti.LagrangeElement{Inti.ReferenceSimplex{N - 1}}(vtxs...)
         end
         push!(bords, bord)
     end
@@ -378,16 +376,20 @@ function _local_vdim_auxiliary_quantities(
     # Check if we need to do near-singular layer potential evaluation
     vertices = mesh.etype2els[Etype][el].vals[vertices_idxs(Etype)]
     if N == 2
-        diam = max(norm(vertices[1] - vertices[2]),
-                   norm(vertices[2] - vertices[3]),
-                   norm(vertices[3] - vertices[1]))
+        diam = max(
+            norm(vertices[1] - vertices[2]),
+            norm(vertices[2] - vertices[3]),
+            norm(vertices[3] - vertices[1]),
+        )
     else
-        diam = max(norm(vertices[1] - vertices[2]),
-                   norm(vertices[2] - vertices[3]),
-                   norm(vertices[3] - vertices[4]),
-                   norm(vertices[4] - vertices[1]))
+        diam = max(
+            norm(vertices[1] - vertices[2]),
+            norm(vertices[2] - vertices[3]),
+            norm(vertices[3] - vertices[4]),
+            norm(vertices[4] - vertices[1]),
+        )
     end
-    need_layer_corr = sum(inrangecount(bdry_kdtree, vertices, diam/2)) > 0
+    need_layer_corr = sum(inrangecount(bdry_kdtree, vertices, diam / 2)) > 0
 
     # build O(h) volume neighbors
     els_idxs = [i[2] for i in collect(el_neighs)]
@@ -401,7 +403,7 @@ function _local_vdim_auxiliary_quantities(
     end
 
     # TODO handle derivative case
-    G  = SingleLayerKernel(pde)
+    G = SingleLayerKernel(pde)
     dG = DoubleLayerKernel(pde)
     Sop = IntegralOperator(G, X, Ybdry)
     Dop = IntegralOperator(dG, X, Ybdry)
@@ -420,7 +422,7 @@ function _local_vdim_auxiliary_quantities(
             Dmat;
             green_multiplier,
             maxdist = diam,
-            derivative=false,
+            derivative = false,
         )
         Smat += δS
         Dmat += δD
