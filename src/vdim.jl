@@ -539,7 +539,8 @@ function polynomial_solutions_vdim(pde::AbstractPDE, order::Integer, center = no
         return (q) -> f(coords(q) - center)
     end
     neumann_shift = map(neumann_traces) do f
-        return (q) -> f((coords = q.coords - center, normal = q.normal))
+        # return (q) -> f((coords = q.coords - center, normal = q.normal))
+        return (q) -> f(coords(q) - center, normal(q))
     end
     return monomial_shift, dirchlet_shift, neumann_shift, multiindices
     # return monomials, dirchlet_traces, neumann_traces, multiindices
@@ -566,7 +567,8 @@ end
 
 function _normal_derivative(P::ElementaryPDESolutions.Polynomial{N,T}) where {N,T}
     ∇P = ElementaryPDESolutions.gradient(P)
-    return (q) -> dot(normal(q), ∇P(coords(q)))
+    # return (q) -> dot(normal(q), ∇P(coords(q)))
+    return (x, n) -> dot(n, ∇P(x))
 end
 
 function (∇P::NTuple{N,<:ElementaryPDESolutions.Polynomial})(x) where {N}
