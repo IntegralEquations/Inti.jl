@@ -360,7 +360,7 @@ function _local_vdim_auxiliary_quantities(
     Etype = first(Inti.element_types(mesh))
     el_neighs = neighbors[(Etype, el)]
 
-    loc_bdry = Inti.boundarynd_new(el_neighs, mesh)
+    loc_bdry = Inti.boundarynd(el_neighs, mesh)
     # TODO handle curved boundary of Γ??
     #bords = typeof(Inti.LagrangeLine(Inti.nodes(mesh)[first(loc_bdry)]...))[]
     # TODO possible performance improvement over prev line
