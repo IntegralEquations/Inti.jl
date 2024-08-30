@@ -376,7 +376,7 @@ function boundary1d(els, msh)
     E, _ = first(els)
     bdi = Inti.boundary_idxs(E)
     for (E, i) in els
-        vertices = Inti.connectivity(msh, E)[:,i]
+        vertices = Inti.connectivity(msh, E)[:, i]
         for bord in (-vertices[bdi[1]], vertices[bdi[2]])
             -bord in res ? delete!(res, -bord) : push!(res, bord)
         end
@@ -389,7 +389,7 @@ function boundarynd(els, msh)
     E, _ = first(els)
     bdi = Inti.boundary_idxs(E)
     for (E, i) in els
-        vertices = Inti.connectivity(msh, E)[:,i]
+        vertices = Inti.connectivity(msh, E)[:, i]
         bords = [[vertices[i] for i in bi] for bi in bdi]
         for new_bord in bords
             flag = true

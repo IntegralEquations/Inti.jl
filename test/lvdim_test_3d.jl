@@ -42,7 +42,6 @@ msh = Inti.import_mesh(name; dim = 3)
 Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 3, Inti.entities(msh))
 Γ = Inti.boundary(Ω)
 
-
 Ωₕ = msh[Ω]
 Γₕ = msh[Γ]
 Ωₕ_Sub = view(msh, Ω)

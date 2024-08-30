@@ -154,14 +154,14 @@ function local_vdim_correction(
     isnothing(interpolation_order) &&
         (interpolation_order = maximum(order, values(source.etype2qrule)))
     # by default basis centered at origin
-    center = isnothing(center) ? zero(SVector{N,Float64}) : center
-    p, P, γ₁P, multiindices = polynomial_solutions_vdim(pde, interpolation_order, center)
+    p, P, γ₁P, multiindices = polynomial_solutions_vdim(pde, interpolation_order)
     dict_near = etype_to_nearest_points(target, source; maxdist)
     bdry_kdtree = KDTree(bdry_nodes)
     # compute sparse correction
     Is = Int[]
     Js = Int[]
     Vs = Eltype[]
+    L̃ = Matrix{Float64}(undef, 21, 15)
     for (E, qtags) in source.etype2qtags
         els = elements(source.mesh, E)
         near_list = dict_near[E]
@@ -175,11 +175,21 @@ function local_vdim_correction(
         for n in 1:ne
             # indices of nodes in element `n`
             isempty(near_list[n]) && continue
+            c, r = translation_and_scaling(els[n])
+            #c = SVector{2, Float64}(0,0)
+            # FIXME Why does scaling the whole domain not work?
+            r = 1.0
+            if !SHIFT
+                c = SVector{N,Float64}(0, 0)
+                r = 1.0
+            end
             R = _local_vdim_auxiliary_quantities(
                 pde,
                 mesh,
                 neighbors,
                 n,
+                c,
+                r,
                 quadrature_order,
                 p,
                 P,
@@ -190,22 +200,20 @@ function local_vdim_correction(
             )
             jglob = @view qtags[:, n]
             # compute translation and scaling
-            c, r = translation_and_scaling(els[n])
             if SHIFT
-                iszero(center) || error("SHIFT is not implemented for non-zero center")
-                L̃ = [f((q.coords - c) / r) for f in p, q in view(source, jglob)]
-                S = change_of_basis(multiindices, p, c, r)
-                Linv = pinv(transpose(L̃))
-                wei = R * transpose(S) * Linv
+                L̃ = [f((q.coords - c) / r) for q in view(source, jglob), f in p]
+                Linv = pinv(L̃)
+                wei = transpose(Linv) * transpose(R)
             else
-                L = [f(q.coords) for f in p, q in view(source, jglob)]
-                Linv = pinv(transpose(L))
-                wei = R * Linv
+                error("unsupported local VDIM without shifting")
+                #L = [f(q.coords) for q in view(source, jglob), f in p]
+                #Linv = pinv(L)
+                #wei = transpose(Liinv) * transpose(R)
             end
             # correct each target near the current element
             append!(Is, repeat(near_list[n]; inner = nq)...)
             append!(Js, repeat(jglob; outer = length(near_list[n]))...)
-            append!(Vs, transpose(wei)...)
+            append!(Vs, wei...)
         end
     end
     @debug """Condition properties of vdim correction:
@@ -338,6 +346,8 @@ function _local_vdim_auxiliary_quantities(
     mesh,
     neighbors,
     el,
+    center,
+    scale,
     quadrature_order,
     p,
     P,
@@ -348,9 +358,9 @@ function _local_vdim_auxiliary_quantities(
 ) where {N}
     # construct the local region
     Etype = first(Inti.element_types(mesh))
-    el_neighs = copy(neighbors[(Etype, el)])
+    el_neighs = neighbors[(Etype, el)]
 
-    loc_bdry = Inti.boundarynd(el_neighs, mesh)
+    loc_bdry = Inti.boundarynd_new(el_neighs, mesh)
     # TODO handle curved boundary of Γ??
     #bords = typeof(Inti.LagrangeLine(Inti.nodes(mesh)[first(loc_bdry)]...))[]
     # TODO possible performance improvement over prev line
@@ -395,19 +405,22 @@ function _local_vdim_auxiliary_quantities(
     els_idxs = [i[2] for i in collect(el_neighs)]
     els_list = mesh.etype2els[Etype][els_idxs]
     bdry_qorder = 2 * quadrature_order + 1
-    Yvol = Inti.Quadrature(mesh, els_list; qorder = quadrature_order)
+    Yvol =
+        Inti.Quadrature(mesh, els_list; qorder = quadrature_order, center = center, scale)
     if need_layer_corr
-        Ybdry = Inti.Quadrature(mesh, bords; qorder = bdry_qorder)
+        Ybdry = Inti.Quadrature(mesh, bords; qorder = bdry_qorder, center = center, scale)
     else
-        Ybdry = Inti.Quadrature(mesh, bords; qorder = bdry_qorder)
+        Ybdry = Inti.Quadrature(mesh, bords; qorder = bdry_qorder, center = center, scale)
     end
 
     # TODO handle derivative case
     G = SingleLayerKernel(pde)
     dG = DoubleLayerKernel(pde)
-    Sop = IntegralOperator(G, X, Ybdry)
-    Dop = IntegralOperator(dG, X, Ybdry)
-    Vop = IntegralOperator(G, X, Yvol)
+    Xcoords = [q.coords for q in X]
+    Xshift = [(q.coords - center) / scale for q in X]
+    Sop = IntegralOperator(G, Xshift, Ybdry)
+    Dop = IntegralOperator(dG, Xshift, Ybdry)
+    Vop = IntegralOperator(G, Xshift, Yvol)
     Smat = assemble_matrix(Sop)
     Dmat = assemble_matrix(Dop)
     Vmat = assemble_matrix(Vop)
@@ -416,12 +429,12 @@ function _local_vdim_auxiliary_quantities(
         green_multiplier = fill(μloc, length(X))
         δS, δD = bdim_correction(
             pde,
-            X,
+            Xshift,
             Ybdry,
             Smat,
             Dmat;
             green_multiplier,
-            maxdist = diam,
+            maxdist = diam / scale,
             derivative = false,
         )
         Smat += δS
@@ -440,7 +453,7 @@ function _local_vdim_auxiliary_quantities(
         @views mul!(Θ[:, n], Dmat, γ₀B[:, n], -1, 1)
         @views mul!(Θ[:, n], Vmat, b[:, n], -1, 1)
         for i in 1:num_targets
-            Θ[i, n] += μ[i] * P[n](X[i])
+            Θ[i, n] += μ[i] * P[n](Xshift[i])
         end
     end
     return Θ

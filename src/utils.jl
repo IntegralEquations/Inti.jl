@@ -253,7 +253,8 @@ function _normalize_correction(correction, target, source)
             target === source ||
             @warn("missing maxdist field in correction: setting to Inf")
         if correction.method == :ldim
-            haskey(correction, :mesh) || error("missing mesh information needed for local dim")
+            haskey(correction, :mesh) ||
+                error("missing mesh information needed for local dim")
         end
         correction = merge(
             (maxdist = Inf, interpolation_order = nothing, center = nothing),

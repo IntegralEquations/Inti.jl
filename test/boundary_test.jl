@@ -57,7 +57,7 @@ end
 # el_in_set(el, set) = any(x->sort(x) == sort(el), set)
 
 I = 3
-test_els = union(copy(nei[(E,I)]))
+test_els = union(copy(nei[(E, I)]))
 els = Inti.elements(test_msh, E)
 #test_els = union(copy(nei[(E,1)]), nei[(E,2)])
 #test_els = union(copy(nei[(E,1)]), nei[(E,2)], nei[(E,3)], nei[(E,4)])
@@ -65,7 +65,7 @@ Inti.viz_elements(test_els, test_msh)
 
 components = Inti.connected_components(test_els, nei)
 
-test_els = copy(nei[(E,I)])
+test_els = copy(nei[(E, I)])
 BD = Inti.boundarynd(test_els, test_msh)
 # bords = [Inti.nodes(test_msh)[abs(i)] for i in BD]
 

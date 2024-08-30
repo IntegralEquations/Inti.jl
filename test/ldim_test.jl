@@ -13,13 +13,14 @@ t = :interior
 pde = Inti.Laplace(; dim = N)
 
 K = 5:5
-H = [0.2*2.0^(-i) for i in 0:0]
-fig = plot(xscale=:log,yscale=:log,xticks=H)
-for k in K 
+H = [0.2 * 2.0^(-i) for i in 0:0]
+fig = plot(; xscale = :log, yscale = :log, xticks = H)
+for k in K
     err = []
     for h in H
         Inti.clear_entities!()
-        Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = h, order = 2)
+        Ω, msh =
+            gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = h, order = 2)
         Γ = Inti.external_boundary(Ω)
 
         ##
@@ -54,7 +55,8 @@ for k in K
         # arrows!(X, Y, u, v, lengthscale=0.01)
         # display(fig)
 
-        δS, δD = Inti.local_bdim_correction(pde, quad, quad; green_multiplier, kneighbor=k)
+        δS, δD =
+            Inti.local_bdim_correction(pde, quad, quad; green_multiplier, kneighbor = k)
         Sdim = Smat + δS
         Ddim = Dmat + δD
         # Sdim, Ddim = Inti.single_double_layer(;
@@ -69,6 +71,6 @@ for k in K
         @show norm(e1, Inf)
         push!(err, e1)
     end
-    plot!(fig, H, err;lw=2,marker=:o,label=k)
+    plot!(fig, H, err; lw = 2, marker = :o, label = k)
 end
 display(fig)

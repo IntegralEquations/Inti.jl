@@ -129,10 +129,13 @@ function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
 end
 
 # Quadrature constructor for list of volume elements for local vdim
-function Quadrature(msh::AbstractMesh{N,T}, elementlist::AbstractVector{E}; qorder) where {N,T,E}
-    #FIXME Ideally we would like to use Gauss quadrature on the local region (fewer points for same order of accuracy) but to do so we need to subtract away the contribution from the global quadrature rule on the local region (typically, these are VR nodes). So, for now, using the global quadrature rule on the local region gives better accuracy since it cancels these (inaccurate) computations out.
-    #etype2qrule =
-    #    Dict(E => _qrule_for_reference_shape(domain(E), qorder))
+function Quadrature(
+    msh::AbstractMesh{N,T},
+    elementlist::AbstractVector{E};
+    qorder,
+    center::SVector{N,Float64} = zero(SVector{N,Float64}),
+    scale::Float64 = 1.0,
+) where {N,T,E}
     if domain(E) isa Inti.ReferenceTriangle
         Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder)
         etype2qrule = Dict(E => Q)
@@ -140,8 +143,7 @@ function Quadrature(msh::AbstractMesh{N,T}, elementlist::AbstractVector{E}; qord
         Q = Inti.VioreanuRokhlin(; domain = :tetrahedron, order = qorder)
         etype2qrule = Dict(E => Q)
     else
-        etype2qrule =
-            Dict(E => _qrule_for_reference_shape(domain(E), qorder))
+        etype2qrule = Dict(E => _qrule_for_reference_shape(domain(E), qorder))
     end
 
     # initialize mesh with empty fields
@@ -153,7 +155,7 @@ function Quadrature(msh::AbstractMesh{N,T}, elementlist::AbstractVector{E}; qord
     )
     # loop element types and generate quadrature for each
     qrule = etype2qrule[E]
-    _build_quadrature!(quad, elementlist, qrule)
+    _build_quadrature!(quad, elementlist, qrule; center, scale)
 
     # check for entities with negative orientation and flip normal vectors if
     # present
@@ -176,11 +178,15 @@ function Quadrature(msh::AbstractMesh; qorder)
 end
 
 @noinline function _build_quadrature!(
-    quad,
+    quad::Quadrature{N,T},
     els::AbstractVector{E},
-    qrule::ReferenceQuadrature,
-) where {E}
-    N = ambient_dimension(quad)
+    qrule::ReferenceQuadrature;
+    center::SVector{N,Float64} = zero(SVector{N,Float64}),
+    scale::Float64 = 1.0,
+) where {E,N,T}
+    #if isdefined(Main, :Infiltrator)
+    #    Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+    #end
     x̂, ŵ = qrule() # nodes and weights on reference element
     num_nodes = length(ŵ)
     M = geometric_dimension(domain(E))
@@ -194,7 +200,7 @@ end
             μ = _integration_measure(jac)
             w = μ * ŵi
             ν = codim == 1 ? _normal(jac) : nothing
-            qnode = QuadratureNode(x, w, ν)
+            qnode = QuadratureNode((x - center) / scale, w / scale^M, ν)
             push!(quad.qnodes, qnode)
         end
     end
@@ -331,7 +337,7 @@ end
 
 Return `Nl = [[el in Y.mesh && dist(x, el) ≤ tol] for x in X]`
 """
-function etype_to_near_elements(X,Y::Quadrature; tol)
+function etype_to_near_elements(X, Y::Quadrature; tol)
     y = [coords(q) for q in Y]
     tree = BallTree(y)
     etype2nearlist = Dict{DataType,Vector{Set{Int}}}()
@@ -346,7 +352,7 @@ function etype_to_near_elements(X,Y::Quadrature; tol)
         end
         for n in 1:N
             for i in 1:P
-                for l in quad2source[Q[i,n]]
+                for l in quad2source[Q[i, n]]
                     push!(source2el[l], n)
                 end
             end
@@ -371,9 +377,9 @@ function near_elements(Y::Quadrature; tol)
         P, N = size(Q)
         for n in 1:N
             for i in 1:P
-                for q in inrange(tree, coords(qnodes(Y)[Q[i,n]]), tol)
+                for q in inrange(tree, coords(qnodes(Y)[Q[i, n]]), tol)
                     push!(quad2el[q], (E, n))
-                end    
+                end
             end
         end
     end
@@ -382,7 +388,7 @@ function near_elements(Y::Quadrature; tol)
     for (E, Q) in Y.etype2qtags
         P, N = size(Q)
         for n in 1:N
-            el2el[(E, n)] = union([quad2el[Q[i,n]] for i in 1:P]...)
+            el2el[(E, n)] = union([quad2el[Q[i, n]] for i in 1:P]...)
         end
     end
     return el2el
@@ -409,7 +415,6 @@ end
 #     r = [maximum(i->norm(C[n]-nodes(mesh(Y))[i]), connectivity(mesh(Y), E)[:,n]) for n in 1:N]
 #     return C, r
 # end
-
 
 """
     quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)

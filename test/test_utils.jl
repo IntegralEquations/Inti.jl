@@ -23,7 +23,7 @@ function gmsh_disk(; center, rx, ry, meshsize, order = 1)
     return Ω, msh
 end
 
-function gmsh_disks(disks;meshsize, order = 1)
+function gmsh_disks(disks; meshsize, order = 1)
     msh = try
         gmsh.initialize()
         gmsh.option.setNumber("General.Verbosity", 2)

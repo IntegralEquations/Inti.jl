@@ -277,13 +277,13 @@ function local_bdim_correction(
             qnodes_nei = source.qnodes[qtags_nei]
             jac        = jacobian(el, 0.5)
             ν          = -_normal(jac)
-            h          = sum(qnodes[i].weight for i in jglob)*4
+            h          = sum(qnodes[i].weight for i in jglob) * 4
             qnodes_op  = map(q -> translate(q, h * ν, -1), qnodes_nei)
             bindx      = boundary1d(nei, msh)
             l, r       = nodes(msh)[-bindx[1]], nodes(msh)[bindx[2]]
             Q, W       = gauss(4nq, 0, h)
-            qnodes_l   = [QuadratureNode(l.+q.*ν, w, SVector(-ν[2], ν[1])) for (q, w) in zip(Q, W)]
-            qnodes_r   = [QuadratureNode(r.+q.*ν, w, SVector(ν[2], -ν[1])) for (q, w) in zip(Q, W)]
+            qnodes_l   = [QuadratureNode(l .+ q .* ν, w, SVector(-ν[2], ν[1])) for (q, w) in zip(Q, W)]
+            qnodes_r   = [QuadratureNode(r .+ q .* ν, w, SVector(ν[2], -ν[1])) for (q, w) in zip(Q, W)]
             qnodes_aux = append!(qnodes_nei, qnodes_op, qnodes_l, qnodes_r)
             # qnodes_aux = source.qnodes # this is the global dim
             for i in near_list[n]
