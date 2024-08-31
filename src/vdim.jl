@@ -129,9 +129,14 @@ function vdim_correction(
     return δV
 end
 
+# function barrier for type stability purposes
+function build_vander(pts, p, c, r)
+    return [f((q.coords - c) / r) for q in pts, f in p]
+end
+
 function local_vdim_correction(
     pde,
-    Eltype,
+    ::Type{Eltype},
     target,
     source::Quadrature,
     mesh::AbstractMesh,
@@ -142,7 +147,7 @@ function local_vdim_correction(
     maxdist = Inf,
     center = nothing,
     shift::Val{SHIFT} = Val(false),
-) where {SHIFT}
+) where {SHIFT,Eltype}
     # variables for debugging the condition properties of the method
     vander_cond = vander_norm = rhs_norm = res_norm = shift_norm = -Inf
     # figure out if we are dealing with a scalar or vector PDE
@@ -201,19 +206,16 @@ function local_vdim_correction(
             jglob = @view qtags[:, n]
             # compute translation and scaling
             if SHIFT
-                L̃ = [f((q.coords - c) / r) for q in view(source, jglob), f in p]
+                L̃ = build_vander(view(source, jglob), p, c, r)
                 Linv = pinv(L̃)
                 wei = transpose(Linv) * transpose(R)
             else
                 error("unsupported local VDIM without shifting")
-                #L = [f(q.coords) for q in view(source, jglob), f in p]
-                #Linv = pinv(L)
-                #wei = transpose(Liinv) * transpose(R)
             end
             # correct each target near the current element
-            append!(Is, repeat(near_list[n]; inner = nq)...)
-            append!(Js, repeat(jglob; outer = length(near_list[n]))...)
-            append!(Vs, wei...)
+            append!(Is, repeat(near_list[n]; inner = nq))
+            append!(Js, repeat(jglob; outer = length(near_list[n])))
+            append!(Vs, wei)
         end
     end
     @debug """Condition properties of vdim correction:
@@ -380,7 +382,7 @@ function _local_vdim_auxiliary_quantities(
         #bord = Inti.LagrangeLine(vtxs)
         vtxs = Inti.nodes(mesh)[idxs]
         if N === 2
-            bord = Inti.LagrangeElement{Inti.ReferenceHyperCube{N - 1}}(vtxs...)
+            bord = Inti.LagrangeLine(SVector{3}(vtxs))
         else
             bord = Inti.LagrangeElement{Inti.ReferenceSimplex{N - 1}}(vtxs...)
         end
