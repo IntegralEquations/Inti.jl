@@ -360,7 +360,11 @@ function _local_vdim_auxiliary_quantities(
     Etype = first(Inti.element_types(mesh))
     el_neighs = neighbors[(Etype, el)]
 
-    loc_bdry = Inti.boundarynd(el_neighs, mesh)
+    T = first(el_neighs)[1]
+    els_idxs = [i[2] for i in collect(el_neighs)]
+    els_list = mesh.etype2els[Etype][els_idxs]
+
+    loc_bdry = Inti.boundarynd(T, els_idxs, mesh)
     # TODO handle curved boundary of Γ??
     #bords = typeof(Inti.LagrangeLine(Inti.nodes(mesh)[first(loc_bdry)]...))[]
     # TODO possible performance improvement over prev line
@@ -402,8 +406,6 @@ function _local_vdim_auxiliary_quantities(
     need_layer_corr = sum(inrangecount(bdry_kdtree, vertices, diam / 2)) > 0
 
     # build O(h) volume neighbors
-    els_idxs = [i[2] for i in collect(el_neighs)]
-    els_list = mesh.etype2els[Etype][els_idxs]
     bdry_qorder = 2 * quadrature_order + 1
     Yvol =
         Inti.Quadrature(mesh, els_list; qorder = quadrature_order, center = center, scale)

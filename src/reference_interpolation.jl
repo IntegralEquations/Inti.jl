@@ -384,28 +384,35 @@ function boundary1d(els, msh)
     return sort([res...])
 end
 
-function boundarynd(els, msh)
-    res = Set()
-    E, _ = first(els)
-    bdi = Inti.boundary_idxs(E)
-    for (E, i) in els
-        vertices = Inti.connectivity(msh, E)[:, i]
+function boundarynd(::Type{T}, els, msh) where {T}
+    bdi = Inti.boundary_idxs(T)
+    edgelist = Vector{Int64}[]
+    edgelist_unsrt = Vector{Int64}[]
+    for i in els
+        vertices = Inti.connectivity(msh, T)[:, i]
         bords = [[vertices[i] for i in bi] for bi in bdi]
-        for new_bord in bords
-            flag = true
-            for old_bord in res
-                if sort(new_bord) == sort(old_bord)
-                    delete!(res, old_bord)
-                    flag = false
-                end
-            end
-            flag && push!(res, new_bord)
+        for q in bords
+            push!(edgelist_unsrt, copy(q))
+            push!(edgelist, sort!(q))
         end
     end
-    return res
+    I = sortperm(edgelist)
+    uniqlist = Int64[]
+    i = 1
+    while i <= length(edgelist) - 1
+        if isequal(edgelist[I[i]], edgelist[I[i+1]])
+            i += 1
+        else
+            push!(uniqlist, i)
+        end
+        i += 1
+    end
+    if !isequal(edgelist[I[end-1]], edgelist[I[end]])
+        push!(uniqlist, i)
+    end
+    return edgelist_unsrt[I[uniqlist]]
 end
 
-##
 function _dfs!(comp, el, nei, els)
     for el_nei in nei[el]
         if el_nei in els
