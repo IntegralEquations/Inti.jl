@@ -192,6 +192,7 @@ end
     M = geometric_dimension(domain(E))
     codim = N - M
     istart = length(quad.qnodes) + 1
+    sizehint!(quad.qnodes, length(els) * length(x̂))
     for el in els
         # and all qnodes for that element
         for (x̂i, ŵi) in zip(x̂, ŵ)

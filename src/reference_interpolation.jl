@@ -386,31 +386,37 @@ end
 
 function boundarynd(::Type{T}, els, msh) where {T}
     bdi = Inti.boundary_idxs(T)
-    edgelist = Vector{Int64}[]
-    edgelist_unsrt = Vector{Int64}[]
-    for i in els
-        vertices = Inti.connectivity(msh, T)[:, i]
-        bords = [[vertices[i] for i in bi] for bi in bdi]
+    nedges = length(els)*length(bdi[1])
+    edgelist = Vector{SVector{3, Int64}}(undef, nedges)
+    edgelist_unsrt = Vector{SVector{3,Int64}}(undef, nedges)
+    bords = Vector{MVector{3,Int64}}(undef, length(bdi[1]))
+    j = 1
+    for ii in els
+        for k in 1:length(bdi[1])
+            bords[k] = [Inti.connectivity(msh, T)[i, ii] for i in bdi[k]]
+        end
         for q in bords
-            push!(edgelist_unsrt, copy(q))
-            push!(edgelist, sort!(q))
+            edgelist_unsrt[j] = q[:]
+            edgelist[j] = sort!(q)
+            j += 1
         end
     end
     I = sortperm(edgelist)
     uniqlist = Int64[]
+    sizehint!(uniqlist, length(els))
     i = 1
     while i <= length(edgelist) - 1
         if isequal(edgelist[I[i]], edgelist[I[i+1]])
             i += 1
         else
-            push!(uniqlist, i)
+            push!(uniqlist, I[i])
         end
         i += 1
     end
     if !isequal(edgelist[I[end-1]], edgelist[I[end]])
-        push!(uniqlist, i)
+        push!(uniqlist, I[i])
     end
-    return edgelist_unsrt[I[uniqlist]]
+    return edgelist_unsrt[uniqlist]
 end
 
 function _dfs!(comp, el, nei, els)

@@ -343,6 +343,10 @@ function translation_and_scaling(el::LagrangeTetrahedron)
     return center, R
 end
 
+function newbord_line(vtxs)
+    return Inti.LagrangeLine(SVector{3}(vtxs))
+end
+
 function _local_vdim_auxiliary_quantities(
     pde::AbstractPDE{N},
     mesh,
@@ -382,7 +386,7 @@ function _local_vdim_auxiliary_quantities(
         #bord = Inti.LagrangeLine(vtxs)
         vtxs = Inti.nodes(mesh)[idxs]
         if N === 2
-            bord = Inti.LagrangeLine(SVector{3}(vtxs))
+            bord = newbord_line(vtxs)
         else
             bord = Inti.LagrangeElement{Inti.ReferenceSimplex{N - 1}}(vtxs...)
         end
