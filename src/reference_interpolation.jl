@@ -386,8 +386,8 @@ end
 
 function boundarynd(::Type{T}, els, msh) where {T}
     bdi = Inti.boundary_idxs(T)
-    nedges = length(els)*length(bdi)
-    edgelist = Vector{SVector{length(bdi[1]), Int64}}(undef, nedges)
+    nedges = length(els) * length(bdi)
+    edgelist = Vector{SVector{length(bdi[1]),Int64}}(undef, nedges)
     edgelist_unsrt = Vector{SVector{length(bdi[1]),Int64}}(undef, nedges)
     bords = Vector{MVector{length(bdi[1]),Int64}}(undef, length(bdi))
     j = 1

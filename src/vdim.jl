@@ -343,8 +343,14 @@ function translation_and_scaling(el::LagrangeTetrahedron)
     return center, R
 end
 
+# function barrier for type stability purposes
 function newbord_line(vtxs)
-    return Inti.LagrangeLine(SVector{3}(vtxs))
+    return LagrangeLine(SVector{3}(vtxs))
+end
+
+# function barrier for type stability purposes
+function newbord_tri(vtxs)
+    return LagrangeElement{ReferenceSimplex{2}}(SVector{3}(vtxs))
 end
 
 function _local_vdim_auxiliary_quantities(
@@ -372,8 +378,6 @@ function _local_vdim_auxiliary_quantities(
 
     loc_bdry = Inti.boundarynd(T, els_idxs, mesh)
     # TODO handle curved boundary of Γ??
-    #bords = typeof(Inti.LagrangeLine(Inti.nodes(mesh)[first(loc_bdry)]...))[]
-    # TODO possible performance improvement over prev line
     if N == 2
         bords = Inti.LagrangeElement{Inti.ReferenceHyperCube{N - 1},3,SVector{N,Float64}}[]
     else
@@ -381,14 +385,11 @@ function _local_vdim_auxiliary_quantities(
     end
 
     for idxs in loc_bdry
-        # TODO possible performance improvement
-        #vtxs = SVector{3, SVector{2, Float64}}(Inti.nodes(mesh)[idxs])
-        #bord = Inti.LagrangeLine(vtxs)
         vtxs = Inti.nodes(mesh)[idxs]
-        if N === 2
+        if N == 2
             bord = newbord_line(vtxs)
         else
-            bord = Inti.LagrangeElement{Inti.ReferenceSimplex{N - 1}}(vtxs...)
+            bord = newbord_tri(vtxs)
         end
         push!(bords, bord)
     end

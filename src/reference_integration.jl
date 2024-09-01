@@ -227,12 +227,16 @@ struct VioreanuRokhlin{D,N} <: ReferenceQuadrature{D}
         domain == :tetrahedron && (domain = ReferenceTetrahedron())
         if domain isa ReferenceTriangle
             if !haskey(TRIANGLE_VR_ORDER_TO_NPTS, order)
-                error("VioreanuRokhlin quadrature of order $order not available for ReferenceTriangle")
+                error(
+                    "VioreanuRokhlin quadrature of order $order not available for ReferenceTriangle",
+                )
             end
             n = TRIANGLE_VR_ORDER_TO_NPTS[order]
         elseif domain isa ReferenceTetrahedron
             if !haskey(TETRAHEDRON_VR_ORDER_TO_NPTS, order)
-                error("VioreanuRokhlin quadrature of order $order not available for ReferenceTetrahedron")
+                error(
+                    "VioreanuRokhlin quadrature of order $order not available for ReferenceTetrahedron",
+                )
             end
             n = TETRAHEDRON_VR_ORDER_TO_NPTS[order]
         else
