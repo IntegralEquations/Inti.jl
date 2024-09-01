@@ -137,7 +137,11 @@ function Quadrature(
     scale::Float64 = 1.0,
 ) where {N,T,E}
     if domain(E) isa Inti.ReferenceTriangle
-        Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder)
+        if N == 2
+            Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder)
+        else
+            Q = Inti.Gauss(; domain = :triangle, order = qorder)
+        end
         etype2qrule = Dict(E => Q)
     elseif domain(E) isa Inti.ReferenceTetrahedron
         Q = Inti.VioreanuRokhlin(; domain = :tetrahedron, order = qorder)

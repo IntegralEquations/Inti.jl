@@ -413,7 +413,7 @@ function _local_vdim_auxiliary_quantities(
     need_layer_corr = sum(inrangecount(bdry_kdtree, vertices, diam / 2)) > 0
 
     # build O(h) volume neighbors
-    bdry_qorder = 2 * quadrature_order + 1
+    bdry_qorder = 2 * quadrature_order
     Yvol =
         Inti.Quadrature(mesh, els_list; qorder = quadrature_order, center = center, scale)
     if need_layer_corr
