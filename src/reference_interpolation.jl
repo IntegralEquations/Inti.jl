@@ -386,13 +386,13 @@ end
 
 function boundarynd(::Type{T}, els, msh) where {T}
     bdi = Inti.boundary_idxs(T)
-    nedges = length(els)*length(bdi[1])
-    edgelist = Vector{SVector{3, Int64}}(undef, nedges)
-    edgelist_unsrt = Vector{SVector{3,Int64}}(undef, nedges)
-    bords = Vector{MVector{3,Int64}}(undef, length(bdi[1]))
+    nedges = length(els)*length(bdi)
+    edgelist = Vector{SVector{length(bdi[1]), Int64}}(undef, nedges)
+    edgelist_unsrt = Vector{SVector{length(bdi[1]),Int64}}(undef, nedges)
+    bords = Vector{MVector{length(bdi[1]),Int64}}(undef, length(bdi))
     j = 1
     for ii in els
-        for k in 1:length(bdi[1])
+        for k in 1:length(bdi)
             bords[k] = [Inti.connectivity(msh, T)[i, ii] for i in bdi[k]]
         end
         for q in bords
@@ -414,7 +414,7 @@ function boundarynd(::Type{T}, els, msh) where {T}
         i += 1
     end
     if !isequal(edgelist[I[end-1]], edgelist[I[end]])
-        push!(uniqlist, I[i])
+        push!(uniqlist, I[end])
     end
     return edgelist_unsrt[uniqlist]
 end
