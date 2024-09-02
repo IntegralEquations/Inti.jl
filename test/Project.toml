@@ -1,7 +1,9 @@
 [deps]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+DynamicPolynomials = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
 FMM2D = "2d63477d-9690-4b75-bcc1-c3461d43fecc"
 FMM3D = "1e13804c-f9b7-11ea-0ef0-29f3b1745df8"
+FixedPolynomials = "3dd14ad9-0029-526e-86e9-8aa0bdd2ab0d"
 Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
 HMatrices = "8646bddf-ab1c-4fa7-9c51-ba187d647618"
 Inti = "fb74042b-437e-4c5b-88cf-d4e2beb394d5"
