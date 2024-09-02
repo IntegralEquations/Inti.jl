@@ -137,8 +137,10 @@ function Quadrature(
     scale::Float64 = 1.0,
 ) where {N,T,E}
     if domain(E) isa Inti.ReferenceTriangle
+        # Local VDIM volume quad
         if N == 2
             Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder)
+            # layer potential quadrature in 3D
         else
             Q = Inti.Gauss(; domain = :triangle, order = qorder)
         end

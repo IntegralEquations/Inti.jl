@@ -344,14 +344,10 @@ function translation_and_scaling(el::LagrangeTetrahedron)
 end
 
 # function barrier for type stability purposes
-function newbord_line(vtxs)
-    return LagrangeLine(SVector{3}(vtxs))
-end
+_newbord_line(vtxs) = LagrangeLine(SVector{3}(vtxs))
 
 # function barrier for type stability purposes
-function newbord_tri(vtxs)
-    return LagrangeElement{ReferenceSimplex{2}}(SVector{3}(vtxs))
-end
+_newbord_tri(vtxs) = LagrangeElement{ReferenceSimplex{2}}(SVector{3}(vtxs))
 
 function _local_vdim_auxiliary_quantities(
     pde::AbstractPDE{N},
@@ -387,9 +383,9 @@ function _local_vdim_auxiliary_quantities(
     for idxs in loc_bdry
         vtxs = Inti.nodes(mesh)[idxs]
         if N == 2
-            bord = newbord_line(vtxs)
+            bord = _newbord_line(vtxs)
         else
-            bord = newbord_tri(vtxs)
+            bord = _newbord_tri(vtxs)
         end
         push!(bords, bord)
     end
@@ -425,7 +421,6 @@ function _local_vdim_auxiliary_quantities(
     # TODO handle derivative case
     G = SingleLayerKernel(pde)
     dG = DoubleLayerKernel(pde)
-    Xcoords = [q.coords for q in X]
     Xshift = [(q.coords - center) / scale for q in X]
     Sop = IntegralOperator(G, Xshift, Ybdry)
     Dop = IntegralOperator(dG, Xshift, Ybdry)
