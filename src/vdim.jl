@@ -131,7 +131,7 @@ end
 
 # function barrier for type stability purposes
 function build_vander(vals_trg, pts, PFE_p, c, r)
-    coords_trg_vec = collect((Vector((q.coords - c) / r)) for q in pts)
+    coords_trg_vec = [Vector((q.coords - c) / r) for q in pts]
     ElementaryPDESolutions.fast_evaluate!(vals_trg, coords_trg_vec, PFE_p)
     return vals_trg
     #return [f((q.coords - c) / r) for q in pts, f in p]
@@ -457,10 +457,10 @@ function _local_vdim_auxiliary_quantities(
     γ₀B = Matrix{Float64}(undef, num_basis, length(Ybdry))
     P = Matrix{Float64}(undef, num_basis, length(X))
     grad = Array{Float64}(undef, num_basis, N, length(Ybdry))
-    coords_trg_vec = collect((Vector(q) for q in Xshift))
-    coords_bdry_vec = collect((Vector(q.coords) for q in Ybdry))
-    coords_vol_vec = collect((Vector(q.coords) for q in Yvol))
-    nrml_bdry_vec = collect(Vector(q.normal) for q in Ybdry)
+    coords_trg_vec = [Vector(q) for q in Xshift]
+    coords_bdry_vec = [Vector(q.coords) for q in Ybdry]
+    coords_vol_vec = [Vector(q.coords) for q in Yvol]
+    nrml_bdry_vec = [Vector(q.normal) for q in Ybdry]
 
     ElementaryPDESolutions.fast_evaluate!(b, coords_vol_vec, PFE_p)
     ElementaryPDESolutions.fast_evaluate!(P, coords_trg_vec, PFE_P)
