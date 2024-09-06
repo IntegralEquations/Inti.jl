@@ -124,16 +124,19 @@ struct Gauss{D,N} <: ReferenceQuadrature{D}
         domain == :segment && (domain = ReferenceLine())
         domain == :triangle && (domain = ReferenceTriangle())
         domain == :tetrehedron && (domain = ReferenceTetrahedron())
-        msg = "quadrature of order $order not available for $domain"
         if domain isa ReferenceLine
             # TODO: support Gauss-Legendre quadratures of arbitrary order
-            order == 13 || error(msg)
+            order == 13 || error("quadrature of order $order not available for $domain")
             n = 7
         elseif domain isa ReferenceTriangle
-            haskey(TRIANGLE_GAUSS_ORDER_TO_NPTS, order) || error(msg)
+            if !haskey(TRIANGLE_GAUSS_ORDER_TO_NPTS, order)
+                error("quadrature of order $order not available for $domain")
+            end
             n = TRIANGLE_GAUSS_ORDER_TO_NPTS[order]
         elseif domain isa ReferenceTetrahedron
-            haskey(TETRAHEDRON_GAUSS_ORDER_TO_NPTS, order) || error(msg)
+            if !haskey(TETRAHEDRON_GAUSS_ORDER_TO_NPTS, order)
+                error("quadrature of order $order not available for $domain")
+            end
             n = TETRAHEDRON_GAUSS_ORDER_TO_NPTS[order]
         else
             error(

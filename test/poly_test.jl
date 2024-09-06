@@ -14,7 +14,7 @@ function poly_test(npts)
     @polyvar x y
 
     N = 2
-    PolArray = Array{Polynomial{Float64}}(undef, length(P))
+    PolArray = Array{FixedPolynomials.Polynomial{Float64}}(undef, length(P))
 
     tsetup = @elapsed begin
         for (polind, ElemPolySolsPols) in enumerate(P)
@@ -25,7 +25,7 @@ function poly_test(npts)
                 exp_data[:, i] = [q for q in pol[1]]
                 coeff_data[i] = pol[2]
             end
-            PolArray[polind] = Polynomial(exp_data, coeff_data, [:x, :y])
+            PolArray[polind] = FixedPolynomials.Polynomial(exp_data, coeff_data, [:x, :y])
         end
         PolSystem = System(PolArray)
         pts = Vector{Vector{Float64}}(undef, npts)
@@ -64,11 +64,11 @@ function poly_test(npts)
     @info "ElementaryPDESolutions.jl time: $tregular"
 
     # Evaluate Jacobian
-    u = Vector{Float64}(undef, length(P))
-    U = Matrix{Float64}(undef, length(P), 2)
+    u = Matrix{Float64}(undef, length(P), npts)
+    U = Array{Float64}(undef, length(P), 2, npts)
     tjacob = @elapsed begin
         for i in 1:npts
-            evaluate_and_jacobian!(u, U, PolSystem, pts[i], cfg)
+            evaluate_and_jacobian!(view(u, :, i), view(U, :, :, i), PolSystem, pts[i], cfg)
         end
     end
     @info "FixedPolynomials.jl Jacobian+Eval time: $tjacob"

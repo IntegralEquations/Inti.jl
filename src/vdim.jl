@@ -130,8 +130,11 @@ function vdim_correction(
 end
 
 # function barrier for type stability purposes
-function build_vander(pts, p, c, r)
-    return [f((q.coords - c) / r) for q in pts, f in p]
+function build_vander(vals_trg, pts, PFE_p, c, r)
+    coords_trg_vec = collect((Vector((q.coords - c) / r)) for q in pts)
+    ElementaryPDESolutions.fast_evaluate!(vals_trg, coords_trg_vec, PFE_p)
+    return vals_trg
+    #return [f((q.coords - c) / r) for q in pts, f in p]
 end
 
 function local_vdim_correction(
@@ -158,15 +161,13 @@ function local_vdim_correction(
     # a reasonable interpolation_order if not provided
     isnothing(interpolation_order) &&
         (interpolation_order = maximum(order, values(source.etype2qrule)))
-    # by default basis centered at origin
-    p, P, γ₁P, multiindices = polynomial_solutions_vdim(pde, interpolation_order)
+    PFE_p, PFE_P = polynomial_solutions_local_vdim(pde, interpolation_order)
     dict_near = etype_to_nearest_points(target, source; maxdist)
     bdry_kdtree = KDTree(bdry_nodes)
     # compute sparse correction
     Is = Int[]
     Js = Int[]
     Vs = Eltype[]
-    L̃ = Matrix{Float64}(undef, 21, 15)
     for (E, qtags) in source.etype2qtags
         els = elements(source.mesh, E)
         near_list = dict_near[E]
@@ -175,8 +176,13 @@ function local_vdim_correction(
         sizehint!(Is, ne * nq * nq)
         sizehint!(Js, ne * nq * nq)
         sizehint!(Vs, ne * nq * nq)
+        num_basis = binomial(interpolation_order + N, N)
+        L̃ = Matrix{Float64}(undef, nq, num_basis)
+        vals_trg = Matrix{Float64}(undef, num_basis, nq)
+
         topo_neighs = 1
         neighbors = Inti.topological_neighbors(mesh, topo_neighs)
+
         for n in 1:ne
             # indices of nodes in element `n`
             isempty(near_list[n]) && continue
@@ -196,9 +202,8 @@ function local_vdim_correction(
                 c,
                 r,
                 quadrature_order,
-                p,
-                P,
-                γ₁P,
+                PFE_p,
+                PFE_P,
                 target[near_list[n]],
                 green_multiplier,
                 bdry_kdtree;
@@ -206,7 +211,7 @@ function local_vdim_correction(
             jglob = @view qtags[:, n]
             # compute translation and scaling
             if SHIFT
-                L̃ = build_vander(view(source, jglob), p, c, r)
+                L̃ .= transpose(build_vander(vals_trg, view(source, jglob), PFE_p, c, r))
                 Linv = pinv(L̃)
                 wei = transpose(Linv) * transpose(R)
             else
@@ -357,9 +362,8 @@ function _local_vdim_auxiliary_quantities(
     center,
     scale,
     quadrature_order,
-    p,
-    P,
-    γ₁P,
+    PFE_p,
+    PFE_P,
     X,
     μ,
     bdry_kdtree;
@@ -445,19 +449,39 @@ function _local_vdim_auxiliary_quantities(
         Dmat += δD
     end
 
-    num_basis = length(p)
+    num_basis = length(PFE_P)
     num_targets = length(X)
-    b = [f(q) for q in Yvol, f in p]
-    γ₀B = [f(q) for q in Ybdry, f in P]
-    γ₁B = [f(q) for q in Ybdry, f in γ₁P]
+    #b = [f(q) for q in Yvol, f in p]
+    b = Matrix{Float64}(undef, num_basis, length(Yvol))
+    γ₁B = Matrix{Float64}(undef, length(Ybdry), num_basis)
+    γ₀B = Matrix{Float64}(undef, num_basis, length(Ybdry))
+    P = Matrix{Float64}(undef, num_basis, length(X))
+    grad = Array{Float64}(undef, num_basis, N, length(Ybdry))
+    coords_trg_vec = collect((Vector(q) for q in Xshift))
+    coords_bdry_vec = collect((Vector(q.coords) for q in Ybdry))
+    coords_vol_vec = collect((Vector(q.coords) for q in Yvol))
+    nrml_bdry_vec = collect(Vector(q.normal) for q in Ybdry)
+
+    ElementaryPDESolutions.fast_evaluate!(b, coords_vol_vec, PFE_p)
+    ElementaryPDESolutions.fast_evaluate!(P, coords_trg_vec, PFE_P)
+    ElementaryPDESolutions.fast_evaluate_with_jacobian!(γ₀B, grad, coords_bdry_vec, PFE_P)
+    for i in 1:length(Ybdry)
+        for j in 1:num_basis
+            γ₁B[i, j] =  0
+            for k = 1:N
+                γ₁B[i, j] += grad[j, k, i] * nrml_bdry_vec[i][k]
+            end
+        end
+    end
+
     Θ = zeros(eltype(Vop), num_targets, num_basis)
     # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
     for n in 1:num_basis
         @views mul!(Θ[:, n], Smat, γ₁B[:, n])
-        @views mul!(Θ[:, n], Dmat, γ₀B[:, n], -1, 1)
-        @views mul!(Θ[:, n], Vmat, b[:, n], -1, 1)
+        @views mul!(Θ[:, n], Dmat, γ₀B[n, :], -1, 1)
+        @views mul!(Θ[:, n], Vmat, b[n, :], -1, 1)
         for i in 1:num_targets
-            Θ[i, n] += μ[i] * P[n](Xshift[i])
+            Θ[i, n] += μ[i] * P[n,i]
         end
     end
     return Θ
@@ -513,6 +537,39 @@ function vdim_mesh_center(msh::AbstractMesh)
         end
     end
     return xc / M
+end
+"""
+    polynomial_solutions_local_vdim(pde, order)
+
+For every monomial term `pₙ` of degree `order`, compute a polynomial `Pₙ` such
+that `ℒ[Pₙ] = pₙ`, where `ℒ` is the differential operator associated with `pde`.
+This function returns `{pₙ,Pₙ,γ₁Pₙ}`, where `γ₁Pₙ` is the generalized Neumann
+trace of `Pₙ`.
+"""
+function polynomial_solutions_local_vdim(pde::AbstractPDE, order::Integer)
+    N = ambient_dimension(pde)
+    # create empty arrays to store the monomials, solutions, and traces. For the
+    # neumann trace, we try to infer the concrete return type instead of simply
+    # having a vector of `Function`.
+    monomials = Vector{ElementaryPDESolutions.Polynomial{N,Float64}}()
+    poly_solutions = Vector{ElementaryPDESolutions.Polynomial{N,Float64}}()
+    multiindices = Vector{MultiIndex{N}}()
+    # iterate over N-tuples going from 0 to order
+    for I in Iterators.product(ntuple(i -> 0:order, N)...)
+        sum(I) > order && continue
+        # define the monomial basis functions, and the corresponding solutions.
+        # TODO: adapt this to vectorial case
+        p   = ElementaryPDESolutions.Polynomial(I => 1 / factorial(MultiIndex(I)))
+        P   = polynomial_solution(pde, p)
+        push!(multiindices, MultiIndex(I))
+        push!(monomials, p)
+        push!(poly_solutions, P)
+    end
+
+    PFE_monomials = ElementaryPDESolutions.assemble_fastevaluator(monomials, Float64)
+    PFE_polysolutions = ElementaryPDESolutions.assemble_fastevaluator(poly_solutions, Float64)
+
+    return PFE_monomials, PFE_polysolutions
 end
 
 """
