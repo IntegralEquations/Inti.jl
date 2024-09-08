@@ -131,8 +131,13 @@ end
 
 # function barrier for type stability purposes
 function build_vander(vals_trg, pts, PFE_p, c, r)
-    coords_trg_vec = [Vector((q.coords - c) / r) for q in pts]
-    ElementaryPDESolutions.fast_evaluate!(vals_trg, coords_trg_vec, PFE_p)
+    #coords_trg_vec = [Vector((q.coords - c) / r) for q in pts]
+    #ElementaryPDESolutions.fast_evaluate!(vals_trg, coords_trg_vec, PFE_p)
+    tmp = Vector{Float64}(undef, length(c))
+    for i in 1:length(pts)
+        tmp .= (pts[i].coords - c ) / r
+        ElementaryPDESolutions.fast_evaluate!(view(vals_trg, :, i), tmp, PFE_p)
+    end
     return vals_trg
     #return [f((q.coords - c) / r) for q in pts, f in p]
 end
@@ -452,24 +457,30 @@ function _local_vdim_auxiliary_quantities(
     num_basis = length(PFE_P)
     num_targets = length(X)
     #b = [f(q) for q in Yvol, f in p]
-    b = Matrix{Float64}(undef, num_basis, length(Yvol))
+    b = Matrix{Float64}(undef, length(Yvol), num_basis)
     γ₁B = Matrix{Float64}(undef, length(Ybdry), num_basis)
-    γ₀B = Matrix{Float64}(undef, num_basis, length(Ybdry))
-    P = Matrix{Float64}(undef, num_basis, length(X))
+    γ₀B = Matrix{Float64}(undef, length(Ybdry), num_basis)
+    P = Matrix{Float64}(undef, length(X), num_basis)
     grad = Array{Float64}(undef, num_basis, N, length(Ybdry))
-    coords_trg_vec = [Vector(q) for q in Xshift]
-    coords_bdry_vec = [Vector(q.coords) for q in Ybdry]
-    coords_vol_vec = [Vector(q.coords) for q in Yvol]
-    nrml_bdry_vec = [Vector(q.normal) for q in Ybdry]
+    #coords_trg_vec = [Vector(q) for q in Xshift]
+    #coords_bdry_vec = [Vector(q.coords) for q in Ybdry]
+    #coords_vol_vec = [Vector(q.coords) for q in Yvol]
+    #nrml_bdry_vec = [Vector(q.normal) for q in Ybdry]
 
-    ElementaryPDESolutions.fast_evaluate!(b, coords_vol_vec, PFE_p)
-    ElementaryPDESolutions.fast_evaluate!(P, coords_trg_vec, PFE_P)
-    ElementaryPDESolutions.fast_evaluate_with_jacobian!(γ₀B, grad, coords_bdry_vec, PFE_P)
+    for i in 1:length(Yvol)
+        ElementaryPDESolutions.fast_evaluate!(view(b, i, :),  PFEYvol[i].coords,_p)
+    end
+    for i in 1:length(X)
+        ElementaryPDESolutions.fast_evaluate!(view(P, i, :), Xshift[i], PFE_P)
+    end
+    for i in 1:length(Ybdry)
+        ElementaryPDESolutions.fast_evaluate_with_jacobian!(view(γ₀B, i, :), view(grad, :, :, i), Ybdry[i].coords, PFE_P)
+    end
     for i in 1:length(Ybdry)
         for j in 1:num_basis
             γ₁B[i, j] =  0
             for k = 1:N
-                γ₁B[i, j] += grad[j, k, i] * nrml_bdry_vec[i][k]
+                γ₁B[i, j] += grad[j, k, i] * Ybdry[i].normal[k]#nrml_bdry_vec[i][k]
             end
         end
     end
@@ -478,10 +489,10 @@ function _local_vdim_auxiliary_quantities(
     # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
     for n in 1:num_basis
         @views mul!(Θ[:, n], Smat, γ₁B[:, n])
-        @views mul!(Θ[:, n], Dmat, γ₀B[n, :], -1, 1)
-        @views mul!(Θ[:, n], Vmat, b[n, :], -1, 1)
+        @views mul!(Θ[:, n], Dmat, γ₀B[:, n], -1, 1)
+        @views mul!(Θ[:, n], Vmat, b[:, n], -1, 1)
         for i in 1:num_targets
-            Θ[i, n] += μ[i] * P[n,i]
+            Θ[i, n] += μ[i] * P[i,n]
         end
     end
     return Θ
