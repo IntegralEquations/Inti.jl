@@ -131,15 +131,12 @@ end
 
 # function barrier for type stability purposes
 function build_vander(vals_trg, pts, PFE_p, c, r)
-    #coords_trg_vec = [Vector((q.coords - c) / r) for q in pts]
-    #ElementaryPDESolutions.fast_evaluate!(vals_trg, coords_trg_vec, PFE_p)
     tmp = Vector{Float64}(undef, length(c))
     for i in 1:length(pts)
         tmp .= (pts[i].coords - c ) / r
         ElementaryPDESolutions.fast_evaluate!(view(vals_trg, :, i), tmp, PFE_p)
     end
     return vals_trg
-    #return [f((q.coords - c) / r) for q in pts, f in p]
 end
 
 function local_vdim_correction(
@@ -468,7 +465,7 @@ function _local_vdim_auxiliary_quantities(
     #nrml_bdry_vec = [Vector(q.normal) for q in Ybdry]
 
     for i in 1:length(Yvol)
-        ElementaryPDESolutions.fast_evaluate!(view(b, i, :),  PFEYvol[i].coords,_p)
+        ElementaryPDESolutions.fast_evaluate!(view(b, i, :), Yvol[i].coords, PFE_p)
     end
     for i in 1:length(X)
         ElementaryPDESolutions.fast_evaluate!(view(P, i, :), Xshift[i], PFE_P)
