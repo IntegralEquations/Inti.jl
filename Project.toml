@@ -3,6 +3,7 @@ uuid = "fb74042b-437e-4c5b-88cf-d4e2beb394d5"
 version = "0.1.1"
 
 [deps]
+Bessels = "0e736298-9ec6-45e8-9647-e4fc86a2fe38"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 ElementaryPDESolutions = "88a69b33-da0f-4502-8c8c-d680cf4d883b"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
