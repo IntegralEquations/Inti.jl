@@ -453,16 +453,11 @@ function _local_vdim_auxiliary_quantities(
 
     num_basis = length(PFE_P)
     num_targets = length(X)
-    #b = [f(q) for q in Yvol, f in p]
     b = Matrix{Float64}(undef, length(Yvol), num_basis)
     γ₁B = Matrix{Float64}(undef, length(Ybdry), num_basis)
     γ₀B = Matrix{Float64}(undef, length(Ybdry), num_basis)
     P = Matrix{Float64}(undef, length(X), num_basis)
     grad = Array{Float64}(undef, num_basis, N, length(Ybdry))
-    #coords_trg_vec = [Vector(q) for q in Xshift]
-    #coords_bdry_vec = [Vector(q.coords) for q in Ybdry]
-    #coords_vol_vec = [Vector(q.coords) for q in Yvol]
-    #nrml_bdry_vec = [Vector(q.normal) for q in Ybdry]
 
     for i in 1:length(Yvol)
         ElementaryPDESolutions.fast_evaluate!(view(b, i, :), Yvol[i].coords, PFE_p)

@@ -2,7 +2,6 @@
 
 using DynamicPolynomials
 using FixedPolynomials
-using ElementaryPDESolutions
 using Inti
 using StaticArrays
 using Gmsh

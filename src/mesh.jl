@@ -677,7 +677,11 @@ function topological_neighbors(msh::AbstractMesh, k = 1)
         end
     end
     # Recursively compute the neighbors from the one-neighbors
-    k_neighbors = deepcopy(one_neighbors)
+    if k > 1
+        k_neighbors = deepcopy(one_neighbors)
+    else
+        k_neighbors = one_neighbors
+    end
     while k > 1
         # update neighborhood of each element
         for el in keys(one_neighbors)

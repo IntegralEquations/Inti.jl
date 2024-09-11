@@ -95,7 +95,7 @@ end
 @noinline function _assemble_matrix!(out, K, X, Y::Quadrature, threads)
     @usethreads threads for j in 1:length(Y)
         for i in 1:length(X)
-            out[i, j] = K(X[i], Y[j]) * weight(Y[j])
+            @inbounds out[i, j] = K(X[i], Y[j]) * weight(Y[j])
         end
     end
     return out

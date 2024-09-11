@@ -1,5 +1,7 @@
 # # High-order convergence of vdim
 
+using DynamicPolynomials
+using FixedPolynomials
 using Inti
 using Meshes
 using StaticArrays
@@ -9,16 +11,13 @@ using HMatrices
 using FMM3D
 using GLMakie
 
-meshsize = 0.1
-interpolation_order = 2
+meshsize = 0.05
+interpolation_order = 4
 VR_qorder = Inti.Tetrahedron_VR_interpolation_order_to_quadrature_order(interpolation_order)
 bdry_qorder = 2 * VR_qorder
 
 function gmsh_sphere(; order = 1, name, meshsize)
     try
-        if isdefined(Main, :Infiltrator)
-            Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-        end
         gmsh.initialize()
         gmsh.option.setNumber("General.Terminal", 0)
         gmsh.model.add("sphere-mesh")
