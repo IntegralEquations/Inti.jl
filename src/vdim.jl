@@ -163,7 +163,7 @@ function local_vdim_correction(
     # a reasonable interpolation_order if not provided
     isnothing(interpolation_order) &&
         (interpolation_order = maximum(order, values(source.etype2qrule)))
-    PFE_p, PFE_P = polynomial_solutions_local_vdim(pde, interpolation_order)
+    PFE_p, PFE_P, multiindices = polynomial_solutions_local_vdim(pde, interpolation_order)
     dict_near = etype_to_nearest_points(target, source; maxdist)
     bdry_kdtree = KDTree(bdry_nodes)
     # compute sparse correction
@@ -189,9 +189,6 @@ function local_vdim_correction(
             # indices of nodes in element `n`
             isempty(near_list[n]) && continue
             c, r = translation_and_scaling(els[n])
-            #c = SVector{2, Float64}(0,0)
-            # FIXME Why does scaling the whole domain not work?
-            r = 1.0
             if !SHIFT
                 c = SVector{N,Float64}(0, 0)
                 r = 1.0
@@ -215,7 +212,8 @@ function local_vdim_correction(
             if SHIFT
                 L̃ .= transpose(build_vander(vals_trg, view(source, jglob), PFE_p, c, r))
                 Linv = pinv(L̃)
-                wei = transpose(Linv) * transpose(R)
+                S = Diagonal(1.0./r.^(abs.(multiindices)))
+                wei = transpose(Linv) * S * transpose(R)
             else
                 error("unsupported local VDIM without shifting")
             end
@@ -370,6 +368,7 @@ function _local_vdim_auxiliary_quantities(
     μ,
     bdry_kdtree;
 ) where {N}
+    scale = 1.0
     # construct the local region
     Etype = first(Inti.element_types(mesh))
     el_neighs = neighbors[(Etype, el)]
@@ -572,7 +571,7 @@ function polynomial_solutions_local_vdim(pde::AbstractPDE, order::Integer)
     PFE_monomials = ElementaryPDESolutions.assemble_fastevaluator(monomials, Float64)
     PFE_polysolutions = ElementaryPDESolutions.assemble_fastevaluator(poly_solutions, Float64)
 
-    return PFE_monomials, PFE_polysolutions
+    return PFE_monomials, PFE_polysolutions, multiindices
 end
 
 """
