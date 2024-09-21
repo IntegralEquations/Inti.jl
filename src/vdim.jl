@@ -271,7 +271,7 @@ function translation_and_scaling(el::LagrangeTriangle)
         Cp = vertices[3] - vertices[1]
         Dp = 2 * (Bp[1] * Cp[2] - Bp[2] * Cp[1])
         Upx = 1 / Dp * (Cp[2] * (Bp[1]^2 + Bp[2]^2) - Bp[2] * (Cp[1]^2 + Cp[2]^2))
-        Upy = 1 / Dp * (Bp[1] * (Cp[1]^2 + Cp[2]^2) - Cp[2] * (Bp[1]^2 + Bp[2]^2))
+        Upy = 1 / Dp * (Bp[1] * (Cp[1]^2 + Cp[2]^2) - Cp[1] * (Bp[1]^2 + Bp[2]^2))
         Up = SVector{2}(Upx, Upy)
         r = norm(Up)
         c = Up + vertices[1]
