@@ -331,6 +331,7 @@ const LagrangeCube = LagrangeElement{ReferenceCube}
 
 """
     vertices_idxs(el::LagrangeElement)
+    vertices_idxs(::Type{LagrangeElement})
 
 The indices of the nodes in `el` that define the vertices of the element.
 """
@@ -353,17 +354,98 @@ vertices(el::LagrangeElement) = view(vals(el), vertices_idxs(el))
 
 The indices of the nodes in `el` that define the boundary of the element.
 """
-function boundary_idxs(el::LagrangeLine)
-    return 1, length(vals(el))
+
+function boundary_idxs(::Type{<:LagrangeLine})
+    return 1, 2
 end
 
-function boundary_idxs(el::LagrangeTriangle{3})
+function boundary_idxs(::Type{<:LagrangeTriangle{3}})
     return (1, 2), (2, 3), (3, 1)
 end
 
-function boundary_idxs(el::LagrangeTriangle{6})
-    return (1, 2), (2, 3), (3, 1)
+function boundary_idxs(::Type{<:LagrangeTriangle{6}})
+    return (1, 2, 4), (2, 3, 5), (3, 1, 6)
 end
+
+function boundary_idxs(::Type{<:LagrangeTetrahedron{4}})
+    return (3, 2, 1), (1, 4, 3), (2, 3, 4), (1, 2, 4)
+end
+
+function boundary1d(els, msh)
+    res = Set{Int}()
+    E, _ = first(els)
+    bdi = Inti.boundary_idxs(E)
+    for (E, i) in els
+        vertices = Inti.connectivity(msh, E)[:, i]
+        for bord in (-vertices[bdi[1]], vertices[bdi[2]])
+            -bord in res ? delete!(res, -bord) : push!(res, bord)
+        end
+    end
+    return sort([res...])
+end
+
+function boundarynd(::Type{T}, els, msh) where {T}
+    bdi = Inti.boundary_idxs(T)
+    nedges = length(els) * length(bdi)
+    edgelist = Vector{SVector{length(bdi[1]),Int64}}(undef, nedges)
+    edgelist_unsrt = Vector{SVector{length(bdi[1]),Int64}}(undef, nedges)
+    bords = Vector{MVector{length(bdi[1]),Int64}}(undef, length(bdi))
+    for i in 1:length(bdi)
+        bords[i] = MVector{length(bdi[1]), Int64}(undef)
+    end
+    j = 1
+    for ii in els
+        for k in 1:length(bdi)
+            for jjj in 1:length(bdi[k])
+                bords[k][jjj] = Inti.connectivity(msh, T)[bdi[k][jjj], ii]
+            end
+        end
+        for q in bords
+            edgelist_unsrt[j] = q[:]
+            edgelist[j] = sort!(q)
+            j += 1
+        end
+    end
+    I = sortperm(edgelist)
+    uniqlist = Int64[]
+    sizehint!(uniqlist, length(els))
+    i = 1
+    while i <= length(edgelist) - 1
+        if isequal(edgelist[I[i]], edgelist[I[i+1]])
+            i += 1
+        else
+            push!(uniqlist, I[i])
+        end
+        i += 1
+    end
+    if !isequal(edgelist[I[end-1]], edgelist[I[end]])
+        push!(uniqlist, I[end])
+    end
+    return edgelist_unsrt[uniqlist]
+end
+
+function _dfs!(comp, el, nei, els)
+    for el_nei in nei[el]
+        if el_nei in els
+            push!(comp, el_nei)
+            delete!(els, el_nei)
+            _dfs!(comp, el_nei, nei, els)
+        end
+    end
+end
+
+function connected_components(els, nei)
+    components = Set{Tuple{DataType,Int}}[]
+    while !isempty(els)
+        el = pop!(els)
+        comp = Set{Tuple{DataType,Int}}()
+        push!(comp, el)
+        _dfs!(comp, el, nei, els)
+        push!(components, comp)
+    end
+    return components
+end
+##
 
 #=
 Hardcode some basic elements.

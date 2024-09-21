@@ -60,8 +60,9 @@ source(iop::IntegralOperator) = iop.source
 
 function IntegralOperator(k, X, Y::Quadrature = X)
     T = return_type(k, eltype(X), eltype(Y))
-    msg = """IntegralOperator of nonbits being created: $T"""
-    isbitstype(T) || (@warn msg)
+    # FIXME This cripples performance for local VDIM
+    #msg = """IntegralOperator of nonbits being created: $T"""
+    #isbitstype(T) || (@warn msg)
     return IntegralOperator{T,typeof(k),typeof(X),typeof(Y)}(k, X, Y)
 end
 
@@ -94,7 +95,7 @@ end
 @noinline function _assemble_matrix!(out, K, X, Y::Quadrature, threads)
     @usethreads threads for j in 1:length(Y)
         for i in 1:length(X)
-            out[i, j] = K(X[i], Y[j]) * weight(Y[j])
+            @inbounds out[i, j] = K(X[i], Y[j]) * weight(Y[j])
         end
     end
     return out

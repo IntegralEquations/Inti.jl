@@ -224,7 +224,7 @@ function (SL::SingleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T
     d = norm(r)
     filter = !(d ≤ SAME_POINT_TOLERANCE)
     if N == 2
-        return filter * (im / 4 * hankelh1(0, k * d))
+        return filter * (im / 4 * Bessels.hankelh1(0, k * d))
     elseif N == 3
         return filter * (1 / (4π) / d * exp(im * k * d))
     end
@@ -238,7 +238,7 @@ function (DL::DoubleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T
     d = norm(r)
     filter = !(d ≤ SAME_POINT_TOLERANCE)
     if N == 2
-        val = im * k / 4 / d * hankelh1(1, k * d) .* dot(r, ny)
+        val = im * k / 4 / d * Bessels.hankelh1(1, k * d) .* dot(r, ny)
         return filter * val
     elseif N == 3
         val = 1 / (4π) / d^2 * exp(im * k * d) * (-im * k + 1 / d) * dot(r, ny)
@@ -254,7 +254,7 @@ function (ADL::AdjointDoubleLayerKernel{T,<:Helmholtz{N}})(target, source)::T wh
     d = norm(r)
     filter = !(d ≤ SAME_POINT_TOLERANCE)
     if N == 2
-        val = -im * k / 4 / d * hankelh1(1, k * d) .* dot(r, nx)
+        val = -im * k / 4 / d * Bessels.hankelh1(1, k * d) .* dot(r, nx)
         return filter * val
     elseif N == 3
         val = -1 / (4π) / d^2 * exp(im * k * d) * (-im * k + 1 / d) * dot(r, nx)
@@ -276,8 +276,8 @@ function (HS::HyperSingularKernel{T,S})(target, source)::T where {T,S<:Helmholtz
         val =
             transpose(nx) * (
                 (
-                    -im * k^2 / 4 / d^2 * hankelh1(2, k * d) * RRT +
-                    im * k / 4 / d * hankelh1(1, k * d) * I
+                    -im * k^2 / 4 / d^2 * Bessels.hankelh1(2, k * d) * RRT +
+                    im * k / 4 / d * Bessels.hankelh1(1, k * d) * I
                 ) * ny
             )
         return filter * val

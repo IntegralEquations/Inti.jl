@@ -17,6 +17,7 @@ using Scratch
 using SparseArrays
 using StaticArrays
 using SpecialFunctions
+using Bessels
 using Printf
 using TOML
 
