@@ -13,6 +13,7 @@ using LinearAlgebra
 using LinearMaps
 using NearestNeighbors
 using Pkg
+using QuadGK
 using Scratch
 using SparseArrays
 using StaticArrays
