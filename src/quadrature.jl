@@ -87,12 +87,15 @@ end
 
 """
     Quadrature(msh::AbstractMesh, etype2qrule::Dict)
+    Quadrature(msh::AbstractMesh, qrule::ReferenceQuadrature)
     Quadrature(msh::AbstractMesh; qorder)
 
 Construct a `Quadrature` for `msh`, where for each element type `E` in `msh` the
-reference quadrature `q = etype2qrule[E]` is used. If an `order` keyword is
-passed, a default quadrature of the desired order is used for each element type
-usig [`_qrule_for_reference_shape`](@ref).
+reference quadrature `q = etype2qrule[E]` is used. When a single `qrule` is
+passed, it is used for all element types in `msh`.
+
+If an `order` keyword is passed, a default quadrature of the desired order is
+used for each element type usig [`_qrule_for_reference_shape`](@ref).
 
 For co-dimension one elements, the normal vector is also computed and stored in
 the [`QuadratureNode`](@ref)s.
@@ -124,6 +127,11 @@ function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
         end
     end
     return quad
+end
+
+function Quadrature(msh::AbstractMesh{N,T}, qrule::ReferenceQuadrature) where {N,T}
+    etype2qrule = Dict(E => qrule for E in element_types(msh))
+    return Quadrature(msh, etype2qrule)
 end
 
 function Quadrature(msh::AbstractMesh; qorder)
