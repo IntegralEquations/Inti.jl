@@ -305,6 +305,17 @@ real or complex number.
 For purely imaginary wavenumbers, consider using the [`Yukawa`](@ref) kernel.
 """
 function Helmholtz(; k, dim)
+    if k isa Complex
+        @assert imag(k) ≥ 0 "k must have a non-negative imaginary part"
+        if iszero(real(k))
+            msg = """Purely imaginary wavenumber detected in Helmholtz equation.
+            Creating a modified Helmholtz (Yukawa) PDE instead."""
+            @warn msg
+            return Yukawa(; λ = imag(k), dim = dim)
+        elseif iszero(imag(k))
+            return Helmholtz(; k = real(k), dim = dim)
+        end
+    end
     return Helmholtz{dim,typeof(k)}(k)
 end
 
@@ -324,11 +335,11 @@ function (SL::SingleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T
     k = parameters(SL)
     r = x - y
     d = norm(r)
-    filter = !(d ≤ SAME_POINT_TOLERANCE)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        return filter * (im / 4 * hankelh1(0, k * d))
+        return im / 4 * hankelh1(0, k * d)
     elseif N == 3
-        return filter * (1 / (4π) / d * exp(im * k * d))
+        return 1 / (4π) / d * exp(im * k * d)
     end
 end
 
@@ -354,13 +365,13 @@ function (ADL::AdjointDoubleLayerKernel{T,<:Helmholtz{N}})(target, source)::T wh
     k = parameters(ADL)
     r = x - y
     d = norm(r)
-    filter = !(d ≤ SAME_POINT_TOLERANCE)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
         val = -im * k / 4 / d * hankelh1(1, k * d) .* dot(r, nx)
-        return filter * val
+        return val
     elseif N == 3
         val = -1 / (4π) / d^2 * exp(im * k * d) * (-im * k + 1 / d) * dot(r, nx)
-        return filter * val
+        return val
     end
 end
 
@@ -371,25 +382,23 @@ function (HS::HyperSingularKernel{T,S})(target, source)::T where {T,S<:Helmholtz
     k = parameters(pde(HS))
     r = x - y
     d = norm(r)
-    filter = !(d ≤ SAME_POINT_TOLERANCE)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        RRT = r * transpose(r) # r ⊗ rᵗ
-        # TODO: rewrite the operation below in a more clear/efficient way
         val =
             transpose(nx) * (
                 (
-                    -im * k^2 / 4 / d^2 * hankelh1(2, k * d) * RRT +
+                    -im * k^2 / 4 / d^2 * hankelh1(2, k * d) * r * transpose +
                     im * k / 4 / d * hankelh1(1, k * d) * I
                 ) * ny
             )
-        return filter * val
+        return val
     elseif N == 3
         RRT = r * transpose(r) # r ⊗ rᵗ
         term1 = 1 / (4π) / d^2 * exp(im * k * d) * (-im * k + 1 / d) * I
         term2 =
             RRT / d * exp(im * k * d) / (4 * π * d^4) * (3 * (d * im * k - 1) + d^2 * k^2)
         val = transpose(nx) * (term1 + term2) * ny
-        return filter * val
+        return val
     end
 end
 
@@ -416,13 +425,13 @@ function (SL::SingleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
     y = coords(source)
     r = x - y
     d = norm(r)
-    filter = !(d ≤ SAME_POINT_TOLERANCE)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
         γ = -log(d)
     elseif N == 3
         γ = 1 / d
     end
-    return filter * (1 / (4π * (N - 1) * μ) * (γ * I + r * transpose(r) / d^N))
+    return 1 / (4π * (N - 1) * μ) * (γ * I + r * transpose(r) / d^N)
 end
 
 # Double Layer Kernel
@@ -433,11 +442,11 @@ function (DL::DoubleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
     ny = normal(source)
     r = x - y
     d = norm(r)
-    filter = !(d ≤ SAME_POINT_TOLERANCE)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        return filter * (1 / π * dot(r, ny) / d^4 * r * transpose(r))
+        return 1 / π * dot(r, ny) / d^4 * r * transpose(r)
     elseif N == 3
-        return filter * (3 / (4π) * dot(r, ny) / d^5 * r * transpose(r))
+        return 3 / (4π) * dot(r, ny) / d^5 * r * transpose(r)
     end
 end
 
@@ -449,11 +458,11 @@ function (ADL::AdjointDoubleLayerKernel{T,<:Stokes{N}})(target, source)::T where
     y = coords(source)
     r = x - y
     d = norm(r)
-    filter = !(d ≤ SAME_POINT_TOLERANCE)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        return filter * (-1 / π * dot(r, nx) / d^4 * r * transpose(r))
+        return -1 / π * dot(r, nx) / d^4 * r * transpose(r)
     elseif N == 3
-        return filter * (-3 / (4π) * dot(r, nx) / d^5 * r * transpose(r))
+        return -3 / (4π) * dot(r, nx) / d^5 * r * transpose(r)
     end
 end
 
