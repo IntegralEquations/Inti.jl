@@ -1,10 +1,13 @@
-const PREDEFINED_KERNELS = ["Laplace", "Helmholtz", "Stokes"]
+const PREDEFINED_KERNELS = ["Laplace", "Helmholtz", "Stokes", "Yukawa"]
+
 """
     abstract type AbstractKernel{T}
 
 A kernel functions `K` with the signature `K(target,source)::T`.
 
-See also: [`GenericKernel`](@ref), [`SingleLayerKernel`](@ref), [`DoubleLayerKernel`](@ref), [`AdjointDoubleLayerKernel`](@ref), [`HyperSingularKernel`](@ref)
+See also: [`GenericKernel`](@ref), [`SingleLayerKernel`](@ref),
+[`DoubleLayerKernel`](@ref), [`AdjointDoubleLayerKernel`](@ref),
+[`HyperSingularKernel`](@ref)
 """
 abstract type AbstractKernel{T} end
 
@@ -23,7 +26,7 @@ end
     abstract type AbstractPDE{N}
 
 A partial differential equation in dimension `N`. `AbstractPDE` types are used
-to define `AbstractPDEKernel`s.
+to define [`AbstractPDEKernel`s](@ref AbstractPDEKernel).
 """
 abstract type AbstractPDE{N} end
 
@@ -39,8 +42,7 @@ abstract type AbstractPDEKernel{T,Op} <: AbstractKernel{T} end
 """
     pde(K::AbstractPDEKernel)
 
-Return the underlying `AbstractPDE` when `K` correspond to the kernel related to
-the underlying Greens function of a PDE.
+Return the underlying `AbstractPDE` associated with the kernel `K`.
 """
 pde(k::AbstractPDEKernel) = k.pde
 
@@ -57,7 +59,7 @@ end
 """
     struct SingleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
 
-The free-space single-layer kernel (i.e. the fundamental solution) of an `OP <:
+The free-space single-layer kernel (i.e. the fundamental solution) of an `Op <:
 AbstractPDE`.
 """
 struct SingleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
@@ -95,8 +97,8 @@ end
 Given an operator `Op`, construct its free-space hypersingular kernel. This
 corresponds to the `transpose(γ₁,ₓγ₁[G])`, where `G` is the
 [`SingleLayerKernel`](@ref). For operators such as [`Laplace`](@ref) or
-[`Helmholtz`](@ref), this is simply the normal derivative of the fundamental
-solution respect to the target variable of the `DoubleLayerKernel`.
+[`Helmholtz`](@ref), this is simply the normal derivative respect to the target
+variable of the `DoubleLayerKernel`.
 """
 struct HyperSingularKernel{T,Op} <: AbstractPDEKernel{T,Op}
     pde::Op
@@ -106,13 +108,13 @@ end
 ################################# LAPLACE ######################################
 ################################################################################
 
+struct Laplace{N} <: AbstractPDE{N} end
+
 """
-    struct Laplace{N}
+    Laplace(; dim)
 
 Laplace equation in `N` dimension: Δu = 0.
 """
-struct Laplace{N} <: AbstractPDE{N} end
-
 Laplace(; dim) = Laplace{dim}()
 
 function Base.show(io::IO, pde::Laplace)
@@ -130,11 +132,11 @@ function (SL::SingleLayerKernel{T,Laplace{N}})(
     r = coords(target) - coords(source),
 )::T where {N,T}
     d = norm(r)
-    filter = !(d ≤ SAME_POINT_TOLERANCE)
+    (d ≤ SAME_POINT_TOLERANCE) && return zero(T)
     if N == 2
-        return filter * (-1 / (2π) * log(d))
+        return -1 / (2π) * log(d)
     elseif N == 3
-        return filter * (1 / (4π) / d)
+        return 1 / (4π) / d
     else
         notimplemented()
     end
@@ -147,11 +149,11 @@ function (DL::DoubleLayerKernel{T,Laplace{N}})(
 )::T where {N,T}
     ny = normal(source)
     d = norm(r)
-    filter = !(d ≤ SAME_POINT_TOLERANCE)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        return filter * (1 / (2π) / (d^2) * dot(r, ny))
+        return 1 / (2π) / (d^2) * dot(r, ny)
     elseif N == 3
-        return filter * (1 / (4π) / (d^3) * dot(r, ny))
+        return 1 / (4π) / (d^3) * dot(r, ny)
     else
         notimplemented()
     end
@@ -164,11 +166,11 @@ function (ADL::AdjointDoubleLayerKernel{T,Laplace{N}})(
 )::T where {N,T}
     nx = normal(target)
     d = norm(r)
-    filter = !(d ≤ SAME_POINT_TOLERANCE)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        return filter * (-1 / (2π) / (d^2) * dot(r, nx))
+        return -1 / (2π) / (d^2) * dot(r, nx)
     elseif N == 3
-        return filter * (-1 / (4π) / (d^3) * dot(r, nx))
+        return -1 / (4π) / (d^3) * dot(r, nx)
     end
 end
 
@@ -180,14 +182,55 @@ function (HS::HyperSingularKernel{T,Laplace{N}})(
     nx = normal(target)
     ny = normal(source)
     d = norm(r)
-    filter = !(d ≤ SAME_POINT_TOLERANCE)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        return filter *
-               (1 / (2π) / (d^2) * transpose(nx) * ((I - 2 * r * transpose(r) / d^2) * ny))
+        return 1 / (2π) / (d^2) * transpose(nx) * ((I - 2 * r * transpose(r) / d^2) * ny)
     elseif N == 3
         ID = SMatrix{3,3,Float64,9}(1, 0, 0, 0, 1, 0, 0, 0, 1)
         RRT = r * transpose(r) # r ⊗ rᵗ
-        return filter * (1 / (4π) / (d^3) * transpose(nx) * ((ID - 3 * RRT / d^2) * ny))
+        return 1 / (4π) / (d^3) * transpose(nx) * ((ID - 3 * RRT / d^2) * ny)
+    end
+end
+
+################################################################################
+################################# Yukawa #######################################
+################################################################################
+
+struct Yukawa{N,K<:Real} <: AbstractPDE{N}
+    λ::K
+end
+
+"""
+    Yukawa(; λ, dim)
+
+Yukawa equation, also known as modified Helmholtz, in `N` dimensions: Δu + λ²u =
+0. The parameter `λ` is a positive number.
+"""
+function Yukawa(; λ, dim)
+    @assert λ > 0 "λ must be a positive number"
+    return Yukawa{dim,typeof(λ)}(λ)
+end
+
+const ModifiedHelmholtz = Yukawa
+
+Base.show(io::IO, ::Yukawa) = print(io, "Δu + λ²u = 0")
+
+parameters(pde::Yukawa) = pde.λ
+
+default_kernel_eltype(::Yukawa)  = Float64
+default_density_eltype(::Yukawa) = Float64
+
+function (SL::SingleLayerKernel{T,<:Yukawa{N,K}})(target, source)::T where {N,T,K}
+    x = coords(target)
+    y = coords(source)
+    λ = parameters(SL)
+    r = x - y
+    d = norm(r)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
+    if N == 2
+        return 1 / (2π) * Bessels.besselk(0, λ * d)
+    elseif N == 3
+        return 1 / (4π) / d * exp(-λ * d)
     end
 end
 
@@ -195,16 +238,21 @@ end
 ################################# Helmholtz ####################################
 ################################################################################
 
-"""
-    struct Helmholtz{N,T}
-
-Helmholtz equation in `N` dimensions: Δu + k²u = 0.
-"""
 struct Helmholtz{N,K} <: AbstractPDE{N}
     k::K
 end
 
-Helmholtz(; k, dim) = Helmholtz{dim,typeof(k)}(k)
+"""
+    Helmholtz(; k, dim)
+
+Helmholtz equation in `N` dimensions: Δu + k²u = 0. The parameter `k` can be a
+real or complex number.
+
+For purely imaginary wavenumbers, consider using the [`Yukawa`](@ref) kernel.
+"""
+function Helmholtz(; k, dim)
+    return Helmholtz{dim,typeof(k)}(k)
+end
 
 function Base.show(io::IO, ::Helmholtz)
     # k = parameters(pde)

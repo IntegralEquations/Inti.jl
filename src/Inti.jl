@@ -22,6 +22,7 @@ using Printf
 using TOML
 
 import ElementaryPDESolutions
+import Bessels # faster than SpecialFunctions for Bessel functions with real args
 
 # helper functions
 include("utils.jl")
