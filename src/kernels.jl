@@ -186,9 +186,7 @@ function (HS::HyperSingularKernel{T,Laplace{N}})(
     if N == 2
         return 1 / (2π) / (d^2) * transpose(nx) * ((I - 2 * r * transpose(r) / d^2) * ny)
     elseif N == 3
-        ID = SMatrix{3,3,Float64,9}(1, 0, 0, 0, 1, 0, 0, 0, 1)
-        RRT = r * transpose(r) # r ⊗ rᵗ
-        return 1 / (4π) / (d^3) * transpose(nx) * ((ID - 3 * RRT / d^2) * ny)
+        return 1 / (4π) / (d^3) * transpose(nx) * ((I - 3 * r * transpose(r) / d^2) * ny)
     end
 end
 
@@ -231,6 +229,62 @@ function (SL::SingleLayerKernel{T,<:Yukawa{N,K}})(target, source)::T where {N,T,
         return 1 / (2π) * Bessels.besselk(0, λ * d)
     elseif N == 3
         return 1 / (4π) / d * exp(-λ * d)
+    end
+end
+
+function (DL::DoubleLayerKernel{T,Yukawa{N,K}})(target, source)::T where {N,T,K}
+    x, y, ny = coords(target), coords(source), normal(source)
+    λ = parameters(DL)
+    r = x - y
+    d = norm(r)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
+    if N == 2
+        k = im * λ
+        return λ / (2 * π * d) * Bessels.besselk(1, λ * d) .* dot(r, ny)
+    elseif N == 3
+        return 1 / (4π) / d^2 * exp(-λ * d) * (λ + 1 / d) * dot(r, ny)
+    end
+end
+
+function (ADL::AdjointDoubleLayerKernel{T,<:Yukawa{N,K}})(target, source)::T where {N,T,K}
+    x, y, nx = coords(target), coords(source), normal(target)
+    λ = parameters(ADL)
+    r = x - y
+    d = norm(r)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
+    if N == 2
+        k = im * λ
+        return -λ / (2 * π * d) * Bessels.besselk(1, λ * d) .* dot(r, nx)
+    elseif N == 3
+        return -1 / (4π) / d^2 * exp(-λ * d) * (λ + 1 / d) * dot(r, nx)
+    end
+end
+
+function (HS::HyperSingularKernel{T,<:Yukawa{N,K}})(target, source)::T where {N,T,K}
+    x, y, nx, ny = coords(target), coords(source), normal(target), normal(source)
+    λ = parameters(pde(HS))
+    r = x - y
+    d = norm(r)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
+    k = im * λ
+    if N == 2
+        RRT = r * transpose(r) # r ⊗ rᵗ
+        # TODO: rewrite the operation below in a more clear/efficient way
+        val =
+            transpose(nx) * (
+                (
+                    -λ^2 / (2π) / d^2 * Bessels.besselk(2, λ * d) * RRT +
+                    λ / (2 * π * d) * Bessels.besselk(1, λ * d) * I
+                ) * ny
+            )
+        return val
+    elseif N == 3
+        term1 = 1 / (4π) / d^2 * exp(-λ * d) * (λ + 1 / d) * I
+        term2 =
+            r * transpose(r) / d * exp(-λ * d) / (4 * π * d^4) *
+            (3 * (-d * λ - 1) - d^2 * λ^2)
+        val = transpose(nx) * (term1 + term2) * ny
+        return val
     end
 end
 
@@ -284,13 +338,13 @@ function (DL::DoubleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T
     k = parameters(DL)
     r = x - y
     d = norm(r)
-    filter = !(d ≤ SAME_POINT_TOLERANCE)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
         val = im * k / 4 / d * hankelh1(1, k * d) .* dot(r, ny)
-        return filter * val
+        return val
     elseif N == 3
         val = 1 / (4π) / d^2 * exp(im * k * d) * (-im * k + 1 / d) * dot(r, ny)
-        return filter * val
+        return val
     end
 end
 
