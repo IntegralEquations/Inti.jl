@@ -329,6 +329,9 @@ parameters(pde::Helmholtz) = pde.k
 default_kernel_eltype(::Helmholtz) = ComplexF64
 default_density_eltype(::Helmholtz) = ComplexF64
 
+hankelh1(n, x::Real)    = Bessels.hankelh1(n, x)
+hankelh1(n, x::Complex) = SpecialFunctions.hankelh1(n, x)
+
 function (SL::SingleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T}
     x = coords(target)
     y = coords(source)
