@@ -390,7 +390,7 @@ function (HS::HyperSingularKernel{T,S})(target, source)::T where {T,S<:Helmholtz
         val =
             transpose(nx) * (
                 (
-                    -im * k^2 / 4 / d^2 * hankelh1(2, k * d) * r * transpose +
+                    -im * k^2 / 4 / d^2 * hankelh1(2, k * d) * r * transpose(r) +
                     im * k / 4 / d * hankelh1(1, k * d) * I
                 ) * ny
             )
