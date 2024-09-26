@@ -201,7 +201,7 @@ end
 """
     Yukawa(; λ, dim)
 
-Yukawa equation, also known as modified Helmholtz, in `N` dimensions: Δu + λ²u =
+Yukawa equation, also known as modified Helmholtz, in `N` dimensions: Δu - λ²u =
 0. The parameter `λ` is a positive number.
 """
 function Yukawa(; λ, dim)
