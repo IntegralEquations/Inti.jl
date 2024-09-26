@@ -17,11 +17,12 @@ using QuadGK
 using Scratch
 using SparseArrays
 using StaticArrays
-using SpecialFunctions
 using Printf
 using TOML
 
 import ElementaryPDESolutions
+import SpecialFunctions
+import Bessels # faster than SpecialFunctions for Bessel functions with real args
 
 # helper functions
 include("utils.jl")
