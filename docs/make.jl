@@ -2,7 +2,7 @@ using Inti
 using Documenter
 using DocumenterCitations
 using DocumenterInterLinks
-using Literate
+using ExampleJuggler, Literate, PlutoStaticHTML, PlutoSliderServer
 # packages needed for extensions
 using Gmsh
 using HMatrices
@@ -10,6 +10,8 @@ using Meshes
 using GLMakie
 using FMM2D
 using FMM3D
+
+cleanexamples()
 
 links = InterLinks(
     "Meshes" => "https://juliageometry.github.io/MeshesDocs/dev/objects.inv",
@@ -36,8 +38,10 @@ function insert_setup(content)
     return replace(content, "#nb ## __NOTEBOOK_SETUP__" => SETUP)
 end
 
+## TO REMOVE if we decide to use Pluto Notebooks to generate documentation
 # Generate examples using Literate
 const examples_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples")
+const notebook_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "pluto-examples")
 const generated_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples", "generated")
 const examples = ["toy_example.jl", "helmholtz_scattering.jl"]
 for t in examples
@@ -69,6 +73,20 @@ for extension in
     push!(modules, ext)
 end
 
+size_threshold_ignore = []
+notebooks = [
+    "Toy example" => "toy_example.jl",
+    "Helmholtz scattering" => "helmholtz_scattering.jl",
+    "Poisson problem" => "poisson.jl",
+]
+
+# Generate markdown versions of the notebooks for documentation using PlutoStaticHTML.jl
+notebook_examples = @docplutonotebooks(notebook_dir, notebooks, iframe = false)
+size_threshold_ignore = last.(notebook_examples)
+
+# Generate HTML versions of the notebooks using PlutoSliderServer.jl
+notebook_examples_html = @docplutonotebooks(notebook_dir, notebooks, iframe = true)
+
 makedocs(;
     modules = modules,
     repo = "",
@@ -99,6 +117,7 @@ makedocs(;
             # "examples/generated/poisson.md",
             # "examples/generated/stokes_drag.md",
         ],
+        "Notebooks" => notebook_examples,
         "References" => "references.md",
         "Docstrings" => "docstrings.md",
     ],
@@ -109,6 +128,8 @@ makedocs(;
     draft,
     plugins = [bib, links],
 )
+
+cleanexamples()
 
 deploydocs(;
     repo = "github.com/IntegralEquations/Inti.jl",
