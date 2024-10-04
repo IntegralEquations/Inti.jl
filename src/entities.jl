@@ -178,9 +178,13 @@ Create a [`GeometricEntity`] representing a parametric curve defined by the
 `{f(t) | a ≤ t ≤ b}`. The function `f` should map a scalar to a `SVector`.
 """
 function parametric_curve(f::F, a::Real, b::Real; kwargs...) where {F}
-    flip = a > b
-    d = HyperRectangle(SVector(float(a)), SVector(float(b)))
-    parametrization = flip ? x -> f(b + a - x[1]) : x -> f(x[1])
+    if a > b # flip parametrization to restore order in the universe
+        d = HyperRectangle(SVector(float(b)), SVector(float(a)))
+        parametrization = x -> f(b + a - x[1])
+    else
+        d = HyperRectangle(SVector(float(a)), SVector(float(b)))
+        parametrization = x -> f(x[1])
+    end
     return GeometricEntity(; domain = d, parametrization, kwargs...)
 end
 
