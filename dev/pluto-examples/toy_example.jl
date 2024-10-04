@@ -18,7 +18,7 @@ using Inti
 md"""
 # Toy example
 
-[![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)](../../build/pluto_examples/toy_example.jl) $\hspace{0.2cm}$ [![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](../../build/pluto_examples/toy_example.html)
+[![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)](../../pluto_examples/toy_example.jl) $\hspace{0.2cm}$ [![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](../../pluto_examples/toy_example.html)
 """
 
 # ╔═╡ 09c0bfc0-1c65-4fad-b486-b6a61ca580e8

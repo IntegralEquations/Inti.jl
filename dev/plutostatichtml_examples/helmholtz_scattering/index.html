@@ -25,14 +25,14 @@
 <!--
     # This information is used for caching.
     [PlutoStaticHTML.State]
-    input_sha = "528c9ef12e2883cfedd173a663162967da09587cb64040b23b314c3c2c7a696b"
+    input_sha = "d68838bde0890f9539360f9445e5a3cb40102ba86cf1bd7a1f06c34fbd873b13"
     julia_version = "1.10.5"
 -->
 
 
 
 
-<div class="markdown"><h1>Helmholtz scattering</h1><p><a href="../../build/pluto_examples/helmholtz_scattering.jl"><img alt="Pluto notebook" src="https://img.shields.io/badge/download-Pluto_notebook-blue"/></a><span class="tex">\(\hspace{0.2cm}\)</span><a href="../../build/pluto_examples/helmholtz_scattering.html"><img alt="nbviewer" src="https://img.shields.io/badge/show-nbviewer-blue.svg"/></a></p></div>
+<div class="markdown"><h1>Helmholtz scattering</h1><p><a href="../../pluto_examples/helmholtz_scattering.jl"><img alt="Pluto notebook" src="https://img.shields.io/badge/download-Pluto_notebook-blue"/></a><span class="tex">\(\hspace{0.2cm}\)</span><a href="../../pluto_examples/helmholtz_scattering.html"><img alt="nbviewer" src="https://img.shields.io/badge/show-nbviewer-blue.svg"/></a></p></div>
 
 
 <div class="markdown"><div class="admonition is-info"><header class="admonition-header">Important points covered in this example</header><div class="admonition-body"><ul><li><p>Creating a geometry using the <em>Gmsh</em> API</p></li><li><p>Assembling integral operators and integral potentials</p></li><li><p>Setting up a sound-soft problem in both 2 and 3 spatial dimensions</p></li><li><p>Using <em>GMRES</em> to solve the linear system</p></li><li><p>Exporting the solution to <em>Gmsh</em> for visualization</p></li></ul></div></div></div>
@@ -101,12 +101,12 @@ gmsh_circle(; meshsize, order = gorder, name)
 
 <pre id="plutouiterminal" style="padding: 10px; background-color: white;">Info    : Meshing 1D...
 Info    : Meshing curve 1 (Ellipse)
-Info    : Done meshing 1D (Wall 0.000150003s, CPU 0.000146s)
+Info    : Done meshing 1D (Wall 0.000162183s, CPU 0.000158s)
 Info    : 63 nodes 64 elements
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
 Info    : [ 60%] Meshing surface 1 order 2
-Info    : Done meshing order 2 (Wall 0.000560789s, CPU 0.000539s)
+Info    : Done meshing order 2 (Wall 0.00057623s, CPU 0.000553s)
 Info    : Writing '/home/lfaria/actions-runner/_work/Inti.jl/Inti.jl/docs/src/pluto-examples/circle.msh'...
 Info    : Done writing '/home/lfaria/actions-runner/_work/Inti.jl/Inti.jl/docs/src/pluto-examples/circle.msh'
 </pre>
@@ -468,7 +468,7 @@ end
 
 
 
-<pre id="plutouiterminal" style="padding: 10px; background-color: white;">[ Info: error with correction = 3.3310639773656095e-5
+<pre id="plutouiterminal" style="padding: 10px; background-color: white;">[ Info: error with correction = 3.2601838509421126e-5
 </pre>
 
 
@@ -527,4 +527,4 @@ SpecialFunctions 2.4.0<br>
 StaticArrays 1.9.7
 </div>
 
-<!-- PlutoStaticHTML.End --></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../toy_example/">« Toy example</a><a class="docs-footer-nextpage" href="../poisson/">Poisson problem »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Friday 4 October 2024 17:15">Friday 4 October 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+<!-- PlutoStaticHTML.End --></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../toy_example/">« Toy example</a><a class="docs-footer-nextpage" href="../poisson/">Poisson problem »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Friday 4 October 2024 20:50">Friday 4 October 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
