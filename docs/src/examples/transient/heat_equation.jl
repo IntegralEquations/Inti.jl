@@ -56,13 +56,13 @@ u^n - \tau\Delta u^n  &= u^{n-1} \quad &\text{in } \Omega\\[0.3cm]
 
 # ╔═╡ fc0e5d68-309e-471d-a99c-3966f6789803
 md"""
-We can rewrite $(2)$ to resemble the Helmholtz equation and obtain
+We can rewrite $(2)$ as the modified Helmholtz equation (or Yukawa equation) and obtain
 
 $\begin{equation} \begin{cases}
-\Delta u + k^2u  &= f \quad &\text{in } \Omega\\[0.3cm]
+\Delta u - k^2u  &= f \quad &\text{in } \Omega\\[0.3cm]
 \hspace{1.6cm} u &= g &\text{on } \partial\Omega
 \end{cases}\tag{3}\end{equation}$
-where $k = \frac{i}{\sqrt\tau}$, $u = u^n$, $f = -\frac{1}{\tau}u^{n-1}$.
+where $k = \frac{1}{\sqrt\tau} \;$  ;  $\;u = u^n \;$ ; $\;f = -\frac{1}{\tau}u^{n-1}$ .
 """
 
 # ╔═╡ 7344c3a8-52b3-4a4d-baf8-9d1c58d3e3a2
@@ -83,7 +83,7 @@ The function ``u_h`` satisfies the homogeneous problem
 
 ```math
 \begin{align}
-	\Delta u_h + k^2u_h &= 0,  \quad &&\text{in } \quad \Omega, \\
+	\Delta u_h - k^2u_h &= 0,  \quad &&\text{in } \quad \Omega, \\
 	u_h &= g - u_p,  \quad &&\text{on } \; \partial\Omega,
 \end{align}\tag{6}
 ```
@@ -179,10 +179,10 @@ begin
 end
 
 # ╔═╡ 5529e3aa-cabb-4714-93e1-138b0e7431f9
-function main(Ω_quad, Γ_quad, f, g ; t_start=0.0, t_end=0.2, τ=0.01)
+function main(Ω_quad, Γ_quad, f, g ; t_start=0.0, t_end=0.2, τ=0.005)
 
-	k = 1/√(τ) # im/√(τ)
-	pde = Inti.Yukawa(; dim = 2, λ=k)
+	λ = 1/√(τ)
+	pde = Inti.Yukawa(; dim = 2, λ)
 	
 	## Initialize Volume Potential, single and double layer operators for solving the problem and then for solution evaluation
 	
@@ -219,7 +219,7 @@ function main(Ω_quad, Γ_quad, f, g ; t_start=0.0, t_end=0.2, τ=0.01)
 
 	times, sol_u = [t_start], [f]
 
-	f *= -1/√(τ)
+	f *= -1/τ
 
 	L = I / 2 + D # S # I / 2 + D - im * k * S
 
@@ -229,12 +229,12 @@ function main(Ω_quad, Γ_quad, f, g ; t_start=0.0, t_end=0.2, τ=0.01)
 		σ = L \ rhs
 
 		# Solution Evaluation (to improve with compression and correction methods)
-		f = D_b2d*σ + V_d2d*f # S_b2d*σ - V_d2d*f  # D_b2d*σ - im*k*S_b2d*σ + V_d2d*f # f = -u^n -> used for the next iteration as source term of the PDE
+		f = D_b2d*σ - V_d2d*f # S_b2d*σ - V_d2d*f  # D_b2d*σ - im*k*S_b2d*σ + V_d2d*f # f = -u^n -> used for the next iteration as source term of the PDE
 		
 		push!(sol_u, f)
 		push!(times, τ*i)
 
-		f *= -1/√(τ)
+		f *= -1/τ
 	end
 
 	DiffEqArray(sol_u, times)	
@@ -2267,7 +2267,7 @@ version = "3.6.0+0"
 # ╟─6029fb91-1263-4c7c-8d13-fd220a00a90c
 # ╟─9e57c112-6328-4179-ab0b-5953978f4bd4
 # ╟─6e8f8c46-6902-4a88-8423-ae2046467ea6
-# ╠═9ab4251b-a061-44f3-b8d1-1ec9133832ee
+# ╟─9ab4251b-a061-44f3-b8d1-1ec9133832ee
 # ╟─c5811230-dcbf-403b-bb94-9f056cdb92bb
 # ╠═baefc33b-9f0c-4caf-b77d-a0dc118e911e
 # ╟─1dd4afd5-4383-438b-8a4a-5b2b5cbbea75
