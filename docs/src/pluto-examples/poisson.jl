@@ -35,7 +35,7 @@ end #hide
 md"""
 # Poisson Problem
 
-[![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)](../../build/pluto_examples/poisson.jl) $\hspace{0.2cm}$ [![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](../../build/pluto_examples/poisson.html)
+[![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)](../../pluto_examples/poisson.jl) $\hspace{0.2cm}$ [![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](../../pluto_examples/poisson.html)
 """
 
 # ╔═╡ 4160cbc1-3e98-4919-a8b5-bfbc65077b53
