@@ -368,7 +368,7 @@ end
 
 # ╔═╡ a61f336e-15ee-4bb3-a071-1115ac6f1be1
 md"""
-Lastly, let us visualize the solution and the error on the mesh nodes using [`quadrature_to_node_vals`](../docstrings/#Inti.quadrature_to_node_vals-Tuple{Inti.Quadrature,%20AbstractVector}):
+Lastly, let us visualize the solution and the error on the mesh nodes using [`quadrature_to_node_vals`](../../docstrings/#Inti.quadrature_to_node_vals-Tuple{Inti.Quadrature,%20AbstractVector}):
 """
 
 # ╔═╡ ce03f9b7-c91c-4f53-bcda-49261a4bdcc2
