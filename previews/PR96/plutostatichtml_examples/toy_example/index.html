@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Toy example · Inti.jl</title><meta name="title" content="Toy example · Inti.jl"/><meta property="og:title" content="Toy example · Inti.jl"/><meta property="twitter:title" content="Toy example · Inti.jl"/><meta name="description" content="Documentation for Inti.jl."/><meta property="og:description" content="Documentation for Inti.jl."/><meta property="twitter:description" content="Documentation for Inti.jl."/><meta property="og:url" content="https://IntegralEquations.github.io/Inti.jl/plutostatichtml_examples/toy_example/"/><meta property="twitter:url" content="https://IntegralEquations.github.io/Inti.jl/plutostatichtml_examples/toy_example/"/><link rel="canonical" href="https://IntegralEquations.github.io/Inti.jl/plutostatichtml_examples/toy_example/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.png" alt="Inti.jl logo"/></a><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../../tutorials/getting_started/">Getting started</a></li><li><a class="tocitem" href="../../tutorials/geo_and_meshes/">Geometry and meshes</a></li><li><a class="tocitem" href="../../tutorials/integral_operators/">Boundary integral operators</a></li><li><a class="tocitem" href="../../tutorials/layer_potentials/">Layer potentials</a></li><li><a class="tocitem" href="../../tutorials/compression_methods/">Compression methods</a></li><li><a class="tocitem" href="../../tutorials/correction_methods/">Correction methods</a></li><li><a class="tocitem" href="../../tutorials/solvers/">Linear solvers</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../../examples/generated/toy_example/">Toy example</a></li><li><a class="tocitem" href="../../examples/generated/helmholtz_scattering/">Helmholtz scattering</a></li><li><a class="tocitem" href="../../examples/poisson/">Poisson problem</a></li></ul></li><li><span class="tocitem">Notebooks</span><ul><li class="is-active"><a class="tocitem" href>Toy example</a></li><li><a class="tocitem" href="../helmholtz_scattering/">Helmholtz scattering</a></li><li><a class="tocitem" href="../poisson/">Poisson problem</a></li></ul></li><li><a class="tocitem" href="../../references/">References</a></li><li><a class="tocitem" href="../../docstrings/">Docstrings</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Notebooks</a></li><li class="is-active"><a href>Toy example</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Toy example</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl/blob/main/docs/src/pluto-examples/toy_example.jl" title="View source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><style>
+    #documenter-page table {
+        display: table !important;
+        margin: 2rem auto !important;
+        border-top: 2pt solid rgba(0,0,0,0.2);
+        border-bottom: 2pt solid rgba(0,0,0,0.2);
+    }
+
+    #documenter-page pre, #documenter-page div {
+        margin-top: 1.4rem !important;
+        margin-bottom: 1.4rem !important;
+    }
+
+    .code-output {
+        padding: 0.7rem 0.5rem !important;
+    }
+
+    .admonition-body {
+        padding: 0em 1.25em !important;
+    }
+</style>
+
+<!-- PlutoStaticHTML.Begin -->
+<!--
+    # This information is used for caching.
+    [PlutoStaticHTML.State]
+    input_sha = "312bbb9e5de5ae3f9d7c1b1961639265b03c06250204d5d39846e7c5643c6c55"
+    julia_version = "1.10.5"
+-->
+
+
+
+
+<div class="markdown"><h1>Toy example</h1><p><a href="../../pluto_examples/toy_example.jl"><img alt="Pluto notebook" src="https://img.shields.io/badge/download-Pluto_notebook-blue"/></a><span class="tex">\(\hspace{5pt}\)</span><a href="../../pluto_examples/toy_example.html"><img alt="nbviewer" src="https://img.shields.io/badge/show-nbviewer-blue.svg"/></a></p></div>
+
+
+<div class="markdown"><p>All examples in Inti.jl are autogenerated by executing the <code>make.jl</code> script in the <code>docs</code> folder. The workflow uses <a href="https://plutostatichtml.huijzer.xyz/stable/">PlutoStaticHTML.jl</a> and <a href="https://github.com/JuliaPluto/PlutoSliderServer.jl">PlutoSliderServer.jl</a> via the intermediate of <a href="https://github.com/j-fu/ExampleJuggler.jl">ExampleJuggler.jl</a> to generate (i) markdown files passed to Documenter.jl, and (ii) pluto notebook files downloadable from the example's page.</p></div>
+
+<pre class='language-julia'><code class='language-julia'>using Inti</code></pre>
+
+<div class='manifest-versions'>
+<p>Built with Julia 1.10.5 and</p>
+Inti 0.1.1<br>
+Pkg 1.10.0<br>
+PlutoUI 0.7.60
+</div>
+
+<!-- PlutoStaticHTML.End --></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../examples/poisson/">« Poisson problem</a><a class="docs-footer-nextpage" href="../helmholtz_scattering/">Helmholtz scattering »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Saturday 5 October 2024 13:01">Saturday 5 October 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
