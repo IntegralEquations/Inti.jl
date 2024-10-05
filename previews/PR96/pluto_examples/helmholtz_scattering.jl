@@ -176,7 +176,7 @@ end
 
 # ╔═╡ 24454bd5-00cf-4282-926f-f1324141fe26
 md"""
-We can now import the file and parse the mesh and domain information into `Inti.jl` using the [`import_mesh`](../docstrings/#Inti.import_mesh-Tuple) function:
+We can now import the file and parse the mesh and domain information into `Inti.jl` using the [`import_mesh`](../../docstrings/#Inti.import_mesh-Tuple) function:
 """
 
 # ╔═╡ ff73663c-7cf4-4b23-83b5-095dc66f711f
@@ -195,7 +195,7 @@ The code above will import the mesh with all of its geometrical entities. The `d
 
 # ╔═╡ 3251d71a-b84c-48d8-9dff-01b2457e610b
 md"""
-To solve our boundary integral equation usign a Nyström method, we actually need a quadrature of our curve/surface (and possibly the normal vectors at the quadrature nodes). Once a mesh is available, creating a quadrature object can be done via the [`Quadrature`](../docstrings/#Inti.Quadrature) constructor, which requires passing a mesh of the domain that one wishes to generate a quadrature
+To solve our boundary integral equation usign a Nyström method, we actually need a quadrature of our curve/surface (and possibly the normal vectors at the quadrature nodes). Once a mesh is available, creating a quadrature object can be done via the [`Quadrature`](../../docstrings/#Inti.Quadrature) constructor, which requires passing a mesh of the domain that one wishes to generate a quadrature
 for:
 """
 
@@ -230,7 +230,7 @@ abs(Inti.integrate(x -> 1, Q) - 2π)
 
 # ╔═╡ 78ac2790-60d4-40da-bf5d-09617f1445a2
 md"""
-With the [`Quadrature`](../docstrings/#Inti.Quadrature) constructed, we now can define discrete approximation to the integral operators ``\mathrm{S}`` and ``\mathrm{D}`` as follows:
+With the [`Quadrature`](../../docstrings/#Inti.Quadrature) constructed, we now can define discrete approximation to the integral operators ``\mathrm{S}`` and ``\mathrm{D}`` as follows:
 """
 
 # ╔═╡ 9b37d163-15ca-44af-9e00-7410956fc16c
@@ -251,7 +251,7 @@ There are two well-known difficulties related to the discretization of the bound
 - The kernel of the integral operator is not smooth, and thus specialized quadrature rules are required to accurately approximate the matrix entries for which the target and source point lie *close* (relative to some scale) to each other.
 - The underlying matrix is dense, and thus the storage and computational cost of the operator is prohibitive for large problems unless acceleration techniques such as *Fast Multipole Methods* or *Hierarchical Matrices* are employed.
 
-`Inti.jl` tries to provide a modular and transparent interface for dealing with both of these difficulties, where the general approach for solving a BIE will be to first construct a (possible compressed) naive representation of the integral operator where singular and nearly-singular integrals are ignored, followed by a the creation of a (sparse) correction intended to account for such singular interactions. See [`single_double_layer`](../docstrings/#Inti.single_double_layer-Tuple{}) for more details on the various options available.
+`Inti.jl` tries to provide a modular and transparent interface for dealing with both of these difficulties, where the general approach for solving a BIE will be to first construct a (possible compressed) naive representation of the integral operator where singular and nearly-singular integrals are ignored, followed by a the creation of a (sparse) correction intended to account for such singular interactions. See [`single_double_layer`](../../docstrings/#Inti.single_double_layer-Tuple{}) for more details on the various options available.
 
 We can now combine `S` and `D` to form the combined-field operator:
 """
@@ -289,7 +289,7 @@ We can now solve the integral equation using e.g. the backslash operator:
 
 # ╔═╡ b26e0c64-b3f1-4b18-a6f5-8f789407a744
 md"""
-The variable `σ` contains the value of the approximate density at the quadrature nodes. To reconstruct a continuous approximation to the solution, we can use [`single_double_layer_potential`](../docstrings/#Inti.single_double_layer_potential-Tuple{}) to obtain the single- and double-layer potentials, and then combine them as follows:
+The variable `σ` contains the value of the approximate density at the quadrature nodes. To reconstruct a continuous approximation to the solution, we can use [`single_double_layer_potential`](../../docstrings/#Inti.single_double_layer_potential-Tuple{}) to obtain the single- and double-layer potentials, and then combine them as follows:
 """
 
 # ╔═╡ fd0f2cf4-1b18-4c56-84a9-2339b3dfc10a
@@ -424,7 +424,7 @@ end # hide
 # ╔═╡ b8fd284a-3865-4762-9602-6bc1eba464a4
 md"""
 !!! note "Near-field evaluation"
-	In the example above we employed a naive evaluation of the integral potentials, and therefore the computed solution is expected to become innacurate near the obstacles. See the [layer potential tutorial](../tutorials/layer_potentials/#Layer-potentials) for more information on how to correct for this.
+	In the example above we employed a naive evaluation of the integral potentials, and therefore the computed solution is expected to become innacurate near the obstacles. See the [layer potential tutorial](../../tutorials/layer_potentials/#Layer-potentials) for more information on how to correct for this.
 """
 
 # ╔═╡ 8b7fc104-324d-42c7-98b7-dff0df561ce2
@@ -516,7 +516,7 @@ end; # hide
 # ╔═╡ b6cad085-eb74-4152-8850-226ed837febd
 md"""
 !!! tip "Writing/reading a mesh from disk"
-	Writing and reading a mesh to/from disk can be time consuming. You can avoid doing so by using [`import_mesh`](../docstrings/#Inti.import_mesh-Tuple) without a file name to import the mesh from the current `gmsh` session without the need to write it to disk.
+	Writing and reading a mesh to/from disk can be time consuming. You can avoid doing so by using [`import_mesh`](../../docstrings/#Inti.import_mesh-Tuple) without a file name to import the mesh from the current `gmsh` session without the need to write it to disk.
 """
 
 # ╔═╡ f5d990e9-8d05-41e6-b6b3-c737692de37a
@@ -551,7 +551,7 @@ Even for this simple example, the dense representation of the integral operators
 # ╔═╡ bc09986a-5378-4d0b-a2b2-df9245f3f9cf
 md"""
 !!! note "Compression methods"
-	It is worth mentioning that hierchical matrices are not the only way to compress such integral operators, and may in fact not even be the best for the problem at hand. For example, one could use a fast multipole method (FMM), which has a much lighter memory footprint. See the the [tutorial on compression methods](../tutorials/compression_methods/#Compression-methods) for more information.
+	It is worth mentioning that hierchical matrices are not the only way to compress such integral operators, and may in fact not even be the best for the problem at hand. For example, one could use a fast multipole method (FMM), which has a much lighter memory footprint. See the the [tutorial on compression methods](../../tutorials/compression_methods/#Compression-methods) for more information.
 """
 
 # ╔═╡ b9e36a69-a3d1-41c8-8951-01f92acf0806

@@ -25,7 +25,7 @@
 <!--
     # This information is used for caching.
     [PlutoStaticHTML.State]
-    input_sha = "8a3fd447e3abd8f559483f7dd98aa29954f1a82391105f149a671f6d4fb074c5"
+    input_sha = "97679d78e181425cc4e6d5ee9a559b8f4c649a6b4b3ea22e71663d4eb407f7f6"
     julia_version = "1.10.5"
 -->
 
@@ -69,16 +69,16 @@ gmsh.finalize()</code></pre>
 
 <pre id="plutouiterminal" style="padding: 10px; background-color: white;">Info    : Meshing 1D...
 Info    : Meshing curve 1 (BSpline)
-Info    : Done meshing 1D (Wall 0.0346176s, CPU 0.034481s)
+Info    : Done meshing 1D (Wall 0.0346024s, CPU 0.034604s)
 Info    : Meshing 2D...
 Info    : Meshing surface 1 (Plane, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.0888898s, CPU 0.088888s)
+Info    : Done meshing 2D (Wall 0.100795s, CPU 0.100793s)
 Info    : 566 nodes 1033 elements
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
 Info    : [ 60%] Meshing surface 1 order 2
 Info    : Surface mesh: worst distortion = 0.451559 (0 elements in ]0, 0.2]); worst gamma = 0.758919
-Info    : Done meshing order 2 (Wall 0.00906492s, CPU 0.009064s)
+Info    : Done meshing order 2 (Wall 0.00983665s, CPU 0.009836s)
 </pre>
 
 
@@ -254,7 +254,7 @@ println("maximum error at all quadrature nodes: ", norm(er_quad, Inf))</code></p
 </pre>
 
 
-<div class="markdown"><p>Lastly, let us visualize the solution and the error on the mesh nodes using <a href="../docstrings/#Inti.quadrature_to_node_vals-Tuple{Inti.Quadrature,%20AbstractVector}"><code>quadrature_to_node_vals</code></a>:</p></div>
+<div class="markdown"><p>Lastly, let us visualize the solution and the error on the mesh nodes using <a href="../../docstrings/#Inti.quadrature_to_node_vals-Tuple{Inti.Quadrature,%20AbstractVector}"><code>quadrature_to_node_vals</code></a>:</p></div>
 
 <pre class='language-julia'><code class='language-julia'>nodes = Inti.nodes(Ω_msh)
 u_nodes = Inti.quadrature_to_node_vals(Ω_quad, u_quad)
@@ -290,4 +290,4 @@ Pkg 1.10.0<br>
 PlutoUI 0.7.60
 </div>
 
-<!-- PlutoStaticHTML.End --></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../helmholtz_scattering/">« Helmholtz scattering</a><a class="docs-footer-nextpage" href="../../references/">References »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Saturday 5 October 2024 13:01">Saturday 5 October 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+<!-- PlutoStaticHTML.End --></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../helmholtz_scattering/">« Helmholtz scattering</a><a class="docs-footer-nextpage" href="../../references/">References »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Saturday 5 October 2024 13:25">Saturday 5 October 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
