@@ -8,12 +8,12 @@ using InteractiveUtils
 begin
 	import Pkg as _Pkg
     haskey(ENV, "PLUTO_PROJECT") && _Pkg.activate(ENV["PLUTO_PROJECT"])
-	using PlutoUI: with_terminal
+	using PlutoUI: with_terminal, TableOfContents
 end ;
 
 # ╔═╡ 332bd3bb-c720-454e-80af-89ad65041773
 # ╠═╡ show_logs = false
-begin #hide
+begin # hide
 using Inti, Gmsh
 meshsize = 0.1
 gmsh.initialize()
@@ -29,13 +29,13 @@ gmsh.model.mesh.generate(2)
 gmsh.model.mesh.setOrder(2)
 msh = Inti.import_mesh(; dim = 2)
 gmsh.finalize()
-end #hide
+end # hide
 
 # ╔═╡ aca57c74-d084-40e7-9760-edf988a64915
 md"""
 # Poisson Problem
 
-[![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)](../../pluto_examples/poisson.jl) $\hspace{0.2cm}$ [![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](../../pluto_examples/poisson.html)
+[![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)](../../pluto_examples/poisson.jl)$\hspace{5pt}$[![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](../../pluto_examples/poisson.html)
 """
 
 # ╔═╡ 4160cbc1-3e98-4919-a8b5-bfbc65077b53
@@ -137,19 +137,19 @@ We can now extract components of the mesh corresponding to the ``\Omega`` and
 """
 
 # ╔═╡ 4e580f9f-6e22-4160-b262-ca941b6bfb8f
-begin #hide
+begin # hide
 Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, msh)
 Γ = Inti.boundary(Ω)
 Ω_msh = view(msh, Ω)
 Γ_msh = view(msh, Γ)
-end; #hide
+end; # hide
 
 # ╔═╡ 2c4bace3-ef35-4500-829f-2f5ae6725249
-begin #hide
+begin # hide
 using Meshes, GLMakie
 viz(Ω_msh; showsegments=true)
 viz!(Γ_msh; color=:red)
-end; #hide
+end; # hide
 
 # ╔═╡ 901578c3-b7aa-4023-bb99-769cf5805f57
 md"""
@@ -166,13 +166,13 @@ boundary:
 """
 
 # ╔═╡ 85ce61fc-086d-4661-8f03-6a6ae4d55511
-begin #hide
+begin # hide
 Ω_quad = Inti.Quadrature(Ω_msh; qorder = 4)
 Γ_quad = Inti.Quadrature(Γ_msh; qorder = 6)
-end; #hide
+end; # hide
 
 # ╔═╡ 6e3ea607-2b70-485d-94f0-5626bab4f832
-begin #hide
+begin # hide
 using FMM2D #to accelerate the maps
 pde = Inti.Laplace(; dim = 2)
 # Newtonian potential mapping domain to boundary
@@ -187,7 +187,7 @@ V_d2b = Inti.volume_potential(;
 		target_location = :on,
 	),
 )
-end #hide
+end # hide
 
 # ╔═╡ 731d9ae8-33a8-4f03-8cbc-5e40972996a2
 md"""
@@ -234,13 +234,13 @@ instead a manufactured solution ``u_e`` from which we will derive the functions
 """
 
 # ╔═╡ 975b7c01-8147-44f8-a693-1185e7b8d63b
-begin #hide
+begin # hide
 # Create a manufactured solution
 uₑ = (x) -> cos(2 * x[1]) * sin(2 * x[2])
 fₑ  = (x) -> 8 * cos(2 * x[1]) * sin(2 * x[2]) # -Δuₑ
 g   = map(q -> uₑ(q.coords), Γ_quad)
 f   = map(q -> fₑ(q.coords), Ω_quad)
-end; #hide
+end; # hide
 
 # ╔═╡ 700cfbbc-970a-466b-9f8c-748f7ff0bc6e
 md"""
@@ -253,10 +253,10 @@ rhs = g - V_d2b*f ;
 
 # ╔═╡ 6eb1d813-e792-4148-8d30-975c49e9dbc6
 # ╠═╡ show_logs = false
-begin #hide
+begin # hide
 using IterativeSolvers, LinearAlgebra
 σ = gmres(-I/2 + D_b2b, rhs; abstol = 1e-8, verbose = true, restart = 1000)
-end; #hide
+end; # hide
 
 # ╔═╡ b21911c7-7276-44cb-a15f-64db3430a896
 md"""
@@ -277,13 +277,13 @@ With the density function at hand, we can now reconstruct our approximate soluti
 """
 
 # ╔═╡ e0e1fa9c-7a43-45b1-ad45-2510533e1aed
-begin #hide
+begin # hide
 G  = Inti.SingleLayerKernel(pde)
 dG = Inti.DoubleLayerKernel(pde)
 𝒱 = Inti.IntegralPotential(G, Ω_quad)
 𝒟 = Inti.IntegralPotential(dG, Γ_quad)
 u = (x) -> 𝒱[f](x) + 𝒟[σ](x)
-end #hide
+end # hide
 
 # ╔═╡ 2c2c943b-30ed-4244-a40c-f061050ca7b8
 md"""
@@ -292,10 +292,10 @@ and evaluate it at any point in the domain:
 
 # ╔═╡ 2faa4311-59d9-4b85-b585-937391e94568
 # ╠═╡ show_logs = false
-begin #hide
+begin # hide
 x = Inti.Point2D(0.1,0.4)
 println("error at $x: ", u(x)-uₑ(x))
-end #hide
+end # hide
 
 # ╔═╡ f3495025-ac97-415d-a398-ee5280c2d714
 let # Render for Documentation
@@ -353,11 +353,11 @@ manufactured:
 
 # ╔═╡ 5be59f68-cf21-4e7e-ac23-7bffd690dc03
 # ╠═╡ show_logs = false
-begin #hide
+begin # hide
 u_quad = V_d2d*f + D_b2d*σ
 er_quad = u_quad - map(q -> uₑ(q.coords), Ω_quad)
 println("maximum error at all quadrature nodes: ", norm(er_quad, Inf))
-end; #hide
+end; # hide
 
 # ╔═╡ 41f97844-3c86-46b8-9fbb-0632bdcee0f6
 let # render for documentation
@@ -368,11 +368,11 @@ end
 
 # ╔═╡ a61f336e-15ee-4bb3-a071-1115ac6f1be1
 md"""
-Lastly, let us visualize the solution and the error on the mesh nodes using [`quadrature_to_node_vals`](@ref):
+Lastly, let us visualize the solution and the error on the mesh nodes using [`quadrature_to_node_vals`](../docstrings/#Inti.quadrature_to_node_vals-Tuple{Inti.Quadrature,%20AbstractVector}):
 """
 
 # ╔═╡ ce03f9b7-c91c-4f53-bcda-49261a4bdcc2
-begin #hide
+begin # hide
 nodes = Inti.nodes(Ω_msh)
 u_nodes = Inti.quadrature_to_node_vals(Ω_quad, u_quad)
 er = u_nodes - map(uₑ, nodes)
@@ -388,10 +388,13 @@ colormap = :inferno
 ax = Axis(fig[1, 3]; aspect = DataAspect())
 viz!(Ω_msh; colorrange, colormap, color = log_er, interpolate = true)
 cb = Colorbar(fig[1, 4]; label = "log₁₀|u - uₑ|", colormap, colorrange)
-end; #hide
+end; # hide
 
 # ╔═╡ e46f76d5-074b-49ac-b976-9f782df9307d
 fig
+
+# ╔═╡ e63c776b-6b52-4e6e-aca8-3d67cd9a9c3f
+TableOfContents()
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2478,5 +2481,6 @@ version = "1.4.1+1"
 # ╟─a61f336e-15ee-4bb3-a071-1115ac6f1be1
 # ╠═ce03f9b7-c91c-4f53-bcda-49261a4bdcc2
 # ╟─e46f76d5-074b-49ac-b976-9f782df9307d
+# ╟─e63c776b-6b52-4e6e-aca8-3d67cd9a9c3f
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

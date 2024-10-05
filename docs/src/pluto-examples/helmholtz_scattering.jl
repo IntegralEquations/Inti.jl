@@ -12,7 +12,7 @@ begin
 end ;
 
 # ╔═╡ ef067551-aa44-4099-b32a-08debb81ee79
-begin #hide
+begin # hide
 using Inti
 using LinearAlgebra
 using StaticArrays
@@ -23,13 +23,13 @@ using SpecialFunctions
 using GSL
 using IterativeSolvers
 using LinearMaps
-end #hide
+end # hide
 
 # ╔═╡ a6c80f87-ff47-496f-8925-1275b58b02e1
 md"""
 # Helmholtz scattering
 
-[![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)](../../pluto_examples/helmholtz_scattering.jl) $\hspace{0.2cm}$ [![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](../../pluto_examples/helmholtz_scattering.html)
+[![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)](../../pluto_examples/helmholtz_scattering.jl)$\hspace{5pt}$[![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](../../pluto_examples/helmholtz_scattering.html)
 """
 
 # ╔═╡ 1715d794-a33d-4faf-953c-b706a9ceea23
@@ -46,7 +46,7 @@ md"""
 md"""
 In this tutorial we will show how to solve an acoustic scattering problem in the context of Helmholtz equation. We will focus on a *smooth* sound-soft obstacle for simplicity, and introduce along the way the necessary techniques used to handle some difficulties encountered. We will use various packages throughout this example (including of course `Inti.jl`); if they are not on your environment, you can install them using `] add <package>` in the REPL.
 
-In the [following section](@ref helmholtz-soundsoft), we will provide a brief mathematical description of the problem (valid in both $2$ and $3$ dimensions). We will tackle the [two-dimensional problem](@ref helmholtz-scattering-2d) first, for which we do not need to worry much about performance issues (e.g. compressing the integral operators). Finally, we present a [three-dimensional example](@ref helmholtz-scattering-3d), where we will use [`HMatrices.jl`](https://github.com/IntegralEquatins/HMatrices.jl) to compress the underlying integral operators.
+In the [following section](#Sound-soft-problem), we will provide a brief mathematical description of the problem (valid in both $2$ and $3$ dimensions). We will tackle the [two-dimensional problem](#Two-dimensional-scattering) first, for which we do not need to worry much about performance issues (e.g. compressing the integral operators). Finally, we present a [three-dimensional example](#Three-dimensional-scattering), where we will use [`HMatrices.jl`](https://github.com/IntegralEquations/HMatrices.jl) to compress the underlying integral operators.
 """
 
 # ╔═╡ 643919c5-762f-4fa6-ac26-6bf0abd94558
@@ -121,18 +121,18 @@ and setup some of the (global) problem parameters:
 """
 
 # ╔═╡ 4cabe108-93c6-4fbf-b8ec-37277abbbda1
-begin #hide
+begin # hide
 k      = 4π
 λ      = 2π / k
 qorder = 4 # quadrature order
 gorder = 2 # order of geometrical approximation
-end; #hide
+end; # hide
 
 # ╔═╡ a33f066e-307c-42c4-836b-5b7d8236a893
 md"""
 ## Two-dimensional scattering
 
-We will use [Gmsh API](https://gmsh.info/doc/texinfo/gmsh.htmlGmsh-application-programming-interface) for creating `.msh` file containing the desired geometry and mesh. Here is a function to mesh the circle:
+We will use [Gmsh API](https://gmsh.info/doc/texinfo/gmsh.html#Gmsh-application-programming-interface) for creating `.msh` file containing the desired geometry and mesh. Here is a function to mesh the circle:
 """
 
 # ╔═╡ cb736b4d-bbd6-456c-9041-f69b2155a470
@@ -159,11 +159,11 @@ Let us now use `gmsh_circle` to create a `circle.msh` file. As customary in wave
 
 # ╔═╡ 12e20620-042c-4040-bd64-af01bd0f2ad9
 # ╠═╡ show_logs = false
-begin #hide
+begin # hide
 name = joinpath(@__DIR__, "circle.msh")
 meshsize = λ / 5
 gmsh_circle(; meshsize, order = gorder, name)
-end #hide
+end # hide
 
 # ╔═╡ 867186cf-fd4c-484b-9ded-344573ccda4f
 let # to render terminal output in the documentation
@@ -176,14 +176,14 @@ end
 
 # ╔═╡ 24454bd5-00cf-4282-926f-f1324141fe26
 md"""
-We can now import the file and parse the mesh and domain information into `Inti.jl` using the [`import_mesh`](@ref Inti.import_mesh) function:
+We can now import the file and parse the mesh and domain information into `Inti.jl` using the [`import_mesh`](../docstrings/#Inti.import_mesh-Tuple) function:
 """
 
 # ╔═╡ ff73663c-7cf4-4b23-83b5-095dc66f711f
-begin #hide
+begin # hide
 Inti.clear_entities!() # empty the entity cache
 msh = Inti.import_mesh(name; dim = 2)
-end #hide
+end # hide
 
 # ╔═╡ 176f1fef-f761-4ad0-8fea-982eab4fe24d
 md"""
@@ -195,16 +195,16 @@ The code above will import the mesh with all of its geometrical entities. The `d
 
 # ╔═╡ 3251d71a-b84c-48d8-9dff-01b2457e610b
 md"""
-To solve our boundary integral equation usign a Nyström method, we actually need a quadrature of our curve/surface (and possibly the normal vectors at the quadrature nodes). Once a mesh is available, creating a quadrature object can be done via the [`Quadrature`](@ref Inti.Quadrature) constructor, which requires passing a mesh of the domain that one wishes to generate a quadrature
+To solve our boundary integral equation usign a Nyström method, we actually need a quadrature of our curve/surface (and possibly the normal vectors at the quadrature nodes). Once a mesh is available, creating a quadrature object can be done via the [`Quadrature`](../docstrings/#Inti.Quadrature) constructor, which requires passing a mesh of the domain that one wishes to generate a quadrature
 for:
 """
 
 # ╔═╡ 09a785ae-7286-4a47-b103-1e90efa20167
-begin #hide
+begin # hide
 Γ = Inti.boundary(Ω)
 Γ_msh = view(msh, Γ)
 Q = Inti.Quadrature(Γ_msh; qorder)
-end; #hide
+end; # hide
 
 # ╔═╡ 593216db-810e-47db-b6cb-aa6cf53e8590
 md"""
@@ -230,11 +230,11 @@ abs(Inti.integrate(x -> 1, Q) - 2π)
 
 # ╔═╡ 78ac2790-60d4-40da-bf5d-09617f1445a2
 md"""
-With the [`Quadrature`](@ref Inti.Quadrature) constructed, we now can define discrete approximation to the integral operators ``\mathrm{S}`` and ``\mathrm{D}`` as follows:
+With the [`Quadrature`](../docstrings/#Inti.Quadrature) constructed, we now can define discrete approximation to the integral operators ``\mathrm{S}`` and ``\mathrm{D}`` as follows:
 """
 
 # ╔═╡ 9b37d163-15ca-44af-9e00-7410956fc16c
-begin #hide
+begin # hide
 pde = Inti.Helmholtz(; k, dim = 2)
 S, D = Inti.single_double_layer(;
 	pde,
@@ -243,7 +243,7 @@ S, D = Inti.single_double_layer(;
 	compression = (method = :none,),
 	correction = (method = :dim,),
 )
-end; #hide
+end; # hide
 
 # ╔═╡ 061b7503-bad0-411e-b126-eea4b89feb03
 md"""
@@ -251,7 +251,7 @@ There are two well-known difficulties related to the discretization of the bound
 - The kernel of the integral operator is not smooth, and thus specialized quadrature rules are required to accurately approximate the matrix entries for which the target and source point lie *close* (relative to some scale) to each other.
 - The underlying matrix is dense, and thus the storage and computational cost of the operator is prohibitive for large problems unless acceleration techniques such as *Fast Multipole Methods* or *Hierarchical Matrices* are employed.
 
-`Inti.jl` tries to provide a modular and transparent interface for dealing with both of these difficulties, where the general approach for solving a BIE will be to first construct a (possible compressed) naive representation of the integral operator where singular and nearly-singular integrals are ignored, followed by a the creation of a (sparse) correction intended to account for such singular interactions. See [`single_double_layer`](@ref Inti.single_double_layer) for more details on the various options available.
+`Inti.jl` tries to provide a modular and transparent interface for dealing with both of these difficulties, where the general approach for solving a BIE will be to first construct a (possible compressed) naive representation of the integral operator where singular and nearly-singular integrals are ignored, followed by a the creation of a (sparse) correction intended to account for such singular interactions. See [`single_double_layer`](../docstrings/#Inti.single_double_layer-Tuple{}) for more details on the various options available.
 
 We can now combine `S` and `D` to form the combined-field operator:
 """
@@ -265,18 +265,18 @@ where `I` is the identity matrix. Assuming an incident field along the $x_1$ dir
 """
 
 # ╔═╡ eaf2025e-1135-4ee6-9dea-25e2c0c09ec8
-begin #hide
+begin # hide
 uᵢ = x -> exp(im * k * x[1]) # plane-wave incident field
 rhs = map(Q) do q
 	x = q.coords
 	return -uᵢ(x)
 end
-end; #hide
+end; # hide
 
 # ╔═╡ 7fcd47c1-9d65-41e2-9363-141d53f0dbca
 md"""
 !!! note "Iterating over a quadrature"
-	In computing `rhs` above, we used `map` to evaluate the incident field at all quadrature nodes. When iterating over `Q`, the iterator returns a [`QuadratureNode`](@ref Inti.QuadratureNode), and not simply the *coordinate* of the quadrature node. This is so that you can access additional information, such as the `normal` vector, at the quadrature node.
+	In computing `rhs` above, we used `map` to evaluate the incident field at all quadrature nodes. When iterating over `Q`, the iterator returns a [`QuadratureNode`](../docstrings/#Inti.QuadratureNode), and not simply the *coordinate* of the quadrature node. This is so that you can access additional information, such as the `normal` vector, at the quadrature node.
 """
 
 # ╔═╡ 4cdf0551-1d13-4060-88e6-cf86ad180938
@@ -289,14 +289,14 @@ We can now solve the integral equation using e.g. the backslash operator:
 
 # ╔═╡ b26e0c64-b3f1-4b18-a6f5-8f789407a744
 md"""
-The variable `σ` contains the value of the approximate density at the quadrature nodes. To reconstruct a continuous approximation to the solution, we can use [`single_double_layer_potential`](@ref Inti.single_double_layer_potential) to obtain the single- and double-layer potentials, and then combine them as follows:
+The variable `σ` contains the value of the approximate density at the quadrature nodes. To reconstruct a continuous approximation to the solution, we can use [`single_double_layer_potential`](../docstrings/#Inti.single_double_layer_potential-Tuple{}) to obtain the single- and double-layer potentials, and then combine them as follows:
 """
 
 # ╔═╡ fd0f2cf4-1b18-4c56-84a9-2339b3dfc10a
-begin #hide
+begin # hide
 𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
 uₛ   = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
-end; #hide
+end; # hide
 
 # ╔═╡ 12b3c26a-96b3-440b-9771-4a945fe14ce7
 md"""
@@ -332,7 +332,7 @@ Here is the maximum error on some points located on a circle of radius `2`:
 
 # ╔═╡ 1daa0518-a98b-448c-bddd-1147a0f7ed4d
 # ╠═╡ show_logs = false
-begin #hide
+begin # hide
 uₑ = x -> circle_helmholtz_soundsoft(x; k, radius = 1, θin = 0) # exact solution
 er = maximum(0:0.01:2π) do θ
 	R = 2
@@ -340,7 +340,7 @@ er = maximum(0:0.01:2π) do θ
 	return abs(uₛ(x) - uₑ(x))
 end
 @info "maximum error = $er"
-end #hide
+end # hide
 
 # ╔═╡ 3557cd23-43b2-4c79-a0e9-53c0d9650851
 let
@@ -356,7 +356,7 @@ As we can see, the error is quite small! Let's use `Makie` to visualize the solu
 """
 
 # ╔═╡ 56350a37-b2d8-463e-934f-e8a4fbf72c67
-begin #hide
+begin # hide
 xx = yy = range(-4; stop = 4, length = 200)
 vals =
 	map(pt -> Inti.isinside(pt, Q) ? NaN : real(uₛ(pt) + uᵢ(pt)), Iterators.product(xx, yy))
@@ -371,7 +371,7 @@ fig, ax, hm = heatmap(
 viz!(Γ_msh; color = :white, segmentsize = 5)
 Colorbar(fig[1, 2], hm)
 fig
-end #hide
+end # hide
 
 # ╔═╡ 471a5475-1ef5-4f40-bb45-a3e29ae5c0a8
 md"""
@@ -381,7 +381,7 @@ Before moving on to the 3D example let us simply mention that, besides the fact 
 """
 
 # ╔═╡ 3f3f4794-f2bf-4171-a1b4-70fd38c01fc3
-let #hide
+let # hide
 # vertices of an equilateral triangle centered at the origin with a vertex at (0,1)
 a, b, c = SVector(0, 1), SVector(sqrt(3) / 2, -1 / 2), SVector(-sqrt(3) / 2, -1 / 2)
 circle_f(center, radius) = s -> center + radius * SVector(cospi(2 * s[1]), sinpi(2 * s[1]))
@@ -419,12 +419,12 @@ fig, ax, hm = heatmap(
 viz!(Γ_msh; color = :black, segmentsize = 4)
 Colorbar(fig[1, 2], hm)
 fig
-end #hide
+end # hide
 
 # ╔═╡ b8fd284a-3865-4762-9602-6bc1eba464a4
 md"""
 !!! note "Near-field evaluation"
-	In the example above we employed a naive evaluation of the integral potentials, and therefore the computed solution is expected to become innacurate near the obstacles. See the [layer potential tutorial](@ref "Layer potentials") for more information on how to correct for this.
+	In the example above we employed a naive evaluation of the integral potentials, and therefore the computed solution is expected to become innacurate near the obstacles. See the [layer potential tutorial](../tutorials/layer_potentials/#Layer-potentials) for more information on how to correct for this.
 """
 
 # ╔═╡ 8b7fc104-324d-42c7-98b7-dff0df561ce2
@@ -465,11 +465,11 @@ As before, lets write a file with our mesh, and import it into `Inti.jl`:
 """
 
 # ╔═╡ a18b8726-fa97-4388-bb8b-53965a5d433b
-begin #hide
+begin # hide
 name_sphere = joinpath(@__DIR__, "sphere.msh")
 gmsh_sphere(; meshsize=(λ / 5), order = gorder, name=name_sphere, visualize = false)
 msh_3d = Inti.import_mesh(name_sphere; dim = 3)
-end #hide
+end # hide
 
 # ╔═╡ 063e3185-8714-4955-b985-5413420a889b
 md"""
@@ -483,11 +483,11 @@ Since we created physical groups in `Gmsh`, we can use them to extract the relev
 """
 
 # ╔═╡ 631328d5-c961-41e1-ac0e-181c3bb75112
-begin #hide
+begin # hide
 Ω_3d = Inti.Domain(e -> "omega" ∈ Inti.labels(e), Inti.entities(msh_3d))
 Σ_3d = Inti.Domain(e -> "sigma" ∈ Inti.labels(e), Inti.entities(msh_3d))
 Γ_3d = Inti.boundary(Ω_3d)
-end; #hide
+end; # hide
 
 # ╔═╡ dbd6d298-0fbf-420f-9622-d1db1d550cc5
 md"""
@@ -495,13 +495,13 @@ We can now create a quadrature as before
 """
 
 # ╔═╡ 6096328b-e1af-4ec5-b72b-cd381c166cb7
-begin #hide
+begin # hide
 Γ_msh_3d = view(msh_3d, Γ_3d)
 Q_3d = Inti.Quadrature(Γ_msh_3d; qorder)
-end; #hide
+end; # hide
 
 # ╔═╡ 498fa575-5cf7-4a7e-8d3b-c50d605aa57c
-begin #hide
+begin # hide
 using HMatrices
 pde_3d = Inti.Helmholtz(; k, dim = 3)
 S_3d, D_3d = Inti.single_double_layer(;
@@ -511,12 +511,12 @@ S_3d, D_3d = Inti.single_double_layer(;
 		  compression = (method = :hmatrix, tol = 1e-4),
 	      correction = (method = :dim,),
 )
-end; #hide
+end; # hide
 
 # ╔═╡ b6cad085-eb74-4152-8850-226ed837febd
 md"""
 !!! tip "Writing/reading a mesh from disk"
-	Writing and reading a mesh to/from disk can be time consuming. You can avoid doing so by using [`import_mesh`](@ref Inti.import_mesh) without a file name to import the mesh from the current `gmsh` session without the need to write it to disk.
+	Writing and reading a mesh to/from disk can be time consuming. You can avoid doing so by using [`import_mesh`](../docstrings/#Inti.import_mesh-Tuple) without a file name to import the mesh from the current `gmsh` session without the need to write it to disk.
 """
 
 # ╔═╡ f5d990e9-8d05-41e6-b6b3-c737692de37a
@@ -531,10 +531,10 @@ Here is how much memory it would take to store the dense representation of these
 
 # ╔═╡ 54f07c21-339b-44c3-9ac2-22af163d55ae
 # ╠═╡ show_logs = false
-begin #hide
+begin # hide
 mem = 2 * length(S_3d) * 16 / 1e9 # 16 bytes per complex number, 1e9 bytes per GB, two matrices
 println("memory required to store S and D: $(mem) GB")
-end #hide
+end # hide
 
 # ╔═╡ baea69b3-028b-4617-83f1-1ab9e2ca7115
 let # to render terminal output in the documentation
@@ -551,7 +551,7 @@ Even for this simple example, the dense representation of the integral operators
 # ╔═╡ bc09986a-5378-4d0b-a2b2-df9245f3f9cf
 md"""
 !!! note "Compression methods"
-	It is worth mentioning that hierchical matrices are not the only way to compress such integral operators, and may in fact not even be the best for the problem at hand. For example, one could use a fast multipole method (FMM), which has a much lighter memory footprint. See the the [tutorial on compression methods](@ref "Compression methods") for more information.
+	It is worth mentioning that hierchical matrices are not the only way to compress such integral operators, and may in fact not even be the best for the problem at hand. For example, one could use a fast multipole method (FMM), which has a much lighter memory footprint. See the the [tutorial on compression methods](../tutorials/compression_methods/#Compression-methods) for more information.
 """
 
 # ╔═╡ b9e36a69-a3d1-41c8-8951-01f92acf0806
@@ -569,7 +569,7 @@ We can now solve the linear system using GMRES solver:
 
 # ╔═╡ dcf006a3-5332-442a-9771-f427cd7189a5
 # ╠═╡ show_logs = false
-begin #hide
+begin # hide
 rhs_3d = map(Q_3d) do q
     x = q.coords
     return -uᵢ(x)
@@ -577,7 +577,7 @@ end
 σ_3d, hist =
     gmres(L_3d, rhs_3d; log = true, abstol = 1e-6, verbose = false, restart = 100, maxiter = 100)
 @show hist
-end #hide
+end # hide
 
 # ╔═╡ 215677a6-af7b-4e5d-863f-aabdfb4a1400
 md"""
@@ -585,10 +585,10 @@ As before, let us represent the solution using `IntegralPotential`s:
 """
 
 # ╔═╡ 14a549ad-e23f-40a4-b7fa-ef31354805a9
-begin #hide
+begin # hide
 𝒮_3d, 𝒟_3d = Inti.single_double_layer_potential(; pde=pde_3d, source = Q_3d)
 uₛ_3d = x -> 𝒟_3d[σ_3d](x) - im * k * 𝒮_3d[σ_3d](x)
-end; #hide
+end; # hide
 
 # ╔═╡ 832858dc-2475-4f6a-a820-a557b2883f0c
 md"""
@@ -596,7 +596,7 @@ To check the result, we compare against the exact solution obtained through a se
 """
 
 # ╔═╡ e00c4d90-aa3b-41f9-b65e-7e9ace89a295
-begin #hide
+begin # hide
 sphbesselj(l, r) = sqrt(π / (2r)) * besselj(l + 1 / 2, r)
 sphbesselh(l, r) = sqrt(π / (2r)) * besselh(l + 1 / 2, r)
 sphharmonic(l, m, θ, ϕ) = GSL.sf_legendre_sphPlm(l, abs(m), cos(θ)) * exp(im * m * ϕ)
@@ -621,7 +621,7 @@ function sphere_helmholtz_soundsoft(xobs; radius = 1, k = 1, θin = 0, ϕin = 0)
     end
     return u
 end
-end; #hide
+end; # hide
 
 # ╔═╡ bb87f66d-5e68-49c5-9167-bdbab60109e5
 md"""
@@ -630,7 +630,7 @@ We will compute the error on some point on the sphere of radius `2`:
 
 # ╔═╡ 3848717e-0c30-4c0b-82ec-b504c9210483
 # ╠═╡ show_logs = false
-begin #hide
+begin # hide
 uₑ_3d = (x) -> sphere_helmholtz_soundsoft(x; radius = 1, k = k, θin = π / 2, ϕin = 0)
 er_3d = maximum(1:100) do _
 	x̂ = rand(Inti.Point3D) |> normalize # an SVector of unit norm
@@ -638,7 +638,7 @@ er_3d = maximum(1:100) do _
 	return abs(uₛ_3d(x) - uₑ_3d(x))
 end
 @info "error with correction = $er_3d"
-end #hide
+end # hide
 
 # ╔═╡ 36ddb3be-7103-429f-9011-99c27c655de5
 let # Render terminal output in documentation
@@ -654,7 +654,7 @@ We see that, once again, the approximation is quite accurate. Let us now visuali
 """
 
 # ╔═╡ b2b31b38-4c2f-4763-9273-971749c40d5c
-begin #hide
+begin # hide
 Σ_msh = view(msh_3d, Σ_3d)
 target = Inti.nodes(Σ_msh)
 
@@ -670,15 +670,15 @@ S_viz, D_viz = Inti.single_double_layer(;
 ui_eval_msh = uᵢ.(target)
 us_eval_msh = D_viz * σ_3d - im * k * S_viz * σ_3d
 u_eval_msh = ui_eval_msh + us_eval_msh
-end; #hide
+end; # hide
 
 # ╔═╡ 0cec09b1-8806-4aee-970d-cc0b1e4b841c
 md"""
-Finalize, we use [`Meshes.viz`](@extref) to visualize the scattered field:
+Finalize, we use [`Meshes.viz`](https://juliageometry.github.io/MeshesDocs/dev/visualization/#Meshes.viz) to visualize the scattered field:
 """
 
 # ╔═╡ dab9a19c-977e-4ab1-a3d9-f9970af69642
-begin #hide
+begin # hide
 nv = length(Inti.nodes(Γ_msh_3d))
 colorrange = extrema(real(u_eval_msh))
 colormap = :inferno
@@ -687,7 +687,7 @@ ax_3d = Axis3(fig_3d[1, 1]; aspect = :data)
 viz!(Γ_msh_3d; colorrange, colormap, color = zeros(nv), interpolate = true)
 viz!(Σ_msh; colorrange, colormap, color = real(u_eval_msh))
 cb = Colorbar(fig_3d[1, 2]; label = "real(u)", colormap, colorrange)
-end; #hide
+end; # hide
 
 # ╔═╡ 0c1114d1-256c-44e3-bbd4-9b5077fc7ee8
 fig_3d
