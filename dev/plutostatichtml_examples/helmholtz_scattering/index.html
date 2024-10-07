@@ -101,12 +101,12 @@ gmsh_circle(; meshsize, order = gorder, name)
 
 <pre id="plutouiterminal" style="padding: 10px; background-color: white;">Info    : Meshing 1D...
 Info    : Meshing curve 1 (Ellipse)
-Info    : Done meshing 1D (Wall 0.000162183s, CPU 0.000158s)
+Info    : Done meshing 1D (Wall 0.000218464s, CPU 0.000211s)
 Info    : 63 nodes 64 elements
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
 Info    : [ 60%] Meshing surface 1 order 2
-Info    : Done meshing order 2 (Wall 0.00057623s, CPU 0.000553s)
+Info    : Done meshing order 2 (Wall 0.000831426s, CPU 0.000831s)
 Info    : Writing '/home/lfaria/actions-runner/_work/Inti.jl/Inti.jl/docs/src/pluto-examples/circle.msh'...
 Info    : Done writing '/home/lfaria/actions-runner/_work/Inti.jl/Inti.jl/docs/src/pluto-examples/circle.msh'
 </pre>
@@ -118,8 +118,8 @@ Info    : Done writing '/home/lfaria/actions-runner/_work/Inti.jl/Inti.jl/docs/s
 msh = Inti.import_mesh(name; dim = 2)
 </code></pre>
 <pre class="code-output documenter-example-output" id="var-msh">Inti.LagrangeMesh{2, Float64} containing:
-	 1 elements of type SVector{2, Float64}
-	 63 elements of type Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 3, SVector{2, Float64}}</pre>
+	 63 elements of type Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 3, SVector{2, Float64}}
+	 1 elements of type SVector{2, Float64}</pre>
 
 
 <div class="markdown"><p>The code above will import the mesh with all of its geometrical entities. The <code>dim=2</code> projects all points to two dimensions by ignoring the third component. To extract the domain <span class="tex">\(\Omega\)</span> we need to filter the entities in the mesh; here we will simply filter them based on the <code>geometric_dimension</code>:</p></div>
@@ -337,8 +337,8 @@ gmsh_sphere(; meshsize=(λ / 5), order = gorder, name=name_sphere, visualize = f
 msh_3d = Inti.import_mesh(name_sphere; dim = 3)
 </code></pre>
 <pre class="code-output documenter-example-output" id="var-msh_3d">Inti.LagrangeMesh{3, Float64} containing:
-	 7 elements of type SVector{3, Float64}
 	 255 elements of type Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 3, SVector{3, Float64}}
+	 7 elements of type SVector{3, Float64}
 	 6239 elements of type Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 6, SVector{3, Float64}}</pre>
 
 
@@ -468,7 +468,7 @@ end
 
 
 
-<pre id="plutouiterminal" style="padding: 10px; background-color: white;">[ Info: error with correction = 3.2601838509421126e-5
+<pre id="plutouiterminal" style="padding: 10px; background-color: white;">[ Info: error with correction = 3.246241250549078e-5
 </pre>
 
 
@@ -527,4 +527,4 @@ SpecialFunctions 2.4.0<br>
 StaticArrays 1.9.7
 </div>
 
-<!-- PlutoStaticHTML.End --></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../toy_example/">« Toy example</a><a class="docs-footer-nextpage" href="../poisson/">Poisson problem »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Friday 4 October 2024 20:50">Friday 4 October 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+<!-- PlutoStaticHTML.End --></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../toy_example/">« Toy example</a><a class="docs-footer-nextpage" href="../poisson/">Poisson problem »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Monday 7 October 2024 11:15">Monday 7 October 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
