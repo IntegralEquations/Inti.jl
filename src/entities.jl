@@ -20,7 +20,14 @@ Base.hash(ent::EntityKey, h::UInt) = hash((ent.dim, abs(ent.tag)), h)
 Base.:(==)(e1::EntityKey, e2::EntityKey) = e1.dim == e2.dim && abs(e1.tag) == abs(e2.tag)
 
 # defer some functions on EntityKey to the corresponding GeometricEntity
-for f in (:labels, :boundary, :pushforward, :ambient_dimension)
+for f in (
+    :labels,
+    :boundary,
+    :pushforward,
+    :ambient_dimension,
+    :hasparametrization,
+    :parametrization,
+)
     @eval $f(k::EntityKey) = $f(global_get_entity(k))
 end
 
@@ -175,12 +182,18 @@ end
     parametric_curve(f, a::Real, b::Real)
 
 Create a [`GeometricEntity`] representing a parametric curve defined by the
-`{f(t) | a ≤ t ≤ b}`. The function `f` should map a scalar to a `SVector`.
+`{f(t) | a ≤ t ≤ b}`. The function `f` should map a scalar to an `SVector`.
+
+Flipping the orientation is supported by passing `a > b`.
 """
 function parametric_curve(f::F, a::Real, b::Real; kwargs...) where {F}
-    flip = a > b
-    d = HyperRectangle(SVector(float(a)), SVector(float(b)))
-    parametrization = flip ? x -> f(b + a - x[1]) : x -> f(x[1])
+    if a > b # flip parametrization to restore order in the universe
+        d = HyperRectangle(SVector(float(b)), SVector(float(a)))
+        parametrization = x -> f(b + a - x[1])
+    else
+        d = HyperRectangle(SVector(float(a)), SVector(float(b)))
+        parametrization = x -> f(x[1])
+    end
     return GeometricEntity(; domain = d, parametrization, kwargs...)
 end
 
