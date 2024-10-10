@@ -173,7 +173,7 @@ end
 size_threshold_ignore = last.(notebook_examples)
 
 # Generate HTML versions of the notebooks using PlutoSliderServer.jl
-notebook_examples_html = @docplutonotebooks(notebook_dir, notebooks, iframe = true)
+# notebook_examples_html = @docplutonotebooks(notebook_dir, notebooks, iframe = true)
 
 makedocs(;
     modules = modules,
