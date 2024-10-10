@@ -8,28 +8,27 @@ using InteractiveUtils
 begin
 	import Pkg as _Pkg
     haskey(ENV, "PLUTO_PROJECT") && _Pkg.activate(ENV["PLUTO_PROJECT"])
-	using PlutoUI: with_terminal, TableOfContents
+	using PlutoUI: TableOfContents
 end ;
 
 # ╔═╡ 332bd3bb-c720-454e-80af-89ad65041773
-# ╠═╡ show_logs = false
-begin # hide
-using Inti, Gmsh
-meshsize = 0.1
-gmsh.initialize()
-jellyfish = Inti.gmsh_curve(0, 2π; meshsize) do s
-	r = 1 + 0.3*cos(4*s + 2*sin(s))
-	return r*Inti.Point2D(cos(s), sin(s))
+begin
+	using Inti, Gmsh
+	meshsize = 0.1
+	gmsh.initialize()
+	jellyfish = Inti.gmsh_curve(0, 2π; meshsize) do s
+		r = 1 + 0.3*cos(4*s + 2*sin(s))
+		return r*Inti.Point2D(cos(s), sin(s))
+	end
+	cl = gmsh.model.occ.addCurveLoop([jellyfish])
+	surf = gmsh.model.occ.addPlaneSurface([cl])
+	gmsh.model.occ.synchronize()
+	gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+	gmsh.model.mesh.generate(2)
+	gmsh.model.mesh.setOrder(2)
+	msh = Inti.import_mesh(; dim = 2)
+	gmsh.finalize()
 end
-cl = gmsh.model.occ.addCurveLoop([jellyfish])
-surf = gmsh.model.occ.addPlaneSurface([cl])
-gmsh.model.occ.synchronize()
-gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-gmsh.model.mesh.generate(2)
-gmsh.model.mesh.setOrder(2)
-msh = Inti.import_mesh(; dim = 2)
-gmsh.finalize()
-end # hide
 
 # ╔═╡ aca57c74-d084-40e7-9760-edf988a64915
 md"""
@@ -110,26 +109,6 @@ We use the *Gmsh API* to create a jellyfish-shaped domain and to generate a
 second order mesh of its interior and boundary:
 """
 
-# ╔═╡ 546966b1-58c2-44e6-ac2c-578094251fce
-let # For the output in the documentation
-with_terminal() do
-	meshsize = 0.1
-gmsh.initialize()
-jellyfish = Inti.gmsh_curve(0, 2π; meshsize) do s
-	r = 1 + 0.3*cos(4*s + 2*sin(s))
-	return r*Inti.Point2D(cos(s), sin(s))
-end
-cl = gmsh.model.occ.addCurveLoop([jellyfish])
-surf = gmsh.model.occ.addPlaneSurface([cl])
-gmsh.model.occ.synchronize()
-gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-gmsh.model.mesh.generate(2)
-gmsh.model.mesh.setOrder(2)
-msh_output = Inti.import_mesh(; dim = 2)
-gmsh.finalize()
-end
-end
-
 # ╔═╡ 1609838c-67ec-4d67-9c9b-993b1bd01fb6
 md"""
 We can now extract components of the mesh corresponding to the ``\Omega`` and
@@ -137,27 +116,26 @@ We can now extract components of the mesh corresponding to the ``\Omega`` and
 """
 
 # ╔═╡ 4e580f9f-6e22-4160-b262-ca941b6bfb8f
-begin # hide
-Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, msh)
-Γ = Inti.boundary(Ω)
-Ω_msh = view(msh, Ω)
-Γ_msh = view(msh, Γ)
-end; # hide
+begin
+	Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, msh)
+	Γ = Inti.boundary(Ω)
+	Ω_msh = view(msh, Ω)
+	Γ_msh = view(msh, Γ)
+	nothing #hide
+end
 
 # ╔═╡ 2c4bace3-ef35-4500-829f-2f5ae6725249
-begin # hide
-using Meshes, GLMakie
-viz(Ω_msh; showsegments=true)
-viz!(Γ_msh; color=:red)
-end; # hide
+begin
+	using Meshes, GLMakie
+	viz(Ω_msh; showsegments=true)
+	viz!(Γ_msh; color=:red)
+	Makie.current_figure() #hide
+end
 
 # ╔═╡ 901578c3-b7aa-4023-bb99-769cf5805f57
 md"""
 and visualize them:
 """
-
-# ╔═╡ 1bb0a7a4-8fab-4744-9cf1-94619bde5395
-Makie.current_figure()
 
 # ╔═╡ b142b298-26a8-4373-934d-3bc8448a8fda
 md"""
@@ -166,28 +144,29 @@ boundary:
 """
 
 # ╔═╡ 85ce61fc-086d-4661-8f03-6a6ae4d55511
-begin # hide
-Ω_quad = Inti.Quadrature(Ω_msh; qorder = 4)
-Γ_quad = Inti.Quadrature(Γ_msh; qorder = 6)
-end; # hide
+begin
+	Ω_quad = Inti.Quadrature(Ω_msh; qorder = 4)
+	Γ_quad = Inti.Quadrature(Γ_msh; qorder = 6)
+	nothing #hide
+end
 
 # ╔═╡ 6e3ea607-2b70-485d-94f0-5626bab4f832
-begin # hide
-using FMM2D #to accelerate the maps
-pde = Inti.Laplace(; dim = 2)
-# Newtonian potential mapping domain to boundary
-V_d2b = Inti.volume_potential(;
-	pde,
-	target = Γ_quad,
-	source = Ω_quad,
-	compression = (method = :fmm, tol = 1e-12),
-	correction = (
-		method = :dim,
-		maxdist = 5 * meshsize,
-		target_location = :on,
-	),
-)
-end # hide
+begin
+	using FMM2D #to accelerate the maps
+	pde = Inti.Laplace(; dim = 2)
+	# Newtonian potential mapping domain to boundary
+	V_d2b = Inti.volume_potential(;
+		pde,
+		target = Γ_quad,
+		source = Ω_quad,
+		compression = (method = :fmm, tol = 1e-12),
+		correction = (
+			method = :dim,
+			maxdist = 5 * meshsize,
+			target_location = :on,
+		),
+	)
+end
 
 # ╔═╡ 731d9ae8-33a8-4f03-8cbc-5e40972996a2
 md"""
@@ -234,13 +213,14 @@ instead a manufactured solution ``u_e`` from which we will derive the functions
 """
 
 # ╔═╡ 975b7c01-8147-44f8-a693-1185e7b8d63b
-begin # hide
-# Create a manufactured solution
-uₑ = (x) -> cos(2 * x[1]) * sin(2 * x[2])
-fₑ  = (x) -> 8 * cos(2 * x[1]) * sin(2 * x[2]) # -Δuₑ
-g   = map(q -> uₑ(q.coords), Γ_quad)
-f   = map(q -> fₑ(q.coords), Ω_quad)
-end; # hide
+begin
+	# Create a manufactured solution
+	uₑ = (x) -> cos(2 * x[1]) * sin(2 * x[2])
+	fₑ  = (x) -> 8 * cos(2 * x[1]) * sin(2 * x[2]) # -Δuₑ
+	g   = map(q -> uₑ(q.coords), Γ_quad)
+	f   = map(q -> fₑ(q.coords), Ω_quad)
+	nothing #hide
+end
 
 # ╔═╡ 700cfbbc-970a-466b-9f8c-748f7ff0bc6e
 md"""
@@ -249,27 +229,22 @@ homogeneous part of the solution:
 """
 
 # ╔═╡ 6db682e4-e641-4272-ba90-1f10b2ff1150
-rhs = g - V_d2b*f ;
+begin
+	rhs = g - V_d2b*f
+	nothing #hide
+end
 
 # ╔═╡ 6eb1d813-e792-4148-8d30-975c49e9dbc6
-# ╠═╡ show_logs = false
-begin # hide
-using IterativeSolvers, LinearAlgebra
-σ = gmres(-I/2 + D_b2b, rhs; abstol = 1e-8, verbose = true, restart = 1000)
-end; # hide
+begin
+	using IterativeSolvers, LinearAlgebra
+	σ = gmres(-I/2 + D_b2b, rhs; abstol = 1e-8, verbose = true, restart = 1000)
+	nothing #hide
+end
 
 # ╔═╡ b21911c7-7276-44cb-a15f-64db3430a896
 md"""
 and solve the integral equation for the integral density function ``σ``:
 """
-
-# ╔═╡ b5c4b1a6-c13d-416e-b820-02c9bfc1fdca
-let # To Render in the Documentation
-	with_terminal() do
-		σ = gmres(-I/2 + D_b2b, rhs; abstol = 1e-8, verbose = true, restart = 1000) ;
-		nothing
-	end
-end
 
 # ╔═╡ 1357bb0a-bf56-4f56-bb2c-65dfe2a78c0c
 md"""
@@ -277,13 +252,13 @@ With the density function at hand, we can now reconstruct our approximate soluti
 """
 
 # ╔═╡ e0e1fa9c-7a43-45b1-ad45-2510533e1aed
-begin # hide
-G  = Inti.SingleLayerKernel(pde)
-dG = Inti.DoubleLayerKernel(pde)
-𝒱 = Inti.IntegralPotential(G, Ω_quad)
-𝒟 = Inti.IntegralPotential(dG, Γ_quad)
-u = (x) -> 𝒱[f](x) + 𝒟[σ](x)
-end # hide
+begin
+	G  = Inti.SingleLayerKernel(pde)
+	dG = Inti.DoubleLayerKernel(pde)
+	𝒱 = Inti.IntegralPotential(G, Ω_quad)
+	𝒟 = Inti.IntegralPotential(dG, Γ_quad)
+	u = (x) -> 𝒱[f](x) + 𝒟[σ](x)
+end
 
 # ╔═╡ 2c2c943b-30ed-4244-a40c-f061050ca7b8
 md"""
@@ -291,17 +266,9 @@ and evaluate it at any point in the domain:
 """
 
 # ╔═╡ 2faa4311-59d9-4b85-b585-937391e94568
-# ╠═╡ show_logs = false
-begin # hide
-x = Inti.Point2D(0.1,0.4)
-println("error at $x: ", u(x)-uₑ(x))
-end # hide
-
-# ╔═╡ f3495025-ac97-415d-a398-ee5280c2d714
-let # Render for Documentation
-with_terminal() do
-println("error at $x: ", u(x)-uₑ(x))
-end
+begin
+	x = Inti.Point2D(0.1,0.4)
+	println("error at $x: ", u(x)-uₑ(x))
 end
 
 # ╔═╡ f3ee21f2-99e7-4be3-a2cc-930b6c4487f1
@@ -352,46 +319,37 @@ manufactured:
 """
 
 # ╔═╡ 5be59f68-cf21-4e7e-ac23-7bffd690dc03
-# ╠═╡ show_logs = false
-begin # hide
-u_quad = V_d2d*f + D_b2d*σ
-er_quad = u_quad - map(q -> uₑ(q.coords), Ω_quad)
-println("maximum error at all quadrature nodes: ", norm(er_quad, Inf))
-end; # hide
-
-# ╔═╡ 41f97844-3c86-46b8-9fbb-0632bdcee0f6
-let # render for documentation
-	with_terminal() do
-		println("maximum error at all quadrature nodes: ", norm(er_quad, Inf))
-	end
+begin
+	u_quad = V_d2d*f + D_b2d*σ
+	er_quad = u_quad - map(q -> uₑ(q.coords), Ω_quad)
+	println("maximum error at all quadrature nodes: ", norm(er_quad, Inf))
+	nothing #hide
 end
 
 # ╔═╡ a61f336e-15ee-4bb3-a071-1115ac6f1be1
 md"""
-Lastly, let us visualize the solution and the error on the mesh nodes using [`quadrature_to_node_vals`](../../docstrings/#Inti.quadrature_to_node_vals-Tuple{Inti.Quadrature,%20AbstractVector}):
+Lastly, let us visualize the solution and the error on the mesh nodes using [`quadrature_to_node_vals`](@ref Inti.quadrature_to_node_vals):
 """
 
 # ╔═╡ ce03f9b7-c91c-4f53-bcda-49261a4bdcc2
-begin # hide
-nodes = Inti.nodes(Ω_msh)
-u_nodes = Inti.quadrature_to_node_vals(Ω_quad, u_quad)
-er = u_nodes - map(uₑ, nodes)
-colorrange = extrema(u_nodes)
-fig = Figure(; size = (800, 300))
-ax = Axis(fig[1, 1]; aspect = DataAspect())
-viz!(Ω_msh; colorrange, color = u_nodes, interpolate = true)
-cb = Colorbar(fig[1, 2]; label = "u", colorrange)
-# plot error
-log_er = log10.(abs.(er))
-colorrange = extrema(log_er)
-colormap = :inferno
-ax = Axis(fig[1, 3]; aspect = DataAspect())
-viz!(Ω_msh; colorrange, colormap, color = log_er, interpolate = true)
-cb = Colorbar(fig[1, 4]; label = "log₁₀|u - uₑ|", colormap, colorrange)
-end; # hide
-
-# ╔═╡ e46f76d5-074b-49ac-b976-9f782df9307d
-fig
+begin
+	nodes = Inti.nodes(Ω_msh)
+	u_nodes = Inti.quadrature_to_node_vals(Ω_quad, u_quad)
+	er = u_nodes - map(uₑ, nodes)
+	colorrange = extrema(u_nodes)
+	fig = Figure(; size = (800, 300))
+	ax = Axis(fig[1, 1]; aspect = DataAspect())
+	viz!(Ω_msh; colorrange, color = u_nodes, interpolate = true)
+	cb = Colorbar(fig[1, 2]; label = "u", colorrange)
+	# plot error
+	log_er = log10.(abs.(er))
+	colorrange = extrema(log_er)
+	colormap = :inferno
+	ax = Axis(fig[1, 3]; aspect = DataAspect())
+	viz!(Ω_msh; colorrange, colormap, color = log_er, interpolate = true)
+	cb = Colorbar(fig[1, 4]; label = "log₁₀|u - uₑ|", colormap, colorrange)
+	fig #hide
+end
 
 # ╔═╡ e63c776b-6b52-4e6e-aca8-3d67cd9a9c3f
 TableOfContents()
@@ -2446,12 +2404,10 @@ version = "1.4.1+1"
 # ╟─b287d01b-7d13-414e-9f22-36e8a3a8ca62
 # ╟─1d3720bb-c113-44d3-ac0d-275f80e87237
 # ╠═332bd3bb-c720-454e-80af-89ad65041773
-# ╟─546966b1-58c2-44e6-ac2c-578094251fce
 # ╟─1609838c-67ec-4d67-9c9b-993b1bd01fb6
 # ╠═4e580f9f-6e22-4160-b262-ca941b6bfb8f
 # ╟─901578c3-b7aa-4023-bb99-769cf5805f57
 # ╠═2c4bace3-ef35-4500-829f-2f5ae6725249
-# ╟─1bb0a7a4-8fab-4744-9cf1-94619bde5395
 # ╟─b142b298-26a8-4373-934d-3bc8448a8fda
 # ╠═85ce61fc-086d-4661-8f03-6a6ae4d55511
 # ╟─731d9ae8-33a8-4f03-8cbc-5e40972996a2
@@ -2465,22 +2421,18 @@ version = "1.4.1+1"
 # ╠═6db682e4-e641-4272-ba90-1f10b2ff1150
 # ╟─b21911c7-7276-44cb-a15f-64db3430a896
 # ╠═6eb1d813-e792-4148-8d30-975c49e9dbc6
-# ╟─b5c4b1a6-c13d-416e-b820-02c9bfc1fdca
 # ╟─1357bb0a-bf56-4f56-bb2c-65dfe2a78c0c
 # ╠═e0e1fa9c-7a43-45b1-ad45-2510533e1aed
 # ╟─2c2c943b-30ed-4244-a40c-f061050ca7b8
 # ╠═2faa4311-59d9-4b85-b585-937391e94568
-# ╟─f3495025-ac97-415d-a398-ee5280c2d714
 # ╟─f3ee21f2-99e7-4be3-a2cc-930b6c4487f1
 # ╠═fccb6992-32c4-4bd2-a742-fb36906fb62a
 # ╟─6489d40d-fdd3-488d-ae5d-4e4e489b669f
 # ╟─66a7946c-a601-4fc8-94a0-429d41b564ac
 # ╟─a5c7fcd0-1966-49fe-b5bf-7d3c1d9f4aa7
 # ╠═5be59f68-cf21-4e7e-ac23-7bffd690dc03
-# ╟─41f97844-3c86-46b8-9fbb-0632bdcee0f6
 # ╟─a61f336e-15ee-4bb3-a071-1115ac6f1be1
 # ╠═ce03f9b7-c91c-4f53-bcda-49261a4bdcc2
-# ╟─e46f76d5-074b-49ac-b976-9f782df9307d
 # ╟─e63c776b-6b52-4e6e-aca8-3d67cd9a9c3f
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
