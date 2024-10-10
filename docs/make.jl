@@ -211,7 +211,7 @@ makedocs(;
         "References" => "references.md",
         "Docstrings" => "docstrings.md",
     ],
-    warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),
+    warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes, :cross_references),
     # warnonly = true,
     pagesonly = true,
     checkdocs = :none,
@@ -227,3 +227,5 @@ deploydocs(;
     devbranch = "main",
     push_preview = true,
 )
+
+# GLMakie.closeall()
