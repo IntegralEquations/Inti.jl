@@ -118,26 +118,26 @@ end
 
 ## TO REMOVE if we decide to use Pluto Notebooks to generate documentation
 # Generate examples using Literate
-const examples_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples")
+# const examples_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples")
 const notebook_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "pluto-examples")
-const generated_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples", "generated")
-const examples = ["toy_example.jl", "helmholtz_scattering.jl"]
-for t in examples
-    println("\n*** Generating $t example")
-    @time begin
-        src = joinpath(examples_dir, t)
-        Literate.markdown(src, generated_dir; mdstrings = true)
-        # if draft, skip creation of notebooks
-        Literate.notebook(
-            src,
-            generated_dir;
-            mdstrings = true,
-            preprocess = insert_setup,
-            # execute = ON_CI,
-            execute = false,
-        )
-    end
-end
+# const generated_dir = joinpath(Inti.PROJECT_ROOT, "docs", "src", "examples", "generated")
+# const examples = ["toy_example.jl", "helmholtz_scattering.jl"]
+# for t in examples
+#     println("\n*** Generating $t example")
+#     @time begin
+#         src = joinpath(examples_dir, t)
+#         Literate.markdown(src, generated_dir; mdstrings = true)
+#         # if draft, skip creation of notebooks
+#         Literate.notebook(
+#             src,
+#             generated_dir;
+#             mdstrings = true,
+#             preprocess = insert_setup,
+#             # execute = ON_CI,
+#             execute = false,
+#         )
+#     end
+# end
 
 println("\n*** Generating documentation")
 
@@ -199,19 +199,19 @@ makedocs(;
             "tutorials/correction_methods.md",
             "tutorials/solvers.md",
         ],
-        "Examples" => [
-            "examples/generated/toy_example.md",
-            "examples/generated/helmholtz_scattering.md",
-            "examples/poisson.md",
-            # "examples/generated/lippmann_schwinger.md",
-            # "examples/generated/poisson.md",
-            # "examples/generated/stokes_drag.md",
-        ],
+        # "Examples" => [
+        #     "examples/generated/toy_example.md",
+        #     "examples/generated/helmholtz_scattering.md",
+        #     "examples/poisson.md",
+        #     # "examples/generated/lippmann_schwinger.md",
+        #     # "examples/generated/poisson.md",
+        #     # "examples/generated/stokes_drag.md",
+        # ],
         "Notebooks" => notebook_examples,
         "References" => "references.md",
         "Docstrings" => "docstrings.md",
     ],
-    warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes, :cross_references),
+    warnonly = Documenter.except(:linkcheck_remotes), # ON_CI ? false : Documenter.except(:linkcheck_remotes),
     # warnonly = true,
     pagesonly = true,
     checkdocs = :none,
