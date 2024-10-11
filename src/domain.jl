@@ -19,6 +19,7 @@ end
 
 Domain() = Domain(Set{EntityKey}())
 Domain(ents::Vararg{EntityKey}) = Domain(Set(ents))
+Domain(ents) = Domain(Set(ents))
 
 """
     Domain([f::Function,] keys)

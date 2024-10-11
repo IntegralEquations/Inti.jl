@@ -79,7 +79,7 @@ mesh(quad::Quadrature) = quad.mesh
 etype2qtags(quad::Quadrature, E) = quad.etype2qtags[E]
 
 quadrature_rule(quad::Quadrature, E) = quad.etype2qrule[E]
-ambient_dimension(quad::Quadrature{N}) where {N} = N
+ambient_dimension(::Quadrature{N}) where {N} = N
 
 function Base.show(io::IO, quad::Quadrature)
     return print(io, " Quadrature with $(length(quad.qnodes)) quadrature nodes")
@@ -187,6 +187,8 @@ end
 The [`Domain`](@ref) over which `Q` performs integration.
 """
 domain(Q::Quadrature) = domain(Q.mesh)
+
+entities(Q::Quadrature) = Q |> mesh |> entities
 
 """
     dom2qtags(Q::Quadrature, dom::Domain)
