@@ -20,7 +20,7 @@ handle custom kernels.
 ## Predefined kernels and integral operators
 
 To simplify the construction of integral operators for some commonly used PDEs,
-Inti.jl defines a few [`AbstractPDE`](@ref)s types. For each of these PDEs, the
+Inti.jl defines a few [`AbstractDifferentialOperator`](@ref)s types. For each of these PDEs, the
 package provides a [`SingleLayerKernel`](@ref), [`DoubleLayerKernel`](@ref),
 [`HyperSingularKernel`](@ref), and [`AdjointDoubleLayerKernel`](@ref) that can
 be used to construct the corresponding kernel functions, e.g.:
@@ -173,7 +173,7 @@ up a custom kernel function, and how to build an integral operator from it.
 
 !!! note "Integral operators coming from PDEs"
     If the integral operator of interest arises from a PDE, it is recommended
-    to define a new [`AbstractPDE`](@ref) type, and implement the required
+    to define a new [`AbstractDifferentialOperator`](@ref) type, and implement the required
     methods for [`SingleLayerKernel`](@ref), [`DoubleLayerKernel`](@ref),
     [`AdjointDoubleLayerKernel`](@ref), and [`HyperSingularKernel`](@ref). This
     will enable the use of the high-level syntax for constructing boundary

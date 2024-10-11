@@ -23,63 +23,63 @@ struct GenericKernel{T,F} <: AbstractKernel{T}
 end
 
 """
-    abstract type AbstractPDE{N}
+    abstract type AbstractDifferentialOperator{N}
 
-A partial differential equation in dimension `N`. `AbstractPDE` types are used
-to define [`AbstractPDEKernel`s](@ref AbstractPDEKernel).
+A partial differential equation in dimension `N`. `AbstractDifferentialOperator` types are used
+to define [`AbstractDifferentialOperatorKernel`s](@ref AbstractDifferentialOperatorKernel).
 """
-abstract type AbstractPDE{N} end
+abstract type AbstractDifferentialOperator{N} end
 
-ambient_dimension(::AbstractPDE{N}) where {N} = N
+ambient_dimension(::AbstractDifferentialOperator{N}) where {N} = N
 
 """
-    abstract type AbstractPDEKernel{T,Op} <: AbstractKernel{T}
+    abstract type AbstractDifferentialOperatorKernel{T,Op} <: AbstractKernel{T}
 
 An [`AbstractKernel`](@ref) with an associated `pde::Op` field.
 """
-abstract type AbstractPDEKernel{T,Op} <: AbstractKernel{T} end
+abstract type AbstractDifferentialOperatorKernel{T,Op} <: AbstractKernel{T} end
 
 """
-    pde(K::AbstractPDEKernel)
+    pde(K::AbstractDifferentialOperatorKernel)
 
-Return the underlying `AbstractPDE` associated with the kernel `K`.
+Return the underlying `AbstractDifferentialOperator` associated with the kernel `K`.
 """
-pde(k::AbstractPDEKernel) = k.pde
+pde(k::AbstractDifferentialOperatorKernel) = k.pde
 
-parameters(k::AbstractPDEKernel) = parameters(pde(k))
+parameters(k::AbstractDifferentialOperatorKernel) = parameters(pde(k))
 
 # convenient constructor for e.g. SingleLayerKernel(pde,Float64) or DoubleLayerKernel(pde,ComplexF64)
 function (::Type{K})(
     pde::Op,
     ::Type{T} = default_kernel_eltype(pde),
-) where {T,Op,K<:AbstractPDEKernel}
+) where {T,Op,K<:AbstractDifferentialOperatorKernel}
     return K{T,Op}(pde)
 end
 
 """
-    struct SingleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
+    struct SingleLayerKernel{T,Op} <: AbstractDifferentialOperatorKernel{T,Op}
 
 The free-space single-layer kernel (i.e. the fundamental solution) of an `Op <:
-AbstractPDE`.
+AbstractDifferentialOperator`.
 """
-struct SingleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
+struct SingleLayerKernel{T,Op} <: AbstractDifferentialOperatorKernel{T,Op}
     pde::Op
 end
 
 """
-    struct DoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
+    struct DoubleLayerKernel{T,Op} <: AbstractDifferentialOperatorKernel{T,Op}
 
 Given an operator `Op`, construct its free-space double-layer kernel. This
 corresponds to the `γ₁` trace of the [`SingleLayerKernel`](@ref). For operators
 such as [`Laplace`](@ref) or [`Helmholtz`](@ref), this is simply the normal
 derivative of the fundamental solution respect to the source variable.
 """
-struct DoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
+struct DoubleLayerKernel{T,Op} <: AbstractDifferentialOperatorKernel{T,Op}
     pde::Op
 end
 
 """
-    struct AdjointDoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
+    struct AdjointDoubleLayerKernel{T,Op} <: AbstractDifferentialOperatorKernel{T,Op}
 
 Given an operator `Op`, construct its free-space adjoint double-layer kernel.
 This corresponds to the `transpose(γ₁,ₓ[G])`, where `G` is the
@@ -87,12 +87,12 @@ This corresponds to the `transpose(γ₁,ₓ[G])`, where `G` is the
 [`Helmholtz`](@ref), this is simply the normal derivative of the fundamental
 solution respect to the target variable.
 """
-struct AdjointDoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
+struct AdjointDoubleLayerKernel{T,Op} <: AbstractDifferentialOperatorKernel{T,Op}
     pde::Op
 end
 
 """
-    struct HyperSingularKernel{T,Op} <: AbstractPDEKernel{T,Op}
+    struct HyperSingularKernel{T,Op} <: AbstractDifferentialOperatorKernel{T,Op}
 
 Given an operator `Op`, construct its free-space hypersingular kernel. This
 corresponds to the `transpose(γ₁,ₓγ₁[G])`, where `G` is the
@@ -100,7 +100,7 @@ corresponds to the `transpose(γ₁,ₓγ₁[G])`, where `G` is the
 [`Helmholtz`](@ref), this is simply the normal derivative respect to the target
 variable of the `DoubleLayerKernel`.
 """
-struct HyperSingularKernel{T,Op} <: AbstractPDEKernel{T,Op}
+struct HyperSingularKernel{T,Op} <: AbstractDifferentialOperatorKernel{T,Op}
     pde::Op
 end
 
@@ -108,7 +108,7 @@ end
 ################################# LAPLACE ######################################
 ################################################################################
 
-struct Laplace{N} <: AbstractPDE{N} end
+struct Laplace{N} <: AbstractDifferentialOperator{N} end
 
 """
     Laplace(; dim)
@@ -194,7 +194,7 @@ end
 ################################# Yukawa #######################################
 ################################################################################
 
-struct Yukawa{N,K<:Real} <: AbstractPDE{N}
+struct Yukawa{N,K<:Real} <: AbstractDifferentialOperator{N}
     λ::K
 end
 
@@ -292,7 +292,7 @@ end
 ################################# Helmholtz ####################################
 ################################################################################
 
-struct Helmholtz{N,K} <: AbstractPDE{N}
+struct Helmholtz{N,K} <: AbstractDifferentialOperator{N}
     k::K
 end
 
@@ -406,7 +406,7 @@ function (HS::HyperSingularKernel{T,S})(target, source)::T where {T,S<:Helmholtz
 end
 
 ############################ STOKES ############################3
-struct Stokes{N,T} <: AbstractPDE{N}
+struct Stokes{N,T} <: AbstractDifferentialOperator{N}
     μ::T
 end
 Stokes(; μ, dim = 3) = Stokes{dim}(μ)
@@ -476,12 +476,12 @@ end
 ################################################################################
 
 """
-    struct Elastostatic{N,T} <: AbstractPDE{N}
+    struct Elastostatic{N,T} <: AbstractDifferentialOperator{N}
 
 Elastostatic equation in `N` dimensions: μΔu + (μ+λ)∇(∇⋅u) = 0. Note that the
 displacement u is a vector of length `N` since this is a vectorial problem.
 """
-struct Elastostatic{N,T} <: AbstractPDE{N}
+struct Elastostatic{N,T} <: AbstractDifferentialOperator{N}
     μ::T
     λ::T
 end

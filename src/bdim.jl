@@ -24,7 +24,7 @@ See [faria2021general](@cite) for more details on the method.
 
 ## Required:
 
-- `pde` must be an [`AbstractPDE`](@ref)
+- `pde` must be an [`AbstractDifferentialOperator`](@ref)
 - `Y` must be a [`Quadrature`](@ref) object of a closed surface
 - `X` is either inside, outside, or on `Y`
 - `S` and `D` are approximations to the single- and double-layer operators for

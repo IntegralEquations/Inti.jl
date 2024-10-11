@@ -5,7 +5,7 @@ Compute a correction to the volume potential `V : Y → X` such that `V + δV` i
 more accurate approximation of the underlying volume potential operator. The
 correction is computed using the (volume) density interpolation method.
 
-This function requires a `pde::AbstractPDE`, a target set `X`, a source
+This function requires a `pde::AbstractDifferentialOperator`, a target set `X`, a source
 quadrature `Y`, a boundary quadrature `Y_boundary`, approximations `S :
 Y_boundary -> X` and `D : Y_boundary -> X` to the single- and double-layer
 potentials (correctly handling nearly-singular integrals), and a naive
@@ -304,7 +304,11 @@ trace of `Pₙ`.
 
 Passing a point `center` will shift the monomials and solutions accordingly.
 """
-function polynomial_solutions_vdim(pde::AbstractPDE, order::Integer, center = nothing)
+function polynomial_solutions_vdim(
+    pde::AbstractDifferentialOperator,
+    order::Integer,
+    center = nothing,
+)
     N = ambient_dimension(pde)
     center = isnothing(center) ? zero(SVector{N,Float64}) : center
     # create empty arrays to store the monomials, solutions, and traces. For the
