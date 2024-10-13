@@ -13,10 +13,10 @@ t = :exterior
 σ = t == :interior ? 1 / 2 : -1 / 2
 # For N = 3 one needs to use compression, e.g. `compression = :fmm`, for the operators below
 N = 2
-pde = Inti.Laplace(; dim = N)
-# pde = Inti.Helmholtz(; dim = N, k = 2π)
-# pde = Inti.Stokes(; dim = N, μ = 1.2)
-@info "Greens identity ($t) $(N)d $pde"
+op = Inti.Laplace(; dim = N)
+# op = Inti.Helmholtz(; dim = N, k = 2π)
+# op = Inti.Stokes(; dim = N, μ = 1.2)
+@info "Greens identity ($t) $(N)d $op"
 Inti.clear_entities!()
 center = Inti.svector(i -> 0.1, N)
 radius = 1
@@ -53,10 +53,10 @@ for h in hh
     else
         center + Inti.svector(i -> 0.5 * radius, N)
     end
-    T = Inti.default_density_eltype(pde)
+    T = Inti.default_density_eltype(op)
     c = rand(T)
-    G = Inti.SingleLayerKernel(pde)
-    dG = Inti.DoubleLayerKernel(pde)
+    G = Inti.SingleLayerKernel(op)
+    dG = Inti.DoubleLayerKernel(op)
     u = (qnode) -> G(xs, qnode) * c
     dudn = (qnode) -> transpose(dG(xs, qnode)) * c
     γ₀u = map(u, Q)
@@ -65,14 +65,14 @@ for h in hh
     γ₁u_norm = norm(norm.(γ₁u, Inf), Inf)
     # single and double layer
     S0, D0 = Inti.single_double_layer(;
-        pde,
+        op,
         target = Q,
         source = Q,
         compression = (method = :none,),
         correction = (method = :none,),
     )
     S1, D1 = Inti.single_double_layer(;
-        pde,
+        op,
         target = Q,
         source = Q,
         compression = (method = :none,),

@@ -6,23 +6,23 @@ using InteractiveUtils
 
 # ╔═╡ 6b6d5e44-304d-4bed-912b-e4b89fce7c5a
 begin
-	import Pkg as _Pkg
+    import Pkg as _Pkg
     haskey(ENV, "PLUTO_PROJECT") && _Pkg.activate(ENV["PLUTO_PROJECT"])
-	using PlutoUI: TableOfContents
-end ;
+    using PlutoUI: TableOfContents
+end;
 
 # ╔═╡ ef067551-aa44-4099-b32a-08debb81ee79
 begin
-	using Inti
-	using LinearAlgebra
-	using StaticArrays
-	using Gmsh
-	using Meshes
-	using GLMakie
-	using SpecialFunctions
-	using GSL
-	using IterativeSolvers
-	using LinearMaps
+    using Inti
+    using LinearAlgebra
+    using StaticArrays
+    using Gmsh
+    using Meshes
+    using GLMakie
+    using SpecialFunctions
+    using GSL
+    using IterativeSolvers
+    using LinearMaps
 end
 
 # ╔═╡ a6c80f87-ff47-496f-8925-1275b58b02e1
@@ -122,11 +122,11 @@ and setup some of the (global) problem parameters:
 
 # ╔═╡ 4cabe108-93c6-4fbf-b8ec-37277abbbda1
 begin
-	k      = 4π
-	λ      = 2π / k
-	qorder = 4 # quadrature order
-	gorder = 2 # order of geometrical approximation
-	nothing #hide
+    k      = 4π
+    λ      = 2π / k
+    qorder = 4 # quadrature order
+    gorder = 2 # order of geometrical approximation
+    nothing #hide
 end
 
 # ╔═╡ a33f066e-307c-42c4-836b-5b7d8236a893
@@ -138,22 +138,22 @@ We will use [Gmsh API](https://gmsh.info/doc/texinfo/gmsh.html#Gmsh-application-
 
 # ╔═╡ cb736b4d-bbd6-456c-9041-f69b2155a470
 begin
-	function gmsh_circle(; name, meshsize, order = 1, radius = 1, center = (0, 0))
-	    try
-	        gmsh.initialize()
-	        gmsh.model.add("circle-mesh")
-	        gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-	        gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
-	        gmsh.model.occ.addDisk(center[1], center[2], 0, radius, radius)
-	        gmsh.model.occ.synchronize()
-	        gmsh.model.mesh.generate(1)
-	        gmsh.model.mesh.setOrder(order)
-	        gmsh.write(name)
-	    finally
-	        gmsh.finalize()
-	    end
-	end
-	nothing #hide
+    function gmsh_circle(; name, meshsize, order = 1, radius = 1, center = (0, 0))
+        try
+            gmsh.initialize()
+            gmsh.model.add("circle-mesh")
+            gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+            gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+            gmsh.model.occ.addDisk(center[1], center[2], 0, radius, radius)
+            gmsh.model.occ.synchronize()
+            gmsh.model.mesh.generate(1)
+            gmsh.model.mesh.setOrder(order)
+            gmsh.write(name)
+        finally
+            gmsh.finalize()
+        end
+    end
+    nothing #hide
 end
 
 # ╔═╡ 2ed4fd2d-b3c2-4211-bf3f-c551923e65cf
@@ -163,9 +163,9 @@ Let us now use `gmsh_circle` to create a `circle.msh` file. As customary in wave
 
 # ╔═╡ 12e20620-042c-4040-bd64-af01bd0f2ad9
 begin
-	name = joinpath(@__DIR__, "circle.msh")
-	meshsize = λ / 5
-	gmsh_circle(; meshsize, order = gorder, name)
+    name = joinpath(@__DIR__, "circle.msh")
+    meshsize = λ / 5
+    gmsh_circle(; meshsize, order = gorder, name)
 end
 
 # ╔═╡ 24454bd5-00cf-4282-926f-f1324141fe26
@@ -176,8 +176,8 @@ We can now import the file and parse the mesh and domain information into `Inti.
 # ╔═╡ ff73663c-7cf4-4b23-83b5-095dc66f711f
 # ╠═╡ show_logs = false
 begin
-	Inti.clear_entities!() # empty the entity cache
-	msh = Inti.import_mesh(name; dim = 2)
+    Inti.clear_entities!() # empty the entity cache
+    msh = Inti.import_mesh(name; dim = 2)
 end
 
 # ╔═╡ 176f1fef-f761-4ad0-8fea-982eab4fe24d
@@ -196,10 +196,10 @@ for:
 
 # ╔═╡ 09a785ae-7286-4a47-b103-1e90efa20167
 begin
-	Γ = Inti.boundary(Ω)
-	Γ_msh = view(msh, Γ)
-	Q = Inti.Quadrature(Γ_msh; qorder)
-	nothing #hide
+    Γ = Inti.boundary(Ω)
+    Γ_msh = view(msh, Γ)
+    Q = Inti.Quadrature(Γ_msh; qorder)
+    nothing #hide
 end
 
 # ╔═╡ 593216db-810e-47db-b6cb-aa6cf53e8590
@@ -231,15 +231,15 @@ With the [`Quadrature`](@ref Inti.Quadrature) constructed, we now can define dis
 
 # ╔═╡ 9b37d163-15ca-44af-9e00-7410956fc16c
 begin
-	pde = Inti.Helmholtz(; k, dim = 2)
-	S, D = Inti.single_double_layer(;
-		pde,
-		target = Q,
-		source = Q,
-		compression = (method = :none,),
-		correction = (method = :dim,),
-	)
-	nothing #hide
+    op = Inti.Helmholtz(; k, dim = 2)
+    S, D = Inti.single_double_layer(;
+        op,
+        target = Q,
+        source = Q,
+        compression = (method = :none,),
+        correction = (method = :dim,),
+    )
+    nothing #hide
 end
 
 # ╔═╡ 061b7503-bad0-411e-b126-eea4b89feb03
@@ -255,8 +255,8 @@ We can now combine `S` and `D` to form the combined-field operator:
 
 # ╔═╡ ebaf6ed5-8e01-4c5f-9d7f-8cdc32a68022
 begin
-	L = I / 2 + D - im * k * S
-	nothing #hide
+    L = I / 2 + D - im * k * S
+    nothing #hide
 end
 
 # ╔═╡ 8ba9aadc-5b34-41cb-adba-1ebdc65a741d
@@ -266,12 +266,12 @@ where `I` is the identity matrix. Assuming an incident field along the $x_1$ dir
 
 # ╔═╡ eaf2025e-1135-4ee6-9dea-25e2c0c09ec8
 begin
-	uᵢ = x -> exp(im * k * x[1]) # plane-wave incident field
-	rhs = map(Q) do q
-		x = q.coords
-		return -uᵢ(x)
-	end
-	nothing #hide
+    uᵢ = x -> exp(im * k * x[1]) # plane-wave incident field
+    rhs = map(Q) do q
+        x = q.coords
+        return -uᵢ(x)
+    end
+    nothing #hide
 end
 
 # ╔═╡ 7fcd47c1-9d65-41e2-9363-141d53f0dbca
@@ -287,8 +287,8 @@ We can now solve the integral equation using e.g. the backslash operator:
 
 # ╔═╡ 2925e1a3-1051-4b09-bbd9-461c6a76a1e3
 begin
-	σ = L \ rhs
-	nothing #hide
+    σ = L \ rhs
+    nothing #hide
 end
 
 # ╔═╡ b26e0c64-b3f1-4b18-a6f5-8f789407a744
@@ -298,9 +298,9 @@ The variable `σ` contains the value of the approximate density at the quadratur
 
 # ╔═╡ fd0f2cf4-1b18-4c56-84a9-2339b3dfc10a
 begin
-	𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
-	uₛ   = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
-	nothing #hide
+    𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
+    uₛ   = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
+    nothing #hide
 end
 
 # ╔═╡ 12b3c26a-96b3-440b-9771-4a945fe14ce7
@@ -312,25 +312,25 @@ To assess the accuracy of the solution, we can compare it to the exact solution 
 
 # ╔═╡ 185cfa1e-7c87-4243-8f5e-c5983932e135
 begin
-	function circle_helmholtz_soundsoft(pt; radius = 1, k, θin)
-	    x = pt[1]
-	    y = pt[2]
-	    r = sqrt(x^2 + y^2)
-	    θ = atan(y, x)
-	    u = 0.0
-	    r < radius && return u
-	    c(n) = -exp(im * n * (π / 2 - θin)) * besselj(n, k * radius) / besselh(n, k * radius)
-	    u    = c(0) * besselh(0, k * r)
-	    n    = 1
-	    while (abs(c(n)) > 1e-12)
-	        u +=
-	            c(n) * besselh(n, k * r) * exp(im * n * θ) +
-	            c(-n) * besselh(-n, k * r) * exp(-im * n * θ)
-	        n += 1
-	    end
-	    return u
-	end
-	nothing #hide
+    function circle_helmholtz_soundsoft(pt; radius = 1, k, θin)
+        x = pt[1]
+        y = pt[2]
+        r = sqrt(x^2 + y^2)
+        θ = atan(y, x)
+        u = 0.0
+        r < radius && return u
+        c(n) = -exp(im * n * (π / 2 - θin)) * besselj(n, k * radius) / besselh(n, k * radius)
+        u    = c(0) * besselh(0, k * r)
+        n    = 1
+        while (abs(c(n)) > 1e-12)
+            u +=
+                c(n) * besselh(n, k * r) * exp(im * n * θ) +
+                c(-n) * besselh(-n, k * r) * exp(-im * n * θ)
+            n += 1
+        end
+        return u
+    end
+    nothing #hide
 end
 
 # ╔═╡ 4c37081c-4f68-48fe-be5b-bebf35f0c35e
@@ -340,13 +340,13 @@ Here is the maximum error on some points located on a circle of radius `2`:
 
 # ╔═╡ 1daa0518-a98b-448c-bddd-1147a0f7ed4d
 begin
-	uₑ = x -> circle_helmholtz_soundsoft(x; k, radius = 1, θin = 0) # exact solution
-	er = maximum(0:0.01:2π) do θ
-		R = 2
-		x = (R * cos(θ), R * sin(θ))
-		return abs(uₛ(x) - uₑ(x))
-	end
-	@info "maximum error = $er"
+    uₑ = x -> circle_helmholtz_soundsoft(x; k, radius = 1, θin = 0) # exact solution
+    er = maximum(0:0.01:2π) do θ
+        R = 2
+        x = (R * cos(θ), R * sin(θ))
+        return abs(uₛ(x) - uₑ(x))
+    end
+    @info "maximum error = $er"
 end
 
 # ╔═╡ 3557cd23-43b2-4c79-a0e9-53c0d9650851
@@ -359,20 +359,22 @@ As we can see, the error is quite small! Let's use `Makie` to visualize the solu
 
 # ╔═╡ 56350a37-b2d8-463e-934f-e8a4fbf72c67
 begin
-	xx = yy = range(-4; stop = 4, length = 200)
-	vals =
-		map(pt -> Inti.isinside(pt, Q) ? NaN : real(uₛ(pt) + uᵢ(pt)), Iterators.product(xx, yy))
-	fig, ax, hm = heatmap(
-		xx,
-		yy,
-		vals;
-		colormap = :inferno,
-		interpolate = true,
-		axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
-	)
-	viz!(Γ_msh; color = :white, segmentsize = 5)
-	Colorbar(fig[1, 2], hm)
-	fig
+    xx = yy = range(-4; stop = 4, length = 200)
+    vals = map(
+        pt -> Inti.isinside(pt, Q) ? NaN : real(uₛ(pt) + uᵢ(pt)),
+        Iterators.product(xx, yy),
+    )
+    fig, ax, hm = heatmap(
+        xx,
+        yy,
+        vals;
+        colormap = :inferno,
+        interpolate = true,
+        axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
+    )
+    viz!(Γ_msh; color = :white, segmentsize = 5)
+    Colorbar(fig[1, 2], hm)
+    fig
 end
 
 # ╔═╡ 471a5475-1ef5-4f40-bb45-a3e29ae5c0a8
@@ -384,43 +386,47 @@ Before moving on to the 3D example let us simply mention that, besides the fact 
 
 # ╔═╡ 3f3f4794-f2bf-4171-a1b4-70fd38c01fc3
 let
-	# vertices of an equilateral triangle centered at the origin with a vertex at (0,1)
-	a, b, c = SVector(0, 1), SVector(sqrt(3) / 2, -1 / 2), SVector(-sqrt(3) / 2, -1 / 2)
-	circle_f(center, radius) = s -> center + radius * SVector(cospi(2 * s[1]), sinpi(2 * s[1]))
-	disk1 = Inti.parametric_curve(circle_f(a, 1 / 2), 0, 1)
-	disk2 = Inti.parametric_curve(circle_f(b, 1 / 2), 0, 1)
-	disk3 = Inti.parametric_curve(circle_f(c, 1 / 2), 0, 1)
-	Γ = disk1 ∪ disk2 ∪ disk3
-	msh = Inti.meshgen(Γ; meshsize)
-	Γ_msh = view(msh, Γ)
-	Q = Inti.Quadrature(Γ_msh; qorder)
-	S, D = Inti.single_double_layer(;
-	    pde,
-	    target = Q,
-	    source = Q,
-	    compression = (method = :none,),
-	    correction = (method = :dim,),
-	)
-	L = I / 2 + D - im * k * S
-	rhs = map(q -> -uᵢ(q.coords), Q)
-	σ = L \ rhs
-	𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
-	uₛ = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
-	vals =
-	    map(pt -> Inti.isinside(pt, Q) ? NaN : real(uₛ(pt) + uᵢ(pt)), Iterators.product(xx, yy))
-	colorrange = (-2, 2)
-	fig, ax, hm = heatmap(
-	    xx,
-	    yy,
-	    vals;
-	    colormap = :inferno,
-	    colorrange,
-	    interpolate = true,
-	    axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
-	)
-	viz!(Γ_msh; color = :black, segmentsize = 4)
-	Colorbar(fig[1, 2], hm)
-	fig
+    # vertices of an equilateral triangle centered at the origin with a vertex at (0,1)
+    a, b, c = SVector(0, 1), SVector(sqrt(3) / 2, -1 / 2), SVector(-sqrt(3) / 2, -1 / 2)
+    function circle_f(center, radius)
+        return s -> center + radius * SVector(cospi(2 * s[1]), sinpi(2 * s[1]))
+    end
+    disk1 = Inti.parametric_curve(circle_f(a, 1 / 2), 0, 1)
+    disk2 = Inti.parametric_curve(circle_f(b, 1 / 2), 0, 1)
+    disk3 = Inti.parametric_curve(circle_f(c, 1 / 2), 0, 1)
+    Γ = disk1 ∪ disk2 ∪ disk3
+    msh = Inti.meshgen(Γ; meshsize)
+    Γ_msh = view(msh, Γ)
+    Q = Inti.Quadrature(Γ_msh; qorder)
+    S, D = Inti.single_double_layer(;
+        op,
+        target = Q,
+        source = Q,
+        compression = (method = :none,),
+        correction = (method = :dim,),
+    )
+    L = I / 2 + D - im * k * S
+    rhs = map(q -> -uᵢ(q.coords), Q)
+    σ = L \ rhs
+    𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
+    uₛ = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
+    vals = map(
+        pt -> Inti.isinside(pt, Q) ? NaN : real(uₛ(pt) + uᵢ(pt)),
+        Iterators.product(xx, yy),
+    )
+    colorrange = (-2, 2)
+    fig, ax, hm = heatmap(
+        xx,
+        yy,
+        vals;
+        colormap = :inferno,
+        colorrange,
+        interpolate = true,
+        axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
+    )
+    viz!(Γ_msh; color = :black, segmentsize = 4)
+    Colorbar(fig[1, 2], hm)
+    fig
 end
 
 # ╔═╡ b8fd284a-3865-4762-9602-6bc1eba464a4
@@ -440,28 +446,28 @@ The visualization is also more involved, and we will use the `Gmsh` API to creat
 
 # ╔═╡ b02fbb5b-ce97-48e7-ab2b-a8db6ca7c8d3
 begin
-	function gmsh_sphere(; meshsize, order = gorder, radius = 1, visualize = false, name)
-	    gmsh.initialize()
-	    gmsh.model.add("sphere-scattering")
-	    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-	    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
-	    sphere_tag = gmsh.model.occ.addSphere(0, 0, 0, radius)
-	    xl, yl, zl = -2 * radius, -2 * radius, 0
-	    Δx, Δy = 4 * radius, 4 * radius
-	    rectangle_tag = gmsh.model.occ.addRectangle(xl, yl, zl, Δx, Δy)
-	    outDimTags, _ =
-	        gmsh.model.occ.cut([(2, rectangle_tag)], [(3, sphere_tag)], -1, true, false)
-	    gmsh.model.occ.synchronize()
-	    gmsh.model.addPhysicalGroup(3, [sphere_tag], -1, "omega")
-	    gmsh.model.addPhysicalGroup(2, [dt[2] for dt in outDimTags], -1, "sigma")
-	    gmsh.model.mesh.generate(2)
-	    gmsh.model.mesh.setOrder(order)
-	    visualize && gmsh.fltk.run()
-	    gmsh.option.setNumber("Mesh.SaveAll", 1) # otherwise only the physical groups are saved
-	    gmsh.write(name)
-	    return gmsh.finalize()
-	end
-	nothing #hide
+    function gmsh_sphere(; meshsize, order = gorder, radius = 1, visualize = false, name)
+        gmsh.initialize()
+        gmsh.model.add("sphere-scattering")
+        gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+        gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+        sphere_tag = gmsh.model.occ.addSphere(0, 0, 0, radius)
+        xl, yl, zl = -2 * radius, -2 * radius, 0
+        Δx, Δy = 4 * radius, 4 * radius
+        rectangle_tag = gmsh.model.occ.addRectangle(xl, yl, zl, Δx, Δy)
+        outDimTags, _ =
+            gmsh.model.occ.cut([(2, rectangle_tag)], [(3, sphere_tag)], -1, true, false)
+        gmsh.model.occ.synchronize()
+        gmsh.model.addPhysicalGroup(3, [sphere_tag], -1, "omega")
+        gmsh.model.addPhysicalGroup(2, [dt[2] for dt in outDimTags], -1, "sigma")
+        gmsh.model.mesh.generate(2)
+        gmsh.model.mesh.setOrder(order)
+        visualize && gmsh.fltk.run()
+        gmsh.option.setNumber("Mesh.SaveAll", 1) # otherwise only the physical groups are saved
+        gmsh.write(name)
+        return gmsh.finalize()
+    end
+    nothing #hide
 end
 
 # ╔═╡ 49f0edcd-9cb8-4722-ae56-b17ee48f8336
@@ -472,9 +478,9 @@ As before, lets write a file with our mesh, and import it into `Inti.jl`:
 # ╔═╡ a18b8726-fa97-4388-bb8b-53965a5d433b
 # ╠═╡ show_logs = false
 begin
-	name_sphere = joinpath(@__DIR__, "sphere.msh")
-	gmsh_sphere(; meshsize=(λ / 5), order = gorder, name=name_sphere, visualize = false)
-	msh_3d = Inti.import_mesh(name_sphere; dim = 3)
+    name_sphere = joinpath(@__DIR__, "sphere.msh")
+    gmsh_sphere(; meshsize = (λ / 5), order = gorder, name = name_sphere, visualize = false)
+    msh_3d = Inti.import_mesh(name_sphere; dim = 3)
 end
 
 # ╔═╡ 063e3185-8714-4955-b985-5413420a889b
@@ -490,10 +496,10 @@ Since we created physical groups in `Gmsh`, we can use them to extract the relev
 
 # ╔═╡ 631328d5-c961-41e1-ac0e-181c3bb75112
 begin
-	Ω_3d = Inti.Domain(e -> "omega" ∈ Inti.labels(e), Inti.entities(msh_3d))
-	Σ_3d = Inti.Domain(e -> "sigma" ∈ Inti.labels(e), Inti.entities(msh_3d))
-	Γ_3d = Inti.boundary(Ω_3d)
-	nothing #hide
+    Ω_3d = Inti.Domain(e -> "omega" ∈ Inti.labels(e), Inti.entities(msh_3d))
+    Σ_3d = Inti.Domain(e -> "sigma" ∈ Inti.labels(e), Inti.entities(msh_3d))
+    Γ_3d = Inti.boundary(Ω_3d)
+    nothing #hide
 end
 
 # ╔═╡ dbd6d298-0fbf-420f-9622-d1db1d550cc5
@@ -503,23 +509,23 @@ We can now create a quadrature as before
 
 # ╔═╡ 6096328b-e1af-4ec5-b72b-cd381c166cb7
 begin
-	Γ_msh_3d = view(msh_3d, Γ_3d)
-	Q_3d = Inti.Quadrature(Γ_msh_3d; qorder)
-	nothing #hide
+    Γ_msh_3d = view(msh_3d, Γ_3d)
+    Q_3d = Inti.Quadrature(Γ_msh_3d; qorder)
+    nothing #hide
 end
 
 # ╔═╡ 498fa575-5cf7-4a7e-8d3b-c50d605aa57c
 begin
-	using HMatrices
-	pde_3d = Inti.Helmholtz(; k, dim = 3)
-	S_3d, D_3d = Inti.single_double_layer(;
-			  pde = pde_3d,
-			  target = Q_3d,
-			  source = Q_3d,
-			  compression = (method = :hmatrix, tol = 1e-4),
-		      correction = (method = :dim,),
-	)
-	nothing #hide
+    using HMatrices
+    op_3d = Inti.Helmholtz(; k, dim = 3)
+    S_3d, D_3d = Inti.single_double_layer(;
+        op = op_3d,
+        target = Q_3d,
+        source = Q_3d,
+        compression = (method = :hmatrix, tol = 1e-4),
+        correction = (method = :dim,),
+    )
+    nothing #hide
 end
 
 # ╔═╡ b6cad085-eb74-4152-8850-226ed837febd
@@ -540,8 +546,8 @@ Here is how much memory it would take to store the dense representation of these
 
 # ╔═╡ 54f07c21-339b-44c3-9ac2-22af163d55ae
 begin
-	mem = 2 * length(S_3d) * 16 / 1e9 # 16 bytes per complex number, 1e9 bytes per GB, two matrices
-	println("memory required to store S and D: $(mem) GB")
+    mem = 2 * length(S_3d) * 16 / 1e9 # 16 bytes per complex number, 1e9 bytes per GB, two matrices
+    println("memory required to store S and D: $(mem) GB")
 end
 
 # ╔═╡ 915d3636-70bd-4001-857f-3aae11eb2d2e
@@ -562,8 +568,8 @@ We will use the generalized minimal residual (GMRES) iterative solver, for the l
 
 # ╔═╡ a2ddce1e-440e-49e2-8c3e-ec6960ff83f0
 begin
-	L_3d = I / 2 + LinearMap(D_3d) - im * k * LinearMap(S_3d)
-	nothing #hide
+    L_3d = I / 2 + LinearMap(D_3d) - im * k * LinearMap(S_3d)
+    nothing #hide
 end
 
 # ╔═╡ f148c58a-50d3-4ac2-a1da-148563d533e7
@@ -574,13 +580,20 @@ We can now solve the linear system using GMRES solver:
 # ╔═╡ dcf006a3-5332-442a-9771-f427cd7189a5
 # ╠═╡ show_logs = false
 begin
-	rhs_3d = map(Q_3d) do q
-	    x = q.coords
-	    return -uᵢ(x)
-	end
-	σ_3d, hist =
-	    gmres(L_3d, rhs_3d; log = true, abstol = 1e-6, verbose = false, restart = 100, maxiter = 100)
-	@show hist
+    rhs_3d = map(Q_3d) do q
+        x = q.coords
+        return -uᵢ(x)
+    end
+    σ_3d, hist = gmres(
+        L_3d,
+        rhs_3d;
+        log = true,
+        abstol = 1e-6,
+        verbose = false,
+        restart = 100,
+        maxiter = 100,
+    )
+    @show hist
 end
 
 # ╔═╡ 215677a6-af7b-4e5d-863f-aabdfb4a1400
@@ -590,9 +603,9 @@ As before, let us represent the solution using `IntegralPotential`s:
 
 # ╔═╡ 14a549ad-e23f-40a4-b7fa-ef31354805a9
 begin
-	𝒮_3d, 𝒟_3d = Inti.single_double_layer_potential(; pde=pde_3d, source = Q_3d)
-	uₛ_3d = x -> 𝒟_3d[σ_3d](x) - im * k * 𝒮_3d[σ_3d](x)
-	nothing #hide
+    𝒮_3d, 𝒟_3d = Inti.single_double_layer_potential(; op = op_3d, source = Q_3d)
+    uₛ_3d = x -> 𝒟_3d[σ_3d](x) - im * k * 𝒮_3d[σ_3d](x)
+    nothing #hide
 end
 
 # ╔═╡ 832858dc-2475-4f6a-a820-a557b2883f0c
@@ -602,31 +615,32 @@ To check the result, we compare against the exact solution obtained through a se
 
 # ╔═╡ e00c4d90-aa3b-41f9-b65e-7e9ace89a295
 begin
-	sphbesselj(l, r) = sqrt(π / (2r)) * besselj(l + 1 / 2, r)
-	sphbesselh(l, r) = sqrt(π / (2r)) * besselh(l + 1 / 2, r)
-	sphharmonic(l, m, θ, ϕ) = GSL.sf_legendre_sphPlm(l, abs(m), cos(θ)) * exp(im * m * ϕ)
-	function sphere_helmholtz_soundsoft(xobs; radius = 1, k = 1, θin = 0, ϕin = 0)
-	    x = xobs[1]
-	    y = xobs[2]
-	    z = xobs[3]
-	    r = sqrt(x^2 + y^2 + z^2)
-	    θ = acos(z / r)
-	    ϕ = atan(y, x)
-	    u = 0.0
-	    r < radius && return u
-	    function c(l, m)
-	        return -4π * im^l * sphharmonic(l, -m, θin, ϕin) * sphbesselj(l, k * radius) / sphbesselh(l, k * radius)
-	    end
-	    l = 0
-	    for l in 0:60
-	        for m in -l:l
-	            u += c(l, m) * sphbesselh(l, k * r) * sphharmonic(l, m, θ, ϕ)
-	        end
-	        l += 1
-	    end
-	    return u
-	end
-	nothing #hide
+    sphbesselj(l, r) = sqrt(π / (2r)) * besselj(l + 1 / 2, r)
+    sphbesselh(l, r) = sqrt(π / (2r)) * besselh(l + 1 / 2, r)
+    sphharmonic(l, m, θ, ϕ) = GSL.sf_legendre_sphPlm(l, abs(m), cos(θ)) * exp(im * m * ϕ)
+    function sphere_helmholtz_soundsoft(xobs; radius = 1, k = 1, θin = 0, ϕin = 0)
+        x = xobs[1]
+        y = xobs[2]
+        z = xobs[3]
+        r = sqrt(x^2 + y^2 + z^2)
+        θ = acos(z / r)
+        ϕ = atan(y, x)
+        u = 0.0
+        r < radius && return u
+        function c(l, m)
+            return -4π * im^l * sphharmonic(l, -m, θin, ϕin) * sphbesselj(l, k * radius) /
+                   sphbesselh(l, k * radius)
+        end
+        l = 0
+        for l in 0:60
+            for m in -l:l
+                u += c(l, m) * sphbesselh(l, k * r) * sphharmonic(l, m, θ, ϕ)
+            end
+            l += 1
+        end
+        return u
+    end
+    nothing #hide
 end
 
 # ╔═╡ bb87f66d-5e68-49c5-9167-bdbab60109e5
@@ -636,13 +650,13 @@ We will compute the error on some point on the sphere of radius `2`:
 
 # ╔═╡ 3848717e-0c30-4c0b-82ec-b504c9210483
 begin
-	uₑ_3d = (x) -> sphere_helmholtz_soundsoft(x; radius = 1, k = k, θin = π / 2, ϕin = 0)
-	er_3d = maximum(1:100) do _
-		x̂ = rand(Inti.Point3D) |> normalize # an SVector of unit norm
-		x = 2 * x̂
-		return abs(uₛ_3d(x) - uₑ_3d(x))
-	end
-	@info "error with correction = $er_3d"
+    uₑ_3d = (x) -> sphere_helmholtz_soundsoft(x; radius = 1, k = k, θin = π / 2, ϕin = 0)
+    er_3d = maximum(1:100) do _
+        x̂ = rand(Inti.Point3D) |> normalize # an SVector of unit norm
+        x = 2 * x̂
+        return abs(uₛ_3d(x) - uₑ_3d(x))
+    end
+    @info "error with correction = $er_3d"
 end
 
 # ╔═╡ 36ddb3be-7103-429f-9011-99c27c655de5
@@ -655,22 +669,22 @@ We see that, once again, the approximation is quite accurate. Let us now visuali
 
 # ╔═╡ b2b31b38-4c2f-4763-9273-971749c40d5c
 begin
-	Σ_msh = view(msh_3d, Σ_3d)
-	target = Inti.nodes(Σ_msh)
-	
-	S_viz, D_viz = Inti.single_double_layer(;
-				pde = pde_3d,
-				target,
-				source = Q_3d,
-				compression = (method = :hmatrix, tol = 1e-4),
-				# correction for the nearfield (for visual purposes, set to `:none` to disable)
-				correction = (method = :dim, maxdist = meshsize, target_location = :outside),
-	)
-	
-	ui_eval_msh = uᵢ.(target)
-	us_eval_msh = D_viz * σ_3d - im * k * S_viz * σ_3d
-	u_eval_msh = ui_eval_msh + us_eval_msh
-	nothing #hide
+    Σ_msh = view(msh_3d, Σ_3d)
+    target = Inti.nodes(Σ_msh)
+
+    S_viz, D_viz = Inti.single_double_layer(;
+        op = op_3d,
+        target,
+        source = Q_3d,
+        compression = (method = :hmatrix, tol = 1e-4),
+        # correction for the nearfield (for visual purposes, set to `:none` to disable)
+        correction = (method = :dim, maxdist = meshsize, target_location = :outside),
+    )
+
+    ui_eval_msh = uᵢ.(target)
+    us_eval_msh = D_viz * σ_3d - im * k * S_viz * σ_3d
+    u_eval_msh = ui_eval_msh + us_eval_msh
+    nothing #hide
 end
 
 # ╔═╡ 0cec09b1-8806-4aee-970d-cc0b1e4b841c
@@ -680,15 +694,15 @@ Finalize, we use [`Meshes.viz`](@extref) to visualize the scattered field:
 
 # ╔═╡ dab9a19c-977e-4ab1-a3d9-f9970af69642
 begin
-	nv = length(Inti.nodes(Γ_msh_3d))
-	colorrange = extrema(real(u_eval_msh))
-	colormap = :inferno
-	fig_3d = Figure(; size = (800, 500))
-	ax_3d = Axis3(fig_3d[1, 1]; aspect = :data)
-	viz!(Γ_msh_3d; colorrange, colormap, color = zeros(nv), interpolate = true)
-	viz!(Σ_msh; colorrange, colormap, color = real(u_eval_msh))
-	cb = Colorbar(fig_3d[1, 2]; label = "real(u)", colormap, colorrange)
-	fig_3d #hide
+    nv = length(Inti.nodes(Γ_msh_3d))
+    colorrange = extrema(real(u_eval_msh))
+    colormap = :inferno
+    fig_3d = Figure(; size = (800, 500))
+    ax_3d = Axis3(fig_3d[1, 1]; aspect = :data)
+    viz!(Γ_msh_3d; colorrange, colormap, color = zeros(nv), interpolate = true)
+    viz!(Σ_msh; colorrange, colormap, color = real(u_eval_msh))
+    cb = Colorbar(fig_3d[1, 2]; label = "real(u)", colormap, colorrange)
+    fig_3d #hide
 end
 
 # ╔═╡ 765e46fc-dac3-439a-ab07-2865298aed45

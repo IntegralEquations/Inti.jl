@@ -60,12 +60,12 @@ u_b = map(q -> u(q.coords), Γₕ_quad)
 du_b = map(q -> du(q.coords, q.normal), Γₕ_quad)
 f_d = map(q -> f(q.coords), Ωₕ_quad)
 
-pde = k == 0 ? Inti.Laplace(; dim = 3) : Inti.Helmholtz(; dim = 3, k)
+op = k == 0 ? Inti.Laplace(; dim = 3) : Inti.Helmholtz(; dim = 3, k)
 
 ## Boundary operators
 tbnd = @elapsed begin
     S_b2d, D_b2d = Inti.single_double_layer(;
-        pde,
+        op,
         target = Ωₕ_quad,
         source = Γₕ_quad,
         compression = (method = :fmm, tol = 1e-8),
@@ -77,7 +77,7 @@ end
 ## Volume potentials
 tvol = @elapsed begin
     V_d2d = Inti.volume_potential(;
-        pde,
+        op,
         target = Ωₕ_quad,
         source = Ωₕ_quad,
         compression = (method = :fmm, tol = 1e-8),

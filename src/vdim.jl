@@ -1,11 +1,11 @@
 """
-    vdim_correction(pde,X,Y,Y_boundary,S,D,V; green_multiplier, kwargs...)
+    vdim_correction(op,X,Y,Y_boundary,S,D,V; green_multiplier, kwargs...)
 
 Compute a correction to the volume potential `V : Y → X` such that `V + δV` is a
 more accurate approximation of the underlying volume potential operator. The
 correction is computed using the (volume) density interpolation method.
 
-This function requires a `pde::AbstractDifferentialOperator`, a target set `X`, a source
+This function requires a `op::AbstractDifferentialOperator`, a target set `X`, a source
 quadrature `Y`, a boundary quadrature `Y_boundary`, approximations `S :
 Y_boundary -> X` and `D : Y_boundary -> X` to the single- and double-layer
 potentials (correctly handling nearly-singular integrals), and a naive
@@ -28,7 +28,7 @@ See [anderson2024fast](@cite) for more details on the method.
   and rescaled to each element.
 """
 function vdim_correction(
-    pde,
+    op,
     target,
     source::Quadrature,
     boundary::Quadrature,
@@ -47,7 +47,7 @@ function vdim_correction(
     @assert eltype(Dop) == eltype(Sop) == T "eltype of Sop, Dop, and Vop must match"
     # figure out if we are dealing with a scalar or vector PDE
     m, n = length(target), length(source)
-    N = ambient_dimension(pde)
+    N = ambient_dimension(op)
     @assert ambient_dimension(source) == N "vdim only works for volume potentials"
     m, n = length(target), length(source)
     # a reasonable interpolation_order if not provided
@@ -55,7 +55,7 @@ function vdim_correction(
         (interpolation_order = maximum(order, values(source.etype2qrule)))
     # by default basis centered at origin
     center = isnothing(center) ? zero(SVector{N,Float64}) : center
-    p, P, γ₁P, multiindices = polynomial_solutions_vdim(pde, interpolation_order, center)
+    p, P, γ₁P, multiindices = polynomial_solutions_vdim(op, interpolation_order, center)
     dict_near = etype_to_nearest_points(target, source; maxdist)
     R = _vdim_auxiliary_quantities(
         p,
@@ -295,28 +295,28 @@ function vdim_mesh_center(msh::AbstractMesh)
 end
 
 """
-    polynomial_solutions_vdim(pde, order[, center])
+    polynomial_solutions_vdim(op, order[, center])
 
 For every monomial term `pₙ` of degree `order`, compute a polynomial `Pₙ` such
-that `ℒ[Pₙ] = pₙ`, where `ℒ` is the differential operator associated with `pde`.
+that `ℒ[Pₙ] = pₙ`, where `ℒ` is the differential operator associated with `op`.
 This function returns `{pₙ,Pₙ,γ₁Pₙ}`, where `γ₁Pₙ` is the generalized Neumann
 trace of `Pₙ`.
 
 Passing a point `center` will shift the monomials and solutions accordingly.
 """
 function polynomial_solutions_vdim(
-    pde::AbstractDifferentialOperator,
+    op::AbstractDifferentialOperator,
     order::Integer,
     center = nothing,
 )
-    N = ambient_dimension(pde)
+    N = ambient_dimension(op)
     center = isnothing(center) ? zero(SVector{N,Float64}) : center
     # create empty arrays to store the monomials, solutions, and traces. For the
     # neumann trace, we try to infer the concrete return type instead of simply
     # having a vector of `Function`.
     monomials = Vector{ElementaryPDESolutions.Polynomial{N,Float64}}()
     dirchlet_traces = Vector{ElementaryPDESolutions.Polynomial{N,Float64}}()
-    T = return_type(neumann_trace, typeof(pde), eltype(dirchlet_traces))
+    T = return_type(neumann_trace, typeof(op), eltype(dirchlet_traces))
     neumann_traces = Vector{T}()
     multiindices = Vector{MultiIndex{N}}()
     # iterate over N-tuples going from 0 to order
@@ -325,8 +325,8 @@ function polynomial_solutions_vdim(
         # define the monomial basis functions, and the corresponding solutions.
         # TODO: adapt this to vectorial case
         p   = ElementaryPDESolutions.Polynomial(I => 1 / factorial(MultiIndex(I)))
-        P   = polynomial_solution(pde, p)
-        γ₁P = neumann_trace(pde, P)
+        P   = polynomial_solution(op, p)
+        γ₁P = neumann_trace(op, P)
         push!(multiindices, MultiIndex(I))
         push!(monomials, p)
         push!(dirchlet_traces, P)
@@ -351,8 +351,8 @@ function polynomial_solution(::Laplace, p::ElementaryPDESolutions.Polynomial)
     return ElementaryPDESolutions.convert_coefs(P, Float64)
 end
 
-function polynomial_solution(pde::Helmholtz, p::ElementaryPDESolutions.Polynomial)
-    k = pde.k
+function polynomial_solution(op::Helmholtz, p::ElementaryPDESolutions.Polynomial)
+    k = op.k
     P = ElementaryPDESolutions.solve_helmholtz(p; k)
     return ElementaryPDESolutions.convert_coefs(P, Float64)
 end

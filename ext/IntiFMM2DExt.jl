@@ -149,7 +149,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         # Helmholtz
     elseif K isa Inti.SingleLayerKernel{ComplexF64,<:Inti.Helmholtz{2}}
         charges = Vector{ComplexF64}(undef, n)
-        zk = ComplexF64(K.pde.k)
+        zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights and constant
             @. charges = weights * x
@@ -181,7 +181,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         end
         dipvecs = similar(normals, Float64)
         dipstrs = Vector{ComplexF64}(undef, n)
-        zk = ComplexF64(K.pde.k)
+        zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights and constant
             for j in 1:n
@@ -219,7 +219,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             xnormals[:, j] = Inti.normal(iop.target[j])
         end
         charges = Vector{ComplexF64}(undef, n)
-        zk = ComplexF64(K.pde.k)
+        zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights
             @. charges = x * weights
@@ -255,7 +255,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         end
         dipvecs = similar(ynormals, Float64)
         dipstrs = Vector{ComplexF64}(undef, n)
-        zk = ComplexF64(K.pde.k)
+        zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights and constant
             for j in 1:n
