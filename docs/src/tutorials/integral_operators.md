@@ -66,7 +66,7 @@ approximations of the following (linear) operators:
 \begin{aligned}
     S[\sigma](\boldsymbol{x}) &:= \int_{\Gamma} G(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}}, \quad 
     &&D[\sigma](\boldsymbol{x}) := \mathrm{p.v.} \int_{\Gamma} \frac{\partial G}{\partial \nu_{\boldsymbol{y}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}} \\
-    D'[\sigma](\boldsymbol{x}) &:=  \mathrm{p.v.} \int_{\Gamma} \frac{\partial G}{\partial \nu_{\boldsymbol{x}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}}, \quad
+    K[\sigma](\boldsymbol{x}) &:=  \mathrm{p.v.} \int_{\Gamma} \frac{\partial G}{\partial \nu_{\boldsymbol{x}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}}, \quad
     &&N[\sigma](\boldsymbol{x}) := \mathrm{f.p.} \int_{\Gamma} \frac{\partial^2 G}{\partial \nu_{\boldsymbol{x}} \partial \nu_{\boldsymbol{y}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}}
 \end{aligned}
 ```
@@ -133,7 +133,7 @@ Calderón projectors:
 \begin{aligned}
 H = \begin{bmatrix}
     -D & S \\
-    -N & D'
+    -N & K
 \end{bmatrix} 
 \end{aligned}
 ```
