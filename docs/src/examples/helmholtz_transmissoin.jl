@@ -27,7 +27,7 @@ end
 
 # ╔═╡ a6c80f87-ff47-496f-8925-1275b58b02e1
 md"""
-# Helmholtz scattering
+# Scattering by a penentrable obstacle
 
 [![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)](../../pluto_examples/helmholtz_scattering.jl)$\hspace{5pt}$[![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](../../pluto_examples/helmholtz_scattering.html)
 """
@@ -44,14 +44,13 @@ md"""
 
 # ╔═╡ 5e0ac317-934c-46bc-b738-a3493fed3c08
 md"""
-In this tutorial we will show how to solve an acoustic scattering problem in the context of Helmholtz equation. We will focus on a *smooth* sound-soft obstacle for simplicity, and introduce along the way the necessary techniques used to handle some difficulties encountered. We will use various packages throughout this example (including of course `Inti.jl`); if they are not on your environment, you can install them using `] add <package>` in the REPL.
+In this tutorial we will show how to solve an acoustic transmission problem in the context of Helmholtz equation. We consider two different second-kind formulations in teh case of  a *smooth* obstacle for simplicity. We will use various packages throughout this example (including of course `Inti.jl`); if they are not on your environment, you can install them using `] add <package>` in the REPL.
 
-In the [following section](#Sound-soft-problem), we will provide a brief mathematical description of the problem (valid in both $2$ and $3$ dimensions). We will tackle the [two-dimensional problem](#Two-dimensional-scattering) first, for which we do not need to worry much about performance issues (e.g. compressing the integral operators). Finally, we present a [three-dimensional example](#Three-dimensional-scattering), where we will use [`HMatrices.jl`](https://github.com/IntegralEquations/HMatrices.jl) to compress the underlying integral operators.
 """
 
 # ╔═╡ 643919c5-762f-4fa6-ac26-6bf0abd94558
 md"""
-## Helholtz transmission problem
+## Helmholtz transmission problem
 
 This example concerns the sound-soft acoustic scattering problem. Mathematically, this means solving an exterior problem governed by Helmholtz equation (time-harmonic acoustics) with a Dirichlet boundary condition. More precisely, letting ``\Omega \subset \mathbb{R}^d`` be a bounded domain, and denoting by ``\Gamma = \partial \Omega`` its boundary, we wish to solve
 
@@ -2767,9 +2766,9 @@ version = "1.4.1+1"
 
 # ╔═╡ Cell order:
 # ╟─6b6d5e44-304d-4bed-912b-e4b89fce7c5a
-# ╟─a6c80f87-ff47-496f-8925-1275b58b02e1
+# ╠═a6c80f87-ff47-496f-8925-1275b58b02e1
 # ╟─1715d794-a33d-4faf-953c-b706a9ceea23
-# ╟─5e0ac317-934c-46bc-b738-a3493fed3c08
+# ╠═5e0ac317-934c-46bc-b738-a3493fed3c08
 # ╠═643919c5-762f-4fa6-ac26-6bf0abd94558
 # ╟─054b4d61-b6d1-4938-8ff5-22e8c5cdb8f7
 # ╠═ef067551-aa44-4099-b32a-08debb81ee79
