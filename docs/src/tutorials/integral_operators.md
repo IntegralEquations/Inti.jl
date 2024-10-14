@@ -59,7 +59,7 @@ nothing # hide
 Much goes on under the hood in the function above, and the sections on
 [correction](@ref "Correction methods") and [compression](@ref "Compression
 methods") methods will provide more details on the options available. The
-important thing to keep in mind is that `S`, `D`, `K`, and `H` are discrete
+important thing to keep in mind is that `S`, `D`, `K`, and `N` are discrete
 approximations of the following (linear) operators:
 
 ```math
@@ -71,7 +71,7 @@ approximations of the following (linear) operators:
 \end{aligned}
 ```
 
-The actual type of `S`, `D`, `K`, and `H` depends on the `compression` and
+The actual type of `S`, `D`, `K`, and `N` depends on the `compression` and
 `correction` methods. In the simple case above, these are simply matrices:
 
 ```@example integral_operators
