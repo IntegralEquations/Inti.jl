@@ -59,7 +59,7 @@ function generate_plaintext(
     return join(cell_strings, "\n\n")
 end
 
-function generate_md(input; output = replace(input, ".jl" => ".md"))
+function generate_md(input; output = replace(input, r"\.jl$" => ".md"))
     fname = basename(input)
     notebook = Pluto.load_notebook(input)
     header =
@@ -84,6 +84,7 @@ function generate_md(input; output = replace(input, ".jl" => ".md"))
     end
     textcomment(text) = string("<!-- ", text, " -->")
     str = generate_plaintext(notebook, "md"; header, codewrapper, textcomment)
+
     open(output, "w") do io
         return write(io, str)
     end
