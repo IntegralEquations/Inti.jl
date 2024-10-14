@@ -2,8 +2,8 @@ using Inti
 using Documenter
 using DocumenterCitations
 using DocumenterInterLinks
-using ExampleJuggler, Literate, PlutoSliderServer
-using Pluto, JuliaFormatter
+using Pluto
+using JuliaFormatter
 # packages needed for extensions
 using Gmsh
 using HMatrices
@@ -11,8 +11,6 @@ using Meshes
 using GLMakie
 using FMM2D
 using FMM3D
-
-cleanexamples()
 
 # from https://github.com/fonsp/Pluto.jl/pull/2471
 function generate_plaintext(
@@ -70,10 +68,6 @@ function generate_md(
         code = strip(cell.code)
         if startswith(code, "begin") && endswith(code, "end")
             code = strip(code[6:end-4])  # Remove "begin" and "end" and strip spaces
-            # reformat code using JuliaFormatter
-            code = format_text(String(code))
-        elseif startswith(code, "let") && endswith(code, "end")
-            code = strip(code[4:end-4])  # Remove "let" and "end" and strip spaces
             # reformat code using JuliaFormatter
             code = format_text(String(code))
         end
