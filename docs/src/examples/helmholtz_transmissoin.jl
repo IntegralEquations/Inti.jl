@@ -27,7 +27,7 @@ end
 
 # ╔═╡ a6c80f87-ff47-496f-8925-1275b58b02e1
 md"""
-# Scattering by a penentrable obstacle
+# Transmission boundary-value problem
 
 [![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)](../../pluto_examples/helmholtz_scattering.jl)$\hspace{5pt}$[![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](../../pluto_examples/helmholtz_scattering.html)
 """
