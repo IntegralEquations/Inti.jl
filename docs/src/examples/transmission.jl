@@ -8,6 +8,7 @@ Pkg.activate(docsdir)                 #src
 
 using Inti
 
+
 k₁       = 8π
 k₂       = 2π
 λ₁       = 2π / k₁
@@ -47,12 +48,12 @@ Q = Inti.Quadrature(Γ_msh; qorder)
 pde₁ = Inti.Helmholtz(; k = k₁, dim = 2)
 pde₂ = Inti.Helmholtz(; k = k₂, dim = 2)
 
-using FMMLIB2D
+using HMatrices
 S₁, D₁ = Inti.single_double_layer(;
     pde = pde₁,
     target = Q,
     source = Q,
-    compression = (method = :fmm, tol = :1e-8),
+    compression = (method = :hmatrix, tol = :1e-8),
     correction = (method = :dim, maxdist = 5 * meshsize),
 )
 
@@ -60,7 +61,7 @@ K₁, N₁ = Inti.adj_double_layer_hypersingular(;
     pde = pde₁,
     target = Q,
     source = Q,
-    compression = (method = :fmm, tol = :1e-8),
+    compression = (method = :hmatrix, tol = :1e-8),
     correction = (method = :dim, maxdist = 5 * meshsize),
 )
 
@@ -68,7 +69,7 @@ S₂, D₂ = Inti.single_double_layer(;
     pde = pde₂,
     target = Q,
     source = Q,
-    compression = (method = :fmm, tol = :1e-8),
+    compression = (method = :hmatrix, tol = :1e-8),
     correction = (method = :dim, maxdist = 5 * meshsize),
 )
 
@@ -76,7 +77,7 @@ K₂, N₂ = Inti.adj_double_layer_hypersingular(;
     pde = pde₂,
     target = Q,
     source = Q,
-    compression = (method = :fmm, tol = :1e-8),
+    compression = (method = :hmatrix, tol = :1e-8),
     correction = (method = :dim, maxdist = 5 * meshsize),
 )
 
