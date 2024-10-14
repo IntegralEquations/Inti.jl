@@ -65,22 +65,22 @@ end
                 Inti.Helmholtz(; k = 1.2, dim = N),
                 # Inti.Stokes(; μ = 1.2, dim = N),
             )
-            for pde in ops
-                @testset "Greens identity ($t) $(N)d $pde" begin
+            for op in ops
+                @testset "Greens identity ($t) $(N)d $op" begin
                     xs = t == :interior ? ntuple(i -> 3, N) : ntuple(i -> 0.1, N)
-                    T = Inti.default_density_eltype(pde)
+                    T = Inti.default_density_eltype(op)
                     c = rand(T)
-                    u = (qnode) -> Inti.SingleLayerKernel(pde)(qnode, xs) * c
-                    dudn = (qnode) -> Inti.AdjointDoubleLayerKernel(pde)(qnode, xs) * c
+                    u = (qnode) -> Inti.SingleLayerKernel(op)(qnode, xs) * c
+                    dudn = (qnode) -> Inti.AdjointDoubleLayerKernel(op)(qnode, xs) * c
                     γ₀u = map(u, Γ_quad)
                     γ₁u = map(dudn, Γ_quad)
                     γ₀u_norm = norm(norm.(γ₀u, Inf), Inf)
                     γ₁u_norm = norm(norm.(γ₁u, Inf), Inf)
                     # single and double layer
-                    G = Inti.SingleLayerKernel(pde)
+                    G = Inti.SingleLayerKernel(op)
                     S = Inti.IntegralOperator(G, Γ_quad)
                     S0 = Inti.assemble_matrix(S)
-                    dG = Inti.DoubleLayerKernel(pde)
+                    dG = Inti.DoubleLayerKernel(op)
                     D = Inti.IntegralOperator(dG, Γ_quad)
                     D0 = Inti.assemble_matrix(D)
                     e0 = norm(S0 * γ₁u - D0 * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
@@ -91,7 +91,7 @@ end
                     δD = Inti.adaptive_correction(D; maxdist, tol = atol)
                     Smat, Dmat = S0 + δS, D0 + δD
                     e1 = norm(Smat * γ₁u - Dmat * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
-                    @testset "Single/double layer $(string(pde))" begin
+                    @testset "Single/double layer $(string(op))" begin
                         @test norm(e0, Inf) > 10 * norm(e1, Inf)
                         @test norm(e1, Inf) < 10 * atol
                     end

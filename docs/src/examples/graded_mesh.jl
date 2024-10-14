@@ -37,9 +37,9 @@ Q = Inti.Quadrature(msh; qorder = 3)
 ##
 
 ## Create integral operators
-pde = Inti.Helmholtz(; dim = 2, k)
+op = Inti.Helmholtz(; dim = 2, k)
 S, D = Inti.single_double_layer(;
-    pde,
+    op,
     target = Q,
     source = Q,
     compression = (method = :fmm, tol = 1e-6),
@@ -47,11 +47,11 @@ S, D = Inti.single_double_layer(;
 )
 L = I / 2 + D - im * k * S
 
-𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
 
 ## Test with a source inside for validation
 if TEST
-    G = Inti.SingleLayerKernel(pde)
+    G = Inti.SingleLayerKernel(op)
     uₑ = x -> G(x, SVector(0.4, 0.4))
     rhs = map(q -> uₑ(q.coords), Q)
     σ = gmres(L, rhs; restart = 100, maxiter = 100, abstol = 1e-8, verbose = true)
@@ -76,7 +76,7 @@ if PLOT
     target = [SVector(x, y) for x in xx, y in yy]
 
     Spot, Dpot = Inti.single_double_layer(;
-        pde,
+        op,
         target = target,
         source = Q,
         compression = (method = :fmm, tol = 1e-4),

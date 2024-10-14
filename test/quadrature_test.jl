@@ -143,10 +143,10 @@ end
     mesh = Inti.meshgen(Γ; meshsize = 0.4)
     quad = Inti.Quadrature(mesh; qorder = 1)
 
-    pde = Inti.Laplace(; dim = 3)
+    op = Inti.Laplace(; dim = 3)
 
     @test_throws ArgumentError Inti.single_double_layer(;
-        pde,
+        op,
         source = quad,
         target = quad,
         compression = (method = :none,),

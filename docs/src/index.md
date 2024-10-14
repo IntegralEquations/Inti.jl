@@ -134,9 +134,9 @@ end
 msh = Inti.meshgen(Γ; meshsize = 0.1)
 Q = Inti.Quadrature(msh; qorder = 5)
 # create the integral operators
-pde = Inti.Laplace(;dim=2)
+op = Inti.Laplace(;dim=2)
 S, _ = Inti.single_double_layer(;
-    pde, 
+    op, 
     target = Q,
     source = Q,
     compression = (method = :none,),
@@ -148,7 +148,7 @@ g = map(q -> uₑ(q.coords), Q) # value at quad nodes
 # solve for σ
 σ = S \ g
 # use the single-layer potential to evaluate the solution
-𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
 uₕ = x -> 𝒮[σ](x)
 ```
 

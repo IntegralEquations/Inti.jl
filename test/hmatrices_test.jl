@@ -17,9 +17,9 @@ include("test_utils.jl")
     Γ_quad = Inti.Quadrature(view(msh, Γ); qorder = 3)
     W = [q.weight for q in Γ_quad]
     # test various PDEs and integral operators
-    for pde in (Inti.Laplace(; dim = 2), Inti.Helmholtz(; k = 1.2, dim = 2))
-        @testset "PDE = $pde" begin
-            for K in (Inti.SingleLayerKernel(pde), Inti.DoubleLayerKernel(pde))
+    for op in (Inti.Laplace(; dim = 2), Inti.Helmholtz(; k = 1.2, dim = 2))
+        @testset "PDE = $op" begin
+            for K in (Inti.SingleLayerKernel(op), Inti.DoubleLayerKernel(op))
                 iop = Inti.IntegralOperator(K, Γ_quad)
                 H = Inti.assemble_hmatrix(iop; atol = 1e-8)
                 x = rand(eltype(iop), size(iop, 2))

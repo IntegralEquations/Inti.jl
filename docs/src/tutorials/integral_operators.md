@@ -20,15 +20,15 @@ handle custom kernels.
 ## Predefined kernels and integral operators
 
 To simplify the construction of integral operators for some commonly used PDEs,
-Inti.jl defines a few [`AbstractPDE`](@ref)s types. For each of these PDEs, the
+Inti.jl defines a few [`AbstractDifferentialOperator`](@ref)s types. For each of these PDEs, the
 package provides a [`SingleLayerKernel`](@ref), [`DoubleLayerKernel`](@ref),
 [`HyperSingularKernel`](@ref), and [`AdjointDoubleLayerKernel`](@ref) that can
 be used to construct the corresponding kernel functions, e.g.:
 
 ```@example integral_operators
 using Inti, StaticArrays, LinearAlgebra
-pde = Inti.Helmholtz(; dim = 2, k = 2π)
-G   = Inti.SingleLayerKernel(pde)
+op = Inti.Helmholtz(; dim = 2, k = 2π)
+G   = Inti.SingleLayerKernel(op)
 ```
 
 Typically, we are not interested in the kernels themselves, but in the integral
@@ -40,14 +40,14 @@ construct the four integral operators of Calderón calculus:
 Γ = Inti.parametric_curve(s -> SVector(cos(s), sin(s)), 0, 2π) |> Inti.Domain
 Q = Inti.Quadrature(Γ; meshsize = 0.1, qorder = 5)
 S, D = Inti.single_double_layer(; 
-    pde, 
+    op, 
     target = Q, 
     source = Q, 
     compression = (method = :none,), 
     correction = (method = :dim,)
 )
 K, N = Inti.adj_double_layer_hypersingular(; 
-    pde, 
+    op, 
     target = Q, 
     source = Q, 
     compression = (method = :none,), 
@@ -85,14 +85,14 @@ something different:
 ```@example integral_operators
 using FMM2D # will load the extension
 Sfmm, Dfmm = Inti.single_double_layer(; 
-    pde, 
+    op, 
     target = Q, 
     source = Q, 
     compression = (method = :fmm, tol = 1e-10), 
     correction = (method = :dim, )
 )
 Kfmm, Nfmm = Inti.adj_double_layer_hypersingular(; 
-    pde, 
+    op, 
     target = Q, 
     source = Q, 
     compression = (method = :fmm, tol = 1e-10), 
@@ -173,7 +173,7 @@ up a custom kernel function, and how to build an integral operator from it.
 
 !!! note "Integral operators coming from PDEs"
     If the integral operator of interest arises from a PDE, it is recommended
-    to define a new [`AbstractPDE`](@ref) type, and implement the required
+    to define a new [`AbstractDifferentialOperator`](@ref) type, and implement the required
     methods for [`SingleLayerKernel`](@ref), [`DoubleLayerKernel`](@ref),
     [`AdjointDoubleLayerKernel`](@ref), and [`HyperSingularKernel`](@ref). This
     will enable the use of the high-level syntax for constructing boundary

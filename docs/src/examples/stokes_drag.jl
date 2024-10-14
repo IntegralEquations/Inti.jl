@@ -63,10 +63,10 @@ Q = Inti.Quadrature(Γ_msh; qorder = 2)
 @show length(Q)
 @show abs(Inti.integrate(x -> 1, Q) - 4π * R^2)
 
-## the pde and its integral kernels
-pde = Inti.Stokes(; dim = 3, μ)
-G   = Inti.SingleLayerKernel(pde)
-dG  = Inti.DoubleLayerKernel(pde)
+## the op and its integral kernels
+op = Inti.Stokes(; dim = 3, μ)
+G = Inti.SingleLayerKernel(op)
+dG = Inti.DoubleLayerKernel(op)
 
 ## choice of a integral representation
 T = SVector{3,Float64}
@@ -85,7 +85,7 @@ Smat = Inti.assemble_matrix(Sop)
 
 ## integral operators defined on the boundary
 S, D = Inti.single_double_layer(;
-    pde,
+    op,
     target = Q,
     source = Q,
     compression = (method = :none,),

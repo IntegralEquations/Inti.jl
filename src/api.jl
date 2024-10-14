@@ -14,11 +14,11 @@ Available correction methods for the singular and nearly-singular integrals in
 const CORRECTION_METHODS = [:none, :dim, :adaptive]
 
 """
-    single_double_layer(; pde, target, source::Quadrature, compression,
+    single_double_layer(; op, target, source::Quadrature, compression,
     correction, derivative = false)
 
 Construct a discrete approximation to the single- and double-layer integral
-operators for `pde`, mapping values defined on the quadrature nodes of `source`
+operators for `op`, mapping values defined on the quadrature nodes of `source`
 to values defined on the nodes of `target`. If `derivative = true`, return
 instead the adjoint double-layer and hypersingular operators (which are the
 derivative of the single- and double-layer, respectively).
@@ -57,7 +57,7 @@ integrals should be computed. The available options are:
     `target_location` is not needed.
 """
 function single_double_layer(;
-    pde,
+    op,
     target,
     source,
     compression,
@@ -66,8 +66,8 @@ function single_double_layer(;
 )
     compression = _normalize_compression(compression, target, source)
     correction  = _normalize_correction(correction, target, source)
-    G           = derivative ? AdjointDoubleLayerKernel(pde) : SingleLayerKernel(pde)
-    dG          = derivative ? HyperSingularKernel(pde) : DoubleLayerKernel(pde)
+    G           = derivative ? AdjointDoubleLayerKernel(op) : SingleLayerKernel(op)
+    dG          = derivative ? HyperSingularKernel(op) : DoubleLayerKernel(op)
     Sop         = IntegralOperator(G, target, source)
     Dop         = IntegralOperator(dG, target, source)
     # handle compression
@@ -125,7 +125,7 @@ function single_double_layer(;
                 glob_loc_near_trgs = glob_loc_near_trgs,
             )
             δS, δD = bdim_correction(
-                pde,
+                op,
                 target[glob_near_trgs],
                 source,
                 Sop_dim_mat,
@@ -137,7 +137,7 @@ function single_double_layer(;
             )
         else
             δS, δD = bdim_correction(
-                pde,
+                op,
                 target,
                 source,
                 Smat,
@@ -182,7 +182,7 @@ function single_double_layer(;
 end
 
 """
-    adj_double_layer_hypersingular(; pde, target, source, compression,
+    adj_double_layer_hypersingular(; op, target, source, compression,
     correction)
 
 Similar to `single_double_layer`, but for the adjoint double-layer and
@@ -190,14 +190,14 @@ hypersingular operators. See the documentation of [`single_double_layer`] for a
 description of the arguments.
 """
 function adj_double_layer_hypersingular(;
-    pde,
+    op,
     target,
     source = target,
     compression,
     correction,
 )
     return single_double_layer(;
-        pde,
+        op,
         target,
         source,
         compression,
@@ -207,26 +207,26 @@ function adj_double_layer_hypersingular(;
 end
 
 """
-    single_double_layer_potential(; pde, source)
+    single_double_layer_potential(; op, source)
 
-Return the single- and double-layer potentials for `pde` as
+Return the single- and double-layer potentials for `op` as
 [`IntegralPotential`](@ref)s.
 """
-function single_double_layer_potential(; pde, source)
-    G  = SingleLayerKernel(pde)
-    dG = DoubleLayerKernel(pde)
+function single_double_layer_potential(; op, source)
+    G  = SingleLayerKernel(op)
+    dG = DoubleLayerKernel(op)
     𝒮  = IntegralPotential(G, source)
     𝒟  = IntegralPotential(dG, source)
     return 𝒮, 𝒟
 end
 
 """
-    volume_potential(; pde, target, source::Quadrature, compression, correction)
+    volume_potential(; op, target, source::Quadrature, compression, correction)
 
 Compute the volume potential operator for a given PDE.
 
 ## Arguments
-- `pde`: The PDE (Partial Differential Equation) to solve.
+- `op`: The PDE (Partial Differential Equation) to solve.
 - `target`: The target domain where the potential is computed.
 - `source`: The source domain where the potential is generated.
 - `compression`: The compression method to use for the potential operator.
@@ -274,10 +274,10 @@ the specified compression method. If no compression is specified, the operator
 is returned as is. If a correction method is specified, the correction is
 computed and added to the compressed operator.
 """
-function volume_potential(; pde, target, source::Quadrature, compression, correction)
+function volume_potential(; op, target, source::Quadrature, compression, correction)
     correction = _normalize_correction(correction, target, source)
     compression = _normalize_compression(compression, target, source)
-    G = SingleLayerKernel(pde)
+    G = SingleLayerKernel(op)
     V = IntegralOperator(G, target, source)
     # compress V
     if compression.method == :none
@@ -312,7 +312,7 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
         # Advanced usage: Use previously constructed layer operators for VDIM
         if !haskey(correction, :S_b2d) || !haskey(correction, :D_b2d)
             S, D = single_double_layer(;
-                pde,
+                op,
                 target,
                 source = boundary,
                 compression,
@@ -324,7 +324,7 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
         end
         interpolation_order = correction.interpolation_order
         δV = vdim_correction(
-            pde,
+            op,
             target,
             source,
             boundary,

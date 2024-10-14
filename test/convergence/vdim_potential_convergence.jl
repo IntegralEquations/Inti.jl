@@ -56,12 +56,12 @@ function test_volume_potential(; meshsize, bdry_qorder, interpolation_order)
     du_b = map(q -> du(q.coords, q.normal), Γₕ_quad)
     f_d = map(q -> f(q.coords), Ωₕ_quad)
 
-    pde = k == 0 ? Inti.Laplace(; dim = 2) : Inti.Helmholtz(; dim = 2, k)
+    op = k == 0 ? Inti.Laplace(; dim = 2) : Inti.Helmholtz(; dim = 2, k)
 
     ## Boundary operators
     tbnd = @elapsed begin
         S_b2d, D_b2d = Inti.single_double_layer(;
-            pde,
+            op,
             target = Ωₕ_quad,
             source = Γₕ_quad,
             compression = (method = :hmatrix, tol = 1e-14),
@@ -73,7 +73,7 @@ function test_volume_potential(; meshsize, bdry_qorder, interpolation_order)
     ## Volume potentials
     tvol = @elapsed begin
         V_d2d = Inti.volume_potential(;
-            pde,
+            op,
             target = Ωₕ_quad,
             source = Ωₕ_quad,
             compression = (method = :hmatrix, tol = 1e-14),

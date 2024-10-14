@@ -44,12 +44,12 @@ msh = Inti.import_mesh(name; dim = 2)
 
 Q = Inti.Quadrature(Γ_msh; qorder)
 
-pde₁ = Inti.Helmholtz(; k = k₁, dim = 2)
-pde₂ = Inti.Helmholtz(; k = k₂, dim = 2)
+op₁ = Inti.Helmholtz(; k = k₁, dim = 2)
+op₂ = Inti.Helmholtz(; k = k₂, dim = 2)
 
 using FMMLIB2D
 S₁, D₁ = Inti.single_double_layer(;
-    pde = pde₁,
+    op = op₁,
     target = Q,
     source = Q,
     compression = (method = :fmm, tol = :1e-8),
@@ -57,7 +57,7 @@ S₁, D₁ = Inti.single_double_layer(;
 )
 
 K₁, N₁ = Inti.adj_double_layer_hypersingular(;
-    pde = pde₁,
+    op = op₁,
     target = Q,
     source = Q,
     compression = (method = :fmm, tol = :1e-8),
@@ -65,7 +65,7 @@ K₁, N₁ = Inti.adj_double_layer_hypersingular(;
 )
 
 S₂, D₂ = Inti.single_double_layer(;
-    pde = pde₂,
+    op = op₂,
     target = Q,
     source = Q,
     compression = (method = :fmm, tol = :1e-8),
@@ -73,7 +73,7 @@ S₂, D₂ = Inti.single_double_layer(;
 )
 
 K₂, N₂ = Inti.adj_double_layer_hypersingular(;
-    pde = pde₂,
+    op = op₂,
     target = Q,
     source = Q,
     compression = (method = :fmm, tol = :1e-8),
@@ -120,8 +120,8 @@ nQ = size(Q, 1)
 sol = reshape(sol, nQ, 2)
 φ, ψ = sol[:, 1], sol[:, 2]
 
-𝒮₁, 𝒟₁ = Inti.single_double_layer_potential(; pde = pde₁, source = Q)
-𝒮₂, 𝒟₂ = Inti.single_double_layer_potential(; pde = pde₂, source = Q)
+𝒮₁, 𝒟₁ = Inti.single_double_layer_potential(; op = op₁, source = Q)
+𝒮₂, 𝒟₂ = Inti.single_double_layer_potential(; op = op₂, source = Q)
 
 v₁ = x -> 𝒟₁[φ](x) - 𝒮₁[ψ](x)
 v₂ = x -> -𝒟₂[φ](x) + 𝒮₂[ψ](x)

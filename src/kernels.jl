@@ -1,4 +1,4 @@
-const PREDEFINED_KERNELS = ["Laplace", "Helmholtz", "Stokes", "Yukawa"]
+const PREDEFINED_OPERATORS = ["Laplace", "Helmholtz", "Stokes", "Yukawa"]
 
 """
     abstract type AbstractKernel{T}
@@ -14,72 +14,49 @@ abstract type AbstractKernel{T} end
 return_type(::AbstractKernel{T}) where {T} = T
 
 """
-    struct GenericKernel{T,F} <: AbstractKernel{T}
+    abstract type AbstractDifferentialOperator{N}
 
-An [`AbstractKernel`](@ref) with `kernel` of type `F`.
+A partial differential operator in dimension `N`.
+
+`AbstractDifferentialOperator` types are used to define [`AbstractKernel`s](@ref
+AbstractKernel) related to fundamental solutions of differential operators.
 """
-struct GenericKernel{T,F} <: AbstractKernel{T}
-    kernel::F
-end
+abstract type AbstractDifferentialOperator{N} end
 
-"""
-    abstract type AbstractPDE{N}
+ambient_dimension(::AbstractDifferentialOperator{N}) where {N} = N
 
-A partial differential equation in dimension `N`. `AbstractPDE` types are used
-to define [`AbstractPDEKernel`s](@ref AbstractPDEKernel).
-"""
-abstract type AbstractPDE{N} end
-
-ambient_dimension(::AbstractPDE{N}) where {N} = N
-
-"""
-    abstract type AbstractPDEKernel{T,Op} <: AbstractKernel{T}
-
-An [`AbstractKernel`](@ref) with an associated `pde::Op` field.
-"""
-abstract type AbstractPDEKernel{T,Op} <: AbstractKernel{T} end
-
-"""
-    pde(K::AbstractPDEKernel)
-
-Return the underlying `AbstractPDE` associated with the kernel `K`.
-"""
-pde(k::AbstractPDEKernel) = k.pde
-
-parameters(k::AbstractPDEKernel) = parameters(pde(k))
-
-# convenient constructor for e.g. SingleLayerKernel(pde,Float64) or DoubleLayerKernel(pde,ComplexF64)
+# convenient constructor for e.g. SingleLayerKernel(op,Float64) or DoubleLayerKernel(op,ComplexF64)
 function (::Type{K})(
-    pde::Op,
-    ::Type{T} = default_kernel_eltype(pde),
-) where {T,Op,K<:AbstractPDEKernel}
-    return K{T,Op}(pde)
+    op::Op,
+    ::Type{T} = default_kernel_eltype(op),
+) where {T,Op,K<:AbstractKernel}
+    return K{T,Op}(op)
 end
 
 """
-    struct SingleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
+    struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
 
 The free-space single-layer kernel (i.e. the fundamental solution) of an `Op <:
-AbstractPDE`.
+AbstractDifferentialOperator`.
 """
-struct SingleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
-    pde::Op
+struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
+    op::Op
 end
 
 """
-    struct DoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
+    struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
 
 Given an operator `Op`, construct its free-space double-layer kernel. This
 corresponds to the `γ₁` trace of the [`SingleLayerKernel`](@ref). For operators
 such as [`Laplace`](@ref) or [`Helmholtz`](@ref), this is simply the normal
 derivative of the fundamental solution respect to the source variable.
 """
-struct DoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
-    pde::Op
+struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
+    op::Op
 end
 
 """
-    struct AdjointDoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
+    struct AdjointDoubleLayerKernel{T,Op} <: AbstractKernel{T}
 
 Given an operator `Op`, construct its free-space adjoint double-layer kernel.
 This corresponds to the `transpose(γ₁,ₓ[G])`, where `G` is the
@@ -87,12 +64,12 @@ This corresponds to the `transpose(γ₁,ₓ[G])`, where `G` is the
 [`Helmholtz`](@ref), this is simply the normal derivative of the fundamental
 solution respect to the target variable.
 """
-struct AdjointDoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
-    pde::Op
+struct AdjointDoubleLayerKernel{T,Op} <: AbstractKernel{T}
+    op::Op
 end
 
 """
-    struct HyperSingularKernel{T,Op} <: AbstractPDEKernel{T,Op}
+    struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
 
 Given an operator `Op`, construct its free-space hypersingular kernel. This
 corresponds to the `transpose(γ₁,ₓγ₁[G])`, where `G` is the
@@ -100,31 +77,32 @@ corresponds to the `transpose(γ₁,ₓγ₁[G])`, where `G` is the
 [`Helmholtz`](@ref), this is simply the normal derivative respect to the target
 variable of the `DoubleLayerKernel`.
 """
-struct HyperSingularKernel{T,Op} <: AbstractPDEKernel{T,Op}
-    pde::Op
+struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
+    op::Op
 end
 
 ################################################################################
 ################################# LAPLACE ######################################
 ################################################################################
 
-struct Laplace{N} <: AbstractPDE{N} end
+struct Laplace{N} <: AbstractDifferentialOperator{N} end
 
 """
     Laplace(; dim)
 
-Laplace equation in `N` dimension: Δu = 0.
+Laplace's differential operator in `dim` dimension: ``-Δu``.
+```
+
+Note the **negative sign** in the definition.
 """
 Laplace(; dim) = Laplace{dim}()
 
-function Base.show(io::IO, pde::Laplace)
-    return print(io, "Δu = 0")
+function Base.show(io::IO, op::Laplace{N}) where {N}
+    return print(io, "Laplace operator in $N dimensions: -Δu")
 end
 
 default_kernel_eltype(::Laplace) = Float64
 default_density_eltype(::Laplace) = Float64
-
-parameters(::Laplace) = nothing
 
 function (SL::SingleLayerKernel{T,Laplace{N}})(
     target,
@@ -194,26 +172,33 @@ end
 ################################# Yukawa #######################################
 ################################################################################
 
-struct Yukawa{N,K<:Real} <: AbstractPDE{N}
+struct Yukawa{N,K<:Real} <: AbstractDifferentialOperator{N}
     λ::K
 end
 
 """
     Yukawa(; λ, dim)
 
-Yukawa equation, also known as modified Helmholtz, in `N` dimensions: Δu - λ²u =
-0. The parameter `λ` is a positive number.
+Yukawa operator, also known as modified Helmholtz, in `dim` dimensions: ``-Δu + λ²u``.
+
+The parameter `λ` is a positive number. Note the **negative sign** in front of
+the Laplacian.
 """
 function Yukawa(; λ, dim)
     @assert λ > 0 "λ must be a positive number"
     return Yukawa{dim,typeof(λ)}(λ)
 end
 
+"""
+    const ModifiedHelmholtz
+
+Type alias for the [`Yukawa`](@ref) operator.
+"""
 const ModifiedHelmholtz = Yukawa
 
-Base.show(io::IO, ::Yukawa) = print(io, "Δu + λ²u = 0")
-
-parameters(pde::Yukawa) = pde.λ
+function Base.show(io::IO, ::Yukawa{N}) where {N}
+    return print(io, "Yukawa operator in $N dimensions: -Δu + λ²u")
+end
 
 default_kernel_eltype(::Yukawa)  = Float64
 default_density_eltype(::Yukawa) = Float64
@@ -221,7 +206,7 @@ default_density_eltype(::Yukawa) = Float64
 function (SL::SingleLayerKernel{T,<:Yukawa{N,K}})(target, source)::T where {N,T,K}
     x = coords(target)
     y = coords(source)
-    λ = parameters(SL)
+    λ = SL.op.λ
     r = x - y
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
@@ -234,7 +219,7 @@ end
 
 function (DL::DoubleLayerKernel{T,Yukawa{N,K}})(target, source)::T where {N,T,K}
     x, y, ny = coords(target), coords(source), normal(source)
-    λ = parameters(DL)
+    λ = DL.op.λ
     r = x - y
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
@@ -248,7 +233,7 @@ end
 
 function (ADL::AdjointDoubleLayerKernel{T,<:Yukawa{N,K}})(target, source)::T where {N,T,K}
     x, y, nx = coords(target), coords(source), normal(target)
-    λ = parameters(ADL)
+    λ = ADL.op.λ
     r = x - y
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
@@ -262,7 +247,7 @@ end
 
 function (HS::HyperSingularKernel{T,<:Yukawa{N,K}})(target, source)::T where {N,T,K}
     x, y, nx, ny = coords(target), coords(source), normal(target), normal(source)
-    λ = parameters(pde(HS))
+    λ = HS.op.λ
     r = x - y
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
@@ -292,24 +277,24 @@ end
 ################################# Helmholtz ####################################
 ################################################################################
 
-struct Helmholtz{N,K} <: AbstractPDE{N}
+struct Helmholtz{N,K} <: AbstractDifferentialOperator{N}
     k::K
 end
 
 """
     Helmholtz(; k, dim)
 
-Helmholtz equation in `N` dimensions: Δu + k²u = 0. The parameter `k` can be a
-real or complex number.
+Helmholtz operator in `dim` dimensions: `-Δu - k²u`.
 
-For purely imaginary wavenumbers, consider using the [`Yukawa`](@ref) kernel.
+The parameter `k` can be a real or complex number. For purely imaginary
+wavenumbers, consider using the [`Yukawa`](@ref) kernel.
 """
 function Helmholtz(; k, dim)
     if k isa Complex
         @assert imag(k) ≥ 0 "k must have a non-negative imaginary part"
         if iszero(real(k))
-            msg = """Purely imaginary wavenumber detected in Helmholtz equation.
-            Creating a modified Helmholtz (Yukawa) PDE instead."""
+            msg = """Purely imaginary wavenumber detected in Helmholtz operator.
+            Creating a modified Helmholtz (Yukawa) op instead."""
             @warn msg
             return Yukawa(; λ = imag(k), dim = dim)
         elseif iszero(imag(k))
@@ -319,12 +304,9 @@ function Helmholtz(; k, dim)
     return Helmholtz{dim,typeof(k)}(k)
 end
 
-function Base.show(io::IO, ::Helmholtz)
-    # k = parameters(pde)
-    return print(io, "Δu + k² u = 0")
+function Base.show(io::IO, ::Helmholtz{N}) where {N}
+    return print(io, "Helmholtz operator in $N dimensions: -Δu - k²u")
 end
-
-parameters(pde::Helmholtz) = pde.k
 
 default_kernel_eltype(::Helmholtz) = ComplexF64
 default_density_eltype(::Helmholtz) = ComplexF64
@@ -335,7 +317,7 @@ hankelh1(n, x::Complex) = SpecialFunctions.hankelh1(n, x)
 function (SL::SingleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T}
     x = coords(target)
     y = coords(source)
-    k = parameters(SL)
+    k = SL.op.k
     r = x - y
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
@@ -349,7 +331,7 @@ end
 # Double Layer Kernel
 function (DL::DoubleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T}
     x, y, ny = coords(target), coords(source), normal(source)
-    k = parameters(DL)
+    k = DL.op.k
     r = x - y
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
@@ -365,7 +347,7 @@ end
 # Adjoint double Layer Kernel
 function (ADL::AdjointDoubleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T}
     x, y, nx = coords(target), coords(source), normal(target)
-    k = parameters(ADL)
+    k = ADL.op.k
     r = x - y
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
@@ -379,10 +361,9 @@ function (ADL::AdjointDoubleLayerKernel{T,<:Helmholtz{N}})(target, source)::T wh
 end
 
 # Hypersingular kernel
-function (HS::HyperSingularKernel{T,S})(target, source)::T where {T,S<:Helmholtz}
+function (HS::HyperSingularKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T}
     x, y, nx, ny = coords(target), coords(source), normal(target), normal(source)
-    N = ambient_dimension(pde(HS))
-    k = parameters(pde(HS))
+    k = HS.op.k
     r = x - y
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
@@ -406,24 +387,28 @@ function (HS::HyperSingularKernel{T,S})(target, source)::T where {T,S<:Helmholtz
 end
 
 ############################ STOKES ############################3
-struct Stokes{N,T} <: AbstractPDE{N}
+struct Stokes{N,T} <: AbstractDifferentialOperator{N}
     μ::T
 end
+
+"""
+    Stokes(; μ, dim)
+
+Stokes operator in `dim` dimensions: ``[-μΔu + ∇p, ∇⋅u]``.
+"""
 Stokes(; μ, dim = 3) = Stokes{dim}(μ)
 Stokes{N}(μ::T) where {N,T} = Stokes{N,T}(μ)
 
-function Base.show(io::IO, pde::Stokes)
-    return println(io, "μΔu -∇p = 0, ∇⋅u = 0")
+function Base.show(io::IO, op::Stokes{N}) where {N}
+    return println(io, "Stokes operator in $N dimensions: [-μΔu + ∇p, ∇⋅u]")
 end
-
-parameters(s::Stokes) = s.μ
 
 default_kernel_eltype(::Stokes{N}) where {N} = SMatrix{N,N,Float64,N * N}
 default_density_eltype(::Stokes{N}) where {N} = SVector{N,Float64}
 
 # Single Layer
 function (SL::SingleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
-    μ = parameters(SL)
+    μ = SL.op.μ
     x = coords(target)
     y = coords(source)
     r = x - y
@@ -439,7 +424,6 @@ end
 
 # Double Layer Kernel
 function (DL::DoubleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
-    μ = parameters(DL)
     x = coords(target)
     y = coords(source)
     ny = normal(source)
@@ -455,7 +439,6 @@ end
 
 # Double Layer Kernel
 function (ADL::AdjointDoubleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
-    μ = parameters(ADL)
     x = coords(target)
     nx = normal(target)
     y = coords(source)
@@ -476,29 +459,29 @@ end
 ################################################################################
 
 """
-    struct Elastostatic{N,T} <: AbstractPDE{N}
+    struct Elastostatic{N,T} <: AbstractDifferentialOperator{N}
 
-Elastostatic equation in `N` dimensions: μΔu + (μ+λ)∇(∇⋅u) = 0. Note that the
-displacement u is a vector of length `N` since this is a vectorial problem.
+Elastostatic operator in `N` dimensions: -μΔu - (μ+λ)∇(∇⋅u)
+
+Note that the displacement ``u`` is a vector of length `N` since this is a
+vectorial problem.
 """
-struct Elastostatic{N,T} <: AbstractPDE{N}
+struct Elastostatic{N,T} <: AbstractDifferentialOperator{N}
     μ::T
     λ::T
 end
 Elastostatic(; μ, λ, dim) = Elastostatic{dim}(promote(μ, λ)...)
 Elastostatic{N}(μ::T, λ::T) where {N,T} = Elastostatic{N,T}(μ, λ)
 
-function Base.show(io::IO, pde::Elastostatic)
-    return print(io, "μΔu + (μ+λ)∇(∇⋅u) = 0")
+function Base.show(io::IO, op::Elastostatic{N}) where {N}
+    return print(io, "Elastostatic operator in $N dimensions: -μΔu - (μ+λ)∇(∇⋅u)")
 end
-
-parameters(pde::Elastostatic) = pde.μ, pde.λ
 
 default_kernel_eltype(::Elastostatic{N}) where {N} = SMatrix{N,N,Float64,N * N}
 default_density_eltype(::Elastostatic{N}) where {N} = SVector{N,Float64}
 
 function (SL::SingleLayerKernel{T,<:Elastostatic{N}})(target, source)::T where {N,T}
-    μ, λ = parameters(pde(SL))
+    μ, λ = SL.op.μ, SL.op.λ
     ν = λ / (2 * (μ + λ))
     x = coords(target)
     y = coords(source)
@@ -514,7 +497,7 @@ function (SL::SingleLayerKernel{T,<:Elastostatic{N}})(target, source)::T where {
 end
 
 function (DL::DoubleLayerKernel{T,<:Elastostatic{N}})(target, source)::T where {N,T}
-    μ, λ = parameters(pde(DL))
+    μ, λ = DL.op.μ, DL.op.λ
     ν = λ / (2 * (μ + λ))
     x = coords(target)
     y = coords(source)
@@ -539,7 +522,7 @@ function (DL::DoubleLayerKernel{T,<:Elastostatic{N}})(target, source)::T where {
 end
 
 function (ADL::AdjointDoubleLayerKernel{T,<:Elastostatic{N}})(target, source)::T where {N,T}
-    μ, λ = parameters(pde(ADL))
+    μ, λ = ADL.op.μ, ADL.op.λ
     ν = λ / (2 * (μ + λ))
     x = coords(target)
     nx = normal(target)
@@ -568,7 +551,7 @@ function (ADL::AdjointDoubleLayerKernel{T,<:Elastostatic{N}})(target, source)::T
 end
 
 function (HS::HyperSingularKernel{T,<:Elastostatic{N}})(target, source)::T where {N,T}
-    μ, λ = parameters(pde(HS))
+    μ, λ = HS.op.μ, HS.op.λ
     ν = λ / (2 * (μ + λ))
     x = coords(target)
     nx = normal(target)

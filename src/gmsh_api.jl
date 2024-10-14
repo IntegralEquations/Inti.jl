@@ -1,7 +1,7 @@
 """
     import_mesh(filename = nothing; dim=3)
 
-Open `filename` and create a [`LagrangeMesh`](@ref) from the `gmsh` model in it.
+Open `filename` and create a [`Mesh`](@ref) from the `gmsh` model in it.
 
 If `filename` is `nothing`, the current `gmsh` model is used. Note that this
 assumes that the *Gmsh* API has been initialized through `gmsh.initialize`.
