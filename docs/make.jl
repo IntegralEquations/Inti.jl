@@ -14,8 +14,8 @@ using FMM3D
 
 const ON_CI = get(ENV, "CI", "false") == "true"
 
-draft = true # build docs without running code. Useful for quick local testing
-# ON_CI && (draft = false) # always full build on CI
+draft = false # build docs without running code. Useful for quick local testing
+ON_CI && (draft = false) # always full build on CI
 
 # from https://github.com/fonsp/Pluto.jl/pull/2471
 function generate_plaintext(
@@ -113,8 +113,8 @@ end
 size_threshold_ignore = []
 notebooks = [
     "Toy example" => "toy_example.jl",
-    # "Helmholtz scattering" => "helmholtz_scattering.jl",
-    # "Poisson problem" => "poisson.jl",
+    "Helmholtz scattering" => "helmholtz_scattering.jl",
+    "Poisson problem" => "poisson.jl",
 ]
 
 notebook_examples = Pair{String,String}[]
@@ -125,9 +125,6 @@ for notebook in notebooks
     push!(notebook_examples, title => joinpath("pluto-examples", basename(file_out)))
 end
 size_threshold_ignore = last.(notebook_examples)
-
-# Generate HTML versions of the notebooks using PlutoSliderServer.jl
-# notebook_examples_html = @docplutonotebooks(notebook_dir, notebooks, iframe = true)
 
 makedocs(;
     modules = modules,
@@ -157,11 +154,11 @@ makedocs(;
         "References" => "references.md",
         "Docstrings" => "docstrings.md",
     ],
-    warnonly = Documenter.except(:linkcheck_remotes), # ON_CI ? false : Documenter.except(:linkcheck_remotes),
+    warnonly = ON_CI ? false : Documenter.except(:linkcheck_remotes),
     # warnonly = true,
     pagesonly = true,
     checkdocs = :none,
-    clean = false,
+    clean = true,
     draft,
     plugins = [bib, links],
 )
@@ -172,4 +169,4 @@ deploydocs(;
     push_preview = true,
 )
 
-# GLMakie.closeall()
+GLMakie.closeall()
