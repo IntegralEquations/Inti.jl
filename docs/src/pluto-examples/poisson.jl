@@ -33,8 +33,6 @@ end
 # ╔═╡ aca57c74-d084-40e7-9760-edf988a64915
 md"""
 # Poisson Problem
-
-[![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)](../../pluto_examples/poisson.jl)$\hspace{5pt}$[![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](../../pluto_examples/poisson.html)
 """
 
 # ╔═╡ 4160cbc1-3e98-4919-a8b5-bfbc65077b53
