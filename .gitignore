@@ -8,7 +8,7 @@
 /docs/build/
 /test/Manifest.toml
 .vscode
-/docs/src/examples/generated/
+/docs/src/pluto-examples/*.md 
 /sandbox/*
 /talks/*
 
