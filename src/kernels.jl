@@ -5,7 +5,7 @@ const PREDEFINED_OPERATORS = ["Laplace", "Helmholtz", "Stokes", "Yukawa"]
 
 A kernel functions `K` with the signature `K(target,source)::T`.
 
-See also: [`GenericKernel`](@ref), [`SingleLayerKernel`](@ref),
+See also: [`SingleLayerKernel`](@ref),
 [`DoubleLayerKernel`](@ref), [`AdjointDoubleLayerKernel`](@ref),
 [`HyperSingularKernel`](@ref)
 """
