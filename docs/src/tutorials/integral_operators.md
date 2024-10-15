@@ -59,19 +59,19 @@ nothing # hide
 Much goes on under the hood in the function above, and the sections on
 [correction](@ref "Correction methods") and [compression](@ref "Compression
 methods") methods will provide more details on the options available. The
-important thing to keep in mind is that `S`, `D`, `K`, and `H` are discrete
+important thing to keep in mind is that `S`, `D`, `K`, and `N` are discrete
 approximations of the following (linear) operators:
 
 ```math
 \begin{aligned}
     S[\sigma](\boldsymbol{x}) &:= \int_{\Gamma} G(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}}, \quad 
     &&D[\sigma](\boldsymbol{x}) := \mathrm{p.v.} \int_{\Gamma} \frac{\partial G}{\partial \nu_{\boldsymbol{y}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}} \\
-    D'[\sigma](\boldsymbol{x}) &:=  \mathrm{p.v.} \int_{\Gamma} \frac{\partial G}{\partial \nu_{\boldsymbol{x}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}}, \quad
+    K[\sigma](\boldsymbol{x}) &:=  \mathrm{p.v.} \int_{\Gamma} \frac{\partial G}{\partial \nu_{\boldsymbol{x}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}}, \quad
     &&N[\sigma](\boldsymbol{x}) := \mathrm{f.p.} \int_{\Gamma} \frac{\partial^2 G}{\partial \nu_{\boldsymbol{x}} \partial \nu_{\boldsymbol{y}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}}
 \end{aligned}
 ```
 
-The actual type of `S`, `D`, `K`, and `H` depends on the `compression` and
+The actual type of `S`, `D`, `K`, and `N` depends on the `compression` and
 `correction` methods. In the simple case above, these are simply matrices:
 
 ```@example integral_operators
@@ -133,7 +133,7 @@ Calderón projectors:
 \begin{aligned}
 H = \begin{bmatrix}
     -D & S \\
-    -N & D'
+    -N & K
 \end{bmatrix} 
 \end{aligned}
 ```
