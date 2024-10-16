@@ -220,6 +220,11 @@ begin
 	nothing
 end
 
+# ╔═╡ 57a8112b-8628-468e-9878-cf8990c32dfb
+md"""
+We now create the external and internal PDEs. 
+"""
+
 # ╔═╡ e0863052-fe3e-4f4a-a5db-091a52c2de84
 begin 
 	pde₁ = Inti.Helmholtz(; k = k₁, dim = 2)
@@ -264,6 +269,155 @@ using FMM2D
 	nothing
 end
 
+# ╔═╡ 75d046f3-c4b2-43e4-8914-cd4c0de3890c
+md"""
+We now create the operators $S_j, D_j, K_j, N_j, j=1,2$ for both wavenumbers $k_1,k_2$. Notice that we make use compression and correction methods for the operators' construction.
+"""
+
+# ╔═╡ 01933384-dd07-40bc-9313-38065467f722
+md"""
+With all the previously defined operators, we can now construct the block operator of the BIE system using `LinearMaps`.
+"""
+
+# ╔═╡ 09156d15-72de-430b-81ff-cf5fda93adb8
+begin
+	L = [
+    	I+LinearMap(D₁)-LinearMap(D₂) -LinearMap(S₁)+LinearMap(S₂)
+    	LinearMap(N₁)-LinearMap(N₂) I-LinearMap(K₁)+LinearMap(K₂)
+	]
+end
+
+# ╔═╡ b6adc4a4-0019-48cd-a64d-0c9f50879ca2
+md"""
+In order to test the accuracy of the computed solution, we can once again manufacture appropriate boundary conditions by taking the trace of solutions $u_1, u_2$ to the external and internal Helmholtz problems respectively.
+"""
+
+# ╔═╡ b2ca7517-4c5c-4463-9eb6-1afc293ffae3
+begin
+	# Construction of the exact scattered and transmitted fields
+	θ = π / 4;
+	𝐝 = [cos(θ), sin(θ)];
+	# plane-wave incident field and its normal gradient
+	u₂ = x -> exp(im * k₂ * dot(x, 𝐝))
+	∇u₂ = x -> im * k₂ * u₂(x) * 𝐝
+	# point source in the interior of the circle and its normal gradient
+	u₁ = x -> hankelh1(0, k₁ * sqrt(dot(x, x)))
+	∇u₁ = x -> -k₁ * hankelh1(1, k₁ * sqrt(dot(x, x))) * x / sqrt(dot(x, x))
+end
+
+# ╔═╡ 4ce819da-5ac9-48a7-aa8f-e5314b215339
+md"""
+Now, we are in position to assemble the right-hand-side of the BIE system and solve it using GMRES.
+"""
+
+# ╔═╡ 2dfd1ebc-04ca-413d-822a-a18c309a1792
+begin
+	# Right hand side of the linear system
+	rhs₁ = map(Q) do q
+	    x = q.coords
+	    return u₁(x) + u₂(x)
+	end
+	
+	rhs₂ = map(Q) do q
+	    x = q.coords
+	    n = q.normal
+	    return dot(n, ∇u₁(x) + ∇u₂(x))
+	end
+	
+	rhs = [rhs₁; rhs₂]
+	
+	sol, hist =
+	    gmres(L, rhs; log = true, abstol = 1e-6, verbose = false, restart = 400, maxiter = 400)
+	@show hist
+end
+
+# ╔═╡ 85f60f69-b844-4b20-9437-2961181913be
+md"""
+Once the solution has been computed, we can use the layer potential representation of the solutions to evaluate them at target points in $\mathbb{R}^2\setminus\Gamma$.
+"""
+
+# ╔═╡ bb92050b-3b9a-442c-a93f-31469c9a53d8
+begin
+	
+	nQ = size(Q, 1)
+	sol_temp = reshape(sol, nQ, 2)
+	φ, ψ = sol_temp[:, 1], sol_temp[:, 2]
+
+
+	𝒮₁, 𝒟₁ = Inti.single_double_layer_potential(; pde = pde₁, source = Q)
+	𝒮₂, 𝒟₂ = Inti.single_double_layer_potential(; pde = pde₂, source = Q)
+	
+	# Obtain the approximate solution of the scattered and transmitted fields
+	v₁ = x -> 𝒟₁[φ](x) - 𝒮₁[ψ](x)
+	v₂ = x -> -𝒟₂[φ](x) + 𝒮₂[ψ](x)
+end
+
+# ╔═╡ 3065dc45-41ff-49bf-9a14-90285cb54503
+md"""
+To evaluate the error of the scattered field, our computed solution is compared to the exact solution on points of a circle centered at the origin of radius $R=2$.
+"""
+
+# ╔═╡ bd821f22-a290-4701-bb02-99c1a5f38a65
+begin
+	# Here is the maximum error on some points located on a circle of radius `2`:
+	
+	er₁ = maximum(0:0.01:2π) do θ
+	    R = 2.0
+	    x = (R * cos(θ), R * sin(θ))
+	    xp = [R * cos(θ), R * sin(θ)]
+	    return abs(v₁(x) - u₁(xp))
+	end
+	@assert er₁ < 1e-3 #hide
+	@info "maximum error = $er₁"
+end
+
+# ╔═╡ 1dcfbf3a-028c-4076-8132-697f5aab1a6d
+md"""
+Likewise, to evaluate the error of the transmitted field, we make the same comparison on points of a circle centered at the origin of radius $R=\frac{1}{2}$.
+"""
+
+# ╔═╡ 6f4821c2-0070-42d3-943a-5588270b7d48
+begin
+	# Here is the maximum error on some points located on a circle of radius `0.5`:
+	
+	er₂ = maximum(0:0.01:2π) do θ
+	    R = 0.5
+	    x = (R * cos(θ), R * sin(θ))
+	    xp = [R * cos(θ), R * sin(θ)]
+	    return abs(v₂(x) - u₂(xp))
+	end
+	@assert er₂ < 1e-3 #hide
+	@info "maximum error = $er₂"
+end
+
+# ╔═╡ fbc3b3a6-30c9-40f1-aa9f-18960275abbf
+md"""
+Finally, we can visualize the error of the approximate solution $u_a$ compared to the exact solution $u_e$.
+"""
+
+# ╔═╡ 380dc92a-5e06-4429-9fe6-ff241709e5e4
+begin
+	xx = yy = range(-4; stop = 4, length = 200)
+	vals = map(pt -> norm(pt) > 1 ? log10(abs(v₁(pt) - u₁(pt))) : log10(abs(v₂(pt) - u₂(pt))), Iterators.product(xx, yy))
+	fig, ax, hm = heatmap(
+	    xx,
+	    yy,
+	    vals;
+	    colormap = :inferno,
+	    interpolate = true,
+	    axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
+	)
+	lines!(
+	    ax,
+	    [cos(θ) for θ in 0:0.01:2π],
+	    [sin(θ) for θ in 0:0.01:2π];
+	    color = :black,
+	    linewidth = 4,
+	)
+	Colorbar(fig[1, 2], hm, label = "log₁₀|uₐ - uₑ|")
+	fig
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -299,7 +453,7 @@ StaticArrays = "~1.9.7"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.4"
+julia_version = "1.10.5"
 manifest_format = "2.0"
 project_hash = "f233076b4b67e51eb9b41c2fafd47130d47527dc"
 
@@ -2260,7 +2414,7 @@ version = "0.15.2+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.8.0+1"
+version = "5.11.0+0"
 
 [[deps.libdecor_jll]]
 deps = ["Artifacts", "Dbus_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pango_jll", "Wayland_jll", "xkbcommon_jll"]
@@ -2330,17 +2484,33 @@ version = "1.4.1+1"
 # ╔═╡ Cell order:
 # ╟─6b6d5e44-304d-4bed-912b-e4b89fce7c5a
 # ╟─a6c80f87-ff47-496f-8925-1275b58b02e1
-# ╠═5e0ac317-934c-46bc-b738-a3493fed3c08
+# ╟─5e0ac317-934c-46bc-b738-a3493fed3c08
 # ╠═58adb64d-7905-4fed-9731-f2b4bb98b7cd
-# ╠═3ebb1396-7f43-454b-ab00-0f7690a46ceb
+# ╟─3ebb1396-7f43-454b-ab00-0f7690a46ceb
 # ╠═a879ffdf-2808-4d83-80b9-95dff7078a37
 # ╠═375eec68-ebe3-4eb5-85e5-ab9fe01ff97f
-# ╠═643919c5-762f-4fa6-ac26-6bf0abd94558
+# ╟─643919c5-762f-4fa6-ac26-6bf0abd94558
 # ╟─88e5d810-7e68-4e48-a4e6-1249c5c597a7
 # ╠═1923719e-9a52-4bd3-89e6-76a1670a906c
 # ╠═ac17c411-0628-4721-af54-d34bcd9f1fb5
 # ╠═e56d3dc6-c434-4c28-9ef9-834f62edd41d
+# ╟─57a8112b-8628-468e-9878-cf8990c32dfb
 # ╠═e0863052-fe3e-4f4a-a5db-091a52c2de84
+# ╟─75d046f3-c4b2-43e4-8914-cd4c0de3890c
 # ╠═4a66d411-e3b4-4652-af91-01e42e79b82f
+# ╟─01933384-dd07-40bc-9313-38065467f722
+# ╠═09156d15-72de-430b-81ff-cf5fda93adb8
+# ╟─b6adc4a4-0019-48cd-a64d-0c9f50879ca2
+# ╠═b2ca7517-4c5c-4463-9eb6-1afc293ffae3
+# ╟─4ce819da-5ac9-48a7-aa8f-e5314b215339
+# ╠═2dfd1ebc-04ca-413d-822a-a18c309a1792
+# ╟─85f60f69-b844-4b20-9437-2961181913be
+# ╠═bb92050b-3b9a-442c-a93f-31469c9a53d8
+# ╟─3065dc45-41ff-49bf-9a14-90285cb54503
+# ╠═bd821f22-a290-4701-bb02-99c1a5f38a65
+# ╟─1dcfbf3a-028c-4076-8132-697f5aab1a6d
+# ╠═6f4821c2-0070-42d3-943a-5588270b7d48
+# ╟─fbc3b3a6-30c9-40f1-aa9f-18960275abbf
+# ╠═380dc92a-5e06-4429-9fe6-ff241709e5e4
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
