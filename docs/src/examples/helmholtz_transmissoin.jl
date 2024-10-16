@@ -11,7 +11,7 @@ begin
     using PlutoUI: TableOfContents
 end;
 
-# ╔═╡ ef067551-aa44-4099-b32a-08debb81ee79
+# ╔═╡ 58adb64d-7905-4fed-9731-f2b4bb98b7cd
 begin
     using Inti
     using LinearAlgebra
@@ -27,115 +27,130 @@ end
 
 # ╔═╡ a6c80f87-ff47-496f-8925-1275b58b02e1
 md"""
-# Transmission boundary-value problem
+# Helmholtz transmission boundary-value problem
 
-[![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)](../../pluto_examples/helmholtz_scattering.jl)$\hspace{5pt}$[![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](../../pluto_examples/helmholtz_scattering.html)
-"""
-
-# ╔═╡ 1715d794-a33d-4faf-953c-b706a9ceea23
-md"""
-!!! note "Important points covered in this example"
-	- Creating a geometry using the *Gmsh* API
-	- Assembling integral operators and integral potentials
-	- Setting up a sound-soft problem in both 2 and 3 spatial dimensions
-	- Using *GMRES* to solve the linear system
-	- Exporting the solution to *Gmsh* for visualization
+[![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)](../../pluto_examples/helmholtz_scattering.jl)[![nbviewer](https://img.shields.io/badge/show-nbviewer-blue.svg)](../../pluto_examples/helmholtz_scattering.html)
 """
 
 # ╔═╡ 5e0ac317-934c-46bc-b738-a3493fed3c08
 md"""
-In this tutorial we will show how to solve an acoustic transmission problem in the context of Helmholtz equation. We consider two different second-kind formulations in teh case of  a *smooth* obstacle for simplicity. We will use various packages throughout this example (including of course `Inti.jl`); if they are not on your environment, you can install them using `] add <package>` in the REPL.
+In this tutorial, we explore several boundary integral equation formulations for the Helmholtz transmission problem.
+
+Specifically, we focus on the scattering of a plane wave
+```math 
+u^{\rm inc}(x) = \exp(ik_1x\cdot d),\quad |d|=1,
+``` 
+that impinges on a bounded obstacle ``\Omega\subset\mathbb R^d`` with boundary ``\Gamma`` of class ``C^2``. In this setup, ``k_1>0`` represents the wavenumber in the unbounded ambient medium ``\mathbb R^d\setminus\overline\Omega``, and we let ``k_2\in\mathbb C``, ``\rm{Im}(k_2)\geq 0``, represents the wavenumber in the medium occupying the bounded domain ``\Omega``. 
+
+We express the total field as 
+```math
+u = \begin{cases} u_1+u^{\rm inc}&\text{in}\ \mathbb R^d\setminus\overline\Omega,\\
+u_2,&\text{in}\quad\Omega,
+\end{cases}
+```
+where ``u_1:\mathbb R^d\setminus\overline\Omega\to\mathbb C`` is the scattered field and  ``u_2:\Omega\to\mathbb C`` is the transmitted field. These functions satisfy the following transmission problem:
+```math
+\begin{cases}
+\Delta u_1+k_1^2u_1=0&\text{in}\quad\mathbb R^d\setminus\overline\Omega,\\[0.5mm]
+\Delta u_2+k_2^2u_2=0&\text{in}\quad\Omega,\\[0.5mm]
+\gamma^+(u_1+u^{\rm inc}) =\gamma^-u_1,&\text{on}\quad\Gamma,\\[0.5mm]
+\partial_n^+(u_1+u^{\rm inc}) =\partial_n^-u_1,&\text{on}\quad\Gamma.\\[0.5mm]
+\end{cases}
+```
+Additionally, the scattered field must satisfy the Sommerfeld radiation condition at infinity:
+```math
+	\lim_{|\boldsymbol{x}| \to \infty} |\boldsymbol{x}|^{(d-1)/2} \left( \frac{\partial u_1}{\partial |\boldsymbol{x}|} - i k_1 u_1 \right) = 0,
+```
+uniformly in all directions ``x/|x|``.
+
+Throughout this tutorial, we use the following notations:
+```math
+\gamma^\pm u = \lim_{\epsilon\to0\pm}u(x+\epsilon \mathbf{n}(x))\quad\text{and}\quad\partial_n^\pm u=\lim_{\epsilon\to 0\pm}\nabla u(x+\epsilon \mathbf{n}(x))\cdot\mathbf{n}(x),\quad x\in\Gamma,
+```
+to denote the Dirichlet and Neumann traces respectively. We recall that in `Inti.jl` the unit normal vector ``\mathbf{n}`` points towards the exterior of the bounded domain ``\Omega``.
+
+We now have the background to defined the data necessary to solve this problem in both 2 and 3 spatial dimensions. Let's load `Inti.jl` as well as the required dependencies:
 
 """
+
+# ╔═╡ a879ffdf-2808-4d83-80b9-95dff7078a37
+begin
+    k₁       = 8π
+	k₂       = 2π
+	λ₁       = 2π / k₁
+	λ₂       = 2π / k₂	
+	qorder   = 4 # quadrature order
+	gorder   = 2 # order of geometrical approximation
+	nothing #hide
+end
 
 # ╔═╡ 643919c5-762f-4fa6-ac26-6bf0abd94558
 md"""
-## Helmholtz transmission problem
+## Direct Müller's formulation
 
-This example concerns the sound-soft acoustic scattering problem. Mathematically, this means solving an exterior problem governed by Helmholtz equation (time-harmonic acoustics) with a Dirichlet boundary condition. More precisely, letting ``\Omega \subset \mathbb{R}^d`` be a bounded domain, and denoting by ``\Gamma = \partial \Omega`` its boundary, we wish to solve
-
+We start off from Green's representation formula. Resorting to the notations
 ```math
-\Delta u + k^2 u = 0 \quad \text{on} \quad \mathbb{R}^d \setminus \bar{\Omega},
+\begin{aligned}
+\mathcal S_j[\varphi](x) =&~ \int_{\Gamma}G_{k_j}(x,y)\varphi(y)ds(y)\quad\text{and}\\
+\mathcal D_{j}[\psi](x)=&~\int_{\Gamma}\frac{\partial G_{k_j}(x,y)}{\partial n(y)}\psi(y)ds(y),\quad x\in\mathbb R^d\setminus\Gamma,\end{aligned}
+```
+for the single- and double-layer potentials, we have 
+```math
+\begin{aligned}
+u_1(x) =&~\mathcal D_1[\gamma^+u_1](x)-\mathcal S_1[\partial^+u_1](x),& x\in\mathbb R^d\setminus\overline\Omega,\\
+u_2(x) =& -\mathcal D_2[\gamma^-u_2](x)+\mathcal S_2[\partial^-u_2](x),& x\in\Omega,\\
+u^{\rm inc}(x) =& -\mathcal D_1[\gamma^-u^{\rm inc]}](x)+\mathcal S_1[\partial^-u^{\rm inc}](x),& x\in\Omega,
+\end{aligned}
+```
+Taking the Dirichlet traces of the boundary integral representations of the fields, we get 
+```math
+\begin{aligned}
+\frac12\gamma^+u_1 =&~D_1[\gamma^+u_1]- S_1[\partial^+u_1],\\
+\frac12\gamma^-u_2 =& - D_2[\gamma^-u_2]+ S_2[\partial^-u_2],\\
+\frac12\gamma^-u^{\rm inc} =& -D_1[\gamma^-u^{\rm inc]}]+ S_1[\partial^-u^{\rm inc}].
+\end{aligned}
+```
+Subtracting the last equation from the first one using the identities ``\gamma^-u^{\rm inc} =\gamma^+u^{\rm inc}`` and ``\partial_n^-u^{\rm inc}=\partial_n^+u^{\rm inc}`` which follow from the smoothness of the incident field across ``\Gamma``, we obtain
+```math
+\frac12\gamma^+u_1-\frac12\gamma^-u^{\rm inc} =~D_1[\gamma^+(u_1+u^{\rm inc})]- S_1[\partial^+_n(u_1+u^{\rm inc})].
+```
+Replacing the tranmission conditions, ``\gamma^+(u^{\rm inc}+u_1)=\gamma^-u_2`` and ``\partial_n^+(u^{\rm inc}+u_1) =\partial_n^-u_2`` in the formula above, we obtain 
+```math
+\frac12\gamma^+u_2-\gamma^-u^{\rm inc} =~D_1[\gamma^-u_2]- S_1[\partial^-_nu_2].
+```
+Then, adding this expression to the formula for ``\frac12\gamma^-u_2`` above, we arrive at 
+```math
+\gamma^-u_2+(D_2-D_1)[\gamma^-u_2]-(S_2-S_1)[\partial_n^-u_2] =\gamma^-u^{\rm inc}.
 ```
 
-subject to Dirichlet boundary conditions on ``\Gamma``
+Similarly, combining the following expressions
+```math
+\begin{aligned}
+\frac12\partial_n^+u_1 =&~N_1[\gamma^+u_1]- K_1[\partial^+u_1],\\
+\frac12\partial_n^-u_2 =& - N_2[\gamma^-u_2]+ K_2[\partial^-u_2],\\
+\frac12\partial_n^-u^{\rm inc} =& -N_1[\gamma^-u^{\rm inc]}]+ K_1[\partial^-u^{\rm inc}],
+\end{aligned}
+```
+that following from taking Neumann trace of the integral representation of the fields, we arrive at 
 
 ```math
-	u(\boldsymbol{x}) = g(\boldsymbol{x}) \quad \text{for} \quad \boldsymbol{x} \in \Gamma.
+\partial_n^-u_2+(N_2-N_1)[\gamma^-u_2]-(K_2-K_1)[\partial_n^-u_2] =\partial_n^-u^{\rm inc}.
 ```
 
-and the *Sommerfeld radiation condition* at infinity
-
+The bounday integral equation system can be recast as 
 ```math
-	\lim_{|\boldsymbol{x}| \to \infty} |\boldsymbol{x}|^{(d-1)/2} \left( \frac{\partial u}{\partial |\boldsymbol{x}|} - i k u \right) = 0.
+\left(I+\begin{bmatrix}D_2-D_1&-S_2+S_1\\N_2-N_1&-K_2+K_1\end{bmatrix}\right)\begin{bmatrix}\gamma^-u_2\\\partial_n^-u_2\end{bmatrix} = \begin{bmatrix}\gamma^-u^{\rm inc}\\\partial_n^-u^{\rm inc}\end{bmatrix}.
 ```
-
-Here ``g`` is a (given) boundary datum, and ``k`` is the constant wavenumber.
-
-For simplicity, we will take ``\Gamma`` circle/sphere, and focus on the *plane-wave scattering* problem. This means we will seek a solution ``u`` of the form ``u = u_s + u_i``, where ``u_i`` is a known incident field, and ``u_s`` is the scattered field we wish to compute.
-
-!!! note "Complex geometries"
-	The main reason for focusing on such a simple example is twofold. First,
-	it alleviates the complexities associated with the mesh generation. Second,
-	since exact solutions are known for this problem (in the form of a series),
-	it is easy to assess the accuracy of the solution obtained. In practice, you
-	can use the same techniques to solve the problem on more complex geometries
-	by providing a `.msh` file containing the mesh.
-
 """
 
-# ╔═╡ 054b4d61-b6d1-4938-8ff5-22e8c5cdb8f7
+# ╔═╡ 88e5d810-7e68-4e48-a4e6-1249c5c597a7
+
 md"""
-Using the theory of boundary integral equations, we can express ``u_s`` as
-
-```math
-	u_s(\boldsymbol{r}) = \mathcal{D}[\sigma](\boldsymbol{r}) - i k \mathcal{S}[\sigma](\boldsymbol{r}),
-```
-
-where ``\mathcal{S}`` is the so-called single layer potential, ``\mathcal{D}``
-is the double-layer potential, and ``\sigma : \Gamma \to \mathbb{C}`` is a
-surface density. This is an indirect formulation (because ``\sigma`` is an
-*auxiliary* density, not necessarily physical) commonly referred to as a
-*combined field formulation*. Taking the limit ``\mathbb{R}^d \setminus \bar
-\Omega \ni x \to \Gamma``, it can be shown that the following equation holds
-on ``\Gamma``:
-
-```math
-	\left( \frac{\mathrm{I}}{2} + \mathrm{D} - i k \mathrm{S} \right)[\sigma] = g,
-```
-
-where $\mathrm{I}$ is the identity operator, and $\mathrm{S}$ and $\mathrm{D}$
-are the single- and double-layer operators. This is the **combined field
-integral equation** that we will solve. The boundary data ``g`` is obtained by
-applying the sound-soft condition ``u=0`` on ``\Gamma``, from which it readily
-follows that ``u_s = -u_i`` on ``\Gamma``.
-
-We are now have the necessary background to solve this problem in both 2 and 3
-spatial dimensions. Let's load `Inti.jl` as well as the required dependencies
+#### In two diensions:
+Let us now use gmsh_circle to create a circle.msh file. As customary in wave-scattering problems, we will choose a mesh size that is proportional to wavelength:
 """
 
-# ╔═╡ 092c4d06-873c-4782-9a16-602c1fdea715
-md"""
-and setup some of the (global) problem parameters:
-"""
-
-# ╔═╡ 4cabe108-93c6-4fbf-b8ec-37277abbbda1
-begin
-    k      = 4π
-    λ      = 2π / k
-    qorder = 4 # quadrature order
-    gorder = 2 # order of geometrical approximation
-    nothing #hide
-end
-
-# ╔═╡ a33f066e-307c-42c4-836b-5b7d8236a893
-md"""
-## Two-dimensional scattering
-
-We will use [Gmsh API](https://gmsh.info/doc/texinfo/gmsh.html#Gmsh-application-programming-interface) for creating `.msh` file containing the desired geometry and mesh. Here is a function to mesh the circle:
-"""
-
-# ╔═╡ cb736b4d-bbd6-456c-9041-f69b2155a470
+# ╔═╡ 1923719e-9a52-4bd3-89e6-76a1670a906c
 begin
     function gmsh_circle(; name, meshsize, order = 1, radius = 1, center = (0, 0))
         try
@@ -155,565 +170,76 @@ begin
     nothing #hide
 end
 
-# ╔═╡ 2ed4fd2d-b3c2-4211-bf3f-c551923e65cf
-md"""
-Let us now use `gmsh_circle` to create a `circle.msh` file. As customary in wave-scattering problems, we will choose a mesh size that is proportional to wavelength:
-"""
-
-# ╔═╡ 12e20620-042c-4040-bd64-af01bd0f2ad9
+# ╔═╡ ac17c411-0628-4721-af54-d34bcd9f1fb5
 begin
     name = joinpath(@__DIR__, "circle.msh")
-    meshsize = λ / 5
+    meshsize = min(λ₁, λ₂) / 10
     gmsh_circle(; meshsize, order = gorder, name)
+	nothing
 end
 
-# ╔═╡ 24454bd5-00cf-4282-926f-f1324141fe26
-md"""
-We can now import the file and parse the mesh and domain information into `Inti.jl` using the [`import_mesh`](@ref Inti.import_mesh) function:
-"""
-
-# ╔═╡ ff73663c-7cf4-4b23-83b5-095dc66f711f
-# ╠═╡ show_logs = false
+# ╔═╡ e56d3dc6-c434-4c28-9ef9-834f62edd41d
 begin
     Inti.clear_entities!() # empty the entity cache
     msh = Inti.import_mesh(name; dim = 2)
+	Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
+	Γ = Inti.boundary(Ω)
+	Γ_msh = view(msh, Γ)
+	Q = Inti.Quadrature(Γ_msh; qorder)
+	nothing
 end
 
-# ╔═╡ 176f1fef-f761-4ad0-8fea-982eab4fe24d
-md"""
-The code above will import the mesh with all of its geometrical entities. The `dim=2` projects all points to two dimensions by ignoring the third component. To extract the domain ``\Omega`` we need to filter the entities in the mesh; here we will simply filter them based on the `geometric_dimension`:
-"""
+# ╔═╡ e0863052-fe3e-4f4a-a5db-091a52c2de84
+begin 
+	pde₁ = Inti.Helmholtz(; k = k₁, dim = 2)
+	pde₂ = Inti.Helmholtz(; k = k₂, dim = 2)
+	nothing
+end
 
-# ╔═╡ 1ce22adc-5b79-426f-bafa-829acc6487f5
-Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
-
-# ╔═╡ 3251d71a-b84c-48d8-9dff-01b2457e610b
-md"""
-To solve our boundary integral equation usign a Nyström method, we actually need a quadrature of our curve/surface (and possibly the normal vectors at the quadrature nodes). Once a mesh is available, creating a quadrature object can be done via the [`Quadrature`](@ref Inti.Quadrature) constructor, which requires passing a mesh of the domain that one wishes to generate a quadrature
-for:
-"""
-
-# ╔═╡ 09a785ae-7286-4a47-b103-1e90efa20167
+# ╔═╡ 4a66d411-e3b4-4652-af91-01e42e79b82f
 begin
-    Γ = Inti.boundary(Ω)
-    Γ_msh = view(msh, Γ)
-    Q = Inti.Quadrature(Γ_msh; qorder)
-    nothing #hide
+using FMM2D
+	S₁, D₁ = Inti.single_double_layer(;
+    pde = pde₁,
+    target = Q,
+    source = Q,
+    compression = (method = :fmm, tol = :1e-8),
+    correction = (method = :dim, maxdist = 5 * meshsize),
+	)
+	
+	K₁, N₁ = Inti.adj_double_layer_hypersingular(;
+    pde = pde₁,
+    target = Q,
+    source = Q,
+    compression = (method = :fmm, tol = :1e-8),
+    correction = (method = :dim, maxdist = 5 * meshsize),
+	)
+
+	S₂, D₂ = Inti.single_double_layer(;
+    pde = pde₂,
+    target = Q,
+    source = Q,
+    compression = (method = :fmm, tol = :1e-8),
+    correction = (method = :dim, maxdist = 5 * meshsize),
+	)
+
+	K₂, N₂ = Inti.adj_double_layer_hypersingular(;
+    pde = pde₂,
+    target = Q,
+    source = Q,
+    compression = (method = :fmm, tol = :1e-8),
+    correction = (method = :dim, maxdist = 5 * meshsize),
+	)
+	nothing
 end
-
-# ╔═╡ 593216db-810e-47db-b6cb-aa6cf53e8590
-md"""
-!!! tip "Views of a mesh"
-	In `Inti.jl`, you can use domain to create a *view* of a mesh containing *only
-	the elements in the domain*. For example `view(msh,Γ)` will return an
-	`SubMesh` type that you can use to iterate over the elements in the boundary
-	of the disk without actually creating a new mesh. You can use `msh[Γ]`,
-	or `collect(view(msh,Γ))` to create a new mesh containing *only* the
-	elements and nodes in `Γ`.
-"""
-
-# ╔═╡ 6e1a493e-2f3c-42d3-9076-1e43905893a3
-md"""
-The object `Q` now contains a quadrature (of order `4`) that can be used to solve a boundary integral equation on `Γ`. As a sanity check, let's make sure integrating the function `x->1` over `Q` gives an approximation to the perimeter:
-"""
-
-# ╔═╡ 3cfa2da8-c45b-41b3-9b41-07dff363558b
-@assert abs(Inti.integrate(x -> 1, Q) - 2π) < 1e-5
-
-# ╔═╡ bb7f702e-eaa3-4751-a6ed-5806647d8ff7
-abs(Inti.integrate(x -> 1, Q) - 2π)
-
-# ╔═╡ 78ac2790-60d4-40da-bf5d-09617f1445a2
-md"""
-With the [`Quadrature`](@ref Inti.Quadrature) constructed, we now can define discrete approximation to the integral operators ``\mathrm{S}`` and ``\mathrm{D}`` as follows:
-"""
-
-# ╔═╡ 9b37d163-15ca-44af-9e00-7410956fc16c
-begin
-    op = Inti.Helmholtz(; k, dim = 2)
-    S, D = Inti.single_double_layer(;
-        op,
-        target = Q,
-        source = Q,
-        compression = (method = :none,),
-        correction = (method = :dim,),
-    )
-    nothing #hide
-end
-
-# ╔═╡ 061b7503-bad0-411e-b126-eea4b89feb03
-md"""
-There are two well-known difficulties related to the discretization of the boundary integral operators $S$ and $D$:
-- The kernel of the integral operator is not smooth, and thus specialized quadrature rules are required to accurately approximate the matrix entries for which the target and source point lie *close* (relative to some scale) to each other.
-- The underlying matrix is dense, and thus the storage and computational cost of the operator is prohibitive for large problems unless acceleration techniques such as *Fast Multipole Methods* or *Hierarchical Matrices* are employed.
-
-`Inti.jl` tries to provide a modular and transparent interface for dealing with both of these difficulties, where the general approach for solving a BIE will be to first construct a (possible compressed) naive representation of the integral operator where singular and nearly-singular integrals are ignored, followed by a the creation of a (sparse) correction intended to account for such singular interactions. See [`single_double_layer`](@ref Inti.single_double_layer) for more details on the various options available.
-
-We can now combine `S` and `D` to form the combined-field operator:
-"""
-
-# ╔═╡ ebaf6ed5-8e01-4c5f-9d7f-8cdc32a68022
-begin
-    L = I / 2 + D - im * k * S
-    nothing #hide
-end
-
-# ╔═╡ 8ba9aadc-5b34-41cb-adba-1ebdc65a741d
-md"""
-where `I` is the identity matrix. Assuming an incident field along the $x_1$ direction of the form $u_i =e^{ikx_1}$, the right-hand side of the equation can be construted using:
-"""
-
-# ╔═╡ eaf2025e-1135-4ee6-9dea-25e2c0c09ec8
-begin
-    uᵢ = x -> exp(im * k * x[1]) # plane-wave incident field
-    rhs = map(Q) do q
-        x = q.coords
-        return -uᵢ(x)
-    end
-    nothing #hide
-end
-
-# ╔═╡ 7fcd47c1-9d65-41e2-9363-141d53f0dbca
-md"""
-!!! note "Iterating over a quadrature"
-	In computing `rhs` above, we used `map` to evaluate the incident field at all quadrature nodes. When iterating over `Q`, the iterator returns a [`QuadratureNode`](@ref Inti.QuadratureNode), and not simply the *coordinate* of the quadrature node. This is so that you can access additional information, such as the `normal` vector, at the quadrature node.
-"""
-
-# ╔═╡ 4cdf0551-1d13-4060-88e6-cf86ad180938
-md"""
-We can now solve the integral equation using e.g. the backslash operator:
-"""
-
-# ╔═╡ 2925e1a3-1051-4b09-bbd9-461c6a76a1e3
-begin
-    σ = L \ rhs
-    nothing #hide
-end
-
-# ╔═╡ b26e0c64-b3f1-4b18-a6f5-8f789407a744
-md"""
-The variable `σ` contains the value of the approximate density at the quadrature nodes. To reconstruct a continuous approximation to the solution, we can use [`single_double_layer_potential`](@ref Inti.single_double_layer_potential) to obtain the single- and double-layer potentials, and then combine them as follows:
-"""
-
-# ╔═╡ fd0f2cf4-1b18-4c56-84a9-2339b3dfc10a
-begin
-    𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
-    uₛ   = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
-    nothing #hide
-end
-
-# ╔═╡ 12b3c26a-96b3-440b-9771-4a945fe14ce7
-md"""
-The variable `uₛ` is an anonymous/lambda function representing the approximate scattered field.
-
-To assess the accuracy of the solution, we can compare it to the exact solution (obtained by separation of variables in polar coordinates):
-"""
-
-# ╔═╡ 185cfa1e-7c87-4243-8f5e-c5983932e135
-begin
-    function circle_helmholtz_soundsoft(pt; radius = 1, k, θin)
-        x = pt[1]
-        y = pt[2]
-        r = sqrt(x^2 + y^2)
-        θ = atan(y, x)
-        u = 0.0
-        r < radius && return u
-        c(n) = -exp(im * n * (π / 2 - θin)) * besselj(n, k * radius) / besselh(n, k * radius)
-        u    = c(0) * besselh(0, k * r)
-        n    = 1
-        while (abs(c(n)) > 1e-12)
-            u +=
-                c(n) * besselh(n, k * r) * exp(im * n * θ) +
-                c(-n) * besselh(-n, k * r) * exp(-im * n * θ)
-            n += 1
-        end
-        return u
-    end
-    nothing #hide
-end
-
-# ╔═╡ 4c37081c-4f68-48fe-be5b-bebf35f0c35e
-md"""
-Here is the maximum error on some points located on a circle of radius `2`:
-"""
-
-# ╔═╡ 1daa0518-a98b-448c-bddd-1147a0f7ed4d
-begin
-    uₑ = x -> circle_helmholtz_soundsoft(x; k, radius = 1, θin = 0) # exact solution
-    er = maximum(0:0.01:2π) do θ
-        R = 2
-        x = (R * cos(θ), R * sin(θ))
-        return abs(uₛ(x) - uₑ(x))
-    end
-    @info "maximum error = $er"
-end
-
-# ╔═╡ 3557cd23-43b2-4c79-a0e9-53c0d9650851
-@assert er < 1e-3
-
-# ╔═╡ 42a42555-0c97-4a40-8865-38966983a9e7
-md"""
-As we can see, the error is quite small! Let's use `Makie` to visualize the solution in this simple (2d) example:
-"""
-
-# ╔═╡ 56350a37-b2d8-463e-934f-e8a4fbf72c67
-begin
-    xx = yy = range(-4; stop = 4, length = 200)
-    vals = map(
-        pt -> Inti.isinside(pt, Q) ? NaN : real(uₛ(pt) + uᵢ(pt)),
-        Iterators.product(xx, yy),
-    )
-    fig, ax, hm = heatmap(
-        xx,
-        yy,
-        vals;
-        colormap = :inferno,
-        interpolate = true,
-        axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
-    )
-    viz!(Γ_msh; color = :white, segmentsize = 5)
-    Colorbar(fig[1, 2], hm)
-    fig
-end
-
-# ╔═╡ 471a5475-1ef5-4f40-bb45-a3e29ae5c0a8
-md"""
-While here we simply used a heatmap to visualize the solution, more complex problems may require a mesh-based visualization, where we would first create a mesh for the places where we want to visualize the solution.
-
-Before moving on to the 3D example let us simply mention that, besides the fact that an analytic solution was available for comparisson, there was nothing special about the unit disk (or the use of GMSH). We could have, for instance, replaced the disk by shapes created parametrically:
-"""
-
-# ╔═╡ 3f3f4794-f2bf-4171-a1b4-70fd38c01fc3
-let
-    # vertices of an equilateral triangle centered at the origin with a vertex at (0,1)
-    a, b, c = SVector(0, 1), SVector(sqrt(3) / 2, -1 / 2), SVector(-sqrt(3) / 2, -1 / 2)
-    function circle_f(center, radius)
-        return s -> center + radius * SVector(cospi(2 * s[1]), sinpi(2 * s[1]))
-    end
-    disk1 = Inti.parametric_curve(circle_f(a, 1 / 2), 0, 1)
-    disk2 = Inti.parametric_curve(circle_f(b, 1 / 2), 0, 1)
-    disk3 = Inti.parametric_curve(circle_f(c, 1 / 2), 0, 1)
-    Γ = disk1 ∪ disk2 ∪ disk3
-    msh = Inti.meshgen(Γ; meshsize)
-    Γ_msh = view(msh, Γ)
-    Q = Inti.Quadrature(Γ_msh; qorder)
-    S, D = Inti.single_double_layer(;
-        op,
-        target = Q,
-        source = Q,
-        compression = (method = :none,),
-        correction = (method = :dim,),
-    )
-    L = I / 2 + D - im * k * S
-    rhs = map(q -> -uᵢ(q.coords), Q)
-    σ = L \ rhs
-    𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
-    uₛ = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
-    vals = map(
-        pt -> Inti.isinside(pt, Q) ? NaN : real(uₛ(pt) + uᵢ(pt)),
-        Iterators.product(xx, yy),
-    )
-    colorrange = (-2, 2)
-    fig, ax, hm = heatmap(
-        xx,
-        yy,
-        vals;
-        colormap = :inferno,
-        colorrange,
-        interpolate = true,
-        axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
-    )
-    viz!(Γ_msh; color = :black, segmentsize = 4)
-    Colorbar(fig[1, 2], hm)
-    fig
-end
-
-# ╔═╡ b8fd284a-3865-4762-9602-6bc1eba464a4
-md"""
-!!! note "Near-field evaluation"
-	In the example above we employed a naive evaluation of the integral potentials, and therefore the computed solution is expected to become innacurate near the obstacles. See the [layer potential tutorial](@ref "Layer potentials") for more information on how to correct for this.
-"""
-
-# ╔═╡ 8b7fc104-324d-42c7-98b7-dff0df561ce2
-md"""
-## Three-dimensional scattering
-
-We now consider the same problem in 3D. Unlike the 2D case, assembling dense matrix representations of the integral operators quickly becomes unfeasiable as the problem size increases. `Inti` adds support for compressing the underlying linear operators by wrapping external libraries. In this example, we will rely on [`HMatrices.jl`](https://github.com/WaveProp/HMatrices.jl) to handle the compression.
-
-The visualization is also more involved, and we will use the `Gmsh` API to create a not only a mesh of the scatterer, but also of a punctured plane where we will visualize the solution. Here is the function that setups up the mesh:
-"""
-
-# ╔═╡ b02fbb5b-ce97-48e7-ab2b-a8db6ca7c8d3
-begin
-    function gmsh_sphere(; meshsize, order = gorder, radius = 1, visualize = false, name)
-        gmsh.initialize()
-        gmsh.model.add("sphere-scattering")
-        gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-        gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
-        sphere_tag = gmsh.model.occ.addSphere(0, 0, 0, radius)
-        xl, yl, zl = -2 * radius, -2 * radius, 0
-        Δx, Δy = 4 * radius, 4 * radius
-        rectangle_tag = gmsh.model.occ.addRectangle(xl, yl, zl, Δx, Δy)
-        outDimTags, _ =
-            gmsh.model.occ.cut([(2, rectangle_tag)], [(3, sphere_tag)], -1, true, false)
-        gmsh.model.occ.synchronize()
-        gmsh.model.addPhysicalGroup(3, [sphere_tag], -1, "omega")
-        gmsh.model.addPhysicalGroup(2, [dt[2] for dt in outDimTags], -1, "sigma")
-        gmsh.model.mesh.generate(2)
-        gmsh.model.mesh.setOrder(order)
-        visualize && gmsh.fltk.run()
-        gmsh.option.setNumber("Mesh.SaveAll", 1) # otherwise only the physical groups are saved
-        gmsh.write(name)
-        return gmsh.finalize()
-    end
-    nothing #hide
-end
-
-# ╔═╡ 49f0edcd-9cb8-4722-ae56-b17ee48f8336
-md"""
-As before, lets write a file with our mesh, and import it into `Inti.jl`:
-"""
-
-# ╔═╡ a18b8726-fa97-4388-bb8b-53965a5d433b
-# ╠═╡ show_logs = false
-begin
-    name_sphere = joinpath(@__DIR__, "sphere.msh")
-    gmsh_sphere(; meshsize = (λ / 5), order = gorder, name = name_sphere, visualize = false)
-    msh_3d = Inti.import_mesh(name_sphere; dim = 3)
-end
-
-# ╔═╡ 063e3185-8714-4955-b985-5413420a889b
-md"""
-!!! tip
-	If you pass `visualize=true` to `gmsh_sphere`, it will open a window with the current model. This is done by calling `gmsh.fltk.run()`. Note that the main julia thread will be blocked until the window is closed.
-"""
-
-# ╔═╡ 069f1446-e072-481d-bbba-6dfdf6600158
-md"""
-Since we created physical groups in `Gmsh`, we can use them to extract the relevant domains `Ω` and `Σ`:
-"""
-
-# ╔═╡ 631328d5-c961-41e1-ac0e-181c3bb75112
-begin
-    Ω_3d = Inti.Domain(e -> "omega" ∈ Inti.labels(e), Inti.entities(msh_3d))
-    Σ_3d = Inti.Domain(e -> "sigma" ∈ Inti.labels(e), Inti.entities(msh_3d))
-    Γ_3d = Inti.boundary(Ω_3d)
-    nothing #hide
-end
-
-# ╔═╡ dbd6d298-0fbf-420f-9622-d1db1d550cc5
-md"""
-We can now create a quadrature as before
-"""
-
-# ╔═╡ 6096328b-e1af-4ec5-b72b-cd381c166cb7
-begin
-    Γ_msh_3d = view(msh_3d, Γ_3d)
-    Q_3d = Inti.Quadrature(Γ_msh_3d; qorder)
-    nothing #hide
-end
-
-# ╔═╡ 498fa575-5cf7-4a7e-8d3b-c50d605aa57c
-begin
-    using HMatrices
-    op_3d = Inti.Helmholtz(; k, dim = 3)
-    S_3d, D_3d = Inti.single_double_layer(;
-        op = op_3d,
-        target = Q_3d,
-        source = Q_3d,
-        compression = (method = :hmatrix, tol = 1e-4),
-        correction = (method = :dim,),
-    )
-    nothing #hide
-end
-
-# ╔═╡ b6cad085-eb74-4152-8850-226ed837febd
-md"""
-!!! tip "Writing/reading a mesh from disk"
-	Writing and reading a mesh to/from disk can be time consuming. You can avoid doing so by using [`import_mesh`](@ref Inti.import_mesh) without a file name to import the mesh from the current `gmsh` session without the need to write it to disk.
-"""
-
-# ╔═╡ f5d990e9-8d05-41e6-b6b3-c737692de37a
-md"""
-Next we assemble the integral operators, indicating that we wish to compress them using hierarchical matrices:
-"""
-
-# ╔═╡ ba95db2c-979a-41f2-9705-92d3cedd0160
-md"""
-Here is how much memory it would take to store the dense representation of these matrices:
-"""
-
-# ╔═╡ 54f07c21-339b-44c3-9ac2-22af163d55ae
-begin
-    mem = 2 * length(S_3d) * 16 / 1e9 # 16 bytes per complex number, 1e9 bytes per GB, two matrices
-    println("memory required to store S and D: $(mem) GB")
-end
-
-# ╔═╡ 915d3636-70bd-4001-857f-3aae11eb2d2e
-md"""
-Even for this simple example, the dense representation of the integral operators as matrix is already quite expensive!
-"""
-
-# ╔═╡ bc09986a-5378-4d0b-a2b2-df9245f3f9cf
-md"""
-!!! note "Compression methods"
-	It is worth mentioning that hierchical matrices are not the only way to compress such integral operators, and may in fact not even be the best for the problem at hand. For example, one could use a fast multipole method (FMM), which has a much lighter memory footprint. See the the [tutorial on compression methods](@ref "Compression methods") for more information.
-"""
-
-# ╔═╡ b9e36a69-a3d1-41c8-8951-01f92acf0806
-md"""
-We will use the generalized minimal residual (GMRES) iterative solver, for the linear system. This requires us to define a linear operator `L`, approximating the combined-field operator, that supports the matrix-vector product. While it is possible to add two `HMatrix` objects to obtain a new `HMatrix`, this is somewhat more involved due to the addition of low-rank blocks (which requires a recompression). To keep things simple, we will use `LinearMaps` to lazily compose the operators:
-"""
-
-# ╔═╡ a2ddce1e-440e-49e2-8c3e-ec6960ff83f0
-begin
-    L_3d = I / 2 + LinearMap(D_3d) - im * k * LinearMap(S_3d)
-    nothing #hide
-end
-
-# ╔═╡ f148c58a-50d3-4ac2-a1da-148563d533e7
-md"""
-We can now solve the linear system using GMRES solver:
-"""
-
-# ╔═╡ dcf006a3-5332-442a-9771-f427cd7189a5
-# ╠═╡ show_logs = false
-begin
-    rhs_3d = map(Q_3d) do q
-        x = q.coords
-        return -uᵢ(x)
-    end
-    σ_3d, hist = gmres(
-        L_3d,
-        rhs_3d;
-        log = true,
-        abstol = 1e-6,
-        verbose = false,
-        restart = 100,
-        maxiter = 100,
-    )
-    @show hist
-end
-
-# ╔═╡ 215677a6-af7b-4e5d-863f-aabdfb4a1400
-md"""
-As before, let us represent the solution using `IntegralPotential`s:
-"""
-
-# ╔═╡ 14a549ad-e23f-40a4-b7fa-ef31354805a9
-begin
-    𝒮_3d, 𝒟_3d = Inti.single_double_layer_potential(; op = op_3d, source = Q_3d)
-    uₛ_3d = x -> 𝒟_3d[σ_3d](x) - im * k * 𝒮_3d[σ_3d](x)
-    nothing #hide
-end
-
-# ╔═╡ 832858dc-2475-4f6a-a820-a557b2883f0c
-md"""
-To check the result, we compare against the exact solution obtained through a series:
-"""
-
-# ╔═╡ e00c4d90-aa3b-41f9-b65e-7e9ace89a295
-begin
-    sphbesselj(l, r) = sqrt(π / (2r)) * besselj(l + 1 / 2, r)
-    sphbesselh(l, r) = sqrt(π / (2r)) * besselh(l + 1 / 2, r)
-    sphharmonic(l, m, θ, ϕ) = GSL.sf_legendre_sphPlm(l, abs(m), cos(θ)) * exp(im * m * ϕ)
-    function sphere_helmholtz_soundsoft(xobs; radius = 1, k = 1, θin = 0, ϕin = 0)
-        x = xobs[1]
-        y = xobs[2]
-        z = xobs[3]
-        r = sqrt(x^2 + y^2 + z^2)
-        θ = acos(z / r)
-        ϕ = atan(y, x)
-        u = 0.0
-        r < radius && return u
-        function c(l, m)
-            return -4π * im^l * sphharmonic(l, -m, θin, ϕin) * sphbesselj(l, k * radius) /
-                   sphbesselh(l, k * radius)
-        end
-        l = 0
-        for l in 0:60
-            for m in -l:l
-                u += c(l, m) * sphbesselh(l, k * r) * sphharmonic(l, m, θ, ϕ)
-            end
-            l += 1
-        end
-        return u
-    end
-    nothing #hide
-end
-
-# ╔═╡ bb87f66d-5e68-49c5-9167-bdbab60109e5
-md"""
-We will compute the error on some point on the sphere of radius `2`:
-"""
-
-# ╔═╡ 3848717e-0c30-4c0b-82ec-b504c9210483
-begin
-    uₑ_3d = (x) -> sphere_helmholtz_soundsoft(x; radius = 1, k = k, θin = π / 2, ϕin = 0)
-    er_3d = maximum(1:100) do _
-        x̂ = rand(Inti.Point3D) |> normalize # an SVector of unit norm
-        x = 2 * x̂
-        return abs(uₛ_3d(x) - uₑ_3d(x))
-    end
-    @info "error with correction = $er_3d"
-end
-
-# ╔═╡ 36ddb3be-7103-429f-9011-99c27c655de5
-@assert er_3d < 1e-3
-
-# ╔═╡ 386046f6-6909-4e9e-bb90-80c32df59f70
-md"""
-We see that, once again, the approximation is quite accurate. Let us now visualize the solution on the punctured plane (which we labeled as "sigma"). Since evaluating the integral representation of the solution at many points is expensive, we will use again use a method to accelerate the evaluation:
-"""
-
-# ╔═╡ b2b31b38-4c2f-4763-9273-971749c40d5c
-begin
-    Σ_msh = view(msh_3d, Σ_3d)
-    target = Inti.nodes(Σ_msh)
-
-    S_viz, D_viz = Inti.single_double_layer(;
-        op = op_3d,
-        target,
-        source = Q_3d,
-        compression = (method = :hmatrix, tol = 1e-4),
-        # correction for the nearfield (for visual purposes, set to `:none` to disable)
-        correction = (method = :dim, maxdist = meshsize, target_location = :outside),
-    )
-
-    ui_eval_msh = uᵢ.(target)
-    us_eval_msh = D_viz * σ_3d - im * k * S_viz * σ_3d
-    u_eval_msh = ui_eval_msh + us_eval_msh
-    nothing #hide
-end
-
-# ╔═╡ 0cec09b1-8806-4aee-970d-cc0b1e4b841c
-md"""
-Finalize, we use [`Meshes.viz`](@extref) to visualize the scattered field:
-"""
-
-# ╔═╡ dab9a19c-977e-4ab1-a3d9-f9970af69642
-begin
-    nv = length(Inti.nodes(Γ_msh_3d))
-    colorrange = extrema(real(u_eval_msh))
-    colormap = :inferno
-    fig_3d = Figure(; size = (800, 500))
-    ax_3d = Axis3(fig_3d[1, 1]; aspect = :data)
-    viz!(Γ_msh_3d; colorrange, colormap, color = zeros(nv), interpolate = true)
-    viz!(Σ_msh; colorrange, colormap, color = real(u_eval_msh))
-    cb = Colorbar(fig_3d[1, 2]; label = "real(u)", colormap, colorrange)
-    fig_3d #hide
-end
-
-# ╔═╡ 765e46fc-dac3-439a-ab07-2865298aed45
-TableOfContents()
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+FMM2D = "2d63477d-9690-4b75-bcc1-c3461d43fecc"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 GSL = "92c85e6c-cbff-5e0c-80f7-495c94daaecd"
 Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
-HMatrices = "8646bddf-ab1c-4fa7-9c51-ba187d647618"
 Inti = "fb74042b-437e-4c5b-88cf-d4e2beb394d5"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -725,10 +251,10 @@ SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
+FMM2D = "~0.2.0"
 GLMakie = "~0.10.11"
 GSL = "~1.0.1"
 Gmsh = "~0.3.1"
-HMatrices = "~0.2.10"
 Inti = "~0.1.1"
 IterativeSolvers = "~0.9.4"
 LinearMaps = "~3.11.3"
@@ -742,9 +268,9 @@ StaticArrays = "~1.9.7"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.5"
+julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "d44a4fc4bc70d7f830d8c6a5f390abee497288c9"
+project_hash = "f233076b4b67e51eb9b41c2fafd47130d47527dc"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1190,6 +716,18 @@ git-tree-sha1 = "72a4842f93e734f378cf381dae2ca4542f019d23"
 uuid = "4fce6fc7-ba6a-5f4c-898f-77e99806d6f8"
 version = "1.3.8+0"
 
+[[deps.FMM2D]]
+deps = ["FMM2D_jll"]
+git-tree-sha1 = "474cb4ad88d52dbc5afd82e1b7174f36cd12f729"
+uuid = "2d63477d-9690-4b75-bcc1-c3461d43fecc"
+version = "0.2.0"
+
+[[deps.FMM2D_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "7dc785c70f868c6c2c06aabb7f78ce5a0f778d05"
+uuid = "0fc7e017-fbf9-5352-9b8d-9e37f15ce1cd"
+version = "1.1.0+0"
+
 [[deps.FileIO]]
 deps = ["Pkg", "Requires", "UUIDs"]
 git-tree-sha1 = "82d8afa92ecf4b52d78d869f038ebfb881267322"
@@ -1393,12 +931,6 @@ deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LazyArtifac
 git-tree-sha1 = "82a471768b513dc39e471540fdadc84ff80ff997"
 uuid = "0234f1f7-429e-5d53-9886-15a909be8d59"
 version = "1.14.3+3"
-
-[[deps.HMatrices]]
-deps = ["Distributed", "LinearAlgebra", "Printf", "RecipesBase", "SparseArrays", "StaticArrays", "Statistics"]
-git-tree-sha1 = "919577057e7e9b9795cedd5af7ad37355d74f64a"
-uuid = "8646bddf-ab1c-4fa7-9c51-ba187d647618"
-version = "0.2.10"
 
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll"]
@@ -2697,7 +2229,7 @@ version = "0.15.2+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.11.0+0"
+version = "5.8.0+1"
 
 [[deps.libdecor_jll]]
 deps = ["Artifacts", "Dbus_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pango_jll", "Wayland_jll", "xkbcommon_jll"]
@@ -2766,80 +2298,16 @@ version = "1.4.1+1"
 
 # ╔═╡ Cell order:
 # ╟─6b6d5e44-304d-4bed-912b-e4b89fce7c5a
-# ╠═a6c80f87-ff47-496f-8925-1275b58b02e1
-# ╟─1715d794-a33d-4faf-953c-b706a9ceea23
-# ╠═5e0ac317-934c-46bc-b738-a3493fed3c08
-# ╠═643919c5-762f-4fa6-ac26-6bf0abd94558
-# ╟─054b4d61-b6d1-4938-8ff5-22e8c5cdb8f7
-# ╠═ef067551-aa44-4099-b32a-08debb81ee79
-# ╟─092c4d06-873c-4782-9a16-602c1fdea715
-# ╠═4cabe108-93c6-4fbf-b8ec-37277abbbda1
-# ╟─a33f066e-307c-42c4-836b-5b7d8236a893
-# ╠═cb736b4d-bbd6-456c-9041-f69b2155a470
-# ╟─2ed4fd2d-b3c2-4211-bf3f-c551923e65cf
-# ╠═12e20620-042c-4040-bd64-af01bd0f2ad9
-# ╟─24454bd5-00cf-4282-926f-f1324141fe26
-# ╠═ff73663c-7cf4-4b23-83b5-095dc66f711f
-# ╟─176f1fef-f761-4ad0-8fea-982eab4fe24d
-# ╠═1ce22adc-5b79-426f-bafa-829acc6487f5
-# ╟─3251d71a-b84c-48d8-9dff-01b2457e610b
-# ╠═09a785ae-7286-4a47-b103-1e90efa20167
-# ╟─593216db-810e-47db-b6cb-aa6cf53e8590
-# ╟─6e1a493e-2f3c-42d3-9076-1e43905893a3
-# ╟─3cfa2da8-c45b-41b3-9b41-07dff363558b
-# ╠═bb7f702e-eaa3-4751-a6ed-5806647d8ff7
-# ╟─78ac2790-60d4-40da-bf5d-09617f1445a2
-# ╠═9b37d163-15ca-44af-9e00-7410956fc16c
-# ╟─061b7503-bad0-411e-b126-eea4b89feb03
-# ╠═ebaf6ed5-8e01-4c5f-9d7f-8cdc32a68022
-# ╟─8ba9aadc-5b34-41cb-adba-1ebdc65a741d
-# ╠═eaf2025e-1135-4ee6-9dea-25e2c0c09ec8
-# ╟─7fcd47c1-9d65-41e2-9363-141d53f0dbca
-# ╟─4cdf0551-1d13-4060-88e6-cf86ad180938
-# ╠═2925e1a3-1051-4b09-bbd9-461c6a76a1e3
-# ╟─b26e0c64-b3f1-4b18-a6f5-8f789407a744
-# ╠═fd0f2cf4-1b18-4c56-84a9-2339b3dfc10a
-# ╟─12b3c26a-96b3-440b-9771-4a945fe14ce7
-# ╠═185cfa1e-7c87-4243-8f5e-c5983932e135
-# ╟─4c37081c-4f68-48fe-be5b-bebf35f0c35e
-# ╠═1daa0518-a98b-448c-bddd-1147a0f7ed4d
-# ╟─3557cd23-43b2-4c79-a0e9-53c0d9650851
-# ╟─42a42555-0c97-4a40-8865-38966983a9e7
-# ╠═56350a37-b2d8-463e-934f-e8a4fbf72c67
-# ╟─471a5475-1ef5-4f40-bb45-a3e29ae5c0a8
-# ╠═3f3f4794-f2bf-4171-a1b4-70fd38c01fc3
-# ╟─b8fd284a-3865-4762-9602-6bc1eba464a4
-# ╟─8b7fc104-324d-42c7-98b7-dff0df561ce2
-# ╠═b02fbb5b-ce97-48e7-ab2b-a8db6ca7c8d3
-# ╟─49f0edcd-9cb8-4722-ae56-b17ee48f8336
-# ╠═a18b8726-fa97-4388-bb8b-53965a5d433b
-# ╟─063e3185-8714-4955-b985-5413420a889b
-# ╟─069f1446-e072-481d-bbba-6dfdf6600158
-# ╠═631328d5-c961-41e1-ac0e-181c3bb75112
-# ╟─dbd6d298-0fbf-420f-9622-d1db1d550cc5
-# ╠═6096328b-e1af-4ec5-b72b-cd381c166cb7
-# ╟─b6cad085-eb74-4152-8850-226ed837febd
-# ╟─f5d990e9-8d05-41e6-b6b3-c737692de37a
-# ╠═498fa575-5cf7-4a7e-8d3b-c50d605aa57c
-# ╟─ba95db2c-979a-41f2-9705-92d3cedd0160
-# ╠═54f07c21-339b-44c3-9ac2-22af163d55ae
-# ╟─915d3636-70bd-4001-857f-3aae11eb2d2e
-# ╟─bc09986a-5378-4d0b-a2b2-df9245f3f9cf
-# ╟─b9e36a69-a3d1-41c8-8951-01f92acf0806
-# ╠═a2ddce1e-440e-49e2-8c3e-ec6960ff83f0
-# ╟─f148c58a-50d3-4ac2-a1da-148563d533e7
-# ╠═dcf006a3-5332-442a-9771-f427cd7189a5
-# ╟─215677a6-af7b-4e5d-863f-aabdfb4a1400
-# ╠═14a549ad-e23f-40a4-b7fa-ef31354805a9
-# ╟─832858dc-2475-4f6a-a820-a557b2883f0c
-# ╠═e00c4d90-aa3b-41f9-b65e-7e9ace89a295
-# ╟─bb87f66d-5e68-49c5-9167-bdbab60109e5
-# ╠═3848717e-0c30-4c0b-82ec-b504c9210483
-# ╟─36ddb3be-7103-429f-9011-99c27c655de5
-# ╟─386046f6-6909-4e9e-bb90-80c32df59f70
-# ╠═b2b31b38-4c2f-4763-9273-971749c40d5c
-# ╟─0cec09b1-8806-4aee-970d-cc0b1e4b841c
-# ╠═dab9a19c-977e-4ab1-a3d9-f9970af69642
-# ╟─765e46fc-dac3-439a-ab07-2865298aed45
+# ╟─a6c80f87-ff47-496f-8925-1275b58b02e1
+# ╟─5e0ac317-934c-46bc-b738-a3493fed3c08
+# ╠═58adb64d-7905-4fed-9731-f2b4bb98b7cd
+# ╠═a879ffdf-2808-4d83-80b9-95dff7078a37
+# ╟─643919c5-762f-4fa6-ac26-6bf0abd94558
+# ╟─88e5d810-7e68-4e48-a4e6-1249c5c597a7
+# ╠═1923719e-9a52-4bd3-89e6-76a1670a906c
+# ╠═ac17c411-0628-4721-af54-d34bcd9f1fb5
+# ╠═e56d3dc6-c434-4c28-9ef9-834f62edd41d
+# ╠═e0863052-fe3e-4f4a-a5db-091a52c2de84
+# ╠═4a66d411-e3b4-4652-af91-01e42e79b82f
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
