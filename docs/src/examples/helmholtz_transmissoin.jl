@@ -69,8 +69,13 @@ Throughout this tutorial, we use the following notations:
 ```
 to denote the Dirichlet and Neumann traces respectively. We recall that in `Inti.jl` the unit normal vector ``\mathbf{n}`` points towards the exterior of the bounded domain ``\Omega``.
 
-We now have the background to defined the data necessary to solve this problem in both 2 and 3 spatial dimensions. Let's load `Inti.jl` as well as the required dependencies:
+We now have the background to define the data necessary to solve this problem. Let's load `Inti.jl` as well as the required dependencies:
 
+"""
+
+# ╔═╡ 3ebb1396-7f43-454b-ab00-0f7690a46ceb
+md"""
+We then define the physical variables of the problem, as well as the variables that control the order of convergence of the Boundary Integral Equation (BIE) discretization technique, which in this case is the Density Interpolation Method.
 """
 
 # ╔═╡ a879ffdf-2808-4d83-80b9-95dff7078a37
@@ -84,6 +89,11 @@ begin
 	nothing #hide
 end
 
+# ╔═╡ 375eec68-ebe3-4eb5-85e5-ab9fe01ff97f
+md"""
+We are now in position to derive our first BIE formulation for the transmission problem
+"""
+
 # ╔═╡ 643919c5-762f-4fa6-ac26-6bf0abd94558
 md"""
 ## Direct Müller's formulation
@@ -91,18 +101,39 @@ md"""
 We start off from Green's representation formula. Resorting to the notations
 ```math
 \begin{aligned}
-\mathcal S_j[\varphi](x) =&~ \int_{\Gamma}G_{k_j}(x,y)\varphi(y)ds(y)\quad\text{and}\\
-\mathcal D_{j}[\psi](x)=&~\int_{\Gamma}\frac{\partial G_{k_j}(x,y)}{\partial n(y)}\psi(y)ds(y),\quad x\in\mathbb R^d\setminus\Gamma,\end{aligned}
+\mathcal S_j[\varphi](x) :=&~ \int_{\Gamma}G_{k_j}(x,y)\varphi(y)ds(y)\quad\text{and}\\
+\mathcal D_{j}[\psi](x):=&~\int_{\Gamma}\frac{\partial G_{k_j}(x,y)}{\partial n(y)}\psi(y)ds(y),\quad x\in\mathbb R^d\setminus\Gamma,\end{aligned}
 ```
-for the single- and double-layer potentials, we have 
+for the single- and double-layer potentials, where we assumed that the densities ``\varphi,\psi:\Gamma\to\mathbb C`` are sufficiently regular functions, we have 
 ```math
 \begin{aligned}
 u_1(x) =&~\mathcal D_1[\gamma^+u_1](x)-\mathcal S_1[\partial^+u_1](x),& x\in\mathbb R^d\setminus\overline\Omega,\\
 u_2(x) =& -\mathcal D_2[\gamma^-u_2](x)+\mathcal S_2[\partial^-u_2](x),& x\in\Omega,\\
-u^{\rm inc}(x) =& -\mathcal D_1[\gamma^-u^{\rm inc]}](x)+\mathcal S_1[\partial^-u^{\rm inc}](x),& x\in\Omega,
+u^{\rm inc}(x) =& -\mathcal D_1[\gamma^-u^{\rm inc]}](x)+\mathcal S_1[\partial^-u^{\rm inc}](x),& x\in\Omega.
 \end{aligned}
 ```
-Taking the Dirichlet traces of the boundary integral representations of the fields, we get 
+
+As is well-known, when taking the traces ``\gamma^\pm`` and ``\partial_n^\pm`` of the layer potentials, we get
+```math
+\begin{aligned}
+\gamma^\pm\mathcal S_j[\varphi] =&~S_j[\varphi],\\
+\gamma^\pm\mathcal D_j[\psi](x) =& \pm\frac{1}{2}\psi+D_j[\psi],\\
+\partial_n^\pm\mathcal S_j[\varphi] =&\mp\frac{1}{2}\varphi+K_j[\varphi],\\
+\partial_n^\pm\mathcal D_j[\psi](x) =&N_j[\psi],
+\end{aligned}
+```
+where the integral operators ``S_j, D_j, K_j``, and ``N_j``, known respectively as the single-layer, double-layer, adjoint double-layer, and hypersingular operators, are defined as
+```math
+\begin{aligned}
+S_j[\varphi](x) :=&~\int_{\Gamma}G_{k_j}(x,y)\varphi(y)ds(y),\\
+D_j[\psi](x) :=&~\int_{\Gamma}\frac{\partial G_{k_j}(x,y)}{\partial n(y)}\psi(y)ds(y),\\
+K_j[\varphi](x) :=&~\int_{\Gamma}\frac{\partial G_{k_j}(x,y)}{\partial n(x)}\varphi(y)ds(y),\\
+N_j[\psi](x) :=&{\rm f.p.}\int_{\Gamma}\frac{\partial^2 G_{k_j}(x,y)}{\partial n(x)\partial n(y)}\psi(y)ds(y),
+\end{aligned}
+```
+for ``x\in\Gamma``.
+
+By taking the Dirichlet traces of the boundary integral representations of the fields, we then obtain
 ```math
 \begin{aligned}
 \frac12\gamma^+u_1 =&~D_1[\gamma^+u_1]- S_1[\partial^+u_1],\\
@@ -118,12 +149,12 @@ Replacing the tranmission conditions, ``\gamma^+(u^{\rm inc}+u_1)=\gamma^-u_2`` 
 ```math
 \frac12\gamma^+u_2-\gamma^-u^{\rm inc} =~D_1[\gamma^-u_2]- S_1[\partial^-_nu_2].
 ```
-Then, adding this expression to the formula for ``\frac12\gamma^-u_2`` above, we arrive at 
+Then, by adding this expression to the formula for ``\frac12\gamma^-u_2`` mentioned above, we arrive at
 ```math
 \gamma^-u_2+(D_2-D_1)[\gamma^-u_2]-(S_2-S_1)[\partial_n^-u_2] =\gamma^-u^{\rm inc}.
 ```
 
-Similarly, combining the following expressions
+Similarly, by combining the following expressions for the Neumann traces in the integral representation of the fields:
 ```math
 \begin{aligned}
 \frac12\partial_n^+u_1 =&~N_1[\gamma^+u_1]- K_1[\partial^+u_1],\\
@@ -131,16 +162,16 @@ Similarly, combining the following expressions
 \frac12\partial_n^-u^{\rm inc} =& -N_1[\gamma^-u^{\rm inc]}]+ K_1[\partial^-u^{\rm inc}],
 \end{aligned}
 ```
-that following from taking Neumann trace of the integral representation of the fields, we arrive at 
-
+we arrive at 
 ```math
 \partial_n^-u_2+(N_2-N_1)[\gamma^-u_2]-(K_2-K_1)[\partial_n^-u_2] =\partial_n^-u^{\rm inc}.
 ```
 
-The bounday integral equation system can be recast as 
+Finally, we recast the BIE system as
 ```math
 \left(I+\begin{bmatrix}D_2-D_1&-S_2+S_1\\N_2-N_1&-K_2+K_1\end{bmatrix}\right)\begin{bmatrix}\gamma^-u_2\\\partial_n^-u_2\end{bmatrix} = \begin{bmatrix}\gamma^-u^{\rm inc}\\\partial_n^-u^{\rm inc}\end{bmatrix}.
 ```
+where ``I`` above denotes the indentity operator.
 """
 
 # ╔═╡ 88e5d810-7e68-4e48-a4e6-1249c5c597a7
@@ -2299,10 +2330,12 @@ version = "1.4.1+1"
 # ╔═╡ Cell order:
 # ╟─6b6d5e44-304d-4bed-912b-e4b89fce7c5a
 # ╟─a6c80f87-ff47-496f-8925-1275b58b02e1
-# ╟─5e0ac317-934c-46bc-b738-a3493fed3c08
+# ╠═5e0ac317-934c-46bc-b738-a3493fed3c08
 # ╠═58adb64d-7905-4fed-9731-f2b4bb98b7cd
+# ╠═3ebb1396-7f43-454b-ab00-0f7690a46ceb
 # ╠═a879ffdf-2808-4d83-80b9-95dff7078a37
-# ╟─643919c5-762f-4fa6-ac26-6bf0abd94558
+# ╠═375eec68-ebe3-4eb5-85e5-ab9fe01ff97f
+# ╠═643919c5-762f-4fa6-ac26-6bf0abd94558
 # ╟─88e5d810-7e68-4e48-a4e6-1249c5c597a7
 # ╠═1923719e-9a52-4bd3-89e6-76a1670a906c
 # ╠═ac17c411-0628-4721-af54-d34bcd9f1fb5
