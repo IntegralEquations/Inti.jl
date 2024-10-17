@@ -20,7 +20,14 @@ Base.hash(ent::EntityKey, h::UInt) = hash((ent.dim, abs(ent.tag)), h)
 Base.:(==)(e1::EntityKey, e2::EntityKey) = e1.dim == e2.dim && abs(e1.tag) == abs(e2.tag)
 
 # defer some functions on EntityKey to the corresponding GeometricEntity
-for f in (:labels, :boundary, :pushforward, :ambient_dimension)
+for f in (
+    :labels,
+    :boundary,
+    :pushforward,
+    :ambient_dimension,
+    :hasparametrization,
+    :parametrization,
+)
     @eval $f(k::EntityKey) = $f(global_get_entity(k))
 end
 
