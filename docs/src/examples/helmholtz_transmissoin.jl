@@ -174,6 +174,21 @@ Finally, we recast the BIE system as
 where ``I`` above denotes the indentity operator.
 """
 
+# ╔═╡ 9f144840-0898-4ae1-a9e9-28975d5c0302
+md"""
+## Indirect Müller's formulation
+
+Juanse, please write how to solve the same problem described above using an indirect formulation that leads to the integral operator L defined below. 
+
+We use the following ansatzs:
+```math
+\begin{aligned}
+u_1=&\mathcal D_1[\varphi](x)-\mathcal S_1[\psi](x),\\
+u_2=&-\mathcal D_2[\varphi](x)+\mathcal S_2[\psi](x),
+\end{aligned}
+```
+"""
+
 # ╔═╡ 88e5d810-7e68-4e48-a4e6-1249c5c597a7
 
 md"""
@@ -289,6 +304,7 @@ end
 
 # ╔═╡ b6adc4a4-0019-48cd-a64d-0c9f50879ca2
 md"""
+### Validation example
 In order to test the accuracy of the computed solution, we can once again manufacture appropriate boundary conditions by taking the trace of solutions $u_1, u_2$ to the external and internal Helmholtz problems respectively.
 """
 
@@ -418,6 +434,15 @@ begin
 	fig
 end
 
+# ╔═╡ 550cf9d5-0859-483f-940a-e2904e65770b
+md"""
+# Planewave scattering using the direct Müller formulation
+
+```math
+u^{\rm inc}(x) = \exp(ik_1x\cdot d)
+```
+"""
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -453,7 +478,7 @@ StaticArrays = "~1.9.7"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.5"
+julia_version = "1.10.4"
 manifest_format = "2.0"
 project_hash = "f233076b4b67e51eb9b41c2fafd47130d47527dc"
 
@@ -2414,7 +2439,7 @@ version = "0.15.2+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.11.0+0"
+version = "5.8.0+1"
 
 [[deps.libdecor_jll]]
 deps = ["Artifacts", "Dbus_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pango_jll", "Wayland_jll", "xkbcommon_jll"]
@@ -2489,7 +2514,8 @@ version = "1.4.1+1"
 # ╟─3ebb1396-7f43-454b-ab00-0f7690a46ceb
 # ╠═a879ffdf-2808-4d83-80b9-95dff7078a37
 # ╠═375eec68-ebe3-4eb5-85e5-ab9fe01ff97f
-# ╟─643919c5-762f-4fa6-ac26-6bf0abd94558
+# ╠═643919c5-762f-4fa6-ac26-6bf0abd94558
+# ╠═9f144840-0898-4ae1-a9e9-28975d5c0302
 # ╟─88e5d810-7e68-4e48-a4e6-1249c5c597a7
 # ╠═1923719e-9a52-4bd3-89e6-76a1670a906c
 # ╠═ac17c411-0628-4721-af54-d34bcd9f1fb5
@@ -2500,7 +2526,7 @@ version = "1.4.1+1"
 # ╠═4a66d411-e3b4-4652-af91-01e42e79b82f
 # ╟─01933384-dd07-40bc-9313-38065467f722
 # ╠═09156d15-72de-430b-81ff-cf5fda93adb8
-# ╟─b6adc4a4-0019-48cd-a64d-0c9f50879ca2
+# ╠═b6adc4a4-0019-48cd-a64d-0c9f50879ca2
 # ╠═b2ca7517-4c5c-4463-9eb6-1afc293ffae3
 # ╟─4ce819da-5ac9-48a7-aa8f-e5314b215339
 # ╠═2dfd1ebc-04ca-413d-822a-a18c309a1792
@@ -2512,5 +2538,6 @@ version = "1.4.1+1"
 # ╠═6f4821c2-0070-42d3-943a-5588270b7d48
 # ╟─fbc3b3a6-30c9-40f1-aa9f-18960275abbf
 # ╠═380dc92a-5e06-4429-9fe6-ff241709e5e4
+# ╠═550cf9d5-0859-483f-940a-e2904e65770b
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
