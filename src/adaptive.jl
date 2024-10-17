@@ -110,10 +110,10 @@ end
             dmin > maxdist && continue
             issingular = iszero(dmin)
             integrand = (ŷ) -> begin
-                y   = el(ŷ)
+                y = el(ŷ)
                 jac = jacobian(el, ŷ)
-                ν   = _normal(jac)
-                τ′  = _integration_measure(jac)
+                ν = _normal(jac)
+                τ′ = _integration_measure(jac)
                 return K(xnode, (coords = y, normal = ν)) * L(ŷ) * τ′
             end
             # use hcubature for singular integration of lagrange basis.

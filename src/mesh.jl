@@ -346,7 +346,7 @@ function _meshgen(f, d::HyperRectangle, sz::NTuple)
     end |> vec
 end
 
-function _build_connectivity!(msh::Mesh{N,T}, tol = 1e-8) where {N,T}
+function _build_connectivity!(msh::Mesh{N,T}; tol = 1e-8) where {N,T}
     nodes = msh.nodes
     connect_dict = msh.etype2mat
     # first build a naive connectivity matrix where duplicate points are present

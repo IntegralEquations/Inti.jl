@@ -27,7 +27,7 @@ ambient_dimension(::AbstractDifferentialOperator{N}) where {N} = N
 
 # convenient constructor for e.g. SingleLayerKernel(op,Float64) or DoubleLayerKernel(op,ComplexF64)
 function (::Type{K})(
-    op::Op,
+    op::Op;
     ::Type{T} = default_kernel_eltype(op),
 ) where {T,Op,K<:AbstractKernel}
     return K{T,Op}(op)
@@ -106,7 +106,7 @@ default_density_eltype(::Laplace) = Float64
 
 function (SL::SingleLayerKernel{T,Laplace{N}})(
     target,
-    source,
+    source;
     r = coords(target) - coords(source),
 )::T where {N,T}
     d = norm(r)
@@ -122,7 +122,7 @@ end
 
 function (DL::DoubleLayerKernel{T,Laplace{N}})(
     target,
-    source,
+    source;
     r = coords(target) - coords(source),
 )::T where {N,T}
     ny = normal(source)
@@ -139,7 +139,7 @@ end
 
 function (ADL::AdjointDoubleLayerKernel{T,Laplace{N}})(
     target,
-    source,
+    source;
     r = coords(target) - coords(source),
 )::T where {N,T}
     nx = normal(target)
@@ -154,7 +154,7 @@ end
 
 function (HS::HyperSingularKernel{T,Laplace{N}})(
     target,
-    source,
+    source;
     r = coords(target) - coords(source),
 )::T where {N,T}
     nx = normal(target)

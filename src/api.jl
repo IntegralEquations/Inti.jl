@@ -213,10 +213,10 @@ Return the single- and double-layer potentials for `op` as
 [`IntegralPotential`](@ref)s.
 """
 function single_double_layer_potential(; op, source)
-    G  = SingleLayerKernel(op)
-    dG = DoubleLayerKernel(op)
-    𝒮  = IntegralPotential(G, source)
-    𝒟  = IntegralPotential(dG, source)
+    G    = SingleLayerKernel(op)
+    dG   = DoubleLayerKernel(op)
+    𝒮 = IntegralPotential(G, source)
+    𝒟 = IntegralPotential(dG, source)
     return 𝒮, 𝒟
 end
 

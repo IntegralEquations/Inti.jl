@@ -73,7 +73,7 @@ end
 function _blockindex(A::BlockArray{T,N}, I::Vararg{Int,N}) where {T,N}
     bsz = blocksize_normalized(A)
     idxs = ntuple(N) do dim
-        return (I[dim]-1)*bsz[dim]+1:I[dim]*bsz[dim]
+        return ((I[dim]-1)*bsz[dim]+1):(I[dim]*bsz[dim])
     end
     return idxs
 end

@@ -245,11 +245,11 @@ function _farfield_distance(el, K, qrule, tol, maxiter)
     x₀ = center(el) # center
     h = radius(el)  # reasonable scale
     f = (x, ŷ) -> begin
-        y   = el(ŷ)
-        jac = jacobian(el, ŷ)
-        ν   = _normal(jac)
-        νₓ  = (x - x₀) |> normalize
-        τ′  = _integration_measure(jac)
+        y     = el(ŷ)
+        jac   = jacobian(el, ŷ)
+        ν    = _normal(jac)
+        νₓ = (x - x₀) |> normalize
+        τ′ = _integration_measure(jac)
         return K((coords = x, normal = νₓ), (coords = y, normal = ν)) * τ′
     end
     τ̂ = domain(el)
@@ -260,7 +260,7 @@ function _farfield_distance(el, K, qrule, tol, maxiter)
         n += 1
         # explore a few directions and pick a maximum distance
         er = 0.0
-        for dir in -N:N
+        for dir in (-N):N
             iszero(dir) && continue
             k    = abs(dir)
             x    = setindex(x₀, x₀[k] + sign(N) * n * h, k)
