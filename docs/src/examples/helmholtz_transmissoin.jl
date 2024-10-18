@@ -53,8 +53,8 @@ where ``u_1:\mathbb R^d\setminus\overline\Omega\to\mathbb C`` is the scattered f
 \begin{cases}
 \Delta u_1+k_1^2u_1=0&\text{in}\quad\mathbb R^d\setminus\overline\Omega,\\[0.5mm]
 \Delta u_2+k_2^2u_2=0&\text{in}\quad\Omega,\\[0.5mm]
-\gamma^+(u_1+u^{\rm inc}) =\gamma^-u_1,&\text{on}\quad\Gamma,\\[0.5mm]
-\partial_n^+(u_1+u^{\rm inc}) =\partial_n^-u_1,&\text{on}\quad\Gamma.\\[0.5mm]
+\gamma^+(u_1+u^{\rm inc}) =\gamma^-u_2,&\text{on}\quad\Gamma,\\[0.5mm]
+\partial_n^+(u_1+u^{\rm inc}) =\partial_n^-u_2,&\text{on}\quad\Gamma.\\[0.5mm]
 \end{cases}
 ```
 Additionally, the scattered field must satisfy the Sommerfeld radiation condition at infinity:
@@ -174,19 +174,107 @@ Finally, we recast the BIE system as
 where ``I`` above denotes the indentity operator.
 """
 
+# ╔═╡ df07f3bf-9f8a-4199-920b-5dc4913a3809
+md"""
+### Direct formulation for the test problem
+
+In order to test the accuracy of this approach, we can formulate the problem so that the right-hand side of the BIE system depends only on the traces of the transmitted and scattered fields.
+
+From the boundary integral representation of the fields we had that
+
+```math
+\begin{aligned}
+\frac12\gamma^+u_1 &= D_1[\gamma^+u_1]- S_1[\partial_n^+u_1],\\
+\frac12\gamma^-u_2 &= - D_2[\gamma^-u_2]+ S_2[\partial_n^-u_2].
+\end{aligned}
+```
+Let us define
+
+```math
+\begin{aligned}
+\delta & := \gamma^-u_2 - \gamma^+u_1, \\
+\eta & := \partial_n^-u_2 - \partial_n^+u_1.
+\end{aligned}
+```
+"""
+
+# ╔═╡ bd6f28d0-894f-49af-88f4-b379baa392bd
+md"""
+By substracting the trace representation equations, we obtain
+
+```math
+\gamma^-u_2 + (D_2-D_1)[\gamma^-u_2] - (S_1-S_2)[\partial_n^-u_2] = \frac{\delta}{2} - D_1[\delta] + S_1[\eta].
+```
+
+Moreover, by taking the Neumann trace, it also follows that
+
+```math
+\gamma^-u_2 + (N_2-N_1)[\gamma^-u_2] - (K_1-K_2)[\partial_n^-u_2] = \frac{\eta}{2} - N_1[\delta] + K_1[\eta].
+```
+By naming
+
+```math
+\begin{align}
+f &:= \frac{\delta}{2} - D_1[\delta] + S_1[\eta], \\
+g &:= \frac{\eta}{2} - N_1[\delta] + K_1[\eta],
+\end{align}
+```
+
+we can represent the BIE system as
+
+```math
+\left(I+\begin{bmatrix}D_2-D_1&-S_2+S_1\\N_2-N_1&-K_2+K_1\end{bmatrix}\right)\begin{bmatrix}\gamma^-u_2\\\partial_n^-u_2\end{bmatrix} = \begin{bmatrix}f\\g\end{bmatrix}.
+```
+where ``I`` above denotes the indentity operator.
+
+"""
+
 # ╔═╡ 9f144840-0898-4ae1-a9e9-28975d5c0302
 md"""
 ## Indirect Müller's formulation
 
-Juanse, please write how to solve the same problem described above using an indirect formulation that leads to the integral operator L defined below. 
-
 We use the following ansatzs:
 ```math
-\begin{aligned}
-u_1=&\mathcal D_1[\varphi](x)-\mathcal S_1[\psi](x),\\
-u_2=&-\mathcal D_2[\varphi](x)+\mathcal S_2[\psi](x),
-\end{aligned}
+\begin{align}
+u_1=&\mathcal D_1[\varphi]-\mathcal S_1[\psi],\\
+u_2=&-\mathcal D_2[\varphi]+\mathcal S_2[\psi],
+\end{align}
 ```
+
+where $\mathcal D_j, \mathcal S_j$ are respectively the double- and single-layer potentials defined in the previous direct formulation section and $\varphi,\psi:\Gamma\rightarrow\mathbb{C}$ are sufficiently smooth surface densities. By taking the trace of our ansatz, from the double-layer discontinuity we obtain
+
+```math
+\begin{align}
+\gamma^+u_1=& \frac{\varphi}{2} + D_1[\varphi]-S_1[\psi],\\
+\gamma^-u_2=& \frac{\varphi}{2} - D_2[\varphi]+S_2[\psi],
+\end{align}
+```
+
+on $\Gamma$. Similarly, by taking the Neumann trace it follows that
+
+```math
+\begin{align}
+\partial_n^+u_1=& \frac{\psi}{2} + N_1[\varphi]-K_1[\psi],\\
+\partial_n^-u_2=& \frac{\psi}{2} - N_2[\varphi]+K_2[\psi].
+\end{align}
+```
+
+By adding the Dirichlet and Neumann traces we arrive at
+
+```math
+\begin{align}
+\gamma^+u_1 + \gamma^-u_2 &= \varphi + (D_1-D_2)[\varphi]-(S_1-S_2)[\psi],\\
+\partial_n^+u_1 + \partial_n^-u_2 &= \psi +(N_1-N_2)[\varphi] -(K_1-K_2)[\psi].
+\end{align}
+```
+
+Finally, similarly as in the direct formulation, we can recast the BIE system:
+
+```math
+\left(I+\begin{bmatrix}D_1-D_2&-S_1+S_2\\N_1-N_2&-K_1+K_2\end{bmatrix}\right)\begin{bmatrix}\varphi\\ \psi \end{bmatrix} = \begin{bmatrix}\gamma^+u_1 + \gamma^-u_2\\\ \partial_n^+u_1 + \partial_n^-u_2\end{bmatrix}.
+```
+where ``I`` above denotes the indentity operator.
+
 """
 
 # ╔═╡ 88e5d810-7e68-4e48-a4e6-1249c5c597a7
@@ -321,6 +409,20 @@ begin
 	∇u₁ = x -> -k₁ * hankelh1(1, k₁ * sqrt(dot(x, x))) * x / sqrt(dot(x, x))
 end
 
+# ╔═╡ 6ff44fe2-4034-499a-a90d-aefa76036882
+begin
+	δ = map(Q) do q
+	    x = q.coords
+	    return u₂(x) - u₁(x)
+	end
+
+	η = map(Q) do q
+	    x = q.coords
+	    n = q.normal
+	    return dot(n, ∇u₂(x)-∇u₁(x))
+	end
+end
+
 # ╔═╡ 4ce819da-5ac9-48a7-aa8f-e5314b215339
 md"""
 Now, we are in position to assemble the right-hand-side of the BIE system and solve it using GMRES.
@@ -438,10 +540,247 @@ end
 md"""
 # Planewave scattering using the direct Müller formulation
 
+Now, let's use the direct Müller formulation to solve the transmission problem when the incident field is given by a plane wave of the form
+
 ```math
-u^{\rm inc}(x) = \exp(ik_1x\cdot d)
+u^{\rm inc}(x) = \exp(ik_1x\cdot d).
 ```
+
+To do so, let us construct the matrix from the BIE system from the direct formulation
+
+```math
+\left(I+\begin{bmatrix}D_2-D_1&-S_2+S_1\\N_2-N_1&-K_2+K_1\end{bmatrix}\right)\begin{bmatrix}\gamma^-u_2\\\partial_n^-u_2\end{bmatrix} = \begin{bmatrix}\gamma^-u^{\rm inc}\\\partial_n^-u^{\rm inc}\end{bmatrix},
+```
+
 """
+
+# ╔═╡ c36cd400-ece7-44fe-ac09-a23840a145ce
+begin
+	L_dir = [
+    	I+LinearMap(D₂)-LinearMap(D₁) -LinearMap(S₂)+LinearMap(S₁)
+    	LinearMap(N₂)-LinearMap(N₁) I-LinearMap(K₂)+LinearMap(K₁)
+	]
+end
+
+# ╔═╡ ab10e8e1-9973-4911-993f-ba7d41d8f582
+md"""
+and the right-hand side
+"""
+
+# ╔═╡ 863e9e4e-8337-4ba7-89dc-da75cfefcd2f
+begin
+	# Define the planewave incident field
+	uᵢ = x -> exp(im * k₁ * dot(x, [1,0]))
+	∇uᵢ = x -> im * k₁ * uᵢ(x) * [1,0]
+	
+	# Right hand side of the linear system
+	rhs₁_dir = map(Q) do q
+	    x = q.coords
+	    return uᵢ(x)
+	end
+	
+	rhs₂_dir = map(Q) do q
+	    x = q.coords
+	    n = q.normal
+	    return dot(n, ∇uᵢ(x))
+	end
+	
+	rhs_dir = [rhs₁_dir; rhs₂_dir]
+end
+
+# ╔═╡ 324ca9fc-ccb7-4637-9107-d3023789e387
+md"""
+Once again, using GMRES to solve the linear system, we obtain the trasmitted field traces:
+"""
+
+# ╔═╡ 3995b7e0-f463-4c6f-91be-76313e485a05
+begin
+	sol_dir, hist_dir =
+	    gmres(L_dir, rhs_dir; log = true, abstol = 1e-6, verbose = false, restart = 400, maxiter = 400)
+	@show hist_dir
+end
+
+# ╔═╡ 5e966db3-d9dd-4c4c-a4d4-22d3faf0f4fc
+begin
+	sol_dir_temp = reshape(sol_dir, nQ, 2)
+	γ⁻u₂, ∂ₙ⁻u₂ = sol_dir_temp[:, 1], sol_temp[:, 2]
+end
+
+# ╔═╡ b079bf44-62a3-43c8-aa9b-f3f36bee2deb
+md"""
+Now, we recover the traces of the scattered field and compute the solution using Green's third identity:
+"""
+
+# ╔═╡ 7a7113f2-b2bd-4171-8da8-24dff640f7e5
+begin
+	γ⁺u₁ = γ⁻u₂ - rhs₁_dir
+	∂ₙ⁺u₁ = ∂ₙ⁻u₂ - rhs₂_dir
+	
+	# Obtain the approximate solution of the scattered and transmitted fields
+	w₁ = x -> 𝒟₁[γ⁺u₁](x) - 𝒮₁[∂ₙ⁺u₁](x)
+	w₂ = x -> -𝒟₂[γ⁻u₂](x) + 𝒮₂[∂ₙ⁻u₂](x)
+end
+
+# ╔═╡ 63e50bf6-f33a-4cc7-b8ea-e3a9a4ffdbd8
+md"""
+With the representation of the scattered and transmitted fields, now it is possible to plot the solution for the transmission problem for an incident scattering wave
+"""
+
+# ╔═╡ 061eeffe-2af2-4963-8ff0-0cca832c54a5
+begin
+	vals_dir = map(pt -> norm(pt) > 1 ? real(uᵢ(pt) + w₁(pt)) : real(w₂(pt)), Iterators.product(xx, yy))
+	fig_dir, ax_dir, hm_dir = heatmap(
+	    xx,
+	    yy,
+	    vals_dir;
+	    colormap = :inferno,
+	    interpolate = true,
+	    axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
+	)
+	lines!(
+	    ax_dir,
+	    [cos(θ) for θ in 0:0.01:2π],
+	    [sin(θ) for θ in 0:0.01:2π];
+	    color = :black,
+	    linewidth = 4,
+	)
+	Colorbar(fig_dir[1, 2], hm_dir)
+	fig_dir
+end
+
+# ╔═╡ 773adaa0-ceed-4c84-b60d-4ce51cba4df7
+md"""
+### Alternative formulation for accuracy test
+
+To test the accuracy of the direct formulation, we can now use the modified formulation with the right-hand-side specifically constructed for validation purposes
+
+```math
+\left(I+\begin{bmatrix}D_2-D_1&-S_2+S_1\\N_2-N_1&-K_2+K_1\end{bmatrix}\right)\begin{bmatrix}\gamma^-u_2\\\partial_n^-u_2\end{bmatrix} = \begin{bmatrix}f\\g\end{bmatrix}.
+```
+where ``I`` above denotes the indentity operator.
+
+"""
+
+# ╔═╡ 461c39de-cb09-417a-8bba-bd095494a62a
+begin
+	f = (I/2 - D₁)*δ + S₁*η
+	g = -N₁*δ + (I/2 + K₁)*η
+
+	rhs_val = [f;g]
+
+	sol_val, hist_val =
+	    gmres(L_dir, rhs_val; log = true, abstol = 1e-6, verbose = false, restart = 400, maxiter = 400)
+	@show hist_dir
+end
+
+# ╔═╡ 7e5d979c-3f90-4dd8-97db-8d38839093d6
+md"""
+Once the system has been solved, we can reconstruct the traces and use the layer potential representation of the solutions fields to evaluate the numerical solution.
+
+To get the Dirichlet and Neumann traces of the scattered field, recall that
+
+```math
+\begin{align}
+\gamma^+u_1 &= \gamma^-u_2 - \delta, \\
+\partial_n^+u_1 &= \partial_n^-u_2 - η.
+\end{align}
+```
+
+"""
+
+# ╔═╡ 3d68eda5-e63c-458e-9ca7-e9250bfabe70
+begin
+	sol_val_temp = reshape(sol_val, nQ, 2)
+	num_γ⁻u₂, num_∂ₙ⁻u₂ = sol_val_temp[:, 1], sol_val_temp[:, 2]
+
+	num_γ⁺u₁ = num_γ⁻u₂ - δ
+	num_∂ₙ⁺u₁ = num_∂ₙ⁻u₂ - η
+
+	# Obtain the numerical solution of the scattered and transmitted fields
+	num_u₁ = x -> 𝒟₁[num_γ⁺u₁](x) - 𝒮₁[num_∂ₙ⁺u₁](x)
+	num_u₂ = x -> -𝒟₂[num_γ⁻u₂](x) + 𝒮₂[num_∂ₙ⁻u₂](x)
+end
+
+# ╔═╡ ba6ec491-575f-4a43-8e3f-7fbb87190743
+md"""
+To evaluate the error of the scattered and transmitted fields, let's evaluate the numerical approximation to the exact solutions on circles outside and inside the domain respectively as done for the indirect approach.
+
+Thus evaluate the error of the scattered field, our numerical solution is compared to the exact solution on points of a circle centered at the origin of radius $R=2$.
+"""
+
+# ╔═╡ 657288df-463c-470b-942d-e5710e59979c
+begin
+	dir_er₁ = maximum(0:0.01:2π) do θ
+	    R = 2.0
+	    x = (R * cos(θ), R * sin(θ))
+	    xp = [R * cos(θ), R * sin(θ)]
+	    return abs(num_u₁(x) - u₁(xp))
+	end
+	@assert dir_er₁ < 1e-3 #hide
+	@info "maximum error = $dir_er₁"
+end
+
+# ╔═╡ 1104ca04-42d0-4349-9ce2-af8ce477cc3e
+md"""
+Now for the transmitted field, we do the same comparison on points of an origin-centered circle of radius $R=\frac{1}{2}$
+"""
+
+# ╔═╡ 88283255-b4a5-43c2-80bd-9f4cd3fdecda
+begin
+	dir_er₂ = maximum(0:0.01:2π) do θ
+	    R = 0.5
+	    x = (R * cos(θ), R * sin(θ))
+	    xp = [R * cos(θ), R * sin(θ)]
+	    return abs(num_u₂(x) - u₂(xp))
+	end
+	@assert dir_er₂ < 1e-3 #hide
+	@info "maximum error = $dir_er₂"
+end
+
+# ╔═╡ a1bb1a81-be1e-4414-a3b7-73808d03782d
+md"""
+We can also visualize the error for the solution fields
+"""
+
+# ╔═╡ ccc555dc-8b7b-4d70-868e-c7ec1091876d
+begin
+	vals_test = map(pt -> norm(pt) > 1 ? log10(abs(num_u₁(pt) - u₁(pt))) : log10(abs(num_u₂(pt) - u₂(pt))), Iterators.product(xx, yy))
+	fig_test, ax_test, hm_test = heatmap(
+	    xx,
+	    yy,
+	    vals_test;
+	    colormap = :inferno,
+	    interpolate = true,
+	    axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
+	)
+	lines!(
+	    ax_test,
+	    [cos(θ) for θ in 0:0.01:2π],
+	    [sin(θ) for θ in 0:0.01:2π];
+	    color = :black,
+	    linewidth = 4,
+	)
+	Colorbar(fig_test[1, 2], hm_test)
+	fig_test
+end
+
+# ╔═╡ e4db40f5-670e-4217-a8f1-f0e6d7a42b66
+md"""
+## Summary
+
+In this example, the Helmholtz transmission boundary-value problem together with direct and indirect formulations for its solution were presented. To test the accuracy of the numerical solution obtained with both approaches, an exact soultion was manufactured and used to generated boundary conditions to obtain an approximate solution. The error obtained for the scattered and transmitted fields using both formulations are summarized in the table below.
+"""
+
+# ╔═╡ 75f1cb0f-1e59-4ec3-9241-15855e8c90e3
+begin
+	println("Maximum error over a circle centered at the origin")
+	println("------------------------------------------------------------------------------")
+	println("                          | ", "Direct formulation", "     | ", "Indirect formulation")
+	println("------------------------------------------------------------------------------")
+    println("Scattered field   (R=2)  ", " | ", dir_er₁, "   |  ", er₁)
+	println("------------------------------------------------------------------------------")
+    println("Transmitted field (R=1/2)", " | ", dir_er₂, "  |  ", er₂)
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -478,7 +817,7 @@ StaticArrays = "~1.9.7"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.4"
+julia_version = "1.10.5"
 manifest_format = "2.0"
 project_hash = "f233076b4b67e51eb9b41c2fafd47130d47527dc"
 
@@ -2439,7 +2778,7 @@ version = "0.15.2+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.8.0+1"
+version = "5.11.0+0"
 
 [[deps.libdecor_jll]]
 deps = ["Artifacts", "Dbus_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pango_jll", "Wayland_jll", "xkbcommon_jll"]
@@ -2513,8 +2852,11 @@ version = "1.4.1+1"
 # ╠═58adb64d-7905-4fed-9731-f2b4bb98b7cd
 # ╟─3ebb1396-7f43-454b-ab00-0f7690a46ceb
 # ╠═a879ffdf-2808-4d83-80b9-95dff7078a37
-# ╠═375eec68-ebe3-4eb5-85e5-ab9fe01ff97f
-# ╠═643919c5-762f-4fa6-ac26-6bf0abd94558
+# ╟─375eec68-ebe3-4eb5-85e5-ab9fe01ff97f
+# ╟─643919c5-762f-4fa6-ac26-6bf0abd94558
+# ╟─df07f3bf-9f8a-4199-920b-5dc4913a3809
+# ╠═6ff44fe2-4034-499a-a90d-aefa76036882
+# ╟─bd6f28d0-894f-49af-88f4-b379baa392bd
 # ╠═9f144840-0898-4ae1-a9e9-28975d5c0302
 # ╟─88e5d810-7e68-4e48-a4e6-1249c5c597a7
 # ╠═1923719e-9a52-4bd3-89e6-76a1670a906c
@@ -2532,12 +2874,34 @@ version = "1.4.1+1"
 # ╠═2dfd1ebc-04ca-413d-822a-a18c309a1792
 # ╟─85f60f69-b844-4b20-9437-2961181913be
 # ╠═bb92050b-3b9a-442c-a93f-31469c9a53d8
-# ╟─3065dc45-41ff-49bf-9a14-90285cb54503
+# ╠═3065dc45-41ff-49bf-9a14-90285cb54503
 # ╠═bd821f22-a290-4701-bb02-99c1a5f38a65
 # ╟─1dcfbf3a-028c-4076-8132-697f5aab1a6d
 # ╠═6f4821c2-0070-42d3-943a-5588270b7d48
 # ╟─fbc3b3a6-30c9-40f1-aa9f-18960275abbf
 # ╠═380dc92a-5e06-4429-9fe6-ff241709e5e4
 # ╠═550cf9d5-0859-483f-940a-e2904e65770b
+# ╠═c36cd400-ece7-44fe-ac09-a23840a145ce
+# ╠═ab10e8e1-9973-4911-993f-ba7d41d8f582
+# ╠═863e9e4e-8337-4ba7-89dc-da75cfefcd2f
+# ╠═324ca9fc-ccb7-4637-9107-d3023789e387
+# ╠═3995b7e0-f463-4c6f-91be-76313e485a05
+# ╠═5e966db3-d9dd-4c4c-a4d4-22d3faf0f4fc
+# ╠═b079bf44-62a3-43c8-aa9b-f3f36bee2deb
+# ╠═7a7113f2-b2bd-4171-8da8-24dff640f7e5
+# ╠═63e50bf6-f33a-4cc7-b8ea-e3a9a4ffdbd8
+# ╠═061eeffe-2af2-4963-8ff0-0cca832c54a5
+# ╠═773adaa0-ceed-4c84-b60d-4ce51cba4df7
+# ╠═461c39de-cb09-417a-8bba-bd095494a62a
+# ╟─7e5d979c-3f90-4dd8-97db-8d38839093d6
+# ╠═3d68eda5-e63c-458e-9ca7-e9250bfabe70
+# ╟─ba6ec491-575f-4a43-8e3f-7fbb87190743
+# ╠═657288df-463c-470b-942d-e5710e59979c
+# ╟─1104ca04-42d0-4349-9ce2-af8ce477cc3e
+# ╠═88283255-b4a5-43c2-80bd-9f4cd3fdecda
+# ╟─a1bb1a81-be1e-4414-a3b7-73808d03782d
+# ╠═ccc555dc-8b7b-4d70-868e-c7ec1091876d
+# ╟─e4db40f5-670e-4217-a8f1-f0e6d7a42b66
+# ╠═75f1cb0f-1e59-4ec3-9241-15855e8c90e3
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
