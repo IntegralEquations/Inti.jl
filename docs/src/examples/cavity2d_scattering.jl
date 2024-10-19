@@ -56,7 +56,7 @@ println("Number of quadrature points: ", length(Q))
 ## Setup the integral operators
 op = Inti.Helmholtz(; dim = 2, k)
 S, D = Inti.single_double_layer(;
-    op
+    op,
     target = Q,
     source = Q,
     correction = (method = :none,),
