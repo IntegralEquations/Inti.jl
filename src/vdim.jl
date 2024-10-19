@@ -358,13 +358,13 @@ function polynomial_solution(op::Helmholtz, p::ElementaryPDESolutions.Polynomial
 end
 
 function polynomial_solution(op::Yukawa, p::ElementaryPDESolutions.Polynomial)
-    k = im*op.λ
+    k = im * op.λ
     P = ElementaryPDESolutions.solve_helmholtz(p; k)
     return ElementaryPDESolutions.convert_coefs(P, Float64)
 end
 
 function neumann_trace(
-    ::Union{Laplace,Helmholtz, Yukawa},
+    ::Union{Laplace,Helmholtz,Yukawa},
     P::ElementaryPDESolutions.Polynomial{N,T},
 ) where {N,T}
     return _normal_derivative(P)

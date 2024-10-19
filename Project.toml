@@ -39,7 +39,7 @@ IntiMakieExt = ["Meshes", "Makie"]
 [compat]
 Bessels = "0.2"
 DataStructures = "0.18"
-ElementaryPDESolutions = "0.2"
+ElementaryPDESolutions = "0.2 - 0.3"
 FMM2D = "0.2"
 FMM3D = "1"
 FMMLIB2D = "0.3"
