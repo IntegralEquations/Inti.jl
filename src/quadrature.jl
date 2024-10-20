@@ -138,7 +138,7 @@ end
 function Quadrature(
     ::Type{T},
     elementlist::AbstractVector{E},
-    etype2qrule::Dict{DataType, Q},
+    etype2qrule::Dict{DataType,Q},
     qrule::Q;
     center::SVector{N,Float64} = zero(SVector{N,Float64}),
     scale::Float64 = 1.0,

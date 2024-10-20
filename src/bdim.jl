@@ -177,4 +177,3 @@ function bdim_correction(
     δD = sparse(Is, Js, Ds, num_trgs, n)
     return δS, δD
 end
-

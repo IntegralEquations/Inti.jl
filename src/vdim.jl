@@ -133,7 +133,7 @@ end
 function build_vander(vals_trg, pts, PFE_p, c, r)
     tmp = Vector{Float64}(undef, length(c))
     for i in 1:length(pts)
-        tmp .= (pts[i].coords - c ) / r
+        tmp .= (pts[i].coords - c) / r
         ElementaryPDESolutions.fast_evaluate!(view(vals_trg, :, i), tmp, PFE_p)
     end
     return vals_trg
@@ -187,7 +187,8 @@ function local_vdim_correction(
             bdry_qrule = _qrule_for_reference_shape(Inti.ReferenceSimplex{2}(), bdry_qorder)
             bdry_etype2qrule = Dict(Inti.ReferenceSimplex{2} => bdry_qrule)
         else
-            bdry_qrule = _qrule_for_reference_shape(Inti.ReferenceHyperCube{1}(), bdry_qorder)
+            bdry_qrule =
+                _qrule_for_reference_shape(Inti.ReferenceHyperCube{1}(), bdry_qorder)
             bdry_etype2qrule = Dict(Inti.ReferenceHyperCube{1} => bdry_qrule)
         end
         vol_qrule = VioreanuRokhlin(; domain = domain(E), order = quadrature_order)
@@ -227,7 +228,7 @@ function local_vdim_correction(
             if SHIFT
                 L̃ .= transpose(build_vander(vals_trg, view(source, jglob), PFE_p, c, r))
                 Linv = pinv(L̃)
-                S = Diagonal(1.0./r.^(abs.(multiindices)))
+                S = Diagonal(1.0 ./ r .^ (abs.(multiindices)))
                 wei = transpose(Linv) * S * transpose(R)
             else
                 error("unsupported local VDIM without shifting")
@@ -478,12 +479,17 @@ function _local_vdim_auxiliary_quantities(
         ElementaryPDESolutions.fast_evaluate!(view(P, i, :), Xshift[i], PFE_P)
     end
     for i in 1:length(Ybdry)
-        ElementaryPDESolutions.fast_evaluate_with_jacobian!(view(γ₀B, i, :), view(grad, :, :, i), Ybdry[i].coords, PFE_P)
+        ElementaryPDESolutions.fast_evaluate_with_jacobian!(
+            view(γ₀B, i, :),
+            view(grad, :, :, i),
+            Ybdry[i].coords,
+            PFE_P,
+        )
     end
     for i in 1:length(Ybdry)
         for j in 1:num_basis
-            γ₁B[i, j] =  0
-            for k = 1:N
+            γ₁B[i, j] = 0
+            for k in 1:N
                 γ₁B[i, j] += grad[j, k, i] * Ybdry[i].normal[k]#nrml_bdry_vec[i][k]
             end
         end
@@ -496,7 +502,7 @@ function _local_vdim_auxiliary_quantities(
         @views mul!(Θ[:, n], Dmat, γ₀B[:, n], -1, 1)
         @views mul!(Θ[:, n], Vmat, b[:, n], -1, 1)
         for i in 1:num_targets
-            Θ[i, n] += μ[i] * P[i,n]
+            Θ[i, n] += μ[i] * P[i, n]
         end
     end
     return Θ
@@ -574,15 +580,16 @@ function polynomial_solutions_local_vdim(pde::AbstractPDE, order::Integer)
         sum(I) > order && continue
         # define the monomial basis functions, and the corresponding solutions.
         # TODO: adapt this to vectorial case
-        p   = ElementaryPDESolutions.Polynomial(I => 1 / factorial(MultiIndex(I)))
-        P   = polynomial_solution(pde, p)
+        p = ElementaryPDESolutions.Polynomial(I => 1 / factorial(MultiIndex(I)))
+        P = polynomial_solution(pde, p)
         push!(multiindices, MultiIndex(I))
         push!(monomials, p)
         push!(poly_solutions, P)
     end
 
     PFE_monomials = ElementaryPDESolutions.assemble_fastevaluator(monomials, Float64)
-    PFE_polysolutions = ElementaryPDESolutions.assemble_fastevaluator(poly_solutions, Float64)
+    PFE_polysolutions =
+        ElementaryPDESolutions.assemble_fastevaluator(poly_solutions, Float64)
 
     return PFE_monomials, PFE_polysolutions, multiindices
 end

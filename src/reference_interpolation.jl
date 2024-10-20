@@ -383,7 +383,7 @@ function boundarynd(::Type{T}, els, msh) where {T}
     edgelist_unsrt = Vector{SVector{length(bdi[1]),Int64}}(undef, nedges)
     bords = Vector{MVector{length(bdi[1]),Int64}}(undef, length(bdi))
     for i in 1:length(bdi)
-        bords[i] = MVector{length(bdi[1]), Int64}(undef)
+        bords[i] = MVector{length(bdi[1]),Int64}(undef)
     end
     j = 1
     for ii in els

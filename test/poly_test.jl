@@ -25,7 +25,8 @@ function poly_test(npts)
                 exp_data[:, i] = [q for q in pol[1]]
                 coeff_data[i] = pol[2]
             end
-            PolArray[polind] = FixedPolynomials.Polynomial(exp_data, coeff_data, [:x, :y])
+            PolArray[polind] =
+                FixedPolynomials.Polynomial(exp_data, coeff_data, [:x, :y])
         end
         PolSystem = System(PolArray)
         pts = Vector{Vector{Float64}}(undef, npts)
