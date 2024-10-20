@@ -58,6 +58,8 @@ function Base.show(io::IO, q::QuadratureNode)
     return print(io, "-- weight: $(q.weight)")
 end
 
+const Maybe{T} = Union{T,Nothing}
+
 """
     struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
 
@@ -65,7 +67,7 @@ A collection of [`QuadratureNode`](@ref)s used to integrate over an
 [`AbstractMesh`](@ref).
 """
 struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
-    mesh::AbstractMesh{N,T}
+    mesh::Maybe{AbstractMesh{N,T}}
     etype2qrule::Dict{DataType,ReferenceQuadrature}
     qnodes::Vector{QuadratureNode{N,T}}
     etype2qtags::Dict{DataType,Matrix{Int}}
@@ -77,7 +79,10 @@ Base.getindex(quad::Quadrature, i) = quad.qnodes[i]
 Base.setindex!(quad::Quadrature, q, i) = (quad.qnodes[i] = q)
 
 qnodes(quad::Quadrature) = quad.qnodes
-mesh(quad::Quadrature) = quad.mesh
+function mesh(quad::Quadrature)
+    isnothing(quad.mesh) && error("The Quadrature has no mesh!")
+    return quad.mesh
+end
 etype2qtags(quad::Quadrature, E) = quad.etype2qtags[E]
 
 quadrature_rule(quad::Quadrature, E) = quad.etype2qrule[E]
@@ -130,50 +135,34 @@ end
 
 # Quadrature constructor for list of volume elements for local vdim
 function Quadrature(
-    msh::AbstractMesh{N,T},
-    elementlist::AbstractVector{E};
-    qorder,
+    ::Type{T},
+    elementlist::AbstractVector{E},
+    etype2qrule::Dict{DataType, Q},
+    qrule::Q;
     center::SVector{N,Float64} = zero(SVector{N,Float64}),
     scale::Float64 = 1.0,
-) where {N,T,E}
-    if domain(E) isa Inti.ReferenceTriangle
-        # Local VDIM volume quad
-        if N == 2
-            Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder)
-            # layer potential quadrature in 3D
-        else
-            Q = Inti.Gauss(; domain = :triangle, order = qorder)
-        end
-        etype2qrule = Dict(E => Q)
-    elseif domain(E) isa Inti.ReferenceTetrahedron
-        Q = Inti.VioreanuRokhlin(; domain = :tetrahedron, order = qorder)
-        etype2qrule = Dict(E => Q)
-    else
-        etype2qrule = Dict(E => _qrule_for_reference_shape(domain(E), qorder))
-    end
-
+) where {N,T,E,Q}
     # initialize mesh with empty fields
     quad = Quadrature{N,T}(
-        msh,
+        nothing,
         etype2qrule,
         QuadratureNode{N,T}[],
         Dict{DataType,Matrix{Int}}(),
     )
     # loop element types and generate quadrature for each
-    qrule = etype2qrule[E]
     _build_quadrature!(quad, elementlist, qrule; center, scale)
 
     # check for entities with negative orientation and flip normal vectors if
     # present
-    for ent in entities(msh)
-        if (sign(tag(ent)) < 0) && (N - geometric_dimension(ent) == 1)
-            @debug "Flipping normals of $ent"
-            tags = dom2qtags(quad, Domain(ent))
-            for i in tags
-                quad[i] = flip_normal(quad[i])
-            end
-        end
-    end
+    #for ent in entities(msh)
+    #    if (sign(tag(ent)) < 0) && (N - geometric_dimension(ent) == 1)
+    #        @debug "Flipping normals of $ent"
+    #        tags = dom2qtags(quad, Domain(ent))
+    #        for i in tags
+    #            quad[i] = flip_normal(quad[i])
+    #        end
+    #    end
+    #end
     return quad
 end
 

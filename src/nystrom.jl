@@ -46,7 +46,7 @@ I[u](x) = \\int_{\\Gamma\\_s} K(x,y)u(y) ds_y, x \\in \\Gamma_{t}
 ```
 where ``\\Gamma_s`` and ``\\Gamma_t`` are the source and target domains, respectively.
 """
-struct IntegralOperator{V,K,T,S<:Quadrature} <: AbstractMatrix{V}
+struct IntegralOperator{V,K,T,S} <: AbstractMatrix{V}
     kernel::K
     # since the target can be as simple as a vector of points, leave it untyped
     target::T
@@ -58,7 +58,7 @@ kernel(iop::IntegralOperator) = iop.kernel
 target(iop::IntegralOperator) = iop.target
 source(iop::IntegralOperator) = iop.source
 
-function IntegralOperator(k, X, Y::Quadrature = X)
+function IntegralOperator(k, X, Y = X)
     T = return_type(k, eltype(X), eltype(Y))
     # FIXME This cripples performance for local VDIM
     #msg = """IntegralOperator of nonbits being created: $T"""
@@ -92,7 +92,7 @@ function assemble_matrix(iop::IntegralOperator; threads = true)
     return out
 end
 
-@noinline function _assemble_matrix!(out, K, X, Y::Quadrature, threads)
+@noinline function _assemble_matrix!(out, K, X, Y, threads)
     @usethreads threads for j in 1:length(Y)
         for i in 1:length(X)
             @inbounds out[i, j] = K(X[i], Y[j]) * weight(Y[j])

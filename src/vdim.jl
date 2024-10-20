@@ -182,6 +182,17 @@ function local_vdim_correction(
         L̃ = Matrix{Float64}(undef, nq, num_basis)
         vals_trg = Matrix{Float64}(undef, num_basis, nq)
 
+        bdry_qorder = 2 * quadrature_order
+        if N == 3
+            bdry_qrule = _qrule_for_reference_shape(Inti.ReferenceSimplex{2}(), bdry_qorder)
+            bdry_etype2qrule = Dict(Inti.ReferenceSimplex{2} => bdry_qrule)
+        else
+            bdry_qrule = _qrule_for_reference_shape(Inti.ReferenceHyperCube{1}(), bdry_qorder)
+            bdry_etype2qrule = Dict(Inti.ReferenceHyperCube{1} => bdry_qrule)
+        end
+        vol_qrule = VioreanuRokhlin(; domain = domain(E), order = quadrature_order)
+        vol_etype2qrule = Dict(E => vol_qrule)
+
         topo_neighs = 1
         neighbors = Inti.topological_neighbors(mesh, topo_neighs)
 
@@ -205,7 +216,11 @@ function local_vdim_correction(
                 PFE_P,
                 target[near_list[n]],
                 green_multiplier,
-                bdry_kdtree;
+                bdry_kdtree,
+                bdry_etype2qrule,
+                vol_etype2qrule,
+                bdry_qrule,
+                vol_qrule;
             )
             jglob = @view qtags[:, n]
             # compute translation and scaling
@@ -366,7 +381,11 @@ function _local_vdim_auxiliary_quantities(
     PFE_P,
     X,
     μ,
-    bdry_kdtree;
+    bdry_kdtree,
+    bdry_etype2qrule,
+    vol_etype2qrule,
+    bdry_qrule,
+    vol_qrule;
 ) where {N}
     scale = 1.0
     # construct the local region
@@ -414,14 +433,8 @@ function _local_vdim_auxiliary_quantities(
     need_layer_corr = sum(inrangecount(bdry_kdtree, vertices, diam / 2)) > 0
 
     # build O(h) volume neighbors
-    bdry_qorder = 2 * quadrature_order
-    Yvol =
-        Inti.Quadrature(mesh, els_list; qorder = quadrature_order, center = center, scale)
-    if need_layer_corr
-        Ybdry = Inti.Quadrature(mesh, bords; qorder = bdry_qorder, center = center, scale)
-    else
-        Ybdry = Inti.Quadrature(mesh, bords; qorder = bdry_qorder, center = center, scale)
-    end
+    Yvol = Inti.Quadrature(Float64, els_list, vol_etype2qrule, vol_qrule; center, scale)
+    Ybdry = Inti.Quadrature(Float64, bords, bdry_etype2qrule, bdry_qrule; center, scale)
 
     # TODO handle derivative case
     G = SingleLayerKernel(pde)
