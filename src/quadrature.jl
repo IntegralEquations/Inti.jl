@@ -45,8 +45,6 @@ flip_normal(q::QuadratureNode) = QuadratureNode(q.coords, q.weight, -q.normal)
 
 weight(q::QuadratureNode) = q.weight
 
-translate(q::QuadratureNode, x) = QuadratureNode(coords(q) + x, weight(q), normal(q))
-
 # useful for using either a quadrature node or a just a simple point in
 # `IntegralOperators`.
 coords(x::Union{SVector,Tuple}) = SVector(x)
@@ -338,90 +336,6 @@ function _etype_to_nearest_points(X, Y::Quadrature, maxdist)
     end
     return etype2nearlist
 end
-
-"""
-    etype_to_near_elements(X,Y::Quadrature; tol)
-
-Return `Nl = [[el in Y.mesh && dist(x, el) ≤ tol] for x in X]`
-"""
-function etype_to_near_elements(X, Y::Quadrature; tol)
-    y = [coords(q) for q in Y]
-    tree = BallTree(y)
-    etype2nearlist = Dict{DataType,Vector{Set{Int}}}()
-    for (E, Q) in Y.etype2qtags
-        P, N = size(Q)
-        etype2nearlist[E] = source2el = [Set{Int}() for _ in 1:length(X)]
-        quad2source = [Set{Int}() for _ in 1:length(y)]
-        for (l, x) in enumerate(X)
-            for q in inrange(tree, x, tol)
-                push!(quad2source[q], l)
-            end
-        end
-        for n in 1:N
-            for i in 1:P
-                for l in quad2source[Q[i, n]]
-                    push!(source2el[l], n)
-                end
-            end
-        end
-    end
-    return etype2nearlist
-end
-
-"""
-    near_elements(Y::Quadrature; tol)
-
-Return `Nl = [[el_j in Y.mesh && dist(el_j, el_i) ≤ tol] for el_i in Y.mesh]`
-"""
-function near_elements(Y::Quadrature; tol)
-    y = [coords(q) for q in Y]
-    tree = BallTree(y)
-    el2el = Dict{Tuple{DataType,Int},Set{Tuple{DataType,Int}}}()
-    quad2el = [Set{Tuple{DataType,Int}}() for _ in 1:length(y)]
-    # for each element, loop over its qnodes, find q∈y close to one of its qnodes, add the element to quad2el[q]
-    # quad2el[q] is the set of elements whose qnodes are close to q 
-    for (E, Q) in Y.etype2qtags
-        P, N = size(Q)
-        for n in 1:N
-            for i in 1:P
-                for q in inrange(tree, coords(qnodes(Y)[Q[i, n]]), tol)
-                    push!(quad2el[q], (E, n))
-                end
-            end
-        end
-    end
-    # for each element, the set of elements close to it is the 
-    # union of the sets of elements close to its qnodes
-    for (E, Q) in Y.etype2qtags
-        P, N = size(Q)
-        for n in 1:N
-            el2el[(E, n)] = union([quad2el[Q[i, n]] for i in 1:P]...)
-        end
-    end
-    return el2el
-end
-
-"""
-    near_components(Y::Quadrature; tol)
-
-Calculate the connected components of each near_elements
-"""
-function near_components(Y::Quadrature; tol)
-    topo_neighbor = topological_neighbors(Y.mesh)
-    dist_neighbor = near_elements(Y; tol)
-    return Dict(E => connected_components(nl, topo_neighbor) for (E, nl) in dist_neighbor)
-end
-
-# function _geometric_center_circum_radius(Y::Quadrature, E, Q, P, N)
-#     C = [(sum(1:P) do i
-#             coords(qnodes(Y)[Q[i,n]]) .* weight(qnodes(Y)[Q[i,n]])
-#           end) /
-#          (sum(1:P) do i
-#             weight(qnodes(Y)[Q[i,n]])
-#           end) for n in 1:N]
-#     r = [maximum(i->norm(C[n]-nodes(mesh(Y))[i]), connectivity(mesh(Y), E)[:,n]) for n in 1:N]
-#     return C, r
-# end
 
 """
     quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)

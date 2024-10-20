@@ -376,19 +376,6 @@ function boundary_idxs(::Type{<:LagrangeTetrahedron{4}})
     return (3, 2, 1), (1, 4, 3), (2, 3, 4), (1, 2, 4)
 end
 
-function boundary1d(els, msh)
-    res = Set{Int}()
-    E, _ = first(els)
-    bdi = Inti.boundary_idxs(E)
-    for (E, i) in els
-        vertices = Inti.connectivity(msh, E)[:, i]
-        for bord in (-vertices[bdi[1]], vertices[bdi[2]])
-            -bord in res ? delete!(res, -bord) : push!(res, bord)
-        end
-    end
-    return sort([res...])
-end
-
 function boundarynd(::Type{T}, els, msh) where {T}
     bdi = Inti.boundary_idxs(T)
     nedges = length(els) * length(bdi)
@@ -428,29 +415,6 @@ function boundarynd(::Type{T}, els, msh) where {T}
     end
     return edgelist_unsrt[uniqlist]
 end
-
-function _dfs!(comp, el, nei, els)
-    for el_nei in nei[el]
-        if el_nei in els
-            push!(comp, el_nei)
-            delete!(els, el_nei)
-            _dfs!(comp, el_nei, nei, els)
-        end
-    end
-end
-
-function connected_components(els, nei)
-    components = Set{Tuple{DataType,Int}}[]
-    while !isempty(els)
-        el = pop!(els)
-        comp = Set{Tuple{DataType,Int}}()
-        push!(comp, el)
-        _dfs!(comp, el, nei, els)
-        push!(components, comp)
-    end
-    return components
-end
-##
 
 #=
 Hardcode some basic elements.

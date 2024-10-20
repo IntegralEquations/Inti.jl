@@ -565,76 +565,11 @@ function connectivity(msh::SubMesh, E::DataType)
 end
 
 """
-    elements_to_near_targets(X,Y::AbstractMesh; tol)
-
-For each element `el` of type `E` in `Y`, return the indices of the points in
-`X` which are closer than `tol` to the `center` of `el`.
-
-This function returns a dictionary where e.g. `dict[E][5] --> Vector{Int}` gives
-the indices of points in `X` which are closer than `tol` to the center of the
-fifth element of type `E`.
-
-If `tol` is a `Dict`, then `tol[E]` is the tolerance for elements of type `E`.
-"""
-function elements_to_near_targets(
-    X::AbstractVector{<:SVector{N}},
-    Y::AbstractMesh{N};
-    tol,
-) where {N}
-    @assert isa(tol, Number) || isa(tol, Dict) "tol must be a number or a dictionary mapping element types to numbers"
-    # for each element type, build the list of targets close to a given element
-    dict = Dict{DataType,Vector{Vector{Int}}}()
-    balltree = BallTree(X)
-    for E in element_types(Y)
-        els = elements(Y, E)
-        tol_ = isa(tol, Number) ? tol : tol[E]
-        idxs = _elements_to_near_targets(balltree, els, tol_)
-        dict[E] = idxs
-    end
-    return dict
-end
-
-@noinline function _elements_to_near_targets(balltree, els, tol)
-    centers = map(center, els)
-    return inrange(balltree, centers, tol)
-end
-
-"""
     Domain(f::Function, msh::AbstractMesh)
 
 Call `Domain(f, ents)` on `ents = entities(msh).`
 """
 Domain(f::Function, msh::AbstractMesh) = Domain(f, entities(msh))
-
-"""
-    target_to_near_elements(X::AbstractVector{<:SVector{N}}, Y::AbstractMesh{N};
-    tol)
-
-For each target `x` in `X`, return a vector of tuples `(E, i)` where `E` is the
-type of the element in `Y` and `i` is the index of the element in `Y` such that
-`x` is closer than `tol` to the center of the element.
-"""
-function target_to_near_elements(
-    X::AbstractVector{<:SVector{N}},
-    Y::AbstractMesh{N};
-    tol,
-) where {N}
-    @assert isa(tol, Number) || isa(tol, Dict) "tol must be a number or a dictionary mapping element types to numbers"
-    dict = Dict{Int,Vector{Tuple{DataType,Int}}}()
-    balltree = BallTree(X)
-    for E in element_types(Y)
-        els = elements(Y, E)
-        tol_ = isa(tol, Number) ? tol : tol[E]
-        idxs = _target_to_near_elements(balltree, els, tol_)
-        for (i, idx) in enumerate(idxs)
-            dict[i] = get!(dict, i, Vector{Tuple{DataType,Int}}())
-            for j in idx
-                push!(dict[i], (E, j))
-            end
-        end
-    end
-    return dict
-end
 
 """
     topological_neighbors(msh::LagrangeMesh, k=1)
