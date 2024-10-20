@@ -69,7 +69,7 @@ u_b = map(q -> u(q.coords), Γₕ_quad)
 du_b = map(q -> du(q.coords, q.normal), Γₕ_quad)
 f_d = map(q -> f(q.coords), Ωₕ_quad)
 
-pde = k == 0 ? Inti.Laplace(; dim = 2) : Inti.Helmholtz(; dim = 2, k)
+op = k == 0 ? Inti.Laplace(; dim = 2) : Inti.Helmholtz(; dim = 2, k)
 
 ## Boundary operators
 tbnd = @elapsed begin

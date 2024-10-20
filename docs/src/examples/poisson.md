@@ -123,10 +123,10 @@ operator mapping to points on the boundary, i.e. operator:
 
 ```@example poisson
 using FMM2D #to accelerate the maps
-pde = Inti.Laplace(; dim = 2)
+op = Inti.Laplace(; dim = 2)
 # Newtonian potential mapping domain to boundary
 V_d2b = Inti.volume_potential(;
-    pde,
+    op,
     target = Γ_quad,
     source = Ω_quad,
     compression = (method = :fmm, tol = 1e-12),
@@ -144,7 +144,7 @@ equation:
 ```@example poisson
 # Single and double layer operators on Γ
 S_b2b, D_b2b = Inti.single_double_layer(;
-    pde,
+    op,
     target = Γ_quad,
     source = Γ_quad,
     compression = (method = :fmm, tol = 1e-12),
@@ -193,8 +193,8 @@ nothing # hide
 With the density function at hand, we can now reconstruct our approximate solution:
 
 ```@example poisson
-G  = Inti.SingleLayerKernel(pde)
-dG = Inti.DoubleLayerKernel(pde)
+G  = Inti.SingleLayerKernel(op)
+dG = Inti.DoubleLayerKernel(op)
 𝒱 = Inti.IntegralPotential(G, Ω_quad)
 𝒟 = Inti.IntegralPotential(dG, Γ_quad)
 u = (x) -> 𝒱[f](x) + 𝒟[σ](x)
@@ -223,7 +223,7 @@ solution ``u`` at all the quadrature nodes of ``\Omega``:
 
 ```@example poisson
 V_d2d = Inti.volume_potential(;
-    pde,
+    op,
     target = Ω_quad,
     source = Ω_quad,
     compression = (method = :fmm, tol = 1e-8),
@@ -236,7 +236,7 @@ our mesh nodes:
 
 ```@example poisson
 S_b2d, D_b2d = Inti.single_double_layer(;
-    pde,
+    op,
     target = Ω_quad,
     source = Γ_quad,
     compression = (method = :fmm, tol = 1e-8),

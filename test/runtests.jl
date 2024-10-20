@@ -20,6 +20,10 @@ using Aqua
 
 @safetestset "Quadrature" include("quadrature_test.jl")
 
+@safetestset "Kernels" include("kernels_test.jl")
+
+@safetestset "Integral operators" include("integral_operator_test.jl")
+
 @safetestset "Density interpolation method" include("dim_test.jl")
 
 @safetestset "Adaptive integration" include("adaptive_test.jl")

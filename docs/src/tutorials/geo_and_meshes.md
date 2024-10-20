@@ -143,6 +143,22 @@ domains to index the mesh:
 Γ₂ = l2 ∪ l4
 fig, ax, pl = viz(view(msh, Γ₁); segmentsize = 4,  label = "Γ₁")
 viz!(view(msh, Γ₂); segmentsize = 4, color = :red, label = "Γ₂")
+fig # hide
+```
+
+Note that the orientation of the curve determines the direction of the
+[`normal`](@ref) vector. The normal points to the right of the curve when moving
+in the direction of increasing parameter `t`:
+
+```@example geo-and-meshes
+pts, tangents, normals = Makie.Point2f[], Makie.Vec2f[], Makie.Vec2f[]
+for l in [l1, l2, l3, l4]
+      push!(pts, l(0.5)) # mid-point of the curve 
+      push!(tangents, vec(Inti.jacobian(l, 0.5)))
+      push!(normals,Inti.normal(l, 0.5))
+end
+arrows!(pts, tangents, color = :blue, linewidth = 2, linestyle = :dash, lengthscale = 1/4, label = "tangent")
+arrows!(pts, normals, color = :black, linewidth = 2, linestyle = :dash, lengthscale = 1/4, label = "normal")
 axislegend()
 fig # hide
 ```

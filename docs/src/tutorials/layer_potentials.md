@@ -66,8 +66,8 @@ it is often more convenient to use the `single_layer_potential` when working
 with a supported PDE, e.g.:
 
 ```@example layer_potentials
-pde = Inti.Laplace(; dim = 2)
-𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+op = Inti.Laplace(; dim = 2)
+𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
 ```
 
 creates the single and double layer potentials for the Laplace equation in 2D.
@@ -81,7 +81,7 @@ created through the Gmsh API. Do to so, let us first define the PDE:g
 using Inti, StaticArrays, LinearAlgebra, Meshes, GLMakie, Gmsh
 # define the PDE
 k = 4π
-pde = Inti.Helmholtz(; dim = 2, k)
+op = Inti.Helmholtz(; dim = 2, k)
 ```
 
 We will now use the [`gmsh_curve`](@ref) function to create a smooth domain of a
@@ -152,7 +152,7 @@ on a quadrature of ``\Gamma``:
 Γ = Inti.boundary(Ω)
 Q = Inti.Quadrature(view(msh,Γ); qorder = 5)
 # evaluate the layer potentials
-𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
 γ₀u = map(q -> u(q.coords), Q)
 γ₁u = map(q -> du(q.coords, q.normal), Q)
 uₕ = x -> 𝒮[γ₁u](x) - 𝒟[γ₀u](x)
@@ -193,7 +193,7 @@ acceleration with a near-field correction to evaluate the layer potentials::
 
 ```@example layer_potentials
 using FMM2D
-S, D = Inti.single_double_layer(; pde, target, source = Q,
+S, D = Inti.single_double_layer(; op, target, source = Q,
     compression = (method = :fmm, tol = 1e-12),
     correction = (method = :dim, target_location = :inside, maxdist = 0.2)
 )

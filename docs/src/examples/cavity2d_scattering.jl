@@ -54,9 +54,9 @@ Q = Inti.Quadrature(Γ_msh; qorder)
 println("Number of quadrature points: ", length(Q))
 
 ## Setup the integral operators
-pde = Inti.Helmholtz(; dim = 2, k)
+op = Inti.Helmholtz(; dim = 2, k)
 S, D = Inti.single_double_layer(;
-    pde,
+    op,
     target = Q,
     source = Q,
     correction = (method = :none,),
@@ -76,7 +76,7 @@ L = I / 2 + LinearMap(D) - im * k * LinearMap(S)
 σ = gmres(L, g; restart = 1000, maxiter = 400, abstol = 1e-4, verbose = true)
 
 ## Plot a heatmap of the solution
-𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
 u = (x) -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
 xx = yy = range(-2, 2; step = meshsize)
 colorrange = (-2, 2)

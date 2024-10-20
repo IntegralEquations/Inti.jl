@@ -42,7 +42,7 @@ using Inti
 Inti.stack_weakdeps_env!() # add weak dependencies 
 # PDE
 k = 2π
-pde = Inti.Helmholtz(; dim = 2, k)
+op = Inti.Helmholtz(; dim = 2, k)
 ```
 
 Next, we generate the geometry of the problem. For this tutorial, we will
@@ -138,7 +138,7 @@ To approximate ``S`` and ``D``, we can proceed as follows:
 
 ```@example getting_started
 S, D = Inti.single_double_layer(;
-    pde,
+    op,
     target = Q,
     source = Q,
     compression = (method = :none,),
@@ -221,7 +221,7 @@ potentials defined as:
 to compute the solution ``u`` in the domain:
 
 ```@example getting_started
-𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
 uₛ = x -> 𝒟[u](x) - 𝒮[g](x)
 ```
 
@@ -253,8 +253,8 @@ to the solution obtained numerically, as illustrated below:
 
 ```@example getting_started
 # build an exact solution
-G = Inti.SingleLayerKernel(pde)
-dG = Inti.DoubleLayerKernel(pde)
+G = Inti.SingleLayerKernel(op)
+dG = Inti.DoubleLayerKernel(op)
 xs = map(θ -> 0.5 * rand() * SVector(cos(θ), sin(θ)), 2π * rand(10))
 cs = rand(ComplexF64, length(xs))
 uₑ  = q -> sum(c * G(x, q) for (x, c) in zip(xs, cs))

@@ -112,6 +112,45 @@ order(::Fejer{N}) where {N} = N - 1
 end
 
 """
+    struct GaussLegendre{N,T}
+
+`N`-point Gauss-Legendre quadrature rule for integrating a function over
+`[0,1]`. Exactly integrates all polynomials of degree `≤ 2N-1`.
+
+```jldoctest
+using Inti
+
+q = Inti.GaussLegendre(;order=10)
+
+Inti.integrate(cos,q) ≈ sin(1) - sin(0)
+
+# output
+
+true
+```
+"""
+struct GaussLegendre{N,T} <: ReferenceQuadrature{ReferenceLine}
+    nodes::SVector{N,SVector{1,T}}
+    weights::SVector{N,T}
+end
+
+function GaussLegendre{N,T}() where {N,T}
+    x, w = gauss(T, N, 0, 1)
+    V = SVector{1,T}
+    return GaussLegendre(SVector{N,V}(V.(x)), SVector{N,T}(w))
+end
+
+GaussLegendre(n::Int) = GaussLegendre{n,Float64}()
+
+GaussLegendre(; order::Int) = GaussLegendre(ceil(Int, (order + 1) / 2))
+
+order(::GaussLegendre{N}) where {N} = 2 * N - 1
+
+function (q::GaussLegendre)()
+    return q.nodes, q.weights
+end
+
+"""
     struct Gauss{D,N} <: ReferenceQuadrature{D}
 
 Tabulated `N`-point symmetric Gauss quadrature rule for integration over `D`.

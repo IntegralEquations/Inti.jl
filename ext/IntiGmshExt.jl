@@ -14,7 +14,7 @@ function Inti.import_mesh(filename = nothing; dim = 3)
     if isnothing(filename)
         gmsh.isInitialized() == 1 ||
             error("gmsh is not initialized. Try gmsh.initialize() first.")
-        msh = Inti.LagrangeMesh{3,Float64}()
+        msh = Inti.Mesh{3,Float64}()
         _import_mesh!(msh)
         dim == 2 && (msh = Inti._convert_to_2d(msh))
         # create iterators for the lagrange elements
@@ -41,8 +41,8 @@ end
 """
     _import_mesh!(msh)
 
-Import the mesh from gmsh into `msh` as a [`LagrangeMesh`](@ref
-Inti.LagrangeMesh).
+Import the mesh from gmsh into `msh` as a [`Mesh`](@ref
+Inti.Mesh).
 """
 function _import_mesh!(msh)
     # NOTE: when importing the nodes, we will renumber them so that the first node has
@@ -176,7 +176,7 @@ function _etype_to_type_tag(E::DataType)
     return gmsh.model.mesh.getElementType(family_name, order)
 end
 
-function Inti.write_gmsh_model(msh::Inti.LagrangeMesh{N,Float64}; name = "") where {N}
+function Inti.write_gmsh_model(msh::Inti.Mesh{N,Float64}; name = "") where {N}
     @assert N ∈ (2, 3)
     # lift the nodes to 3d if N == 2
     nodes = N == 3 ? Inti.nodes(msh) : [SVector(x[1], x[2], 0) for x in Inti.nodes(msh)]

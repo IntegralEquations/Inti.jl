@@ -142,6 +142,11 @@ Axis-aligned hyperrectangle in `N` dimensions given by
 struct HyperRectangle{N,T} <: ReferenceInterpolant{ReferenceHyperCube{N},T}
     low_corner::SVector{N,T}
     high_corner::SVector{N,T}
+    # check that low_corner <= high_corner
+    function HyperRectangle(low_corner::SVector{N,T}, high_corner::SVector{N,T}) where {N,T}
+        @assert all(low_corner .<= high_corner) "low_corner must be less than high_corner"
+        return new{N,T}(low_corner, high_corner)
+    end
 end
 
 low_corner(el::HyperRectangle) = el.low_corner

@@ -46,8 +46,8 @@ geo = Inti.GeometricEntity("ellipsoid")
 Γ = Inti.boundary(Ω)
 Q = Inti.Quadrature(Γ; meshsize = 0.4, qorder = 5)
 # create the operator
-pde = Inti.Helmholtz(; dim = 3, k = 2π)
-K = Inti.SingleLayerKernel(pde)
+op = Inti.Helmholtz(; dim = 3, k = 2π)
+K = Inti.SingleLayerKernel(op)
 Sop = Inti.IntegralOperator(K, Q, Q)
 x = rand(eltype(Sop), length(Q))
 rtol = 1e-8
