@@ -140,7 +140,7 @@ function build_vander(vals_trg, pts, PFE_p, c, r)
 end
 
 function local_vdim_correction(
-    pde,
+    op,
     ::Type{Eltype},
     target,
     source::Quadrature,
@@ -149,6 +149,7 @@ function local_vdim_correction(
     green_multiplier::Vector{<:Real},
     interpolation_order = nothing,
     quadrature_order = nothing,
+    meshsize = 1.0,
     maxdist = Inf,
     center = nothing,
     shift::Val{SHIFT} = Val(false),
@@ -157,13 +158,13 @@ function local_vdim_correction(
     vander_cond = vander_norm = rhs_norm = res_norm = shift_norm = -Inf
     # figure out if we are dealing with a scalar or vector PDE
     m, n = length(target), length(source)
-    N = ambient_dimension(pde)
+    N = ambient_dimension(op)
     @assert ambient_dimension(source) == N "vdim only works for volume potentials"
     m, n = length(target), length(source)
     # a reasonable interpolation_order if not provided
     isnothing(interpolation_order) &&
         (interpolation_order = maximum(order, values(source.etype2qrule)))
-    PFE_p, PFE_P, multiindices = polynomial_solutions_local_vdim(pde, interpolation_order)
+    PFE_p, PFE_P, multiindices = polynomial_solutions_local_vdim(op, interpolation_order)
     dict_near = etype_to_nearest_points(target, source; maxdist)
     bdry_kdtree = KDTree(bdry_nodes)
     # compute sparse correction
@@ -206,13 +207,12 @@ function local_vdim_correction(
                 r = 1.0
             end
             R = _local_vdim_auxiliary_quantities(
-                pde,
+                op,
                 mesh,
                 neighbors,
                 n,
                 c,
                 r,
-                quadrature_order,
                 PFE_p,
                 PFE_P,
                 target[near_list[n]],
@@ -228,7 +228,10 @@ function local_vdim_correction(
             if SHIFT
                 L̃ .= transpose(build_vander(vals_trg, view(source, jglob), PFE_p, c, r))
                 Linv = pinv(L̃)
-                S = Diagonal(1.0 ./ r .^ (abs.(multiindices)))
+                S = Diagonal(1.0./r.^(abs.(multiindices)))
+                if isdefined(Main, :Infiltrator)
+                    Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+                end
                 wei = transpose(Linv) * S * transpose(R)
             else
                 error("unsupported local VDIM without shifting")
@@ -371,13 +374,12 @@ _newbord_line(vtxs) = LagrangeLine(SVector{3}(vtxs))
 _newbord_tri(vtxs) = LagrangeElement{ReferenceSimplex{2}}(SVector{3}(vtxs))
 
 function _local_vdim_auxiliary_quantities(
-    pde::AbstractPDE{N},
+    op::AbstractDifferentialOperator{N},
     mesh,
     neighbors,
     el,
     center,
     scale,
-    quadrature_order,
     PFE_p,
     PFE_P,
     X,
@@ -438,8 +440,8 @@ function _local_vdim_auxiliary_quantities(
     Ybdry = Inti.Quadrature(Float64, bords, bdry_etype2qrule, bdry_qrule; center, scale)
 
     # TODO handle derivative case
-    G = SingleLayerKernel(pde)
-    dG = DoubleLayerKernel(pde)
+    G = SingleLayerKernel(op)
+    dG = DoubleLayerKernel(op)
     Xshift = [(q.coords - center) / scale for q in X]
     Sop = IntegralOperator(G, Xshift, Ybdry)
     Dop = IntegralOperator(dG, Xshift, Ybdry)
@@ -451,7 +453,7 @@ function _local_vdim_auxiliary_quantities(
         μloc = _green_multiplier(:inside)
         green_multiplier = fill(μloc, length(X))
         δS, δD = bdim_correction(
-            pde,
+            op,
             Xshift,
             Ybdry,
             Smat,
@@ -560,15 +562,15 @@ function vdim_mesh_center(msh::AbstractMesh)
     return xc / M
 end
 """
-    polynomial_solutions_local_vdim(pde, order)
+    polynomial_solutions_local_vdim(op, order)
 
 For every monomial term `pₙ` of degree `order`, compute a polynomial `Pₙ` such
-that `ℒ[Pₙ] = pₙ`, where `ℒ` is the differential operator associated with `pde`.
+that `ℒ[Pₙ] = pₙ`, where `ℒ` is the differential operator `op`.
 This function returns `{pₙ,Pₙ,γ₁Pₙ}`, where `γ₁Pₙ` is the generalized Neumann
 trace of `Pₙ`.
 """
-function polynomial_solutions_local_vdim(pde::AbstractPDE, order::Integer)
-    N = ambient_dimension(pde)
+function polynomial_solutions_local_vdim(op::AbstractDifferentialOperator, order::Integer)
+    N = ambient_dimension(op)
     # create empty arrays to store the monomials, solutions, and traces. For the
     # neumann trace, we try to infer the concrete return type instead of simply
     # having a vector of `Function`.
@@ -581,7 +583,7 @@ function polynomial_solutions_local_vdim(pde::AbstractPDE, order::Integer)
         # define the monomial basis functions, and the corresponding solutions.
         # TODO: adapt this to vectorial case
         p = ElementaryPDESolutions.Polynomial(I => 1 / factorial(MultiIndex(I)))
-        P = polynomial_solution(pde, p)
+        P = polynomial_solution(op, p)
         push!(multiindices, MultiIndex(I))
         push!(monomials, p)
         push!(poly_solutions, P)

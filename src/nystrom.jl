@@ -59,11 +59,12 @@ target(iop::IntegralOperator) = iop.target
 source(iop::IntegralOperator) = iop.source
 
 function IntegralOperator(k, X, Y = X)
+    # TODO: Breaks if Y is no a ::Quadrature
     # check that all entities in the quadrature are of the same dimension
-    if !allequal(geometric_dimension(ent) for ent in entities(Y))
-        msg = "entities in the target quadrature have different geometric dimensions"
-        throw(ArgumentError(msg))
-    end
+    #if !allequal(geometric_dimension(ent) for ent in entities(Y))
+    #    msg = "entities in the target quadrature have different geometric dimensions"
+    #    throw(ArgumentError(msg))
+    #end
     T = return_type(k, eltype(X), eltype(Y))
     # FIXME This cripples performance for local VDIM
     #msg = """IntegralOperator of nonbits being created: $T"""
@@ -97,7 +98,7 @@ function assemble_matrix(iop::IntegralOperator; threads = true)
     return out
 end
 
-@noinline function _assemble_matrix!(out, K, X, Y, threads)
+@noinline function _assemble_matrix!(out, K, X, Y::Quadrature, threads)
     @usethreads threads for j in 1:length(Y)
         for i in 1:length(X)
             @inbounds out[i, j] = K(X[i], Y[j]) * weight(Y[j])

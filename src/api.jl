@@ -341,7 +341,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         green_multiplier = fill(μ, length(target))
         shift = Val(true)
         δV = local_vdim_correction(
-            pde,
+            op,
             eltype(V),
             target,
             source,
@@ -351,6 +351,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
             correction.maxdist,
             correction.interpolation_order,
             correction.quadrature_order,
+            correction.meshsize,
             shift,
         )
     else
