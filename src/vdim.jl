@@ -164,7 +164,13 @@ function local_vdim_correction(
     # a reasonable interpolation_order if not provided
     isnothing(interpolation_order) &&
         (interpolation_order = maximum(order, values(source.etype2qrule)))
-    PFE_p, PFE_P, multiindices = polynomial_solutions_local_vdim(op, interpolation_order)
+
+    # Helmholtz PDE operator in x̂ coordinates where x = scale * x̂
+    s = meshsize
+    op_hat = Inti.Helmholtz(; dim = ambient_dimension(op), k = s * op.k)
+    PFE_p, PFE_P, multiindices =
+        polynomial_solutions_local_vdim(op_hat, interpolation_order)
+
     dict_near = etype_to_nearest_points(target, source; maxdist)
     bdry_kdtree = KDTree(bdry_nodes)
     # compute sparse correction
@@ -202,17 +208,13 @@ function local_vdim_correction(
             # indices of nodes in element `n`
             isempty(near_list[n]) && continue
             c, r = translation_and_scaling(els[n])
-            if !SHIFT
-                c = SVector{N,Float64}(0, 0)
-                r = 1.0
-            end
             R = _local_vdim_auxiliary_quantities(
-                op,
+                op_hat,
                 mesh,
                 neighbors,
                 n,
                 c,
-                r,
+                s,
                 PFE_p,
                 PFE_P,
                 target[near_list[n]],
@@ -228,7 +230,7 @@ function local_vdim_correction(
             if SHIFT
                 L̃ .= transpose(build_vander(vals_trg, view(source, jglob), PFE_p, c, r))
                 Linv = pinv(L̃)
-                S = Diagonal(1.0./r.^(abs.(multiindices)))
+                S = s^2 * Diagonal((s / r) .^ (abs.(multiindices)))
                 if isdefined(Main, :Infiltrator)
                     Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
                 end
@@ -374,7 +376,7 @@ _newbord_line(vtxs) = LagrangeLine(SVector{3}(vtxs))
 _newbord_tri(vtxs) = LagrangeElement{ReferenceSimplex{2}}(SVector{3}(vtxs))
 
 function _local_vdim_auxiliary_quantities(
-    op::AbstractDifferentialOperator{N},
+    op_hat::AbstractDifferentialOperator{N},
     mesh,
     neighbors,
     el,
@@ -390,7 +392,6 @@ function _local_vdim_auxiliary_quantities(
     bdry_qrule,
     vol_qrule;
 ) where {N}
-    scale = 1.0
     # construct the local region
     Etype = first(Inti.element_types(mesh))
     el_neighs = neighbors[(Etype, el)]
@@ -435,13 +436,15 @@ function _local_vdim_auxiliary_quantities(
     end
     need_layer_corr = sum(inrangecount(bdry_kdtree, vertices, diam / 2)) > 0
 
+    # Now begin working in x̂ coordinates where x = scale * x̂
+
     # build O(h) volume neighbors
     Yvol = Inti.Quadrature(Float64, els_list, vol_etype2qrule, vol_qrule; center, scale)
     Ybdry = Inti.Quadrature(Float64, bords, bdry_etype2qrule, bdry_qrule; center, scale)
 
     # TODO handle derivative case
-    G = SingleLayerKernel(op)
-    dG = DoubleLayerKernel(op)
+    G = SingleLayerKernel(op_hat)
+    dG = DoubleLayerKernel(op_hat)
     Xshift = [(q.coords - center) / scale for q in X]
     Sop = IntegralOperator(G, Xshift, Ybdry)
     Dop = IntegralOperator(dG, Xshift, Ybdry)
@@ -453,7 +456,7 @@ function _local_vdim_auxiliary_quantities(
         μloc = _green_multiplier(:inside)
         green_multiplier = fill(μloc, length(X))
         δS, δD = bdim_correction(
-            op,
+            op_hat,
             Xshift,
             Ybdry,
             Smat,

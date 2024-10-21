@@ -185,10 +185,6 @@ end
     center::SVector{N,Float64} = zero(SVector{N,Float64}),
     scale::Float64 = 1.0,
 ) where {E,N,T}
-
-    # FIXME !!
-    scale = 1.0
-
     x̂, ŵ = qrule() # nodes and weights on reference element
     num_nodes = length(ŵ)
     M = geometric_dimension(domain(E))

@@ -67,10 +67,10 @@ k  = 2π
 #u  = (x) -> cos(k0 * dot(x, θ))
 #du = (x, n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
 #f  = (x) -> (k^2 - k0^2) * u(x)
-s = 4000
-u  = (x) -> 1/(k^2 - k0^2) * exp(im * k0 * dot(x, θ)) + 1/(k^2 - 4*s)*exp(-s*norm(x)^2)
-du = (x, n) -> im*k0 * dot(θ, n) / (k^2 - k0^2) * exp(im * k0 * dot(x, θ)) - 2*s/(k^2 - 4*s) * dot(x, n) * exp(-s*norm(x)^2)
-f  = (x) -> exp(im*k0*dot(x, θ)) + 1/(k^2 - 4*s) * (4*s^2*norm(x)^2 - 4*s + k^2) * exp(-s * norm(x)^2)
+s  = 4000
+u  = (x) -> 1 / (k^2 - k0^2) * exp(im * k0 * dot(x, θ)) + 1 / (k^2 - 4 * s) * exp(-s * norm(x)^2)
+du = (x, n) -> im * k0 * dot(θ, n) / (k^2 - k0^2) * exp(im * k0 * dot(x, θ)) - 2 * s / (k^2 - 4 * s) * dot(x, n) * exp(-s * norm(x)^2)
+f  = (x) -> exp(im * k0 * dot(x, θ)) + 1 / (k^2 - 4 * s) * (4 * s^2 * norm(x)^2 - 4 * s + k^2) * exp(-s * norm(x)^2)
 
 u_d = map(q -> u(q.coords), Ωₕ_quad)
 u_b = map(q -> u(q.coords), Γₕ_quad)
