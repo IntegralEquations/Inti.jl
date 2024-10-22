@@ -56,6 +56,8 @@ function Base.show(io::IO, q::QuadratureNode)
     return print(io, "-- weight: $(q.weight)")
 end
 
+const Maybe{T} = Union{T,Nothing}
+
 """
     struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
 
@@ -63,7 +65,7 @@ A collection of [`QuadratureNode`](@ref)s used to integrate over an
 [`AbstractMesh`](@ref).
 """
 struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
-    mesh::AbstractMesh{N,T}
+    mesh::Maybe{AbstractMesh{N,T}}
     etype2qrule::Dict{DataType,ReferenceQuadrature}
     qnodes::Vector{QuadratureNode{N,T}}
     etype2qtags::Dict{DataType,Matrix{Int}}
@@ -75,7 +77,10 @@ Base.getindex(quad::Quadrature, i) = quad.qnodes[i]
 Base.setindex!(quad::Quadrature, q, i) = (quad.qnodes[i] = q)
 
 qnodes(quad::Quadrature) = quad.qnodes
-mesh(quad::Quadrature) = quad.mesh
+function mesh(quad::Quadrature)
+    isnothing(quad.mesh) && error("The Quadrature has no mesh!")
+    return quad.mesh
+end
 etype2qtags(quad::Quadrature, E) = quad.etype2qtags[E]
 
 quadrature_rule(quad::Quadrature, E) = quad.etype2qrule[E]
@@ -129,6 +134,39 @@ function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
     return quad
 end
 
+# Quadrature constructor for list of volume elements for local vdim
+function Quadrature(
+    ::Type{T},
+    elementlist::AbstractVector{E},
+    etype2qrule::Dict{DataType,Q},
+    qrule::Q;
+    center::SVector{N,Float64} = zero(SVector{N,Float64}),
+    scale::Float64 = 1.0,
+) where {N,T,E,Q}
+    # initialize mesh with empty fields
+    quad = Quadrature{N,T}(
+        nothing,
+        etype2qrule,
+        QuadratureNode{N,T}[],
+        Dict{DataType,Matrix{Int}}(),
+    )
+    # loop element types and generate quadrature for each
+    _build_quadrature!(quad, elementlist, qrule; center, scale)
+
+    # check for entities with negative orientation and flip normal vectors if
+    # present
+    #for ent in entities(msh)
+    #    if (sign(tag(ent)) < 0) && (N - geometric_dimension(ent) == 1)
+    #        @debug "Flipping normals of $ent"
+    #        tags = dom2qtags(quad, Domain(ent))
+    #        for i in tags
+    #            quad[i] = flip_normal(quad[i])
+    #        end
+    #    end
+    #end
+    return quad
+end
+
 function Quadrature(msh::AbstractMesh{N,T}, qrule::ReferenceQuadrature) where {N,T}
     etype2qrule = Dict(E => qrule for E in element_types(msh))
     return Quadrature(msh, etype2qrule)
@@ -141,16 +179,18 @@ function Quadrature(msh::AbstractMesh; qorder)
 end
 
 @noinline function _build_quadrature!(
-    quad,
+    quad::Quadrature{N,T},
     els::AbstractVector{E},
-    qrule::ReferenceQuadrature,
-) where {E}
-    N = ambient_dimension(quad)
+    qrule::ReferenceQuadrature;
+    center::SVector{N,Float64} = zero(SVector{N,Float64}),
+    scale::Float64 = 1.0,
+) where {E,N,T}
     x̂, ŵ = qrule() # nodes and weights on reference element
     num_nodes = length(ŵ)
     M = geometric_dimension(domain(E))
     codim = N - M
     istart = length(quad.qnodes) + 1
+    sizehint!(quad.qnodes, length(els) * length(x̂))
     for el in els
         # and all qnodes for that element
         for (x̂i, ŵi) in zip(x̂, ŵ)
@@ -159,7 +199,7 @@ end
             μ = _integration_measure(jac)
             w = μ * ŵi
             ν = codim == 1 ? _normal(jac) : nothing
-            qnode = QuadratureNode(x, w, ν)
+            qnode = QuadratureNode((x - center) / scale, w / scale^M, ν)
             push!(quad.qnodes, qnode)
         end
     end

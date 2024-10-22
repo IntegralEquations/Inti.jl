@@ -151,7 +151,7 @@ end
     adaptive_integration_singular(f, τ̂, x̂ₛ; kwargs...)
 
 Similar to [`adaptive_integration`](@ref), but indicates that `f` has an
-isolated (integrable) singularity at `x̂ₛ ∈ x̂ₛ`.
+isolated (integrable) singularity at `x̂ₛ ∈ τ̂`.
 
 The integration is performed by splitting `τ̂` so that `x̂ₛ` is a fixed vertex,
 guaranteeing that `f` is never evaluated at `x̂ₛ`. Aditionally, a suitable

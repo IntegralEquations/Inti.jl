@@ -46,7 +46,7 @@ I[u](x) = \\int_{\\Gamma\\_s} K(x,y)u(y) ds_y, x \\in \\Gamma_{t}
 ```
 where ``\\Gamma_s`` and ``\\Gamma_t`` are the source and target domains, respectively.
 """
-struct IntegralOperator{V,K,T,S<:Quadrature} <: AbstractMatrix{V}
+struct IntegralOperator{V,K,T,S} <: AbstractMatrix{V}
     kernel::K
     # since the target can be as simple as a vector of points, leave it untyped
     target::T
@@ -58,15 +58,18 @@ kernel(iop::IntegralOperator) = iop.kernel
 target(iop::IntegralOperator) = iop.target
 source(iop::IntegralOperator) = iop.source
 
-function IntegralOperator(k, X, Y::Quadrature = X)
+function IntegralOperator(k, X, Y = X)
     # check that all entities in the quadrature are of the same dimension
-    if !allequal(geometric_dimension(ent) for ent in entities(Y))
-        msg = "entities in the target quadrature have different geometric dimensions"
-        throw(ArgumentError(msg))
+    if Y isa Quadrature && !isnothing(Y.mesh)
+        if !allequal(geometric_dimension(ent) for ent in entities(Y))
+            msg = "entities in the target quadrature have different geometric dimensions"
+            throw(ArgumentError(msg))
+        end
     end
     T = return_type(k, eltype(X), eltype(Y))
-    msg = """IntegralOperator of nonbits being created: $T"""
-    isbitstype(T) || (@warn msg)
+    # FIXME This cripples performance for local VDIM
+    #msg = """IntegralOperator of nonbits being created: $T"""
+    #isbitstype(T) || (@warn msg)
     return IntegralOperator{T,typeof(k),typeof(X),typeof(Y)}(k, X, Y)
 end
 
@@ -99,7 +102,7 @@ end
 @noinline function _assemble_matrix!(out, K, X, Y::Quadrature, threads)
     @usethreads threads for j in 1:length(Y)
         for i in 1:length(X)
-            out[i, j] = K(X[i], Y[j]) * weight(Y[j])
+            @inbounds out[i, j] = K(X[i], Y[j]) * weight(Y[j])
         end
     end
     return out
