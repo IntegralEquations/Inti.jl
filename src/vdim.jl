@@ -139,6 +139,24 @@ function build_vander(vals_trg, pts, PFE_p, c, r)
     return vals_trg
 end
 
+function _scaled_operator(op::AbstractDifferentialOperator, scale)
+    if op isa Helmholtz
+        return Helmholtz(; k = scale * op.k, dim = ambient_dimension(op))
+    elseif op isa Laplace
+        return op
+    else
+        error("Unsupported operator for stabilized Local VDIM")
+    end
+end
+
+function _lowfreq_operator(op::AbstractDifferentialOperator{N}) where {N}
+    if op isa Helmholtz
+        return Laplace(; dim = N)
+    else
+        error("Unsupported operator for stabilized Local VDIM")
+    end
+end
+
 function local_vdim_correction(
     op,
     ::Type{Eltype},
@@ -167,7 +185,10 @@ function local_vdim_correction(
 
     # Helmholtz PDE operator in x̂ coordinates where x = scale * x̂
     s = meshsize
-    op_hat = Inti.Helmholtz(; dim = ambient_dimension(op), k = s * op.k)
+    op_hat = _scaled_operator(op, s)
+    op_lowfreq = _lowfreq_operator(op)
+    PFE_p_lowfreq, PFE_p_lowfreq, multiindices =
+        polynomial_solutions_local_vdim(op_lowfreq, interpolation_order)
     PFE_p, PFE_P, multiindices =
         polynomial_solutions_local_vdim(op_hat, interpolation_order)
 
@@ -191,40 +212,70 @@ function local_vdim_correction(
 
         bdry_qorder = 2 * quadrature_order
         if N == 3
-            bdry_qrule = _qrule_for_reference_shape(Inti.ReferenceSimplex{2}(), bdry_qorder)
-            bdry_etype2qrule = Dict(Inti.ReferenceSimplex{2} => bdry_qrule)
+            bdry_qrule = _qrule_for_reference_shape(ReferenceSimplex{2}(), bdry_qorder)
+            bdry_etype2qrule = Dict(ReferenceSimplex{2} => bdry_qrule)
         else
-            bdry_qrule =
-                _qrule_for_reference_shape(Inti.ReferenceHyperCube{1}(), bdry_qorder)
-            bdry_etype2qrule = Dict(Inti.ReferenceHyperCube{1} => bdry_qrule)
+            bdry_qrule = _qrule_for_reference_shape(ReferenceHyperCube{1}(), bdry_qorder)
+            bdry_etype2qrule = Dict(ReferenceHyperCube{1} => bdry_qrule)
         end
         vol_qrule = VioreanuRokhlin(; domain = domain(E), order = quadrature_order)
         vol_etype2qrule = Dict(E => vol_qrule)
 
         topo_neighs = 1
-        neighbors = Inti.topological_neighbors(mesh, topo_neighs)
+        neighbors = topological_neighbors(mesh, topo_neighs)
 
         for n in 1:ne
             # indices of nodes in element `n`
             isempty(near_list[n]) && continue
             c, r = translation_and_scaling(els[n])
-            R = _local_vdim_auxiliary_quantities(
-                op_hat,
+            Yvol, Ybdry, diam, need_layer_corr = _local_vdim_construct_local_quadratures(
+                N,
                 mesh,
                 neighbors,
                 n,
                 c,
                 s,
-                PFE_p,
-                PFE_P,
-                target[near_list[n]],
-                green_multiplier,
                 bdry_kdtree,
                 bdry_etype2qrule,
                 vol_etype2qrule,
                 bdry_qrule,
-                vol_qrule;
+                vol_qrule,
             )
+            if r * op.k < 10^(-2)
+                lowfreq = true
+                R = _lowfreq_vdim_auxiliary_quantities(
+                    op_hat,
+                    mesh,
+                    neighbors,
+                    n,
+                    c,
+                    s,
+                    PFE_p,
+                    PFE_P,
+                    target[near_list[n]],
+                    green_multiplier,
+                    bdry_kdtree,
+                    bdry_etype2qrule,
+                    vol_etype2qrule,
+                    bdry_qrule,
+                    vol_qrule;
+                )
+            else
+                lowfreq = false
+                R = _local_vdim_auxiliary_quantities(
+                    op_hat,
+                    c,
+                    s,
+                    PFE_p,
+                    PFE_P,
+                    target[near_list[n]],
+                    green_multiplier,
+                    Yvol,
+                    Ybdry,
+                    diam,
+                    need_layer_corr;
+                )
+            end
             jglob = @view qtags[:, n]
             # compute translation and scaling
             if SHIFT
@@ -375,41 +426,37 @@ _newbord_line(vtxs) = LagrangeLine(SVector{3}(vtxs))
 # function barrier for type stability purposes
 _newbord_tri(vtxs) = LagrangeElement{ReferenceSimplex{2}}(SVector{3}(vtxs))
 
-function _local_vdim_auxiliary_quantities(
-    op_hat::AbstractDifferentialOperator{N},
+function _local_vdim_construct_local_quadratures(
+    N,
     mesh,
     neighbors,
     el,
     center,
     scale,
-    PFE_p,
-    PFE_P,
-    X,
-    μ,
     bdry_kdtree,
     bdry_etype2qrule,
     vol_etype2qrule,
     bdry_qrule,
     vol_qrule;
-) where {N}
+)
     # construct the local region
-    Etype = first(Inti.element_types(mesh))
+    Etype = first(element_types(mesh))
     el_neighs = neighbors[(Etype, el)]
 
     T = first(el_neighs)[1]
     els_idxs = [i[2] for i in collect(el_neighs)]
     els_list = mesh.etype2els[Etype][els_idxs]
 
-    loc_bdry = Inti.boundarynd(T, els_idxs, mesh)
+    loc_bdry = boundarynd(T, els_idxs, mesh)
     # TODO handle curved boundary of Γ??
     if N == 2
-        bords = Inti.LagrangeElement{Inti.ReferenceHyperCube{N - 1},3,SVector{N,Float64}}[]
+        bords = LagrangeElement{ReferenceHyperCube{N - 1},3,SVector{N,Float64}}[]
     else
-        bords = Inti.LagrangeElement{Inti.ReferenceSimplex{N - 1},3,SVector{N,Float64}}[]
+        bords = LagrangeElement{ReferenceSimplex{N - 1},3,SVector{N,Float64}}[]
     end
 
     for idxs in loc_bdry
-        vtxs = Inti.nodes(mesh)[idxs]
+        vtxs = nodes(mesh)[idxs]
         if N == 2
             bord = _newbord_line(vtxs)
         else
@@ -439,9 +486,25 @@ function _local_vdim_auxiliary_quantities(
     # Now begin working in x̂ coordinates where x = scale * x̂
 
     # build O(h) volume neighbors
-    Yvol = Inti.Quadrature(Float64, els_list, vol_etype2qrule, vol_qrule; center, scale)
-    Ybdry = Inti.Quadrature(Float64, bords, bdry_etype2qrule, bdry_qrule; center, scale)
+    Yvol = Quadrature(Float64, els_list, vol_etype2qrule, vol_qrule; center, scale)
+    Ybdry = Quadrature(Float64, bords, bdry_etype2qrule, bdry_qrule; center, scale)
 
+    return Yvol, Ybdry, diam, need_layer_corr
+end
+
+function _local_vdim_auxiliary_quantities(
+    op_hat::AbstractDifferentialOperator{N},
+    center,
+    scale,
+    PFE_p,
+    PFE_P,
+    X,
+    μ,
+    Yvol,
+    Ybdry,
+    diam,
+    need_layer_corr;
+) where {N}
     # TODO handle derivative case
     G = SingleLayerKernel(op_hat)
     dG = DoubleLayerKernel(op_hat)
@@ -511,6 +574,26 @@ function _local_vdim_auxiliary_quantities(
         end
     end
     return Θ
+end
+
+function _lowfreq_vdim_auxiliary_quantities(
+    op_hat::Helmholtz{2},
+    mesh,
+    neighbors,
+    el,
+    center,
+    scale,
+    PFE_p,
+    PFE_P,
+    X,
+    μ,
+    bdry_kdtree,
+    bdry_etype2qrule,
+    vol_etype2qrule,
+    bdry_qrule,
+    vol_qrule;
+)
+    error("not yet implemented")
 end
 
 function _vdim_auxiliary_quantities(
