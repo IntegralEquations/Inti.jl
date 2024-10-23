@@ -388,6 +388,7 @@ begin
     	I+LinearMap(D₁)-LinearMap(D₂) -LinearMap(S₁)+LinearMap(S₂)
     	LinearMap(N₁)-LinearMap(N₂) I-LinearMap(K₁)+LinearMap(K₂)
 	]
+	nothing
 end
 
 # ╔═╡ b6adc4a4-0019-48cd-a64d-0c9f50879ca2
@@ -530,7 +531,7 @@ begin
 	    [cos(θ) for θ in 0:0.01:2π],
 	    [sin(θ) for θ in 0:0.01:2π];
 	    color = :black,
-	    linewidth = 4,
+	    linewidth = 1,
 	)
 	Colorbar(fig[1, 2], hm, label = "log₁₀|uₐ - uₑ|")
 	fig
@@ -560,6 +561,7 @@ begin
     	I+LinearMap(D₂)-LinearMap(D₁) -LinearMap(S₂)+LinearMap(S₁)
     	LinearMap(N₂)-LinearMap(N₁) I-LinearMap(K₂)+LinearMap(K₁)
 	]
+	nothing
 end
 
 # ╔═╡ ab10e8e1-9973-4911-993f-ba7d41d8f582
@@ -603,7 +605,7 @@ end
 # ╔═╡ 5e966db3-d9dd-4c4c-a4d4-22d3faf0f4fc
 begin
 	sol_dir_temp = reshape(sol_dir, nQ, 2)
-	γ⁻u₂, ∂ₙ⁻u₂ = sol_dir_temp[:, 1], sol_temp[:, 2]
+	γ⁻u₂, ∂ₙ⁻u₂ = sol_dir_temp[:, 1], sol_dir_temp[:, 2]
 end
 
 # ╔═╡ b079bf44-62a3-43c8-aa9b-f3f36bee2deb
@@ -642,7 +644,7 @@ begin
 	    [cos(θ) for θ in 0:0.01:2π],
 	    [sin(θ) for θ in 0:0.01:2π];
 	    color = :black,
-	    linewidth = 4,
+	    linewidth = 1,
 	)
 	Colorbar(fig_dir[1, 2], hm_dir)
 	fig_dir
@@ -758,7 +760,7 @@ begin
 	    [cos(θ) for θ in 0:0.01:2π],
 	    [sin(θ) for θ in 0:0.01:2π];
 	    color = :black,
-	    linewidth = 4,
+	    linewidth = 1,
 	)
 	Colorbar(fig_test[1, 2], hm_test)
 	fig_test
@@ -2880,18 +2882,18 @@ version = "1.4.1+1"
 # ╠═6f4821c2-0070-42d3-943a-5588270b7d48
 # ╟─fbc3b3a6-30c9-40f1-aa9f-18960275abbf
 # ╠═380dc92a-5e06-4429-9fe6-ff241709e5e4
-# ╠═550cf9d5-0859-483f-940a-e2904e65770b
+# ╟─550cf9d5-0859-483f-940a-e2904e65770b
 # ╠═c36cd400-ece7-44fe-ac09-a23840a145ce
-# ╠═ab10e8e1-9973-4911-993f-ba7d41d8f582
+# ╟─ab10e8e1-9973-4911-993f-ba7d41d8f582
 # ╠═863e9e4e-8337-4ba7-89dc-da75cfefcd2f
-# ╠═324ca9fc-ccb7-4637-9107-d3023789e387
+# ╟─324ca9fc-ccb7-4637-9107-d3023789e387
 # ╠═3995b7e0-f463-4c6f-91be-76313e485a05
 # ╠═5e966db3-d9dd-4c4c-a4d4-22d3faf0f4fc
 # ╠═b079bf44-62a3-43c8-aa9b-f3f36bee2deb
 # ╠═7a7113f2-b2bd-4171-8da8-24dff640f7e5
 # ╠═63e50bf6-f33a-4cc7-b8ea-e3a9a4ffdbd8
 # ╠═061eeffe-2af2-4963-8ff0-0cca832c54a5
-# ╠═773adaa0-ceed-4c84-b60d-4ce51cba4df7
+# ╟─773adaa0-ceed-4c84-b60d-4ce51cba4df7
 # ╠═461c39de-cb09-417a-8bba-bd095494a62a
 # ╟─7e5d979c-3f90-4dd8-97db-8d38839093d6
 # ╠═3d68eda5-e63c-458e-9ca7-e9250bfabe70
