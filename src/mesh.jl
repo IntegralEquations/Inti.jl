@@ -171,7 +171,7 @@ function Base.getindex(msh::Mesh{N,T}, Ω::Domain) where {N,T}
             # check if parent has elements of type E for the entity
             haskey(msh.ent2etags[k], E) || continue
             etags_glob = msh.ent2etags[k][E]
-            etags_loc  = get!(ent2etags[k], E, Int[])
+            etags_loc = get!(ent2etags[k], E, Int[])
             for iglob in etags_glob
                 etag_loc += 1
                 # add nodes and connectivity matrix
@@ -217,12 +217,12 @@ parametrization.
     the quality of the underlying parametrization. For complex surfaces, you are
     better off using a proper mesher such as `gmsh`.
 """
-function meshgen(Ω::Domain, args...; kwargs...)
+function meshgen(Ω::Domain, T = Float64, args...; kwargs...)
     # extract the ambient dimension for these entities (i.e. are we in 2d or
     # 3d). Only makes sense if all entities have the same ambient dimension.
     N = ambient_dimension(first(Ω))
     @assert all(p -> ambient_dimension(p) == N, entities(Ω)) "Entities must have the same ambient dimension"
-    mesh = Mesh{N,Float64}()
+    mesh = Mesh{N,T}()
     meshgen!(mesh, Ω, args...; kwargs...)
     return mesh
 end
@@ -238,10 +238,14 @@ function meshgen!(msh::Mesh, Ω::Domain, num_elements::Int)
     e1d = filter(k -> geometric_dimension(k) == 1, all_keys(Ω))
     return meshgen!(msh, Ω, Dict(e => num_elements for e in e1d))
 end
-function meshgen!(msh::Mesh, Ω::Domain; meshsize::Real)
-    # compute the length of each curve using an adaptive quadrature
+function meshgen!(msh::Mesh, Ω::Domain; meshsize)
+    # get all 1d entities (i.e. lines)
     e1d = filter(k -> geometric_dimension(k) == 1, all_keys(Ω))
-    dict = Dict(k => ceil(Int, measure(k) / meshsize) for k in e1d)
+    # normalize meshsize to a dictionary
+    isa(meshsize, Real) && (meshsize = Dict(e => meshsize for e in e1d))
+    isa(meshsize, Dict) || error("meshsize must be a number or a dictionary")
+    # compute the length of each curve using an adaptive quadrature
+    dict = Dict(k => ceil(Int, measure(k) / meshsize[k]) for k in e1d)
     # curves which are opposite sides of a surface must have the same number of
     # elements. If they differ, we take the maximum. Because there can be chains
     # of dependencies (i.e. l1 is opposite to l2 and l2 is opposite to l3), we
@@ -340,7 +344,7 @@ function _meshgen(f, d::HyperRectangle, sz::NTuple)
     lc, hc = low_corner(d), high_corner(d)
     Δx = (hc - lc) ./ sz
     map(CartesianIndices(sz)) do I
-        low  = lc + (Tuple(I) .- 1) .* Δx
+        low = lc + (Tuple(I) .- 1) .* Δx
         high = low .+ Δx
         return ParametricElement(f, HyperRectangle(low, high))
     end |> vec
