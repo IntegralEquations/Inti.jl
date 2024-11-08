@@ -141,12 +141,12 @@ function Quadrature(msh::AbstractMesh; qorder)
 end
 
 @noinline function _build_quadrature!(
-    quad,
+    quad::Quadrature{N,T},
     els::AbstractVector{E},
     qrule::ReferenceQuadrature,
-) where {E}
-    N = ambient_dimension(quad)
-    x̂, ŵ = qrule() # nodes and weights on reference element
+) where {N,T,E}
+    x̂ = map(x̂ -> T.(x̂), qcoords(qrule))
+    ŵ = map(ŵ -> T.(ŵ), qweights(qrule))
     num_nodes = length(ŵ)
     M = geometric_dimension(domain(E))
     codim = N - M
@@ -158,8 +158,8 @@ end
             jac = jacobian(el, x̂i)
             μ = _integration_measure(jac)
             w = μ * ŵi
-            ν = codim == 1 ? _normal(jac) : nothing
-            qnode = QuadratureNode(x, w, ν)
+            ν = codim == 1 ? T.(_normal(jac)) : nothing
+            qnode = QuadratureNode(T.(x), T.(w), ν)
             push!(quad.qnodes, qnode)
         end
     end

@@ -195,9 +195,9 @@ end
 Base.getindex(msh::Mesh, ent::EntityKey) = getindex(msh, Domain(ent))
 
 """
-    meshgen(Ω, n)
-    meshgen(Ω, n_dict)
-    meshgen(Ω; meshsize)
+    meshgen(Ω, n; T = Float64)
+    meshgen(Ω, n_dict; T = Float64)
+    meshgen(Ω; meshsize, T = Float64)
 
 Generate a `Mesh` for the domain `Ω` where each curve is meshed using
 `n` elements. Passing a dictionary allows for a finer control; in such cases,
@@ -209,6 +209,8 @@ is computed as so as to obtain an *average* mesh size of `meshsize`. Note that
 the actual mesh size may vary significantly for each element if the
 parametrization is far from uniform.
 
+The mesh is created with primitive data of type `T`.
+
 This function requires the entities forming `Ω` to have an explicit
 parametrization.
 
@@ -217,7 +219,7 @@ parametrization.
     the quality of the underlying parametrization. For complex surfaces, you are
     better off using a proper mesher such as `gmsh`.
 """
-function meshgen(Ω::Domain, T = Float64, args...; kwargs...)
+function meshgen(Ω::Domain, args...; T = Float64, kwargs...)
     # extract the ambient dimension for these entities (i.e. are we in 2d or
     # 3d). Only makes sense if all entities have the same ambient dimension.
     N = ambient_dimension(first(Ω))

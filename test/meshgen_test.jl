@@ -13,7 +13,13 @@ using StaticArrays
     arc1 = Inti.parametric_curve(f, 0, 0.5)
     arc2 = Inti.parametric_curve(f, 0.5, 1)
     Γ = Inti.Domain(arc1, arc2)
-    msh = Inti.meshgen(Γ, 100)
+    msh = Inti.meshgen(Γ, 100; T = Float32)
+    quad = Inti.Quadrature(msh; qorder = 2)
+    @test Inti.integrate(x -> 1, quad) ≈ 2 * π * r
+    @test Inti.measure(arc1) ≈ π * r
+    @test Inti.measure(arc2) ≈ π * r
+
+    msh = Inti.meshgen(Γ, 100; T = Float64)
     quad = Inti.Quadrature(msh; qorder = 2)
     @test Inti.integrate(x -> 1, quad) ≈ 2 * π * r
     @test Inti.measure(arc1) ≈ π * r
