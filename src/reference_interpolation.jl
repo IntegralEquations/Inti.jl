@@ -181,6 +181,7 @@ parametrization(el::ParametricElement) = el.parametrization
 domain(::ParametricElement{D,T,F}) where {D,T,F} = D()
 return_type(::ParametricElement{D,T,F}) where {D,T,F} = T
 
+geometric_dimension(p::ParametricElement) = geometric_dimension(domain(p))
 ambient_dimension(p::ParametricElement) = length(return_type(p))
 
 function (el::ParametricElement)(u)
@@ -336,6 +337,7 @@ const LagrangeCube = LagrangeElement{ReferenceCube}
 
 """
     vertices_idxs(el::LagrangeElement)
+    vertices_idxs(::Type{LagrangeElement})
 
 The indices of the nodes in `el` that define the vertices of the element.
 """
@@ -358,17 +360,76 @@ vertices(el::LagrangeElement) = view(vals(el), vertices_idxs(el))
 
 The indices of the nodes in `el` that define the boundary of the element.
 """
-function boundary_idxs(el::LagrangeLine)
-    return 1, length(vals(el))
+
+function boundary_idxs(::Type{<:LagrangeLine})
+    return 1, 2
 end
 
-function boundary_idxs(el::LagrangeTriangle{3})
+function boundary_idxs(::Type{<:LagrangeTriangle{3}})
     return (1, 2), (2, 3), (3, 1)
 end
 
-function boundary_idxs(el::LagrangeTriangle{6})
-    return (1, 2), (2, 3), (3, 1)
+function boundary_idxs(::Type{<:LagrangeTriangle{6}})
+    return (1, 2, 4), (2, 3, 5), (3, 1, 6)
 end
+
+function boundary1d(els, msh)
+    res = Set{Int}()
+    E, _ = first(els)
+    bdi = Inti.boundary_idxs(E)
+    for (E, i) in els
+        vertices = Inti.connectivity(msh, E)[:, i]
+        for bord in (-vertices[bdi[1]], vertices[bdi[2]])
+            -bord in res ? delete!(res, -bord) : push!(res, bord)
+        end
+    end
+    return sort([res...])
+end
+
+function boundarynd(els, msh)
+    res = Set()
+    E, _ = first(els)
+    bdi = Inti.boundary_idxs(E)
+    for (E, i) in els
+        vertices = Inti.connectivity(msh, E)[:, i]
+        bords = [[vertices[i] for i in bi] for bi in bdi]
+        for new_bord in bords
+            flag = true
+            for old_bord in res
+                if sort(new_bord) == sort(old_bord)
+                    delete!(res, old_bord)
+                    flag = false
+                end
+            end
+            flag && push!(res, new_bord)
+        end
+    end
+    return res
+end
+
+##
+function _dfs!(comp, el, nei, els)
+    for el_nei in nei[el]
+        if el_nei in els
+            push!(comp, el_nei)
+            delete!(els, el_nei)
+            _dfs!(comp, el_nei, nei, els)
+        end
+    end
+end
+
+function connected_components(els, nei)
+    components = Set{Tuple{DataType,Int}}[]
+    while !isempty(els)
+        el = pop!(els)
+        comp = Set{Tuple{DataType,Int}}()
+        push!(comp, el)
+        _dfs!(comp, el, nei, els)
+        push!(components, comp)
+    end
+    return components
+end
+##
 
 #=
 Hardcode some basic elements.
