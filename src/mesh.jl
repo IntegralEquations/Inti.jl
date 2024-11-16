@@ -158,7 +158,8 @@ function Base.getindex(msh::Mesh{N,T}, Ω::Domain) where {N,T}
     foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), keys(Ω))
     glob2loc = Dict{Int,Int}()
     for E in element_types(msh)
-        E <: Union{LagrangeElement,SVector,ParametricElement} || error()
+        E <: Union{LagrangeElement,SVector,ParametricElement} ||
+            error("unsupported element type $E")
         els = elements(msh, E)
         # create new element iterator
         els_new = etype2els[E] = E <: ParametricElement ? E[] : ElementIterator(new_msh, E)
@@ -303,7 +304,7 @@ function meshgen!(msh::Mesh, Ω::Domain, dict::Dict)
             # mesh area
             _meshgen!(msh, k, n)
         else
-            error("meshgen! not implemented volumes")
+            error("meshgen! not implemented on volumes")
         end
     end
     _build_connectivity!(msh)
@@ -571,7 +572,7 @@ function connectivity(msh::SubMesh, E::DataType)
 end
 
 """
-    near_interaction_list(X,Y::AbstractMesh; tol)
+    elements_to_near_targets(X,Y::AbstractMesh; tol)
 
 For each element `el` of type `E` in `Y`, return the indices of the points in
 `X` which are closer than `tol` to the `center` of `el`.
@@ -582,7 +583,7 @@ fifth element of type `E`.
 
 If `tol` is a `Dict`, then `tol[E]` is the tolerance for elements of type `E`.
 """
-function near_interaction_list(
+function elements_to_near_targets(
     X::AbstractVector{<:SVector{N}},
     Y::AbstractMesh{N};
     tol,
@@ -594,13 +595,13 @@ function near_interaction_list(
     for E in element_types(Y)
         els = elements(Y, E)
         tol_ = isa(tol, Number) ? tol : tol[E]
-        idxs = _near_interaction_list(balltree, els, tol_)
+        idxs = _elements_to_near_targets(balltree, els, tol_)
         dict[E] = idxs
     end
     return dict
 end
 
-@noinline function _near_interaction_list(balltree, els, tol)
+@noinline function _elements_to_near_targets(balltree, els, tol)
     centers = map(center, els)
     return inrange(balltree, centers, tol)
 end

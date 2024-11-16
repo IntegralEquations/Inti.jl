@@ -42,7 +42,7 @@ function adaptive_correction(iop::IntegralOperator; tol, maxdist = nothing, maxs
     else
         maxdist
     end
-    dict_near = near_interaction_list(X, Y; tol = maxdist)
+    dict_near = elements_to_near_targets(X, Y; tol = maxdist)
     T = eltype(iop)
     msh = mesh(Y)
     correction = (I = Int[], J = Int[], V = T[])
@@ -166,14 +166,14 @@ function adaptive_integration_singular(f, τ̂::ReferenceLine, x̂ₛ; kwargs...
     end
 end
 
-function near_interaction_list(QX::Quadrature, QY::Quadrature; tol)
+function elements_to_near_targets(QX::Quadrature, QY::Quadrature; tol)
     X = [coords(q) for q in QX]
     msh = mesh(QY)
-    return near_interaction_list(X, msh; tol)
+    return elements_to_near_targets(X, msh; tol)
 end
-function near_interaction_list(X, QY::Quadrature; tol)
+function elements_to_near_targets(X, QY::Quadrature; tol)
     msh = mesh(QY)
-    return near_interaction_list(X, msh; tol)
+    return elements_to_near_targets(X, msh; tol)
 end
 
 """
