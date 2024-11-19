@@ -435,3 +435,39 @@ function kress_change_of_variables_periodic(P)
     v = (x) -> (1 / P - 1 / 2) * ((1 - 2x))^3 + 1 / P * ((2x - 1)) + 1 / 2
     return x -> v(x)^P / (v(x)^P + v(1 - x)^P)
 end
+
+"""
+    connected_components(nodes, neighbors)
+
+Given a list of `nodes` and a dictionary `neighbors` mapping each node to its neighbors,
+return partition of `nodes` into connected components.
+
+The partition is given by a `Vector{typeof(nodes)}`, where the `k`-th entry gives a list of
+nodes in the `k`-th connected component.
+"""
+function connected_components(nodes, neighbors)
+    visited    = empty(nodes)    # Set to keep track of visited nodes
+    components = typeof(nodes)[] # Vector of connected components
+
+    function dfs(node, component)
+        # Helper function for DFS
+        if node in visited || node ∉ nodes
+            return
+        end
+        push!(visited, node)
+        push!(component, node)
+        for neighbor in get(neighbors, node, [])
+            dfs(neighbor, component)
+        end
+    end
+
+    for node in nodes
+        if node ∉ visited
+            component = empty(nodes) # Temporary storage for the current component
+            dfs(node, component)
+            push!(components, component)
+        end
+    end
+
+    return components
+end

@@ -408,27 +408,27 @@ function boundarynd(els, msh)
 end
 
 ##
-function _dfs!(comp, el, nei, els)
-    for el_nei in nei[el]
-        if el_nei in els
-            push!(comp, el_nei)
-            delete!(els, el_nei)
-            _dfs!(comp, el_nei, nei, els)
-        end
-    end
-end
+# function _dfs!(comp, el, nei, els)
+#     for el_nei in nei[el]
+#         if el_nei in els
+#             push!(comp, el_nei)
+#             delete!(els, el_nei)
+#             _dfs!(comp, el_nei, nei, els)
+#         end
+#     end
+# end
 
-function connected_components(els, nei)
-    components = Set{Tuple{DataType,Int}}[]
-    while !isempty(els)
-        el = pop!(els)
-        comp = Set{Tuple{DataType,Int}}()
-        push!(comp, el)
-        _dfs!(comp, el, nei, els)
-        push!(components, comp)
-    end
-    return components
-end
+# function connected_components(els, nei)
+#     components = Set{Tuple{DataType,Int}}[]
+#     while !isempty(els)
+#         el = pop!(els)
+#         comp = Set{Tuple{DataType,Int}}()
+#         push!(comp, el)
+#         _dfs!(comp, el, nei, els)
+#         push!(components, comp)
+#     end
+#     return components
+# end
 ##
 
 #=

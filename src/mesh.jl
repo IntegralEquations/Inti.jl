@@ -617,9 +617,9 @@ Domain(f::Function, msh::AbstractMesh) = Domain(f, entities(msh))
     target_to_near_elements(X::AbstractVector{<:SVector{N}}, Y::AbstractMesh{N};
     tol)
 
-For each target `x` in `X`, return a vector of tuples `(E, i)` where `E` is the
-type of the element in `Y` and `i` is the index of the element in `Y` such that
-`x` is closer than `tol` to the center of the element.
+For each target `x` in `X`, return a vector of tuples `(E, i)` where `E` is the type of the
+element in `Y` and `i` is the index of the element in `Y` such that `x` is closer than `tol`
+to the center of the element.
 """
 function target_to_near_elements(
     X::AbstractVector{<:SVector{N}},
@@ -627,20 +627,22 @@ function target_to_near_elements(
     tol,
 ) where {N}
     @assert isa(tol, Number) || isa(tol, Dict) "tol must be a number or a dictionary mapping element types to numbers"
-    dict = Dict{Int,Vector{Tuple{DataType,Int}}}()
+    t2e = [Tuple{DataType,Int}[] for _ in 1:length(X)]
     balltree = BallTree(X)
     for E in element_types(Y)
-        els = elements(Y, E)
         tol_ = isa(tol, Number) ? tol : tol[E]
-        idxs = _target_to_near_elements(balltree, els, tol_)
-        for (i, idx) in enumerate(idxs)
-            dict[i] = get!(dict, i, Vector{Tuple{DataType,Int}}())
-            for j in idx
-                push!(dict[i], (E, j))
+        els = elements(Y, E)
+        centers = map(center, els)
+        idxs = inrange(balltree, centers, tol_)
+        # the idxs[j] entry contains the indices of the targets X which are closer than tol
+        # to the center of the j-th element.
+        for (j, near_idxs) in enumerate(idxs)
+            for i in near_idxs
+                push!(t2e[i], (E, j))
             end
         end
     end
-    return dict
+    return t2e
 end
 
 """
@@ -693,4 +695,40 @@ function topological_neighbors(msh::AbstractMesh, k = 1)
         k -= 1
     end
     return k_neighbors
+end
+
+function nearest_element_in_connected_components(
+    X::AbstractVector{<:SVector},
+    Y::AbstractMesh;
+    maxdist,
+)
+    topo_nei = topological_neighbors(Y, 1)
+    t2e = target_to_near_elements(X, Y; tol = maxdist)
+    nearest_els = [Tuple{DataType,Int}[] for _ in 1:length(X)]
+    for i in eachindex(X)
+        for comp in connected_components(t2e[i], topo_nei)
+            kmin = argmin(comp) do (E, j)
+                el = elements(Y, E)[j]
+                return norm(X[i] - center(el))
+            end
+            push!(nearest_els[i], kmin)
+        end
+    end
+    return nearest_els
+end
+
+function local_bdim_element_to_target(
+    X::AbstractVector{<:SVector},
+    Y::AbstractMesh;
+    maxdist,
+)
+    # inverse of the nearest_element_in_connected_components map
+    t2e = nearest_element_in_connected_components(X, Y; maxdist = maxdist)
+    dict = Dict(E => [Int[] for _ in 1:length(elements(Y, E))] for E in element_types(Y))
+    for (i, els) in enumerate(t2e)
+        for (E, j) in els
+            push!(dict[E][j], i)
+        end
+    end
+    return dict
 end
