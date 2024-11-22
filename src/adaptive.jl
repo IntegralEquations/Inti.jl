@@ -30,7 +30,13 @@ The correction is computed by using the [`adaptive_integration`](@ref) routine,
 with a tolerance `atol` and a maximum number of subdivisions `maxsplit`; see
 [`adaptive_integration`](@ref) for more details.
 """
-function adaptive_correction(iop::IntegralOperator; tol, maxdist = nothing, maxsplit = 1000)
+function adaptive_correction(
+    iop::IntegralOperator;
+    tol,
+    maxdist = nothing,
+    maxsplit = 1000,
+    nq,
+)
     maxdist = isnothing(maxdist) ? farfield_distance(iop; tol) : maxdist
     # unpack type-unstable fields in iop, allocate output, and dispatch
     X, Y, K = target(iop), source(iop), kernel(iop)
@@ -64,6 +70,7 @@ function adaptive_correction(iop::IntegralOperator; tol, maxdist = nothing, maxs
             maxdist[E],
             tol,
             maxsplit,
+            nq,
         )
     end
     m, n = size(iop)
@@ -82,6 +89,7 @@ end
     maxdist,
     atol,
     maxsplit,
+    nq,
 )
     E = eltype(iter)
     Xqnodes = collect(X)
@@ -125,9 +133,10 @@ end
                     buffer,
                     atol,
                     maxsplit,
+                    nq,
                 )
             else
-                W, er = adaptive_integration(integrand, τ̂; buffer, atol, maxsplit)
+                W, er = adaptive_integration(integrand, τ̂; buffer, atol, maxsplit, nq)
             end
             max_abser = max(max_abser, er)
             max_reler = max(max_reler, er / norm(W))

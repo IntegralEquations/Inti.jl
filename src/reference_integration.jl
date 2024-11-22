@@ -413,8 +413,14 @@ function adaptive_integration(
     maxsplit = 1000,
     norm = LinearAlgebra.norm,
     buffer = nothing,
+    nq = nothing,
 )
-    return _adaptive_integration(f, quad, atol, rtol, maxsplit, norm, buffer)
+    if isnothing(nq)
+        return _adaptive_integration(f, quad, atol, rtol, maxsplit, norm, buffer)
+    else
+        X, W = gauss(nq, 0, 1)
+        return sum(W .* f.(X)), 0.0
+    end
 end
 function adaptive_integration(f, τ̂::ReferenceShape; kwargs...)
     return adaptive_integration(f, default_embedded_quadrature(τ̂); kwargs...)
