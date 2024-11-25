@@ -152,6 +152,8 @@ end
 function _lowfreq_operator(op::AbstractDifferentialOperator{N}) where {N}
     if op isa Helmholtz
         return Laplace(; dim = N)
+    elseif op isa Laplace
+        return Laplace(; dim = N)
     else
         error("Unsupported operator for stabilized Local VDIM")
     end
@@ -187,9 +189,9 @@ function local_vdim_correction(
     s = meshsize
     op_hat = _scaled_operator(op, s)
     op_lowfreq = _lowfreq_operator(op)
-    PFE_p_lowfreq, PFE_p_lowfreq, multiindices =
-        polynomial_solutions_local_vdim(op_lowfreq, interpolation_order)
-    PFE_p, PFE_P, multiindices =
+    PFE_p_lowfreq, PFE_P_lowfreq, multiindices_lowfreq, monomials_indices_lowfreq =
+        polynomial_solutions_local_vdim(op_lowfreq, interpolation_order + 2)
+    PFE_p, PFE_P, multiindices, monomials_indices =
         polynomial_solutions_local_vdim(op_hat, interpolation_order)
 
     dict_near = etype_to_nearest_points(target, source; maxdist)
@@ -227,42 +229,61 @@ function local_vdim_correction(
         for n in 1:ne
             # indices of nodes in element `n`
             isempty(near_list[n]) && continue
-            c, r = translation_and_scaling(els[n])
-            Yvol, Ybdry, diam, need_layer_corr = _local_vdim_construct_local_quadratures(
-                N,
-                mesh,
-                neighbors,
-                n,
-                c,
-                s,
-                bdry_kdtree,
-                bdry_etype2qrule,
-                vol_etype2qrule,
-                bdry_qrule,
-                vol_qrule,
-            )
-            if r * op.k < 10^(-2)
+            c, r, diam = translation_and_scaling(els[n])
+            if true
+                #if r * op.k < 10^(-3)
                 lowfreq = true
+                Yvol, Ybdry, need_layer_corr = _local_vdim_construct_local_quadratures(
+                    N,
+                    mesh,
+                    neighbors,
+                    n,
+                    c,
+                    r,
+                    diam,
+                    bdry_kdtree,
+                    bdry_etype2qrule,
+                    vol_etype2qrule,
+                    bdry_qrule,
+                    vol_qrule,
+                )
                 R = _lowfreq_vdim_auxiliary_quantities(
-                    op_hat,
+                    op,
+                    op_lowfreq,
+                    c,
+                    r,
+                    num_basis,
+                    PFE_p_lowfreq,
+                    PFE_P_lowfreq,
+                    multiindices,
+                    multiindices_lowfreq,
+                    monomials_indices,
+                    monomials_indices_lowfreq,
+                    target[near_list[n]],
+                    green_multiplier,
+                    Yvol,
+                    Ybdry,
+                    diam,
+                    need_layer_corr;
+                )
+            else
+                @show "used highfreq"
+                lowfreq = false
+                Yvol, Ybdry, need_layer_corr = _local_vdim_construct_local_quadratures(
+                    N,
                     mesh,
                     neighbors,
                     n,
                     c,
                     s,
-                    PFE_p,
-                    PFE_P,
-                    target[near_list[n]],
-                    green_multiplier,
+                    diam,
                     bdry_kdtree,
                     bdry_etype2qrule,
                     vol_etype2qrule,
                     bdry_qrule,
-                    vol_qrule;
+                    vol_qrule,
                 )
-            else
-                lowfreq = false
-                R = _local_vdim_auxiliary_quantities(
+                R, _ = _local_vdim_auxiliary_quantities(
                     op_hat,
                     c,
                     s,
@@ -279,13 +300,15 @@ function local_vdim_correction(
             jglob = @view qtags[:, n]
             # compute translation and scaling
             if SHIFT
+                # TODO copy this from (part of) the output of _local_vdim_auxiliary_quantities ?
                 L̃ .= transpose(build_vander(vals_trg, view(source, jglob), PFE_p, c, r))
                 Linv = pinv(L̃)
-                S = s^2 * Diagonal((s / r) .^ (abs.(multiindices)))
-                if isdefined(Main, :Infiltrator)
-                    Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+                if !lowfreq
+                    S = s^2 * Diagonal((s / r) .^ (abs.(multiindices)))
+                    wei = transpose(Linv) * S * transpose(R)
+                else
+                    wei = transpose(Linv) * transpose(R)
                 end
-                wei = transpose(Linv) * S * transpose(R)
             else
                 error("unsupported local VDIM without shifting")
             end
@@ -303,6 +326,9 @@ function local_vdim_correction(
     |-- max shift norm :              $shift_norm
     """
     δV = sparse(Is, Js, Vs, m, n)
+    if isdefined(Main, :Infiltrator)
+        Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+    end
     return δV
 end
 
@@ -329,6 +355,7 @@ function translation_and_scaling(el::LagrangeTriangle)
     l1 = norm(vertices[1] - vertices[2])
     l2 = norm(vertices[2] - vertices[3])
     l3 = norm(vertices[3] - vertices[1])
+    diam = max(l1, l2, l3)
     if ((l1^2 + l2^2 >= l3^2) && (l2^2 + l3^2 >= l1^2) && (l3^2 + l1^2 > l2^2))
         acuteright = true
     else
@@ -357,7 +384,7 @@ function translation_and_scaling(el::LagrangeTriangle)
             r = l3 / 2
         end
     end
-    return c, r
+    return c, r, diam
 end
 
 function translation_and_scaling(el::LagrangeTetrahedron)
@@ -370,6 +397,7 @@ function translation_and_scaling(el::LagrangeTetrahedron)
     d = norm(vertices[3] - vertices[2])
     e = norm(vertices[3] - vertices[1])
     f = norm(vertices[2] - vertices[1])
+    diam = max(a, b, c, d, e, f)
     f² = f^2
     a² = a^2
     b² = b^2
@@ -417,7 +445,7 @@ function translation_and_scaling(el::LagrangeTetrahedron)
             R = f / 2
         end
     end
-    return center, R
+    return center, R, diam
 end
 
 # function barrier for type stability purposes
@@ -433,6 +461,7 @@ function _local_vdim_construct_local_quadratures(
     el,
     center,
     scale,
+    diam,
     bdry_kdtree,
     bdry_etype2qrule,
     vol_etype2qrule,
@@ -467,20 +496,6 @@ function _local_vdim_construct_local_quadratures(
 
     # Check if we need to do near-singular layer potential evaluation
     vertices = mesh.etype2els[Etype][el].vals[vertices_idxs(Etype)]
-    if N == 2
-        diam = max(
-            norm(vertices[1] - vertices[2]),
-            norm(vertices[2] - vertices[3]),
-            norm(vertices[3] - vertices[1]),
-        )
-    else
-        diam = max(
-            norm(vertices[1] - vertices[2]),
-            norm(vertices[2] - vertices[3]),
-            norm(vertices[3] - vertices[4]),
-            norm(vertices[4] - vertices[1]),
-        )
-    end
     need_layer_corr = sum(inrangecount(bdry_kdtree, vertices, diam / 2)) > 0
 
     # Now begin working in x̂ coordinates where x = scale * x̂
@@ -489,11 +504,11 @@ function _local_vdim_construct_local_quadratures(
     Yvol = Quadrature(Float64, els_list, vol_etype2qrule, vol_qrule; center, scale)
     Ybdry = Quadrature(Float64, bords, bdry_etype2qrule, bdry_qrule; center, scale)
 
-    return Yvol, Ybdry, diam, need_layer_corr
+    return Yvol, Ybdry, need_layer_corr
 end
 
 function _local_vdim_auxiliary_quantities(
-    op_hat::AbstractDifferentialOperator{N},
+    op::AbstractDifferentialOperator{N},
     center,
     scale,
     PFE_p,
@@ -506,8 +521,8 @@ function _local_vdim_auxiliary_quantities(
     need_layer_corr;
 ) where {N}
     # TODO handle derivative case
-    G = SingleLayerKernel(op_hat)
-    dG = DoubleLayerKernel(op_hat)
+    G = SingleLayerKernel(op)
+    dG = DoubleLayerKernel(op)
     Xshift = [(q.coords - center) / scale for q in X]
     Sop = IntegralOperator(G, Xshift, Ybdry)
     Dop = IntegralOperator(dG, Xshift, Ybdry)
@@ -519,7 +534,7 @@ function _local_vdim_auxiliary_quantities(
         μloc = _green_multiplier(:inside)
         green_multiplier = fill(μloc, length(X))
         δS, δD = bdim_correction(
-            op_hat,
+            op,
             Xshift,
             Ybdry,
             Smat,
@@ -528,6 +543,7 @@ function _local_vdim_auxiliary_quantities(
             maxdist = diam / scale,
             derivative = false,
         )
+
         Smat += δS
         Dmat += δD
     end
@@ -573,27 +589,173 @@ function _local_vdim_auxiliary_quantities(
             Θ[i, n] += μ[i] * P[i, n]
         end
     end
-    return Θ
+    area = 0
+    for i in 1:length(Yvol)
+        area += Yvol[i].weight
+    end
+    if isdefined(Main, :Infiltrator)
+        Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+    end
+    return Θ, b
 end
 
 function _lowfreq_vdim_auxiliary_quantities(
-    op_hat::Helmholtz{2},
-    mesh,
-    neighbors,
-    el,
+    op::Laplace{2},
+    op_lowfreq::Laplace{2},
     center,
     scale,
-    PFE_p,
-    PFE_P,
+    num_basis,
+    PFE_p_lowfreq,
+    PFE_P_lowfreq,
+    multiindices,
+    multiindices_lowfreq,
+    monomials_indices,
+    monomials_indices_lowfreq,
     X,
     μ,
-    bdry_kdtree,
-    bdry_etype2qrule,
-    vol_etype2qrule,
-    bdry_qrule,
-    vol_qrule;
+    Yvol,
+    Ybdry,
+    diam,
+    need_layer_corr;
 )
-    error("not yet implemented")
+    Xshift = [(q.coords - center) / scale for q in X]
+    # Laplace
+    θ, b = _local_vdim_auxiliary_quantities(
+        op_lowfreq,
+        center,
+        scale,
+        PFE_p_lowfreq,
+        PFE_P_lowfreq,
+        X,
+        μ,
+        Yvol,
+        Ybdry,
+        diam,
+        need_layer_corr,
+    )
+
+    num_targets = length(X)
+
+    # Set up integral operators just to find the element type of the correction matrix R
+    G = SingleLayerKernel(op)
+    Vop = IntegralOperator(G, Xshift, Yvol)
+    R = zeros(eltype(Vop), num_targets, num_basis)
+
+    Hmat = Matrix{ComplexF64}(undef, length(X), length(Yvol))
+    #Hmat .= 0
+    #@show scale * op.k
+    for i in 1:num_targets
+        for j in 1:length(Yvol)
+            Hmat[i, j] = Yvol[j].weight
+        end
+    end
+
+    for n in 1:num_basis
+        beta = multiindices[n]
+        for j in 1:num_targets
+            R[j, n] = θ[j, monomials_indices_lowfreq[beta]]
+        end
+        R[:, n] .*= scale^2
+        # Commenting this yields more accuracy
+        R[:, n] += scale^2 * log(scale) * Hmat * b[:, monomials_indices_lowfreq[beta]]
+        #if isdefined(Main, :Infiltrator)
+        #    Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+        #  end
+    end
+    # beware! the `b` here is that of PFE_p_lowfreq.
+    return R
+end
+
+function _lowfreq_vdim_auxiliary_quantities(
+    op::Helmholtz{2},
+    op_lowfreq::Laplace{2},
+    center,
+    scale,
+    num_basis,
+    PFE_p_lowfreq,
+    PFE_P_lowfreq,
+    multiindices,
+    multiindices_lowfreq,
+    monomials_indices,
+    monomials_indices_lowfreq,
+    X,
+    μ,
+    Yvol,
+    Ybdry,
+    diam,
+    need_layer_corr;
+)
+    Xshift = [(q.coords - center) / scale for q in X]
+    # Laplace
+    θ, b = _local_vdim_auxiliary_quantities(
+        op_lowfreq,
+        center,
+        scale,
+        PFE_p_lowfreq,
+        PFE_P_lowfreq,
+        X,
+        μ,
+        Yvol,
+        Ybdry,
+        diam,
+        need_layer_corr,
+    )
+
+    num_targets = length(X)
+
+    # Set up integral operators just to find the element type of the correction matrix R
+    G = SingleLayerKernel(op)
+    Vop = IntegralOperator(G, Xshift, Yvol)
+    R = zeros(eltype(Vop), num_targets, num_basis)
+    kr2 = (op.k * scale)^2
+    γ = 0.57721566490153286060
+
+    Hmat = Matrix{ComplexF64}(undef, length(X), length(Yvol))
+    #Hmat .= 0
+    #@show scale * op.k
+    for i in 1:num_targets
+        for j in 1:length(Yvol)
+            z2 =
+                kr2 * (
+                    (Xshift[i][1] - Yvol[j].coords[1])^2 +
+                    (Xshift[i][2] - Yvol[j].coords[2])^2
+                )
+            bessj0 = 0
+            for k in 0:3
+                bessj0 += (-1)^k * (1 / 4 * z2)^k / (factorial(k)^2)
+            end
+            Hmat[i, j] =
+                (
+                    (1 + 2 * im / pi * (γ + 1 / 2 * log(kr2 / 4))) * bessj0 +
+                    2 * im / pi *
+                    (1 / 4 * z2 - 3 / 2 * (1 / 4 * z2)^2 / 4 + 11 / 3456 * z2^3)
+                ) *
+                Yvol[j].weight *
+                scale^2
+        end
+    end
+
+    for n in 1:num_basis
+        beta = multiindices[n]
+        beta10 = beta + Inti.MultiIndex((1, 0))
+        beta01 = beta + Inti.MultiIndex((0, 1))
+        beta20 = beta + Inti.MultiIndex((2, 0))
+        beta02 = beta + Inti.MultiIndex((0, 2))
+        for j in 1:num_targets
+            x1t = Xshift[j][1]
+            x2t = Xshift[j][2]
+            R[j, n] =
+                (1 - 1 / 4 * kr2 * (x1t^2 + x2t^2)) * θ[j, monomials_indices_lowfreq[beta]]
+            +1 / 2 * kr2 * x1t * θ[j, monomials_indices_lowfreq[beta10]]
+            +1 / 2 * kr2 * x2t * θ[j, monomials_indices_lowfreq[beta01]]
+            -1 / 4 * kr2 * θ[j, monomials_indices_lowfreq[beta20]]
+            -1 / 4 * kr2 * θ[j, monomials_indices_lowfreq[beta02]]
+        end
+        R[:, n] .*= 2 * im / pi * scale^2
+        # Commenting this yields more accuracy
+        R[:, n] += Hmat * b[:, monomials_indices_lowfreq[beta]]
+    end
+    return R, b
 end
 
 function _vdim_auxiliary_quantities(
@@ -674,12 +836,13 @@ function polynomial_solutions_local_vdim(op::AbstractDifferentialOperator, order
         push!(monomials, p)
         push!(poly_solutions, P)
     end
+    monomials_indices = Dict(multiindices .=> 1:length(multiindices))
 
     PFE_monomials = ElementaryPDESolutions.assemble_fastevaluator(monomials, Float64)
     PFE_polysolutions =
         ElementaryPDESolutions.assemble_fastevaluator(poly_solutions, Float64)
 
-    return PFE_monomials, PFE_polysolutions, multiindices
+    return PFE_monomials, PFE_polysolutions, multiindices, monomials_indices
 end
 
 """

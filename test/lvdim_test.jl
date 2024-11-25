@@ -11,10 +11,10 @@ using FMMLIB2D
 using GLMakie
 using Meshes
 
-meshsize = 0.00125
-#meshsize = 0.0125/4096/2
+#meshsize = 0.001/8
+meshsize = 0.000125
 interpolation_order = 4
-VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(10)
+VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(4)
 bdry_qorder = 2 * VR_qorder
 
 function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
@@ -59,18 +59,19 @@ tquad = @elapsed begin
 end
 @info "Quadrature generation time: $tquad"
 
-k0 = 3π
-k  = 2π
+k0 = 1
+k  = 0
 θ  = (cos(π / 3), sin(π / 3))
 #u  = (x) -> exp(im * k0 * dot(x, θ))
 #du = (x,n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
-#u  = (x) -> cos(k0 * dot(x, θ))
-#du = (x, n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
-#f  = (x) -> (k^2 - k0^2) * u(x)
-s  = 4000
-u  = (x) -> 1 / (k^2 - k0^2) * exp(im * k0 * dot(x, θ)) + 1 / (k^2 - 4 * s) * exp(-s * norm(x)^2)
-du = (x, n) -> im * k0 * dot(θ, n) / (k^2 - k0^2) * exp(im * k0 * dot(x, θ)) - 2 * s / (k^2 - 4 * s) * dot(x, n) * exp(-s * norm(x)^2)
-f  = (x) -> exp(im * k0 * dot(x, θ)) + 1 / (k^2 - 4 * s) * (4 * s^2 * norm(x)^2 - 4 * s + k^2) * exp(-s * norm(x)^2)
+u  = (x) -> cos(k0 * dot(x, θ))
+du = (x, n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
+f  = (x) -> (k^2 - k0^2) * u(x)
+
+#s  = 4
+#u  = (x) -> 1 / (k^2 - k0^2) * exp(im * k0 * dot(x, θ)) + 1 / (k^2 - 4 * s) * exp(-s * norm(x)^2)
+#du = (x, n) -> im * k0 * dot(θ, n) / (k^2 - k0^2) * exp(im * k0 * dot(x, θ)) - 2 * s / (k^2 - 4 * s) * dot(x, n) * exp(-s * norm(x)^2)
+#f  = (x) -> exp(im * k0 * dot(x, θ)) + 1 / (k^2 - 4 * s) * (4 * s^2 * norm(x)^2 - 4 * s + k^2) * exp(-s * norm(x)^2)
 
 u_d = map(q -> u(q.coords), Ωₕ_quad)
 u_b = map(q -> u(q.coords), Γₕ_quad)
