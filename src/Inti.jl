@@ -46,6 +46,7 @@ include("quadrature.jl")
 include("kernels.jl")
 include("nystrom.jl")
 include("bdim.jl")
+include("lbdim.jl")
 include("vdim.jl")
 include("adaptive.jl")
 
