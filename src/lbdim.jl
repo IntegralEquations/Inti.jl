@@ -21,6 +21,7 @@ function local_bdim_correction(
     derivative::Bool = false,
     maxdist,
     kneighbor = 1,
+    qorder_aux,
 )
     imat_cond = imat_norm = res_norm = rhs_norm = theta_norm = -Inf
     T = default_kernel_eltype(pde) # Float64
@@ -33,7 +34,6 @@ function local_bdim_correction(
     neighbors = topological_neighbors(msh, kneighbor)
     X = [coords(q) for q in qnodes]
     dict_near = local_bdim_element_to_target(X, msh; maxdist)
-    # dict_near = etype_to_nearest_points(target, source; maxdist)
     # find first an appropriate set of source points to center the monopoles
     qmax = sum(size(mat, 1) for mat in values(source.etype2qtags)) # max number of qnodes per el
     ns   = ceil(Int, parameters.sources_oversample_factor * qmax)
@@ -49,26 +49,12 @@ function local_bdim_correction(
     else
         error("only 2D and 3D supported")
     end
-    # figure out if we are dealing with a scalar or vector PDE
-    σ = if T <: Number
-        1
-    else
-        @assert allequal(size(T))
-        size(T, 1)
-    end
     # compute traces of monopoles on the source mesh
-    G    = SingleLayerKernel(pde, T)
-    γ₁G  = DoubleLayerKernel(pde, T)
+    G = SingleLayerKernel(pde, T)
+    γ₁G = DoubleLayerKernel(pde, T)
     γ₁ₓG = AdjointDoubleLayerKernel(pde, T)
-    γ₀B  = Dense{T}(undef, length(source), ns)
-    γ₁B  = Dense{T}(undef, length(source), ns)
-    for k in 1:ns
-        for j in 1:length(source)
-            γ₀B[j, k] = G(source[j], xs[k])
-            γ₁B[j, k] = γ₁ₓG(source[j], xs[k])
-        end
-    end
     Is, Js, Ss, Ds = Int[], Int[], T[], T[]
+    qrule_aux = GaussLegendre(; order = qorder_aux)
     for (E, qtags) in source.etype2qtags
         els = elements(msh, E)
         near_list = dict_near[E]
@@ -85,16 +71,23 @@ function local_bdim_correction(
         Θi = Dense{T}(undef, 1, ns)
         Mdata, Wdata, Θidata = parent(M)::Matrix, parent(W)::Matrix, parent(Θi)::Matrix
         K = derivative ? γ₁ₓG : G
+        γ₁K = derivative ? HyperSingularKernel(pde, T) : γ₁G
         # for each element, we will solve Mᵀ W = Θiᵀ, where W is a vector of
         # size 2nq, and Θi is a row vector of length(ns)
         for n in 1:ne
             # if there is nothing near, skip immediately to next element
             isempty(near_list[n]) && continue
             el = els[n]
-            # copy the monopoles/dipoles for the current element
+            # compute the monopoles/dipoles for the current element
             jglob = @view qtags[:, n]
-            M[1:nq, :] .= γ₀B[jglob, :]
-            M[nq+1:2nq, :] .= γ₁B[jglob, :]
+            for k in 1:ns
+                for (jloc, j) in enumerate(jglob)
+                    M[jloc, k]    = G(source[j], xs[k])
+                    M[nq+jloc, k] = γ₁ₓG(source[j], xs[k])
+                end
+            end
+            # M[1:nq, :] .= γ₀B[jglob, :]
+            # M[nq+1:2nq, :] .= γ₁B[jglob, :]
             F = qr!(transpose(Mdata))
             @debug (imat_cond = max(cond(Mdata), imat_cond)) maxlog = 0
             @debug (imat_norm = max(norm(Mdata), imat_norm)) maxlog = 0
@@ -107,33 +100,38 @@ function local_bdim_correction(
                 append!(qtags_nei, source.etype2qtags[E′][:, m])
             end
             qnodes_nei = source.qnodes[qtags_nei]
-            jac = jacobian(el, 0.5)
-            ν = _normal(jac)
-            h = sum(qnodes[i].weight for i in jglob)
-            for i in near_list[n]
-                # integrate the monopoles/dipoles over the auxiliary surface
-                # with target x: Θₖ <-- S[γ₁Bₖ](x) - D[γ₀Bₖ](x) + μ * Bₖ(x)
+            for i::Int in near_list[n]
+                # integrate the monopoles/dipoles over the auxiliary surface with target x:
+                # Θₖ <-- S[γ₁Bₖ](x) - D[γ₀Bₖ](x) + μ * Bₖ(x).
                 x = target[i]
                 aux_els, orientation = local_bdim_auxiliary_els(nei, msh, coords(x))
-                qnodes_aux =
-                    local_bdim_auxiliary_quadrature(aux_els, ceil(Int, 10 * abs(log(h))))
-                μ = orientation == :exterior ? green_multiplier[i] : -green_multiplier[i]
                 for k in 1:ns
-                    Θi[k] = μ * K(x, xs[k])
-                end
-                for q in qnodes_aux
-                    SK = G(x, q)
-                    DK = γ₁G(x, q)
-                    for k in 1:ns
+                    Θi[k] = zero(T)
+                    for q in qnodes_nei # regular integration over neighbors
+                        SK = K(x, q)
+                        DK = γ₁K(x, q)
                         Θi[k] += (SK * γ₁ₓG(q, xs[k]) - DK * G(q, xs[k])) * weight(q)
                     end
-                end
-                for q in qnodes_nei
-                    SK = G(x, q)
-                    DK = γ₁G(x, q)
-                    for k in 1:ns
-                        Θi[k] += (SK * γ₁ₓG(q, xs[k]) - DK * G(q, xs[k])) * weight(q)
+                    for el′ in aux_els
+                        v = integrate(qrule_aux) do ŷ
+                            y_ = el′(ŷ)
+                            jac_ = jacobian(el′, ŷ)
+                            ν_ = _normal(jac_)
+                            μ_ = _integration_measure(jac_)
+                            q_ = (coords = y_, normal = ν_)
+                            SK = K(x, q_)
+                            DK = γ₁K(x, q_)
+                            return (SK * γ₁ₓG(q_, xs[k]) - DK * G(q_, xs[k])) * μ_
+                        end
+                        Θi[k] += v
                     end
+                    vals = (-1.0, -0.5, 0, 0.5, 1.0)
+                    Bk = K(x, xs[k])
+                    er, idx = findmin(v -> norm(Θi[k] + v * Bk), vals)
+                    if er > 1e-1
+                        @warn "possible issue deciding if the target point $x is inside or outside the domain"
+                    end
+                    Θi[k] += vals[idx] * Bk
                 end
                 @debug (rhs_norm = max(rhs_norm, norm(Θidata))) maxlog = 0
                 ldiv!(Wdata, F, transpose(Θidata))
@@ -178,4 +176,28 @@ function local_bdim_element_to_target(
         end
     end
     return dict
+end
+
+function local_bdim_auxiliary_els(ekeys, msh, x, c = 1)
+    bnd = boundary(ekeys, msh)
+    els = []
+    if isempty(bnd)
+        @warn "empty boundary: no extrusion performed"
+        return els
+    end
+    l, r = bnd[1], bnd[2]
+    d = min(norm(x - l), norm(x - r))
+    lr = LagrangeLine(l, r)
+    ν = normal(lr, 0.5)
+    xc = lr(0.5)
+    # extrude on the side "away" from x. If x is on the line, then is does not matter which side
+    side = sign(dot(x - xc, ν))
+    side = iszero(side) ? 1 : side
+    orientation = side > 0 ? :exterior : :interior
+    z = xc - side * c * d * ν
+    l1 = LagrangeLine(r, z)
+    push!(els, l1)
+    l2 = LagrangeLine(z, l)
+    push!(els, l2)
+    return els, orientation
 end
