@@ -4,6 +4,7 @@ using Inti
 using Random
 using Meshes
 using CairoMakie
+using StaticArrays
 
 include("test_utils.jl")
 Random.seed!(1)
@@ -11,22 +12,34 @@ Random.seed!(1)
 N = 2
 t = :interior
 pde = Inti.Laplace(; dim = N)
-qorder = 3
+# pde = Inti.Helmholtz(; k = 2.1, dim = N)
+# pde = Inti.Stokes(; dim = 2, μ = 1.0)
+qorder = 7
 
 K = 5:5
-H = [0.2 * 2.0^(-i) for i in 0:3]
+H = [0.2 * 2.0^(-i) for i in 0:5]
 fig = Figure()
 ax = Axis(fig[1, 1]; xlabel = "h", ylabel = "error", xscale = log10, yscale = log10)
-k = 5
-err = Float64[]
+err1 = Float64[]
+err2 = Float64[]
 for h in H
+    # k = ceil(Int, 0.1 / h)
+    k = 5
     Inti.clear_entities!()
-    Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = h, order = 2)
-    Γ = Inti.external_boundary(Ω)
-
+    # Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = h, order = 2)
+    # Γ = Inti.external_boundary(Ω)
+    Γ = Inti.parametric_curve(0, 2π) do s
+        return SVector(cos(s), sin(s))
+    end |> Inti.Domain
+    msh = Inti.meshgen(Γ; meshsize = h)
+    Γ_msh = msh[Γ]
+    nel = sum(Inti.element_types(Γ_msh)) do E
+        return length(Inti.elements(Γ_msh, E))
+    end
+    @info h, k, nel
     ##
 
-    quad = Inti.Quadrature(msh[Γ]; qorder)
+    quad = Inti.Quadrature(Γ_msh; qorder)
     σ = t == :interior ? 1 / 2 : -1 / 2
     xs = t == :interior ? ntuple(i -> 3, N) : ntuple(i -> 0.1, N)
     T = Inti.default_density_eltype(pde)
@@ -56,7 +69,15 @@ for h in H
     # arrows!(X, Y, u, v, lengthscale=0.01)
     # display(fig)
 
-    δS, δD = Inti.local_bdim_correction(pde, quad, quad; green_multiplier, kneighbor = k)
+    tldim = @elapsed δS, δD = Inti.local_bdim_correction(
+        pde,
+        quad,
+        quad;
+        green_multiplier,
+        kneighbor = k,
+        maxdist = 5 * h,
+        qorder_aux = 10 * ceil(Int, abs(log(h))),
+    )
     Sdim = Smat + δS
     Ddim = Dmat + δD
     # Sdim, Ddim = Inti.single_double_layer(;
@@ -67,18 +88,29 @@ for h in H
     #     correction  = (method = :ldim,),
     # )
     e1 = norm(Sdim * γ₁u - Ddim * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
+
+    tdim = @elapsed δS, δD =
+        Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
+    Sdim = Smat + δS
+    Ddim = Dmat + δD
+    e2 = norm(Sdim * γ₁u - Ddim * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
     # @show norm(e0, Inf)
-    @show norm(e1, Inf)
-    push!(err, e1)
+    @show e1
+    @show e2
+    @show tldim
+    @show tdim
+    push!(err1, e1)
+    push!(err2, e2)
 end
 
-scatterlines!(ax, H, err; linewidth = 2, marker = :circle, label = " k = $k")
+scatterlines!(ax, H, err1; linewidth = 2, marker = :circle, label = " local")
+scatterlines!(ax, H, err2; linewidth = 2, marker = :circle, label = "global")
 
 # add some reference slopes
 for slope in (qorder-2):(qorder+2)
-    ref = err[end] / H[end]^slope
+    ref = err2[end] / H[end]^slope
     lines!(ax, H, ref * H .^ slope; linestyle = :dash, label = "slope $slope")
 end
-axislegend()
+axislegend(; position = :lt)
 
-display(fig)
+# display(fig)

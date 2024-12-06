@@ -217,6 +217,7 @@ function _qrule_for_reference_shape(ref, order)
     if ref === ReferenceLine() || ref === :line
         return Fejer(; order)
         # return Fejer(; order)
+        return GaussLegendre(; order)
     elseif ref === ReferenceSquare() || ref === :square
         qx = _qrule_for_reference_shape(ReferenceLine(), order)
         qy = qx
