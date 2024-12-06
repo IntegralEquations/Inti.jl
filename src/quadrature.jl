@@ -169,6 +169,21 @@ end
     return quad
 end
 
+function qnodes(els, x̂, ŵ)
+    for el in els
+        # and all qnodes for that element
+        for (x̂i, ŵi) in zip(x̂, ŵ)
+            x = el(x̂i)
+            jac = jacobian(el, x̂i)
+            μ = _integration_measure(jac)
+            w = μ * ŵi
+            ν = codim == 1 ? T.(_normal(jac)) : nothing
+            qnode = QuadratureNode(T.(x), T.(w), ν)
+            push!(quad.qnodes, qnode)
+        end
+    end
+end
+
 """
     Quadrature(Ω::Domain; meshsize, qorder)
 
@@ -215,7 +230,6 @@ an appropiate quadrature rule.
 """
 function _qrule_for_reference_shape(ref, order)
     if ref === ReferenceLine() || ref === :line
-        return Fejer(; order)
         # return Fejer(; order)
         return GaussLegendre(; order)
     elseif ref === ReferenceSquare() || ref === :square
@@ -325,14 +339,22 @@ end
 
 Compute the `mean_curvature` at each quadrature node in `Q`.
 """
-mean_curvature(Q::Quadrature) = _curvature(mean_curvature, Q)
+mean_curvature(Q::Quadrature{3}) = _curvature(mean_curvature, Q)
 
 """
     gauss_curvature(Q::Quadrature)
 
 Compute the `gauss_curvature` at each quadrature node in `Q`.
 """
-gauss_curvature(Q::Quadrature) = _curvature(gauss_curvature, Q)
+gauss_curvature(Q::Quadrature{3}) = _curvature(gauss_curvature, Q)
+
+"""
+    curvature(Q::Quadrature{2})
+
+Compute the curvature at each quadrature node in `Q`, where `Q` is the quadrature of curve
+in 2D.
+"""
+curvature(Q::Quadrature{2}) = _curvature(curvature, Q)
 
 # helper function for computing curvature
 function _curvature(f, Q)
@@ -351,4 +373,27 @@ function _curvature(f, Q)
         end
     end
     return curv
+end
+
+function local_bdim_auxiliary_quadrature(els, order)
+    qrule = GaussLegendre(; order = order)
+    x̂, ŵ = qrule()
+    qnodes = QuadratureNode{2,Float64}[]
+
+    function append_qnodes!(qnodes, el, x̂, ŵ)
+        for (x̂i, ŵi) in zip(x̂, ŵ)
+            x = el(x̂i)
+            jac = jacobian(el, x̂i)
+            μ = _integration_measure(jac)
+            w = μ * ŵi
+            qnode = QuadratureNode(x, w, _normal(jac))
+            push!(qnodes, qnode)
+        end
+    end
+
+    for el in els
+        append_qnodes!(qnodes, el, x̂, ŵ)
+    end
+
+    return qnodes
 end

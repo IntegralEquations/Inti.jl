@@ -20,6 +20,9 @@ function (el::ReferenceInterpolant)(x)
     return interface_method(el)
 end
 
+reference_domain(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = D()
+reference_domain(e::ReferenceInterpolant) = reference_domain(typeof(e))
+
 geometric_dimension(::ReferenceInterpolant{D,T}) where {D,T} = geometric_dimension(D)
 ambient_dimension(el::ReferenceInterpolant{D,T}) where {D,T} = length(T)
 
@@ -103,6 +106,18 @@ function gauss_curvature(el::ReferenceInterpolant, x̂)
     # Guassian curvature
     κ = (L * N - M^2) / (E * G - F^2)
     return κ
+end
+
+"""
+    curvature(τ, x̂)
+
+Compute the curvature of `τ` at the parametric coordinate `x̂`, where `τ` is a line element
+in 2D.
+"""
+function curvature(τ, x̂::SVector)
+    x′, y′ = jacobian(τ, x̂) |> vec
+    x′′, y′′ = hessian(τ, x̂) |> vec
+    return (x′ * y′′ - y′ * x′′) / (x′^2 + y′^2)^(3 / 2)
 end
 
 domain(::ReferenceInterpolant{D,T}) where {D,T} = D()
@@ -361,7 +376,7 @@ vertices(el::LagrangeElement) = view(vals(el), vertices_idxs(el))
 The indices of the nodes in `el` that define the boundary of the element.
 """
 
-function boundary_idxs(::Type{<:LagrangeLine})
+function boundary_idxs(::Type{<:ReferenceInterpolant{ReferenceLine}})
     return 1, 2
 end
 
@@ -372,64 +387,6 @@ end
 function boundary_idxs(::Type{<:LagrangeTriangle{6}})
     return (1, 2, 4), (2, 3, 5), (3, 1, 6)
 end
-
-function boundary1d(els, msh)
-    res = Set{Int}()
-    E, _ = first(els)
-    bdi = Inti.boundary_idxs(E)
-    for (E, i) in els
-        vertices = Inti.connectivity(msh, E)[:, i]
-        for bord in (-vertices[bdi[1]], vertices[bdi[2]])
-            -bord in res ? delete!(res, -bord) : push!(res, bord)
-        end
-    end
-    return sort([res...])
-end
-
-function boundarynd(els, msh)
-    res = Set()
-    E, _ = first(els)
-    bdi = Inti.boundary_idxs(E)
-    for (E, i) in els
-        vertices = Inti.connectivity(msh, E)[:, i]
-        bords = [[vertices[i] for i in bi] for bi in bdi]
-        for new_bord in bords
-            flag = true
-            for old_bord in res
-                if sort(new_bord) == sort(old_bord)
-                    delete!(res, old_bord)
-                    flag = false
-                end
-            end
-            flag && push!(res, new_bord)
-        end
-    end
-    return res
-end
-
-##
-# function _dfs!(comp, el, nei, els)
-#     for el_nei in nei[el]
-#         if el_nei in els
-#             push!(comp, el_nei)
-#             delete!(els, el_nei)
-#             _dfs!(comp, el_nei, nei, els)
-#         end
-#     end
-# end
-
-# function connected_components(els, nei)
-#     components = Set{Tuple{DataType,Int}}[]
-#     while !isempty(els)
-#         el = pop!(els)
-#         comp = Set{Tuple{DataType,Int}}()
-#         push!(comp, el)
-#         _dfs!(comp, el, nei, els)
-#         push!(components, comp)
-#     end
-#     return components
-# end
-##
 
 #=
 Hardcode some basic elements.

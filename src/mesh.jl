@@ -58,6 +58,16 @@ Return the element types present in the `msh`.
 function element_types end
 
 """
+    const ElementKey = Tuple{DataType,Int}
+
+Type alias for a tuple of element type and element index. A key `k` can be used to fetch an
+element by calling `msh[k]`.
+"""
+const ElementKey = Tuple{DataType,Int}
+
+Base.getindex(msh::AbstractMesh, k::ElementKey) = elements(msh, k[1])[k[2]]
+
+"""
     struct Mesh{N,T} <: AbstractMesh{N,T}
 
 Unstructured mesh defined by a set of `nodes`` (of type `SVector{N,T}`), and a
@@ -717,18 +727,57 @@ function nearest_element_in_connected_components(
     return nearest_els
 end
 
-function local_bdim_element_to_target(
-    X::AbstractVector{<:SVector},
-    Y::AbstractMesh;
-    maxdist,
-)
-    # inverse of the nearest_element_in_connected_components map
-    t2e = nearest_element_in_connected_components(X, Y; maxdist = maxdist)
-    dict = Dict(E => [Int[] for _ in 1:length(elements(Y, E))] for E in element_types(Y))
-    for (i, els) in enumerate(t2e)
-        for (E, j) in els
-            push!(dict[E][j], i)
+function boundary(ekeys, msh::AbstractMesh)
+    bnd = Set()
+    seen_sorted = Set()
+    for (E, n) in ekeys
+        # FIXME: for now we only support 1d entities, so check that it is the case
+        D = reference_domain(E)
+        @assert geometric_dimension(D) == 1 "boundary only supported for 1d entities"
+        for iloc in boundary_idxs(E)
+            i_bnd = connectivity(msh, E)[iloc, n]
+            i_bnd_sorted = sort(i_bnd)
+            if sort(i_bnd_sorted) in seen_sorted
+                # already seen, so not part of the boundary
+                delete!(bnd, i_bnd)
+                delete!(bnd, -i_bnd)
+                continue
+            end
+            push!(bnd, iloc == 1 ? -i_bnd : i_bnd)
+            push!(seen_sorted, i_bnd_sorted)
         end
     end
-    return dict
+    # create the elements composing the boundary
+    bnd = sort([bnd...])
+    els = [msh.nodes[abs(i)] for i in bnd]
+    return els
 end
+
+# function boundary1d(els, msh)
+#     res = Set{Int}()
+#     E, _ = first(els)
+#     bdi = Inti.boundary_idxs(E)
+#     for (E, i) in els
+#         vertices = Inti.connectivity(msh, E)[:, i]
+#         for bord in (-vertices[bdi[1]], vertices[bdi[2]])
+#             -bord in res ? delete!(res, -bord) : push!(res, bord)
+#         end
+#     end
+#     return sort([res...])
+# end
+
+# function local_bdim_auxiliary_domain(ekeys, msh, ν, h)
+#     bnd = boundary(ekeys, msh)
+#     els = []
+#     if isempty(bnd)
+#         return els
+#     end
+#     l, r = bnd[1], bnd[2]
+#     l1 = LagrangeLine(r, r - ν * h)
+#     push!(els, l1)
+#     l2 = LagrangeLine(r - ν * h, l - ν * h)
+#     push!(els, l2)
+#     lend = LagrangeLine(l - ν * h, l)
+#     push!(els, lend)
+#     return els
+# end

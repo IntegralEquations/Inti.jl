@@ -471,3 +471,9 @@ function connected_components(nodes, neighbors)
 
     return components
 end
+
+# extend sort to work with tuples and numbers. Note that this defines an `Inti.sort`
+# function which defaults to `Base.sort`, so this is NOT type piracy.
+sort(x) = Base.sort(x)
+sort(x::Number) = x
+sort(x::Tuple) = sort(SVector(x))
