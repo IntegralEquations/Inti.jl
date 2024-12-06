@@ -14,23 +14,38 @@ t = :interior
 pde = Inti.Laplace(; dim = N)
 # pde = Inti.Helmholtz(; k = 2.1, dim = N)
 # pde = Inti.Stokes(; dim = 2, μ = 1.0)
-qorder = 7
+qorder = 5
 
 K = 5:5
-H = [0.2 * 2.0^(-i) for i in 0:5]
+H = [0.2 * 2.0^(-i) for i in 2:5]
 fig = Figure()
 ax = Axis(fig[1, 1]; xlabel = "h", ylabel = "error", xscale = log10, yscale = log10)
 err1 = Float64[]
 err2 = Float64[]
 for h in H
     # k = ceil(Int, 0.1 / h)
-    k = 5
+    k = 10
     Inti.clear_entities!()
     # Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = h, order = 2)
     # Γ = Inti.external_boundary(Ω)
-    Γ = Inti.parametric_curve(0, 2π) do s
-        return SVector(cos(s), sin(s))
+    # Γ = Inti.parametric_curve(0, 2π) do s
+    #     return SVector(cos(s), sin(s))
+    # end |> Inti.Domain
+    # Γ =
+    #     Inti.parametric_curve(0.0, 1.0; labels = ["kite"]) do s
+    #         return SVector(
+    #             2.5 + cos(2π * s[1]) + 0.65 * cos(4π * s[1]) - 0.65,
+    #             1.5 * sin(2π * s[1]),
+    #         )
+    #     end |> Inti.Domain
+    δ = 0.01
+    Γ₁ = Inti.parametric_curve(0.0, 2π) do s
+        return SVector(cos(s) - 1 - δ / 2, sin(s))
     end |> Inti.Domain
+    Γ₂ = Inti.parametric_curve(0.0, 2π) do s
+        return SVector(cos(s) + 1 + δ / 2, sin(s))
+    end |> Inti.Domain
+    Γ = Γ₁ ∪ Γ₂
     msh = Inti.meshgen(Γ; meshsize = h)
     Γ_msh = msh[Γ]
     nel = sum(Inti.element_types(Γ_msh)) do E
@@ -75,8 +90,8 @@ for h in H
         quad;
         green_multiplier,
         kneighbor = k,
-        maxdist = 5 * h,
-        qorder_aux = 10 * ceil(Int, abs(log(h))),
+        maxdist = 10 * h,
+        qorder_aux = 20 * ceil(Int, abs(log(h))),
     )
     Sdim = Smat + δS
     Ddim = Dmat + δD
@@ -113,4 +128,4 @@ for slope in (qorder-2):(qorder+2)
 end
 axislegend(; position = :lt)
 
-# display(fig)
+display(fig)

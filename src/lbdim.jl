@@ -104,6 +104,7 @@ function local_bdim_correction(
                 # integrate the monopoles/dipoles over the auxiliary surface with target x:
                 # Θₖ <-- S[γ₁Bₖ](x) - D[γ₀Bₖ](x) + μ * Bₖ(x).
                 x = target[i]
+                dmin = minimum(norm(coords(x) - coords(q)) for q in qnodes_nei)
                 aux_els, orientation = local_bdim_auxiliary_els(nei, msh, coords(x))
                 for k in 1:ns
                     Θi[k] = zero(T)
@@ -125,13 +126,20 @@ function local_bdim_correction(
                         end
                         Θi[k] += v
                     end
-                    vals = (-1.0, -0.5, 0, 0.5, 1.0)
                     Bk = K(x, xs[k])
-                    er, idx = findmin(v -> norm(Θi[k] + v * Bk), vals)
-                    if er > 1e-1
-                        @warn "possible issue deciding if the target point $x is inside or outside the domain"
+                    # FIXME
+                    # vals = (-1.0, -0.5, 0, 0.5, 1.0)
+                    # er, idx = findmin(v -> norm(Θi[k] + v * Bk), vals)
+                    # if er > 1e-1
+                    #     @warn "possible issue deciding if the target point $x is inside or outside the domain"
+                    # end
+                    # Θi[k] += vals[idx] * Bk
+                    s = orientation == :interior ? 1 : -1
+                    if iszero(dmin)
+                        Θi[k] += s * 0.5 * Bk
+                    else
+                        Θi[k] += 0 * Bk
                     end
-                    Θi[k] += vals[idx] * Bk
                 end
                 @debug (rhs_norm = max(rhs_norm, norm(Θidata))) maxlog = 0
                 ldiv!(Wdata, F, transpose(Θidata))
