@@ -324,14 +324,22 @@ end
 
 Compute the `mean_curvature` at each quadrature node in `Q`.
 """
-mean_curvature(Q::Quadrature) = _curvature(mean_curvature, Q)
+mean_curvature(Q::Quadrature{3}) = _curvature(mean_curvature, Q)
 
 """
     gauss_curvature(Q::Quadrature)
 
 Compute the `gauss_curvature` at each quadrature node in `Q`.
 """
-gauss_curvature(Q::Quadrature) = _curvature(gauss_curvature, Q)
+gauss_curvature(Q::Quadrature{3}) = _curvature(gauss_curvature, Q)
+
+"""
+    curvature(Q::Quadrature{2})
+
+Compute the curvature at each quadrature node in `Q`, where `Q` is the quadrature of curve
+in 2D.
+"""
+curvature(Q::Quadrature{2}) = _curvature(curvature, Q)
 
 # helper function for computing curvature
 function _curvature(f, Q)

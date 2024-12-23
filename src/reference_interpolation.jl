@@ -106,30 +106,15 @@ function gauss_curvature(el::ReferenceInterpolant, x̂)
 end
 
 """
-    curvature(Q::Quadrature{2})
+    curvature(τ, x̂)
 
-Compute the curvature at each quadrature node in `Q`, where `Q` is the quadrature of curve
+Compute the curvature of `τ` at the parametric coordinate `x̂`, where `τ` is a line element
 in 2D.
 """
-curvature(Q::Quadrature{2}) = _curvature(curvature, Q)
-
-# helper function for computing curvature
-function _curvature(f, Q)
-    msh = mesh(Q)
-    curv = zeros(length(Q))
-    for (E, tags) in Q.etype2qtags
-        qrule = quadrature_rule(Q, E)
-        q̂, _ = qrule()
-        els = elements(msh, E)
-        for n in 1:size(tags, 2)
-            el = els[n]
-            for i in 1:size(tags, 1)
-                qtag = tags[i, n]
-                curv[qtag] = f(el, q̂[i])
-            end
-        end
-    end
-    return curv
+function curvature(τ, x̂::SVector)
+    x′, y′ = jacobian(τ, x̂) |> vec
+    x′′, y′′ = hessian(τ, x̂) |> vec
+    return (x′ * y′′ - y′ * x′′) / (x′^2 + y′^2)^(3 / 2)
 end
 
 domain(::ReferenceInterpolant{D,T}) where {D,T} = D()
