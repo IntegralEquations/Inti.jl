@@ -6,13 +6,13 @@ using Meshes
 using CairoMakie
 using StaticArrays
 
-include("test_utils.jl")
+include("../test_utils.jl")
 Random.seed!(1)
 
 N = 2
 t = :interior
 # t = :exterior
-α, β = 1, 0
+α, β = 0, 1
 pde = Inti.Laplace(; dim = N)
 # pde = Inti.Helmholtz(; k = 2.1, dim = N)
 # pde = Inti.Stokes(; dim = 2, μ = 1.0)
@@ -26,16 +26,16 @@ err2 = Float64[]
 
 Inti.clear_entities!()
 ##### Circle
-χ = s -> SVector(1cos(s), 1sin(s))
-Γ = Inti.parametric_curve(χ, -π, π) |> Inti.Domain
-if t == :interior
-    xs = ntuple(i -> 3, N)
-    tset = [0.5 * χ(s) for s in LinRange(-π, π, 10)]
-    # tset = [SVector(10, 0)]
-else
-    xs = ntuple(i -> 0.1, N)
-    tset = [2 * χ(s) for s in LinRange(-π, π, 10)]
-end
+# χ = s -> SVector(1cos(s), 1sin(s))
+# Γ = Inti.parametric_curve(χ, -π, π) |> Inti.Domain
+# if t == :interior
+#     xs = ntuple(i -> 3, N)
+#     tset = [0.5 * χ(s) for s in LinRange(-π, π, 10)]
+#     # tset = [SVector(10, 0)]
+# else
+#     xs = ntuple(i -> 0.1, N)
+#     tset = [2 * χ(s) for s in LinRange(-π, π, 10)]
+# end
 
 ##### Kite
 # χ = s -> SVector(
@@ -115,8 +115,8 @@ for h in H
     quad = Inti.Quadrature(Γ_msh; qorder)
     T = Inti.default_density_eltype(pde)
     c = rand(T)
-    # u = (qnode) -> Inti.SingleLayerKernel(pde)(qnode, xs) * c
-    u = qnode -> 1
+    u = (qnode) -> Inti.SingleLayerKernel(pde)(qnode, xs) * c
+    # u = qnode -> 1
     ubnd = map(u, quad)
     utst = map(u, tset)
     utst_norm = norm(utst, Inf)
@@ -177,6 +177,7 @@ for h in H
     Sdim = Smat + δS
     Ddim = Dmat + δD
     σ    = (α * Sdim + β * (Ddim + μ*I)) \ ubnd
+    usol = (α * Stest + β * Dtest) * σ
     e2   = norm(usol - utst, Inf) / utst_norm
     # @show norm(e0, Inf)
     @show e0

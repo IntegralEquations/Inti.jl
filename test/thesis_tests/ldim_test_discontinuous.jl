@@ -8,7 +8,7 @@ using StaticArrays
 using QuadGK
 using ForwardDiff
 
-include("test_utils.jl")
+include("../test_utils.jl")
 Random.seed!(1)
 
 N = 2
@@ -23,7 +23,7 @@ H = [0.2 * 2.0^(-i) for i in 2:10]
 err1 = Float64[]
 err2 = Float64[]
 
-k = 5
+k = 10
 Inti.clear_entities!()
 
 # Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = h, order = 2)
@@ -57,7 +57,7 @@ Inti.clear_entities!()
 # Γ = Γ₁ ∪ Γ₂
 
 ##### 8-like
-δ = 1e-8
+δ = 0.001
 a, b = 0, 1
 χ = s -> SVector(
     (1 + cos(2s * 2π)/2) * cos(s * 2π),
@@ -100,9 +100,9 @@ for h in H
     # bu = x -> quadgk(y -> b(y) * u(x - y), -ε, ε, atol=1e-15)[1]
     # bu = x -> sin(x)
 
-    # u = x -> x[2] > 0 ? 1 : 0
-    u = x -> x[2]
-    u = x -> x[2] / norm(x)
+    u = x -> x[2] > 0 ? 1 : 0
+    # u = x -> x[2]
+    # u = x -> x[2] / norm(x)
     # u = x -> 1
     uvec = map(u, Inti.coords.(quad))
     # uvec = [bu(atan(x[2], x[1])) for x in Inti.coords.(quad)]

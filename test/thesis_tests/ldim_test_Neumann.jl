@@ -6,7 +6,7 @@ using Meshes
 using CairoMakie
 using StaticArrays
 
-include("test_utils.jl")
+include("../test_utils.jl")
 Random.seed!(1)
 
 N = 2
@@ -18,22 +18,17 @@ qorder = 5
 
 K = 5:5
 H = [0.2 * 2.0^(-i) for i in 2:6]
-fig = Figure()
-ax = Axis(fig[1, 1]; xlabel = "h", ylabel = "error", xscale = log10, yscale = log10)
 err1 = Float64[]
 err2 = Float64[]
-for h in H
-    # k = ceil(Int, 0.1 / h)
-    k = 10
-    Inti.clear_entities!()
 
-    # Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = h, order = 2)
-    # Γ = Inti.external_boundary(Ω)
-
+FIG = Figure()
+AX  = Axis(FIG[1, 1]; aspect=1)
+Inti.clear_entities!()
     ##### Circle
-    # Γ = Inti.parametric_curve(0, 2π) do s
-    #     return SVector(cos(s), sin(s))
-    # end |> Inti.Domain
+    χ = s -> SVector(cos(s), sin(s))
+    xs = t == :interior ? ntuple(i -> 3, N) : ntuple(i -> 0.1, N)
+    Γ = Inti.parametric_curve(χ, -π, π) |> Inti.Domain
+    tset = [0.5 * χ(s) for s in LinRange(-π, π, 10)]
 
     ##### Kite
     # Γ =
@@ -43,26 +38,47 @@ for h in H
     #             1.5 * sin(2π * s[1]),
     #         )
     #     end |> Inti.Domain
+    # xs = t == :interior ? ntuple(i -> 3, N) : ntuple(i -> 0.1, N)
     
     ##### Two circles
     # δ = 0.01
+    # χ = s -> SVector(cos(s), sin(s))
     # Γ₁ = Inti.parametric_curve(0.0, 2π) do s
-    #     return SVector(cos(s) - 1 - δ / 2, sin(s))
+    #     return χ(s) - SVector(1 + δ/2, 0)
     # end |> Inti.Domain
     # Γ₂ = Inti.parametric_curve(0.0, 2π) do s
-    #     return SVector(cos(s) + 1 + δ / 2, sin(s))
+    #     return χ(s) + SVector(1 + δ/2, 0)
     # end |> Inti.Domain
     # Γ = Γ₁ ∪ Γ₂
+    # xs = t == :interior ? ntuple(i -> 3, N) : ntuple(i -> 0.1, N)
+    # tset1 = map(s -> 0.5χ(s) - SVector(1 + δ/2, 0), LinRange(0, 2π, 10))
+    # tset2 = map(s -> 0.5χ(s) + SVector(1 + δ/2, 0), LinRange(0, 2π, 10))
+    # tset  = tset1 ∪ tset2
 
     ##### 8-like
-    δ = 0.001
-    Γ = Inti.parametric_curve(-π, π) do s
-            return SVector(
-                (1 + cos(2s)/2) * cos(s),
-                (1 + (2-δ)*cos(2s)/2) * sin(s),
-            )
-        end |> Inti.Domain
+    # δ = 0.001
+    # χ = s -> SVector(
+    #     (1 + cos(2s)/2) * cos(s),
+    #     (1 + (2-δ)*cos(2s)/2) * sin(s),
+    # )
+    # xs = t == :interior ? ntuple(i -> 1, N) : ntuple(i -> 0.1, N)
+    # Γ = Inti.parametric_curve(χ, -π, π) |> Inti.Domain
+    # tset = [0.5SVector(cos(s), sin(s)) - SVector(0.8, 0) for s in LinRange(-π, π, 10)] ∪
+    #        [0.5SVector(cos(s), sin(s)) + SVector(0.8, 0) for s in LinRange(-π, π, 10)]
     ##
+
+    lines!(AX, χ.(LinRange(-π, π, 100)))
+    scatter!(AX, [xs])
+    scatter!(AX, tset)
+    display(FIG)
+
+for h in H
+    # k = ceil(Int, 0.1 / h)
+    k = 10
+
+    # Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = h, order = 2)
+    # Γ = Inti.external_boundary(Ω)
+
 
     msh = Inti.meshgen(Γ; meshsize = h)
     Γ_msh = msh[Γ]
@@ -73,16 +89,13 @@ for h in H
     ##
 
     quad = Inti.Quadrature(Γ_msh; qorder)
-    σ = t == :interior ? 1 / 2 : -1 / 2
-    xs = t == :interior ? ntuple(i -> 3, N) : ntuple(i -> 0.1, N)
     T = Inti.default_density_eltype(pde)
     c = rand(T)
-    u = (qnode) -> Inti.SingleLayerKernel(pde)(qnode, xs) * c
-    dudn = (qnode) -> Inti.AdjointDoubleLayerKernel(pde)(qnode, xs) * c
-    γ₀u = map(u, quad)
-    γ₁u = map(dudn, quad)
-    γ₀u_norm = norm(norm.(γ₀u, Inf), Inf)
-    γ₁u_norm = norm(norm.(γ₁u, Inf), Inf)
+    u  = (qnode) -> Inti.SingleLayerKernel(pde)(qnode, xs) * c
+    un = (qnode) -> Inti.AdjointDoubleLayerKernel(pde)(qnode, xs) * c
+    ubnd = map(un, quad)
+    utst = map(u, tset)
+    utst_norm = norm(utst, Inf)
     # single and double layer
     G = Inti.SingleLayerKernel(pde)
     S = Inti.IntegralOperator(G, quad)
@@ -90,7 +103,10 @@ for h in H
     dG = Inti.DoubleLayerKernel(pde)
     D = Inti.IntegralOperator(dG, quad)
     Dmat = Inti.assemble_matrix(D)
-    e0 = norm(Smat * γ₁u - Dmat * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
+
+    σ    = (Smat + I/2) \ ubnd
+    usol = Inti.IntegralOperator(G, tset, quad) * σ
+    e0   = norm(usol - utst, Inf) / utst_norm
 
     green_multiplier = fill(-0.5, length(quad))
     # δS, δD = Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
@@ -120,13 +136,17 @@ for h in H
     #     compression = (method = :none,),
     #     correction  = (method = :ldim,),
     # )
-    e1 = norm(Sdim * γ₁u - Ddim * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
+    σ    = (Sdim + I/2) \ ubnd
+    usol = Inti.IntegralOperator(G, tset, quad) * σ
+    e1   = norm(usol - utst, Inf) / utst_norm
 
     tdim = @elapsed δS, δD =
         Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
     Sdim = Smat + δS
     Ddim = Dmat + δD
-    e2 = norm(Sdim * γ₁u - Ddim * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
+    σ    = (Sdim + I/2) \ ubnd
+    usol = Inti.IntegralOperator(G, tset, quad) * σ
+    e2   = norm(usol - utst, Inf) / utst_norm
     # @show norm(e0, Inf)
     @show e1
     @show e2
@@ -135,6 +155,9 @@ for h in H
     push!(err1, e1)
     push!(err2, e2)
 end
+
+fig = Figure()
+ax = Axis(fig[1, 1]; xlabel = "h", ylabel = "error", xscale = log10, yscale = log10)
 
 scatterlines!(ax, H, err1; linewidth = 2, marker = :circle, label = " local")
 scatterlines!(ax, H, err2; linewidth = 2, marker = :circle, label = "global")
