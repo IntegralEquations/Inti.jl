@@ -32,9 +32,10 @@ function local_bdim_correction(
     msh = source.mesh
     qnodes = source.qnodes
     neighbors = topological_neighbors(msh, kneighbor)
-    X = [coords(q) for q in qnodes]
+    X = [coords(q) for q in target]
     dict_near = local_bdim_element_to_target(X, msh; maxdist)
     # find first an appropriate set of source points to center the monopoles
+    # FIXME why sum
     qmax = sum(size(mat, 1) for mat in values(source.etype2qtags)) # max number of qnodes per el
     ns   = ceil(Int, parameters.sources_oversample_factor * qmax)
     # compute a bounding box for source points
@@ -105,7 +106,7 @@ function local_bdim_correction(
                 # Θₖ <-- S[γ₁Bₖ](x) - D[γ₀Bₖ](x) + μ * Bₖ(x).
                 x = target[i]
                 dmin = minimum(norm(coords(x) - coords(q)) for q in qnodes_nei)
-                aux_els, orientation = local_bdim_auxiliary_els(nei, msh, coords(x))
+                aux_els, orientation = local_bdim_auxiliary_els(nei, msh, qnodes_nei, coords(x))
                 for k in 1:ns
                     Θi[k] = zero(T)
                     for q in qnodes_nei # regular integration over neighbors
@@ -134,12 +135,7 @@ function local_bdim_correction(
                     #     @warn "possible issue deciding if the target point $x is inside or outside the domain"
                     # end
                     # Θi[k] += vals[idx] * Bk
-                    s = orientation == :interior ? 1 : -1
-                    if iszero(dmin)
-                        Θi[k] += s * 0.5 * Bk
-                    else
-                        Θi[k] += 0 * Bk
-                    end
+                    Θi[k] -= orientation * Bk
                 end
                 @debug (rhs_norm = max(rhs_norm, norm(Θidata))) maxlog = 0
                 ldiv!(Wdata, F, transpose(Θidata))
@@ -186,23 +182,36 @@ function local_bdim_element_to_target(
     return dict
 end
 
-function local_bdim_auxiliary_els(ekeys, msh, x, c = 1)
+function local_bdim_auxiliary_els(ekeys, msh, qnodes, x, c = 1)
+    # @info "DEBUG1"
     bnd = boundary(ekeys, msh)
     els = []
     if isempty(bnd)
         @warn "empty boundary: no extrusion performed"
         return els
     end
+    # construct the extruded domain wrt the segment joining the two extemes
+    # extrude on the side "away" from x. If x is on the line, then it does not matter which side
     l, r = bnd[1], bnd[2]
-    d = min(norm(x - l), norm(x - r))
     lr = LagrangeLine(l, r)
     ν = normal(lr, 0.5)
     xc = lr(0.5)
-    # extrude on the side "away" from x. If x is on the line, then is does not matter which side
-    side = sign(dot(x - xc, ν))
-    side = iszero(side) ? 1 : side
-    orientation = side > 0 ? :exterior : :interior
-    z = xc - side * c * d * ν
+    d = norm(l - r)
+    side_seg = sign(dot(x - xc, ν))
+    side_seg = iszero(side_seg) ? 1 : side_seg
+    z = xc - side_seg * c * d * ν
+
+    # decide the side of x wrt the curve
+    mindx = argmin(norm(coords(q) - x) for q in qnodes)
+    νm  = normal(qnodes[mindx])
+    xm = coords(qnodes[mindx])
+    side_curve = sign(dot(x - xm, νm))
+    if side_curve == 0
+        orientation = 0.5 * side_seg
+    else        
+        orientation = side_curve * side_seg > 0 ? 0 : side_seg
+    end
+
     l1 = LagrangeLine(r, z)
     push!(els, l1)
     l2 = LagrangeLine(z, l)
