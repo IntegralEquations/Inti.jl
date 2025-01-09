@@ -1,5 +1,4 @@
 ##### Circle
-k = 10
 χ = s -> SVector(cos(s), sin(s))
 Γ = Inti.parametric_curve(χ, -π, π) |> Inti.Domain
 if t == :interior
@@ -10,3 +9,5 @@ else
     xs = ntuple(i -> 0.1, N)
     tset = [2 * χ(s) for s in LinRange(-π, π, 10)]
 end
+
+k = 10
