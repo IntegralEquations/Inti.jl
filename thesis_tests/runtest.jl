@@ -54,24 +54,26 @@ theme = Theme(;
 )
 Makie.set_theme!(theme)
 
+##
 fig = Figure()
 ax = Axis(fig[1, 1])
-
-##
 for qorder in Q
     # err0 = Err0[qorder]
     err1 = Err1[qorder]
     err2 = Err2[qorder]
-    # scatterlines!(ax, H, err0; marker = :x, label = "no correction")
-    scatterlines!(ax, H, err2; marker = :circle, label = "global")
-    scatterlines!(ax, H, err1; marker = :rect,   label = "local")
+    # scatterlines!(ax, H, err0;colormap=:tab10, colorrange=(1, 10), color=3, marker = :x,    label=qorder == Q[1] ? "no correction" : nothing)
+    scatterlines!(ax, H, err2;colormap=:tab10, colorrange=(1, 10), color=2, marker=:circle, label=qorder == Q[1] ? "global" : nothing)
+    scatterlines!(ax, H, err1;colormap=:tab10, colorrange=(1, 10), color=1, marker=:rect,   label=qorder == Q[1] ? " local" : nothing)
 
     # add some reference slopes
     P = div(qorder + 1, 2)
     slope = P + 1
-    ref = err2[end] / H[end]^slope
-    lines!(ax, H, ref * H .^ slope; linestyle = :dash, label = "slope $slope")
+    ref = 0.8 * err2[1] / H[1]^slope
+    lines!(ax, H, ref * H .^ slope;color=:black, linestyle = :dash, label =nothing)
+    text!(ax, H[2], 0.8*err2[2], text="slope $slope";align=(:left, :top))
 end
 axislegend(; position = :lt)
 
 display(fig)
+
+##
