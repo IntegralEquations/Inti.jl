@@ -17,20 +17,23 @@ t = :interior
 pde = Inti.Laplace(; dim = N)
 # pde = Inti.Helmholtz(; k = 2.1, dim = N)
 # pde = Inti.Stokes(; dim = 2, μ = 1.0)
-qorder = 5
+Q = (3, 5)
 
 ii = 1:5
 H = [0.1 * 2.0^(-i) for i in ii]
 
-err0 = Float64[]
-err1 = Float64[]
-err2 = Float64[]
+Err0 = Dict(qorder => Float64[] for qorder in Q)
+Err1 = Dict(qorder => Float64[] for qorder in Q)
+Err2 = Dict(qorder => Float64[] for qorder in Q)
 
-GEOMETRY = "geometries/8-like_discontinuous.jl"
+##
+##
+
+GEOMETRY = "geometries/kite.jl"
 # k = 10      # number of neighbors for local correction
 # α, β = 0, 1 # coefficients for single, double layer
 ## suggested values are include in geometry files
-TESTFILE = "test_files/Integral_discontinuous.jl"
+TESTFILE = "test_files/Integral_Green_identity.jl"
 
 Inti.clear_entities!()
 include(GEOMETRY)
@@ -53,12 +56,19 @@ Makie.set_theme!(theme)
 
 fig = Figure()
 ax = Axis(fig[1, 1])
-# scatterlines!(ax, H, err0; marker = :x, label = "no correction")
-scatterlines!(ax, H, err2; marker = :circle, label = "global")
-scatterlines!(ax, H, err1; marker = :rect, label = " local")
 
-# add some reference slopes
-for slope in (qorder-2):(qorder)
+##
+for qorder in Q
+    # err0 = Err0[qorder]
+    err1 = Err1[qorder]
+    err2 = Err2[qorder]
+    # scatterlines!(ax, H, err0; marker = :x, label = "no correction")
+    scatterlines!(ax, H, err2; marker = :circle, label = "global")
+    scatterlines!(ax, H, err1; marker = :rect,   label = "local")
+
+    # add some reference slopes
+    P = div(qorder + 1, 2)
+    slope = P + 1
     ref = err2[end] / H[end]^slope
     lines!(ax, H, ref * H .^ slope; linestyle = :dash, label = "slope $slope")
 end
