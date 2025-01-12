@@ -3,6 +3,7 @@
 *.jl.mem
 *.msh
 *.pos
+*.png
 /Manifest.toml
 /docs/Manifest.toml
 /docs/build/

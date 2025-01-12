@@ -75,5 +75,7 @@ end
 axislegend(; position = :lt)
 
 display(fig)
-
 ##
+GEOM = splitdir(GEOMETRY)[2][1:end-3]
+TEST = splitdir(TESTFILE)[2][1:end-3]
+save("thesis_tests/plots/$(GEOM)_$(TEST).png", fig)
