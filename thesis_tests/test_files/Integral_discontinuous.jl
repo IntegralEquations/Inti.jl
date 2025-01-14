@@ -65,7 +65,7 @@ for qorder in Q
             green_multiplier,
             kneighbor = k,
             maxdist = 10 * h,
-            qorder_aux = 20 * ceil(Int, abs(log(h))),
+            qorder_aux = 10 * ceil(Int, abs(log(h))),
         )
         Sdim = Smat + δS
         Ddim = Dmat + δD
