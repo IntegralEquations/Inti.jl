@@ -230,7 +230,7 @@ function local_vdim_correction(
             # indices of nodes in element `n`
             isempty(near_list[n]) && continue
             c, r, diam = translation_and_scaling(els[n])
-            if true
+            if false
                 #if r * op.k < 10^(-3)
                 lowfreq = true
                 Yvol, Ybdry, need_layer_corr = _local_vdim_construct_local_quadratures(
@@ -283,7 +283,10 @@ function local_vdim_correction(
                     bdry_qrule,
                     vol_qrule,
                 )
-                R, _ = _local_vdim_auxiliary_quantities(
+        #if isdefined(Main, :Infiltrator)
+        #    Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+        #  end
+                R, b = _local_vdim_auxiliary_quantities(
                     op_hat,
                     c,
                     s,
@@ -296,6 +299,9 @@ function local_vdim_correction(
                     diam,
                     need_layer_corr;
                 )
+        #if isdefined(Main, :Infiltrator)
+        #    Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+        #  end
             end
             jglob = @view qtags[:, n]
             # compute translation and scaling
@@ -306,8 +312,17 @@ function local_vdim_correction(
                 if !lowfreq
                     S = s^2 * Diagonal((s / r) .^ (abs.(multiindices)))
                     wei = transpose(Linv) * S * transpose(R)
+                    if isdefined(Main, :Infiltrator)
+                        Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+                      end
                 else
-                    wei = transpose(Linv) * transpose(R)
+                    D = Vector{Float64}(undef, num_basis)
+                    D .= r^2
+                    D = Diagonal(D)
+                    wei = transpose(Linv) * D * transpose(R)
+                    if isdefined(Main, :Infiltrator)
+                        Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+                    end
                 end
             else
                 error("unsupported local VDIM without shifting")
@@ -326,9 +341,6 @@ function local_vdim_correction(
     |-- max shift norm :              $shift_norm
     """
     δV = sparse(Is, Js, Vs, m, n)
-    if isdefined(Main, :Infiltrator)
-        Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-    end
     return δV
 end
 
@@ -589,13 +601,6 @@ function _local_vdim_auxiliary_quantities(
             Θ[i, n] += μ[i] * P[i, n]
         end
     end
-    area = 0
-    for i in 1:length(Yvol)
-        area += Yvol[i].weight
-    end
-    if isdefined(Main, :Infiltrator)
-        Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-    end
     return Θ, b
 end
 
@@ -618,8 +623,6 @@ function _lowfreq_vdim_auxiliary_quantities(
     diam,
     need_layer_corr;
 )
-    Xshift = [(q.coords - center) / scale for q in X]
-    # Laplace
     θ, b = _local_vdim_auxiliary_quantities(
         op_lowfreq,
         center,
@@ -631,38 +634,24 @@ function _lowfreq_vdim_auxiliary_quantities(
         Yvol,
         Ybdry,
         diam,
-        need_layer_corr,
+        need_layer_corr;
     )
+    Xshift = [(q.coords - center) / scale for q in X]
+    num_targets = length(Xshift)
 
-    num_targets = length(X)
-
-    # Set up integral operators just to find the element type of the correction matrix R
-    G = SingleLayerKernel(op)
-    Vop = IntegralOperator(G, Xshift, Yvol)
-    R = zeros(eltype(Vop), num_targets, num_basis)
-
-    Hmat = Matrix{ComplexF64}(undef, length(X), length(Yvol))
-    #Hmat .= 0
-    #@show scale * op.k
-    for i in 1:num_targets
+    Hmat = Matrix{eltype(θ)}(undef, num_targets, length(Yvol))
+    for n in 1:num_targets
         for j in 1:length(Yvol)
-            Hmat[i, j] = Yvol[j].weight
+            Hmat[n, j] = Yvol[j].weight
         end
     end
 
+    R = Matrix{eltype(θ)}(undef, num_targets, num_basis)
     for n in 1:num_basis
-        beta = multiindices[n]
-        for j in 1:num_targets
-            R[j, n] = θ[j, monomials_indices_lowfreq[beta]]
-        end
-        R[:, n] .*= scale^2
-        # Commenting this yields more accuracy
-        R[:, n] += scale^2 * log(scale) * Hmat * b[:, monomials_indices_lowfreq[beta]]
-        #if isdefined(Main, :Infiltrator)
-        #    Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-        #  end
+        β = multiindices[n]
+        R[:, n] = θ[:, monomials_indices_lowfreq[β]]
+        R[:, n] += log(scale) * Hmat * b[:, monomials_indices_lowfreq[β]]
     end
-    # beware! the `b` here is that of PFE_p_lowfreq.
     return R
 end
 
