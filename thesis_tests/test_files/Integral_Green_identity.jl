@@ -1,5 +1,4 @@
 σ = t == :interior ? 1 / 2 : -1 / 2
-xs = t == :interior ? ntuple(i -> 3, N) : ntuple(i -> 0.1, N)
 T = Inti.default_density_eltype(pde)
 c = rand(T)
 u = (qnode) -> Inti.SingleLayerKernel(pde)(qnode, xs) * c
