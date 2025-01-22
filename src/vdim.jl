@@ -230,6 +230,7 @@ function local_vdim_correction(
             # indices of nodes in element `n`
             isempty(near_list[n]) && continue
             c, r, diam = translation_and_scaling(els[n])
+            #s=1.0
             if false
                 #if r * op.k < 10^(-3)
                 lowfreq = true
@@ -266,8 +267,34 @@ function local_vdim_correction(
                     diam,
                     need_layer_corr;
                 )
+                Yvol_s1, Ybdry_s1, need_layer_corr_s1 = _local_vdim_construct_local_quadratures(
+                    N,
+                    mesh,
+                    neighbors,
+                    n,
+                    c,
+                    1.0,
+                    diam,
+                    bdry_kdtree,
+                    bdry_etype2qrule,
+                    vol_etype2qrule,
+                    bdry_qrule,
+                    vol_qrule,
+                )
+                R_s1, b_s1 = _local_vdim_auxiliary_quantities(
+                    op_hat,
+                    c,
+                    1.0,
+                    PFE_p,
+                    PFE_P,
+                    target[near_list[n]],
+                    green_multiplier,
+                    Yvol_s1,
+                    Ybdry_s1,
+                    diam,
+                    need_layer_corr_s1;
+                )
             else
-                @show "used highfreq"
                 lowfreq = false
                 Yvol, Ybdry, need_layer_corr = _local_vdim_construct_local_quadratures(
                     N,
@@ -299,6 +326,33 @@ function local_vdim_correction(
                     diam,
                     need_layer_corr;
                 )
+                Yvol_s1, Ybdry_s1, need_layer_corr_s1 = _local_vdim_construct_local_quadratures(
+                    N,
+                    mesh,
+                    neighbors,
+                    n,
+                    c,
+                    1.0,
+                    diam,
+                    bdry_kdtree,
+                    bdry_etype2qrule,
+                    vol_etype2qrule,
+                    bdry_qrule,
+                    vol_qrule,
+                )
+                R_s1, b_s1 = _local_vdim_auxiliary_quantities(
+                    op_hat,
+                    c,
+                    1.0,
+                    PFE_p,
+                    PFE_P,
+                    target[near_list[n]],
+                    green_multiplier,
+                    Yvol_s1,
+                    Ybdry_s1,
+                    diam,
+                    need_layer_corr_s1;
+                )
         #if isdefined(Main, :Infiltrator)
         #    Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
         #  end
@@ -311,7 +365,63 @@ function local_vdim_correction(
                 Linv = pinv(L̃)
                 if !lowfreq
                     S = s^2 * Diagonal((s / r) .^ (abs.(multiindices)))
+                    S_s1 = Diagonal((1 / r) .^ (abs.(multiindices)))
                     wei = transpose(Linv) * S * transpose(R)
+                    wei_s1 = transpose(Linv) * S_s1 * transpose(R_s1)
+
+                    area = 0.0
+                    for i in 1:length(Yvol)
+                        area += Yvol[i].weight
+                    end
+                    area_s1 = 0.0
+                    for i in 1:length(Yvol_s1)
+                        area_s1 += Yvol_s1[i].weight
+                    end
+                    area_contour = 0.0
+                    for i in 1:length(Ybdry)
+                        x = Ybdry[i].coords[1]
+                        y = Ybdry[i].coords[2]
+                        nx = Ybdry[i].normal[1]
+                        ny = Ybdry[i].normal[2]
+                        area_contour += (x/2 * nx + y/2*ny) * Ybdry[i].weight
+                    end
+                    area_contour_s1 = 0.0
+                    for i in 1:length(Ybdry_s1)
+                        x = Ybdry_s1[i].coords[1]
+                        y = Ybdry_s1[i].coords[2]
+                        nx = Ybdry_s1[i].normal[1]
+                        ny = Ybdry_s1[i].normal[2]
+                        area_contour_s1 += (x/2 * nx + y/2*ny) * Ybdry_s1[i].weight
+                    end
+
+                    Vint = 0.0
+                    for i in 1:length(Yvol)
+                        x = Yvol[i].coords[1]
+                        y = Yvol[i].coords[2]
+                        Vint += (3*x^2 + 3*y^2) * Yvol[i].weight
+                    end
+                    Vint_s1 = 0.0
+                    for i in 1:length(Yvol)
+                        x = Yvol_s1[i].coords[1]
+                        y = Yvol_s1[i].coords[2]
+                        Vint_s1 += (3*x^2 + 3*y^2) * Yvol_s1[i].weight
+                    end
+                    Vcontour = 0.0
+                    for i in 1:length(Ybdry)
+                        x = Ybdry[i].coords[1]
+                        y = Ybdry[i].coords[2]
+                        nx = Ybdry[i].normal[1]
+                        ny = Ybdry[i].normal[2]
+                        Vcontour += (x^3 * nx + y^3*ny) * Ybdry[i].weight
+                    end
+                    Vcontour_s1 = 0.0
+                    for i in 1:length(Ybdry_s1)
+                        x = Ybdry_s1[i].coords[1]
+                        y = Ybdry_s1[i].coords[2]
+                        nx = Ybdry_s1[i].normal[1]
+                        ny = Ybdry_s1[i].normal[2]
+                        Vcontour_s1 += (x^3 * nx + y^3*ny) * Ybdry_s1[i].weight
+                    end
                     if isdefined(Main, :Infiltrator)
                         Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
                       end
@@ -320,6 +430,9 @@ function local_vdim_correction(
                     D .= r^2
                     D = Diagonal(D)
                     wei = transpose(Linv) * D * transpose(R)
+
+                    S_s1 = Diagonal((1 / r) .^ (abs.(multiindices)))
+                    wei_s1 = transpose(Linv) * S_s1 * transpose(R_s1)
                     if isdefined(Main, :Infiltrator)
                         Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
                     end
