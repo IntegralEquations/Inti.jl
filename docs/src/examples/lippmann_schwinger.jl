@@ -86,12 +86,12 @@ dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
 # ## Volume Integral Operators and Volume Integral Equations
 using FMMLIB2D
 
-pde = Inti.Helmholtz(; dim = 2, k = k₁)
+op = Inti.Helmholtz(; dim = 2, k = k₁)
 
 # With quadratures constructed on the volume, we can define a discrete approximation
 # to the volume integral operator ``\mathcal{V}`` using VDIM.
 V_d2d = Inti.volume_potential(;
-    pde,
+    op,
     target = Ωₕ_quad,
     source = Ωₕ_quad,
     compression = (method = :fmm, tol = 1e-7),
@@ -124,7 +124,7 @@ u, hist =
     gmres(L, rhs; log = true, abstol = 1e-7, verbose = false, restart = 200, maxiter = 200)
 @show hist
 
-𝒱 = Inti.IntegralPotential(Inti.SingleLayerKernel(pde), Ωₕ_quad)
+𝒱 = Inti.IntegralPotential(Inti.SingleLayerKernel(op), Ωₕ_quad)
 
 # The representation formula gives the solution in $\R^2 \setminus \Omega$:
 uˢ = (x) -> uⁱ(x) - k₁^2 * 𝒱[refr_map_d.*u](x)

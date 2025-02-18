@@ -59,6 +59,11 @@ target(iop::IntegralOperator) = iop.target
 source(iop::IntegralOperator) = iop.source
 
 function IntegralOperator(k, X, Y::Quadrature = X)
+    # check that all entities in the quadrature are of the same dimension
+    if !allequal(geometric_dimension(ent) for ent in entities(Y))
+        msg = "entities in the target quadrature have different geometric dimensions"
+        throw(ArgumentError(msg))
+    end
     T = return_type(k, eltype(X), eltype(Y))
     msg = """IntegralOperator of nonbits being created: $T"""
     isbitstype(T) || (@warn msg)
@@ -104,7 +109,7 @@ end
     assemble_fmm(iop; atol)
 
 Set up a 2D or 3D FMM for evaluating the discretized integral operator `iop`
-associated with the `pde`. In 2D the `FMM2D` or `FMMLIB2D` library is used
+associated with the `op`. In 2D the `FMM2D` or `FMMLIB2D` library is used
 (whichever was most recently loaded) while in 3D `FMM3D` is used.
 
 !!! warning "FMMLIB2D"
@@ -153,8 +158,8 @@ Helper function to help determine the constant σ in the Green identity S\\[γ�
 point is inside a domain or not.
 """
 function _green_multiplier(x::SVector, Q::Quadrature{N}) where {N}
-    pde = Laplace(; dim = N)
-    K = DoubleLayerKernel(pde)
+    op = Laplace(; dim = N)
+    K = DoubleLayerKernel(op)
     σ = sum(Q.qnodes) do q
         return K(x, q) * weight(q)
     end
@@ -267,7 +272,7 @@ function _farfield_distance(el, K, qrule, tol, maxiter)
         @debug n, er
         (er < tol / 2) && break # attained desired tolerance
     end
-    msg = """failed to attained desired tolerance when computing maxdist. Your
+    msg = """failed to attain desired tolerance when computing maxdist. Your
     quadrature may not be accurate enough, or your meshsize not small enough, to
     achieve the requested tolerance on the far field."""
     er > tol / 2 && @warn msg

@@ -107,18 +107,18 @@ fₑ = (x) -> -8 * uₑ(x)
 # ## Boundary and integral operators
 using FMM2D
 
-pde = Inti.Laplace(; dim = 2)
+op = Inti.Laplace(; dim = 2)
 
 ## Boundary operators
 S_b2b, D_b2b = Inti.single_double_layer(;
-    pde,
+    op,
     target = Γₕ_quad,
     source = Γₕ_quad,
     compression = (method = :fmm, tol = 1e-12),
     correction = (method = :dim,),
 )
 S_b2d, D_b2d = Inti.single_double_layer(;
-    pde,
+    op,
     target = Ωₕ_quad,
     source = Γₕ_quad,
     compression = (method = :fmm, tol = 1e-12),
@@ -127,14 +127,14 @@ S_b2d, D_b2d = Inti.single_double_layer(;
 
 ## Volume potentials
 V_d2d = Inti.volume_potential(;
-    pde,
+    op,
     target = Ωₕ_quad,
     source = Ωₕ_quad,
     compression = (method = :fmm, tol = 1e-12),
     correction = (method = :dim, interpolation_order),
 )
 V_d2b = Inti.volume_potential(;
-    pde,
+    op,
     target = Γₕ_quad,
     source = Ωₕ_quad,
     compression = (method = :fmm, tol = 1e-12),

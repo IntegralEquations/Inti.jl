@@ -10,9 +10,9 @@ Parameters associated with the density interpolation method used in
 end
 
 """
-    bdim_correction(pde,X,Y,S,D; green_multiplier, kwargs...)
+    bdim_correction(op,X,Y,S,D; green_multiplier, kwargs...)
 
-Given a `pde` and a (possibly innacurate) discretizations of its single and
+Given a `op` and a (possibly innacurate) discretizations of its single and
 double-layer operators `S` and `D` (taking a vector of values on `Y` and
 returning a vector on of values on `X`), compute corrections `δS` and `δD` such
 that `S + δS` and `D + δD` are more accurate approximations of the underlying
@@ -24,11 +24,11 @@ See [faria2021general](@cite) for more details on the method.
 
 ## Required:
 
-- `pde` must be an [`AbstractPDE`](@ref)
+- `op` must be an [`AbstractDifferentialOperator`](@ref)
 - `Y` must be a [`Quadrature`](@ref) object of a closed surface
 - `X` is either inside, outside, or on `Y`
 - `S` and `D` are approximations to the single- and double-layer operators for
-  `pde` taking densities in `Y` and returning densities in `X`.
+  `op` taking densities in `Y` and returning densities in `X`.
 - `green_multiplier` (keyword argument) is a vector with the same length as `X`
   storing the value of `μ(x)` for `x ∈ X` in the Green identity `S\\[γ₁u\\](x) -
   D\\[γ₀u\\](x) + μ*u(x) = 0`. See [`_green_multiplier`](@ref).
@@ -48,7 +48,7 @@ See [faria2021general](@cite) for more details on the method.
 
 """
 function bdim_correction(
-    pde,
+    op,
     target,
     source::Quadrature,
     Sop,
@@ -91,8 +91,8 @@ function bdim_correction(
         error("only 2D and 3D supported")
     end
     # compute traces of monopoles on the source mesh
-    G   = SingleLayerKernel(pde, T)
-    γ₁G = AdjointDoubleLayerKernel(pde, T)
+    G   = SingleLayerKernel(op, T)
+    γ₁G = AdjointDoubleLayerKernel(op, T)
     γ₀B = Dense{T}(undef, length(source), ns)
     γ₁B = Dense{T}(undef, length(source), ns)
     for k in 1:ns

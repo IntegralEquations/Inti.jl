@@ -12,27 +12,27 @@ jobs:
     permissions:
       contents: write
       statuses: write
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1'
+      - uses: julia-actions/cache@v2
       - name: Install dependencies
         run: julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
       - name: Build and deploy without coverage
         if: github.ref != 'refs/heads/main'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
-        run: DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs/ docs/make.jl
+        run: DISPLAY=:1 xvfb-run -s '-screen 1 1024x768x24' julia --project=docs/ docs/make.jl
       - name: Build and deploy with coverage
         if: github.ref == 'refs/heads/main'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
-        run: DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs/ --code-coverage=user docs/make.jl
-      - name: Process coverage
-        if: github.ref == 'refs/heads/main'
-        uses: julia-actions/julia-processcoverage@v1
-      - name: Upload coverage to Codecov
-        if: github.ref == 'refs/heads/main'
-        uses: codecov/codecov-action@v4
+        run: DISPLAY=:1 xvfb-run -s '-screen 1 1024x768x24' julia --project=docs/ --code-coverage=user docs/make.jl
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}   
+          files: lcov.info

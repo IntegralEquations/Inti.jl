@@ -56,7 +56,7 @@ Pkg.activate(docsdir)                 #src
 # and the *Sommerfeld radiation condition* at infinity
 
 # ```math
-#     \lim_{|\boldsymbol{x}| \to \infty} \|\boldsymbol{x}|^{(d-1)/2} \left( \frac{\partial u}{\partial |\boldsymbol{x}|} - i k u \right) = 0.
+#     \lim_{|\boldsymbol{x}| \to \infty} |\boldsymbol{x}|^{(d-1)/2} \left( \frac{\partial u}{\partial |\boldsymbol{x}|} - i k u \right) = 0.
 # ```
 
 # Here ``g`` is a (given) boundary datum, and ``k`` is the constant wavenumber.
@@ -197,9 +197,9 @@ abs(Inti.integrate(x -> 1, Q) - 2π)
 # discrete approximation to the integral operators ``\mathrm{S}`` and
 # ``\mathrm{D}`` as follows:
 
-pde = Inti.Helmholtz(; k, dim = 2)
+op = Inti.Helmholtz(; k, dim = 2)
 S, D = Inti.single_double_layer(;
-    pde,
+    op,
     target = Q,
     source = Q,
     compression = (method = :none,),
@@ -259,7 +259,7 @@ nothing #hide
 # Inti.single_double_layer_potential) to obtain the single- and double-layer
 # potentials, and then combine them as follows:
 
-𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
 uₛ   = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
 nothing #hide
 
@@ -338,7 +338,7 @@ msh = Inti.meshgen(Γ; meshsize)
 Γ_msh = view(msh, Γ)
 Q = Inti.Quadrature(Γ_msh; qorder)
 S, D = Inti.single_double_layer(;
-    pde,
+    op,
     target = Q,
     source = Q,
     compression = (method = :none,),
@@ -347,7 +347,7 @@ S, D = Inti.single_double_layer(;
 L = I / 2 + D - im * k * S
 rhs = map(q -> -uᵢ(q.coords), Q)
 σ = L \ rhs
-𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
 uₛ = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
 vals =
     map(pt -> Inti.isinside(pt, Q) ? NaN : real(uₛ(pt) + uᵢ(pt)), Iterators.product(xx, yy))
@@ -445,9 +445,9 @@ nothing #hide
 # Next we assemble the integral operators, indicating that we wish to compress
 # them using hierarchical matrices:
 using HMatrices
-pde = Inti.Helmholtz(; k, dim = 3)
+op = Inti.Helmholtz(; k, dim = 3)
 S, D = Inti.single_double_layer(;
-    pde,
+    op,
     target = Q,
     source = Q,
     compression = (method = :hmatrix, tol = 1e-4),
@@ -497,7 +497,7 @@ end
 
 # As before, let us represent the solution using `IntegralPotential`s:
 
-𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
 uₛ = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
 nothing #hide
 
@@ -550,7 +550,7 @@ end
 target = Inti.nodes(Σ_msh)
 
 S, D = Inti.single_double_layer(;
-    pde,
+    op,
     target,
     source = Q,
     compression = (method = :hmatrix, tol = 1e-4),

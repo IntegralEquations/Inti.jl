@@ -142,6 +142,11 @@ Axis-aligned hyperrectangle in `N` dimensions given by
 struct HyperRectangle{N,T} <: ReferenceInterpolant{ReferenceHyperCube{N},T}
     low_corner::SVector{N,T}
     high_corner::SVector{N,T}
+    # check that low_corner <= high_corner
+    function HyperRectangle(low_corner::SVector{N,T}, high_corner::SVector{N,T}) where {N,T}
+        @assert all(low_corner .<= high_corner) "low_corner must be less than high_corner"
+        return new{N,T}(low_corner, high_corner)
+    end
 end
 
 low_corner(el::HyperRectangle) = el.low_corner
@@ -370,6 +375,15 @@ Hardcode some basic elements.
 TODO: Eventually this could/should be automated.
 =#
 
+# P0 for ReferenceLine
+function reference_nodes(::Type{<:LagrangeLine{1}})
+    return SVector(SVector(0.5))
+end
+
+function (el::LagrangeLine{1})(u)
+    return vals(el)[1]
+end
+
 # P1 for ReferenceLine
 function reference_nodes(::Type{<:LagrangeLine{2}})
     return SVector(SVector(0.0), SVector(1.0))
@@ -390,6 +404,22 @@ function (el::LagrangeLine{3})(u)
     return v[1] +
            (4 * v[3] - 3 * v[1] - v[2]) * u[1] +
            2 * (v[2] + v[1] - 2 * v[3]) * u[1]^2
+end
+
+# P3 for ReferenceLine
+function reference_nodes(::Type{<:LagrangeLine{4}})
+    return SVector(SVector(0.0), SVector(1.0), SVector(1 / 3), SVector(2 / 3))
+end
+
+function (el::LagrangeLine{4})(u)
+    v1, v2, v3, v4 = vals(el)
+    # Calculate the coefficients based on the values
+    a = -9 * v1 / 2 + 9 * v2 / 2 + 27 * v3 / 2 - 27 * v4 / 2
+    b = 9 * v1 - 9 * v2 / 2 - 45 * v3 / 2 + 18 * v4
+    c = -11 * v1 / 2 + v2 + 9 * v3 - 9 * v4 / 2
+    d = v1
+    # Evaluate the cubic polynomial at u
+    return d + c * u[1] + b * u[1]^2 + a * u[1]^3
 end
 
 # P1 for ReferenceTriangle

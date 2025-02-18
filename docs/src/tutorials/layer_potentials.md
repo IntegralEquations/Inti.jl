@@ -12,7 +12,7 @@ CurrentModule = Inti
 In this tutorial we focus on **evaluating** the layer potentials given a source
 density. This is a common post-processing task in boundary integral equation
 methods, and while most of it is straightforward, some subtleties arise when the
-target points are close to the boundary (nearly-singular integrals). 
+target points are close to the boundary (nearly-singular integrals).
 
 ## Integral potentials
 
@@ -26,7 +26,7 @@ where ``K`` is the kernel of the operator, ``\Gamma`` is the source's boundary,
 ``\boldsymbol{r} \not \in \Gamma`` is a target point, and ``\sigma`` is the
 source density.
 
-Here is a simple example of how to create a kernel representing Laplace's
+Here is a simple example of how to create a kernel representing a Laplace
 double-layer potential:
 
 ```@example layer_potentials
@@ -44,8 +44,8 @@ Q = Inti.Quadrature(Γ; meshsize = 0.1, qorder = 5)
 𝒮 = Inti.IntegralPotential(K, Q)
 ```
 
-If you have a source density ``\sigma``, defined on the quadrature nodes of
-``\Gamma``, you can create a function that evaluates the layer potential at an
+If we have a source density ``\sigma``, defined on the quadrature nodes of
+``\Gamma``, we can create a function that evaluates the layer potential at an
 arbitrary point:
 
 ```@example layer_potentials
@@ -66,8 +66,8 @@ it is often more convenient to use the `single_layer_potential` when working
 with a supported PDE, e.g.:
 
 ```@example layer_potentials
-pde = Inti.Laplace(; dim = 2)
-𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+op = Inti.Laplace(; dim = 2)
+𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
 ```
 
 creates the single and double layer potentials for the Laplace equation in 2D.
@@ -81,7 +81,7 @@ created through the Gmsh API. Do to so, let us first define the PDE:g
 using Inti, StaticArrays, LinearAlgebra, Meshes, GLMakie, Gmsh
 # define the PDE
 k = 4π
-pde = Inti.Helmholtz(; dim = 2, k)
+op = Inti.Helmholtz(; dim = 2, k)
 ```
 
 We will now use the [`gmsh_curve`](@ref) function to create a smooth domain of a
@@ -89,7 +89,7 @@ kite using splines:
 
 ```@example layer_potentials
 gmsh.initialize()
-meshsize = 2π / k / 4 
+meshsize = 2π / k / 4
 kite = Inti.gmsh_curve(0, 1; meshsize) do s
     SVector(0.25, 0.0) + SVector(cos(2π * s) + 0.65 * cos(4π * s[1]) - 0.65, 1.5 * sin(2π * s))
 end
@@ -141,9 +141,9 @@ representation holds:
 u(\boldsymbol{r}) = \mathcal{S}[\gamma_1 u](\boldsymbol{r}) - \mathcal{D}[\gamma_0 u](\boldsymbol{r}), \quad \boldsymbol{r} \in \Omega
 ```
 
-where ``\gamma_0 u`` and ``\gamma_1 u`` are the Dirichlet and Neumann traces of
-``u``, and ``\mathcal{S}`` and ``\mathcal{D}`` are the single and double layer
-potentials over ``\Gamma := \partial \Omega``.
+where ``\gamma_0 u`` and ``\gamma_1 u`` are the respective Dirichlet and
+Neumann traces of ``u``, and ``\mathcal{S}`` and ``\mathcal{D}`` are the respective
+single and double layer potentials over ``\Gamma := \partial \Omega``.
 
 Let's compare next the exact solution with the layer potential evaluation, based
 on a quadrature of ``\Gamma``:
@@ -152,7 +152,7 @@ on a quadrature of ``\Gamma``:
 Γ = Inti.boundary(Ω)
 Q = Inti.Quadrature(view(msh,Γ); qorder = 5)
 # evaluate the layer potentials
-𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
 γ₀u = map(q -> u(q.coords), Q)
 γ₁u = map(q -> du(q.coords, q.normal), Q)
 uₕ = x -> 𝒮[γ₁u](x) - 𝒟[γ₀u](x)
@@ -163,7 +163,7 @@ fig, ax, pl = viz(Ω_msh;
     color = er_log10,
     colormap = :viridis,
     colorrange,
-    axis = (aspect = DataAspect(),), 
+    axis = (aspect = DataAspect(),),
     interpolate=true
 )
 Colorbar(fig[1, 2]; label = "log₁₀(error)", colorrange)
@@ -182,17 +182,18 @@ There are two cases where the direct evaluation of layer potentials is not
 recommended:
 
 1. When the target point is close to the boundary (nearly-singular integrals).
-2. When you wish to evaluate the layer potential at many target points and take
-   advantage of an acceleration routine.
+2. When evaluation at many target points is desired (computationally
+   burdensome)and take advantage of an acceleration routine.
 
-In such cases, it is recommended to use the `single_double_layer` function, (or
-to directly assemble an `IntegralOperator`) with a correction method. Here is an
-example of how to use the FMM acceleration with a near-field correction to
-evaluate the layer potentials::
+In such contexts, it is recommended to use the `single_double_layer` function
+(alternately, one can directly assemble an `IntegralOperator`) with a
+correction, for the first case, and/or a compression (acceleration) method, for
+the latter case, as appropriate. Here is an example of how to use the FMM
+acceleration with a near-field correction to evaluate the layer potentials::
 
 ```@example layer_potentials
 using FMM2D
-S, D = Inti.single_double_layer(; pde, target, source = Q,
+S, D = Inti.single_double_layer(; op, target, source = Q,
     compression = (method = :fmm, tol = 1e-12),
     correction = (method = :dim, target_location = :inside, maxdist = 0.2)
 )

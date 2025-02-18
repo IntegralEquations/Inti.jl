@@ -29,7 +29,7 @@ following sections.
     Note that the [`single_double_layer`](@ref),
     [`adj_double_layer_hypersingular`](@ref), and [`volume_potential`](@ref)
     functions have high-level API with a `correction` keyword argument that
-    allows you to specify the correction method to use when constructing the
+    allows one to specify the correction method to use when constructing the
     integral operators; see the documentation of these functions for more
     details.
 

@@ -28,7 +28,7 @@ function that maps points from a [`ReferenceShape`](@ref) to the physical space.
 In most applications involving complex three-dimensional surfaces, an external
 meshing software is used to generate a mesh, and the mesh is imported using the
 `import_mesh` function (which relies on [Gmsh](https://gmsh.info)). The entities
-can then the extracted from the mesh based on e.g. their dimension or label.
+can then be extracted from the mesh based on e.g. their dimension or label.
 Here is an example of how to import a mesh from a file:
 
 ```@example geo-and-meshes
@@ -46,15 +46,16 @@ Inti.element_types(msh)
 ```
 
 Note that the `msh` object contains all entities used to construct the mesh,
-usually defined in a `.geo` file, and you can extract them using the `entities`:
+usually defined in a `.geo` file, which can be extracted using the `entities`:
 
 ```@example geo-and-meshes
 ents = Inti.entities(msh)
 nothing # hide
 ```
 
-You can filter entities satisfying a certain condition, e.g., entities of a
-given dimension of containing a certain label, in order to construct a domain:
+Filtering of entities satisfying a certain condition, e.g., entities of a given
+dimension or containing a certain label, can also be performed in order to
+construct a domain:
 
 ```@example geo-and-meshes
 filter = e -> Inti.geometric_dimension(e) == 3
@@ -75,7 +76,7 @@ or a [`SubMesh`](@ref) containing a view of the mesh:
 Γ_msh = view(msh, Γ)
 ```
 
-Finally, you can visualize the mesh using:
+Finally, we can visualize the mesh using:
 
 ```@example geo-and-meshes
 using Meshes, GLMakie
@@ -84,6 +85,12 @@ ax = Axis3(fig[1, 1]; aspect = :data)
 viz!(Γ_msh; showsegments = true, alpha = 0.5)
 fig
 ```
+
+!!! warning "Mesh visualization"
+    Note that although the mesh may be of high order and/or conforming, the
+    *visualization* of a mesh is always performed on the underlying first order
+    mesh, and therefore elements may look flat even if the problem is solved on
+    a curved mesh.
 
 ## Parametric entities and `meshgen`
 
@@ -136,6 +143,22 @@ domains to index the mesh:
 Γ₂ = l2 ∪ l4
 fig, ax, pl = viz(view(msh, Γ₁); segmentsize = 4,  label = "Γ₁")
 viz!(view(msh, Γ₂); segmentsize = 4, color = :red, label = "Γ₂")
+fig # hide
+```
+
+Note that the orientation of the curve determines the direction of the
+[`normal`](@ref) vector. The normal points to the right of the curve when moving
+in the direction of increasing parameter `t`:
+
+```@example geo-and-meshes
+pts, tangents, normals = Makie.Point2f[], Makie.Vec2f[], Makie.Vec2f[]
+for l in [l1, l2, l3, l4]
+      push!(pts, l(0.5)) # mid-point of the curve 
+      push!(tangents, vec(Inti.jacobian(l, 0.5)))
+      push!(normals,Inti.normal(l, 0.5))
+end
+arrows!(pts, tangents, color = :blue, linewidth = 2, linestyle = :dash, lengthscale = 1/4, label = "tangent")
+arrows!(pts, normals, color = :black, linewidth = 2, linestyle = :dash, lengthscale = 1/4, label = "normal")
 axislegend()
 fig # hide
 ```
@@ -184,7 +207,7 @@ See [`GeometricEntity(shape::String)`](@ref) for a list of predefined geometries
 !!! warning "Mesh quality"
       The quality of the generated mesh created through `meshgen` depends
       heavily on the quality of the underlying parametrization. For surfaces
-      containing a degenerate parametrization, or for complex shapes, you are
+      containing a degenerate parametrization, or for complex shapes, one is
       better off using a suitable CAD (Computer-Aided Design) software in
       conjunction with a mesh generator.
 
@@ -213,7 +236,7 @@ including the boundary segments:
 Inti.entities(msh)
 ```
 
-This allows you into the `msh` object to extract e.g. the boundary mesh:
+This allows us to probe the `msh` object to extract e.g. the boundary mesh:
 
 ```@example geo-and-meshes
 viz(msh[Inti.boundary(Ω)]; color = :red)
@@ -243,12 +266,12 @@ fig # hide
 ```
 
 This example shows how to extract the centers of the tetrahedral elements in the
-mesh; and of course you can perform any computation you like on the elements.
+mesh; and of course we can perform any desired computation on the elements.
 
 !!! tip "Type-stable iteration over elements"
       Since a mesh in Inti.jl can contain elements of various types, the
       `elements` function above is not type-stable. For a type-stable iterator
-      approach, you should first iterate over the element types using
+      approach, one should first iterate over the element types using
       [`element_types`](@ref), and then use `elements(msh, E)` to iterate over a
       specific element type `E`.
 
@@ -261,5 +284,5 @@ x̂ = SVector(1/3,1/3, 1/3)
 el(x̂)
 ```
 
-Likewise, you can compute the [`jacobian`](@ref) of the element, or its
+Likewise, we can compute the [`jacobian`](@ref) of the element, or its
 [`normal`](@ref) at a given parametric coordinate.

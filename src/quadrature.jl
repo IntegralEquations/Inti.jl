@@ -79,7 +79,7 @@ mesh(quad::Quadrature) = quad.mesh
 etype2qtags(quad::Quadrature, E) = quad.etype2qtags[E]
 
 quadrature_rule(quad::Quadrature, E) = quad.etype2qrule[E]
-ambient_dimension(quad::Quadrature{N}) where {N} = N
+ambient_dimension(::Quadrature{N}) where {N} = N
 
 function Base.show(io::IO, quad::Quadrature)
     return print(io, " Quadrature with $(length(quad.qnodes)) quadrature nodes")
@@ -87,12 +87,15 @@ end
 
 """
     Quadrature(msh::AbstractMesh, etype2qrule::Dict)
+    Quadrature(msh::AbstractMesh, qrule::ReferenceQuadrature)
     Quadrature(msh::AbstractMesh; qorder)
 
 Construct a `Quadrature` for `msh`, where for each element type `E` in `msh` the
-reference quadrature `q = etype2qrule[E]` is used. If an `order` keyword is
-passed, a default quadrature of the desired order is used for each element type
-usig [`_qrule_for_reference_shape`](@ref).
+reference quadrature `q = etype2qrule[E]` is used. When a single `qrule` is
+passed, it is used for all element types in `msh`.
+
+If an `order` keyword is passed, a default quadrature of the desired order is
+used for each element type usig [`_qrule_for_reference_shape`](@ref).
 
 For co-dimension one elements, the normal vector is also computed and stored in
 the [`QuadratureNode`](@ref)s.
@@ -126,6 +129,11 @@ function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
     return quad
 end
 
+function Quadrature(msh::AbstractMesh{N,T}, qrule::ReferenceQuadrature) where {N,T}
+    etype2qrule = Dict(E => qrule for E in element_types(msh))
+    return Quadrature(msh, etype2qrule)
+end
+
 function Quadrature(msh::AbstractMesh; qorder)
     etype2qrule =
         Dict(E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(msh))
@@ -133,12 +141,12 @@ function Quadrature(msh::AbstractMesh; qorder)
 end
 
 @noinline function _build_quadrature!(
-    quad,
+    quad::Quadrature{N,T},
     els::AbstractVector{E},
     qrule::ReferenceQuadrature,
-) where {E}
-    N = ambient_dimension(quad)
-    x̂, ŵ = qrule() # nodes and weights on reference element
+) where {N,T,E}
+    x̂ = map(x̂ -> T.(x̂), qcoords(qrule))
+    ŵ = map(ŵ -> T.(ŵ), qweights(qrule))
     num_nodes = length(ŵ)
     M = geometric_dimension(domain(E))
     codim = N - M
@@ -150,8 +158,8 @@ end
             jac = jacobian(el, x̂i)
             μ = _integration_measure(jac)
             w = μ * ŵi
-            ν = codim == 1 ? _normal(jac) : nothing
-            qnode = QuadratureNode(x, w, ν)
+            ν = codim == 1 ? T.(_normal(jac)) : nothing
+            qnode = QuadratureNode(T.(x), T.(w), ν)
             push!(quad.qnodes, qnode)
         end
     end
@@ -179,6 +187,8 @@ end
 The [`Domain`](@ref) over which `Q` performs integration.
 """
 domain(Q::Quadrature) = domain(Q.mesh)
+
+entities(Q::Quadrature) = Q |> mesh |> entities
 
 """
     dom2qtags(Q::Quadrature, dom::Domain)

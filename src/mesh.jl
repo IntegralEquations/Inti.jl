@@ -7,7 +7,7 @@ An abstract mesh structure in dimension `N` with primite data of type `T` (e.g.
 Concrete subtypes of `AbstractMesh` should implement [`ElementIterator`](@ref)
 for accessing the mesh elements.
 
-See also: [`LagrangeMesh`](@ref)
+See also: [`Mesh`](@ref)
 """
 abstract type AbstractMesh{N,T} end
 
@@ -58,10 +58,10 @@ Return the element types present in the `msh`.
 function element_types end
 
 """
-    struct LagrangeMesh{N,T} <: AbstractMesh{N,T}
+    struct Mesh{N,T} <: AbstractMesh{N,T}
 
-Unstructured mesh is defined by a set of `nodes`` (of type `SVector{N,T}`), and
-a dictionary mapping element types to connectivity matrices. Each columns of a
+Unstructured mesh defined by a set of `nodes`` (of type `SVector{N,T}`), and a
+dictionary mapping element types to connectivity matrices. Each columns of a
 given connectivity matrix stores the integer tags of the nodes in the mesh
 comprising the element.
 
@@ -72,7 +72,7 @@ a given mesh using e.g. `view(msh,Γ)` or `msh[Γ]`, where `Γ` is a
 
 See [`elements`](@ref) for a way to iterate over the elements of a mesh.
 """
-struct LagrangeMesh{N,T} <: AbstractMesh{N,T}
+struct Mesh{N,T} <: AbstractMesh{N,T}
     nodes::Vector{SVector{N,T}}
     # for each element type (key), return the connectivity matrix
     etype2mat::Dict{DataType,Matrix{Int}}
@@ -83,8 +83,8 @@ struct LagrangeMesh{N,T} <: AbstractMesh{N,T}
 end
 
 # empty constructor
-function LagrangeMesh{N,T}() where {N,T}
-    return LagrangeMesh{N,T}(
+function Mesh{N,T}() where {N,T}
+    return Mesh{N,T}(
         SVector{N,T}[],
         Dict{DataType,Matrix{Int}}(),
         Dict{DataType,AbstractVector{<:ReferenceInterpolant}}(),
@@ -92,16 +92,16 @@ function LagrangeMesh{N,T}() where {N,T}
     )
 end
 
-element_types(msh::LagrangeMesh) = keys(msh.etype2mat)
+element_types(msh::Mesh) = keys(msh.etype2mat)
 
-elements(msh::LagrangeMesh, E::DataType) = msh.etype2els[E]
+elements(msh::Mesh, E::DataType) = msh.etype2els[E]
 
 # generic implementation
 function elements(msh::AbstractMesh)
     return Iterators.flatten(elements(msh, E) for E in element_types(msh))
 end
 
-nodes(msh::LagrangeMesh) = msh.nodes
+nodes(msh::Mesh) = msh.nodes
 
 """
     ent2etags(msh::AbstractMesh)
@@ -109,9 +109,9 @@ nodes(msh::LagrangeMesh) = msh.nodes
 Return a dictionary mapping entities to a dictionary of element types to element
 tags.
 """
-ent2etags(msh::LagrangeMesh) = msh.ent2etags
-etype2mat(msh::LagrangeMesh) = msh.etype2mat
-etype2els(msh::LagrangeMesh) = msh.etype2els
+ent2etags(msh::Mesh) = msh.ent2etags
+etype2mat(msh::Mesh) = msh.etype2mat
+etype2els(msh::Mesh) = msh.etype2els
 
 """
     connectivity(msh::AbstractMesh,E::DataType)
@@ -119,9 +119,9 @@ etype2els(msh::LagrangeMesh) = msh.etype2els
 Return the connectivity matrix for elements of type `E` in `msh`. The integer
 tags in the matrix refer to the points in `nodes(msh)`
 """
-connectivity(msh::LagrangeMesh, E::DataType) = msh.etype2mat[E]
+connectivity(msh::Mesh, E::DataType) = msh.etype2mat[E]
 
-function ent2nodetags(msh::LagrangeMesh, ent::EntityKey)
+function ent2nodetags(msh::Mesh, ent::EntityKey)
     tags = Int[]
     for (E, t) in msh.ent2etags[ent]
         append!(tags, view(msh.etype2mat[E], :, t))
@@ -129,7 +129,7 @@ function ent2nodetags(msh::LagrangeMesh, ent::EntityKey)
     return tags
 end
 
-entities(msh::LagrangeMesh) = keys(msh.ent2etags)
+entities(msh::Mesh) = keys(msh.ent2etags)
 
 """
     domain(msh::AbstractMesh)
@@ -139,7 +139,7 @@ Return a [`Domain`] containing of all entities covered by the mesh.
 domain(msh::AbstractMesh) = Domain(entities(msh))
 
 """
-    dom2elt(m::LagrangeMesh,Ω,E)::Vector{Int}
+    dom2elt(m::Mesh,Ω,E)::Vector{Int}
 
 Compute the element indices `idxs` of the elements of type `E` composing `Ω`.
 """
@@ -152,8 +152,8 @@ function dom2elt(m::AbstractMesh, Ω::Domain, E::DataType)
     return idxs
 end
 
-function Base.getindex(msh::LagrangeMesh{N,T}, Ω::Domain) where {N,T}
-    new_msh = LagrangeMesh{N,T}()
+function Base.getindex(msh::Mesh{N,T}, Ω::Domain) where {N,T}
+    new_msh = Mesh{N,T}()
     (; nodes, etype2mat, etype2els, ent2etags) = new_msh
     foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), keys(Ω))
     glob2loc = Dict{Int,Int}()
@@ -171,7 +171,7 @@ function Base.getindex(msh::LagrangeMesh{N,T}, Ω::Domain) where {N,T}
             # check if parent has elements of type E for the entity
             haskey(msh.ent2etags[k], E) || continue
             etags_glob = msh.ent2etags[k][E]
-            etags_loc  = get!(ent2etags[k], E, Int[])
+            etags_loc = get!(ent2etags[k], E, Int[])
             for iglob in etags_glob
                 etag_loc += 1
                 # add nodes and connectivity matrix
@@ -192,14 +192,14 @@ function Base.getindex(msh::LagrangeMesh{N,T}, Ω::Domain) where {N,T}
     end
     return new_msh
 end
-Base.getindex(msh::LagrangeMesh, ent::EntityKey) = getindex(msh, Domain(ent))
+Base.getindex(msh::Mesh, ent::EntityKey) = getindex(msh, Domain(ent))
 
 """
-    meshgen(Ω, n)
-    meshgen(Ω, n_dict)
-    meshgen(Ω; meshsize)
+    meshgen(Ω, n; T = Float64)
+    meshgen(Ω, n_dict; T = Float64)
+    meshgen(Ω; meshsize, T = Float64)
 
-Generate a `LagrangeMesh` for the domain `Ω` where each curve is meshed using
+Generate a `Mesh` for the domain `Ω` where each curve is meshed using
 `n` elements. Passing a dictionary allows for a finer control; in such cases,
 `n_dict[ent]` should return an integer for each entity `ent` in `Ω` of
 `geometric_dimension` one.
@@ -209,6 +209,8 @@ is computed as so as to obtain an *average* mesh size of `meshsize`. Note that
 the actual mesh size may vary significantly for each element if the
 parametrization is far from uniform.
 
+The mesh is created with primitive data of type `T`.
+
 This function requires the entities forming `Ω` to have an explicit
 parametrization.
 
@@ -217,12 +219,12 @@ parametrization.
     the quality of the underlying parametrization. For complex surfaces, you are
     better off using a proper mesher such as `gmsh`.
 """
-function meshgen(Ω::Domain, args...; kwargs...)
+function meshgen(Ω::Domain, args...; T = Float64, kwargs...)
     # extract the ambient dimension for these entities (i.e. are we in 2d or
     # 3d). Only makes sense if all entities have the same ambient dimension.
     N = ambient_dimension(first(Ω))
     @assert all(p -> ambient_dimension(p) == N, entities(Ω)) "Entities must have the same ambient dimension"
-    mesh = LagrangeMesh{N,Float64}()
+    mesh = Mesh{N,T}()
     meshgen!(mesh, Ω, args...; kwargs...)
     return mesh
 end
@@ -234,14 +236,18 @@ meshgen(e::EntityKey, args...; kwargs...) = meshgen(Domain(e), args...; kwargs..
 
 Similar to [`meshgen`](@ref), but append entries to `mesh`.
 """
-function meshgen!(msh::LagrangeMesh, Ω::Domain, num_elements::Int)
+function meshgen!(msh::Mesh, Ω::Domain, num_elements::Int)
     e1d = filter(k -> geometric_dimension(k) == 1, all_keys(Ω))
     return meshgen!(msh, Ω, Dict(e => num_elements for e in e1d))
 end
-function meshgen!(msh::LagrangeMesh, Ω::Domain; meshsize::Real)
-    # compute the length of each curve using an adaptive quadrature
+function meshgen!(msh::Mesh, Ω::Domain; meshsize)
+    # get all 1d entities (i.e. lines)
     e1d = filter(k -> geometric_dimension(k) == 1, all_keys(Ω))
-    dict = Dict(k => ceil(Int, measure(k) / meshsize) for k in e1d)
+    # normalize meshsize to a dictionary
+    isa(meshsize, Real) && (meshsize = Dict(e => meshsize for e in e1d))
+    isa(meshsize, Dict) || error("meshsize must be a number or a dictionary")
+    # compute the length of each curve using an adaptive quadrature
+    dict = Dict(k => ceil(Int, measure(k) / meshsize[k]) for k in e1d)
     # curves which are opposite sides of a surface must have the same number of
     # elements. If they differ, we take the maximum. Because there can be chains
     # of dependencies (i.e. l1 is opposite to l2 and l2 is opposite to l3), we
@@ -262,7 +268,7 @@ function meshgen!(msh::LagrangeMesh, Ω::Domain; meshsize::Real)
     end
     return meshgen!(msh, Ω, dict)
 end
-function meshgen!(msh::LagrangeMesh, Ω::Domain, dict::Dict)
+function meshgen!(msh::Mesh, Ω::Domain, dict::Dict)
     d = geometric_dimension(Ω)
     for k in keys(Ω)
         if d == 1
@@ -306,7 +312,7 @@ end
 
 # a simple mesh generation for GeometricEntity objects containing a
 # parametrization
-function _meshgen!(mesh::LagrangeMesh, key::EntityKey, sz)
+function _meshgen!(mesh::Mesh, key::EntityKey, sz)
     ent = global_get_entity(key)
     d = domain(ent)
     hasparametrization(ent) || error("$key has no parametrization")
@@ -340,13 +346,13 @@ function _meshgen(f, d::HyperRectangle, sz::NTuple)
     lc, hc = low_corner(d), high_corner(d)
     Δx = (hc - lc) ./ sz
     map(CartesianIndices(sz)) do I
-        low  = lc + (Tuple(I) .- 1) .* Δx
+        low = lc + (Tuple(I) .- 1) .* Δx
         high = low .+ Δx
         return ParametricElement(f, HyperRectangle(low, high))
     end |> vec
 end
 
-function _build_connectivity!(msh::LagrangeMesh{N,T}, tol = 1e-8) where {N,T}
+function _build_connectivity!(msh::Mesh{N,T}, tol = 1e-8) where {N,T}
     nodes = msh.nodes
     connect_dict = msh.etype2mat
     # first build a naive connectivity matrix where duplicate points are present
@@ -387,17 +393,14 @@ ElementIterator(m, E::DataType) = ElementIterator{E,typeof(m)}(m)
 # implement the interface for ElementIterator of lagrange elements on a generic
 # mesh. The elements are constructed on the flight based on the global nodes and
 # the connectivity list stored
-function Base.length(iter::ElementIterator{E,<:LagrangeMesh}) where {E}
+function Base.length(iter::ElementIterator{E,<:Mesh}) where {E}
     tags = iter.mesh.etype2mat[E]::Matrix{Int}
     _, Nel = size(tags)
     return Nel
 end
-Base.size(iter::ElementIterator{E,<:LagrangeMesh}) where {E} = (length(iter),)
+Base.size(iter::ElementIterator{E,<:Mesh}) where {E} = (length(iter),)
 
-function Base.getindex(
-    iter::ElementIterator{E,<:LagrangeMesh},
-    i::Int,
-) where {E<:LagrangeElement}
+function Base.getindex(iter::ElementIterator{E,<:Mesh}, i::Int) where {E<:LagrangeElement}
     tags = iter.mesh.etype2mat[E]::Matrix{Int}
     node_tags = view(tags, :, i)
     vtx = view(iter.mesh.nodes, node_tags)
@@ -409,8 +412,8 @@ end
 # converting various element types to their 2d counterpart. These are needed
 # because some meshers like gmsh always create three-dimensional objects, so we
 # must convert after importing the mesh
-function _convert_to_2d(mesh::LagrangeMesh{3,T}) where {T}
-    msh2d = LagrangeMesh{2,T}()
+function _convert_to_2d(mesh::Mesh{3,T}) where {T}
+    msh2d = Mesh{2,T}()
     # create new dictionaries for elements and ent2etagsdict with 2d elements as keys
     new_etype2mat = msh2d.etype2mat
     new_ent2etags = msh2d.ent2etags
@@ -438,7 +441,7 @@ function _convert_to_2d(::Type{LagrangeElement{R,N,SVector{3,T}}}) where {R,N,T}
 end
 _convert_to_2d(::Type{SVector{3,T}}) where {T} = SVector{2,T}
 
-function remove_duplicate_nodes!(msh::LagrangeMesh, tol)
+function remove_duplicate_nodes!(msh::Mesh, tol)
     nodes = copy(msh.nodes)
     new_nodes = empty!(msh.nodes)
     connect_dict = msh.etype2mat
@@ -474,12 +477,12 @@ over elements of the submesh just like you would with a mesh.
 Construct `SubMesh`s using `view(parent,Ω::Domain)`.
 """
 struct SubMesh{N,T} <: AbstractMesh{N,T}
-    parent::LagrangeMesh{N,T}
+    parent::Mesh{N,T}
     domain::Domain
     # etype2etags maps E => indices of elements in parent mesh contained in the
     # submesh
     etype2etags::Dict{DataType,Vector{Int}}
-    function SubMesh(mesh::LagrangeMesh{N,T}, Ω::Domain) where {N,T}
+    function SubMesh(mesh::Mesh{N,T}, Ω::Domain) where {N,T}
         etype2etags = Dict{DataType,Vector{Int}}()
         for E in element_types(mesh)
             # add the indices of the elements of type E in the submesh. Skip if
@@ -491,8 +494,8 @@ struct SubMesh{N,T} <: AbstractMesh{N,T}
     end
 end
 
-Base.view(m::LagrangeMesh, Ω::Domain) = SubMesh(m, Ω)
-Base.view(m::LagrangeMesh, ent::EntityKey) = SubMesh(m, Domain(ent))
+Base.view(m::Mesh, Ω::Domain) = SubMesh(m, Ω)
+Base.view(m::Mesh, ent::EntityKey) = SubMesh(m, Domain(ent))
 
 Base.collect(msh::SubMesh) = msh.parent[msh.domain]
 
@@ -546,7 +549,7 @@ function nodetags(msh::SubMesh)
     end
     return unique!(tags)
 end
-nodetags(msh::LagrangeMesh) = collect(1:length(msh.nodes))
+nodetags(msh::Mesh) = collect(1:length(msh.nodes))
 
 """
     nodes(msh::SubMesh)
@@ -601,3 +604,10 @@ end
     centers = map(center, els)
     return inrange(balltree, centers, tol)
 end
+
+"""
+    Domain(f::Function, msh::AbstractMesh)
+
+Call `Domain(f, ents)` on `ents = entities(msh).`
+"""
+Domain(f::Function, msh::AbstractMesh) = Domain(f, entities(msh))

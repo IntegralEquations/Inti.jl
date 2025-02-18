@@ -30,22 +30,27 @@ efficiency, the package currently supports the following features:
 
 ## Installing Julia
 
-Download of Julia from [julialang.org](https://julialang.org/downloads/), or use
+Download Julia from [julialang.org](https://julialang.org/downloads/), or use
 [juliaup](https://github.com/JuliaLang/juliaup) installer. We recommend using
 the latest stable version of Julia, although `Inti.jl` should work with
 `>=v1.9`.
 
 ## Installing Inti.jl
 
-Inti.jl is not yet registered in the Julia General registry. You can install it
-by launching a Julia REPL and typing the following command:
+Inti.jl is registered in the Julia General registry and can be installed by 
+launching a Julia REPL and typing the following command:
+
+```julia
+]add Inti
+```
+
+Alternatively, one can install the latest version of Inti.jl from the `main` branch using:
 
 ```julia
 using Pkg; Pkg.add(;url = "https://github.com/IntegralEquations/Inti.jl", rev = "main")
 ```
 
-This will download and install the latest version of Inti.jl from the `main`
-branch. Change `rev` if you need a different branch or a specific commit hash.
+Change `rev` if a different branch or a specific commit hash is desired.
 
 ## Installing weak dependencies
 
@@ -61,8 +66,8 @@ Inti.stack_weakdeps_env!(; verbose = false, update = true)
 ```
 
 Note that the first time you run this command, it may take a while to download
-and compile the dependencies. Subsequent runs will be faster. If you prefer, you
-can manually control which extensions to install by `Pkg.add`ing the desired
+and compile the dependencies. Subsequent runs will be faster. If preferred, 
+extensions can be manually controlled by `Pkg.add`ing the desired
 packages from the list above.
 
 ## Basic usage
@@ -81,8 +86,8 @@ problem consists of the following steps:
   define a quadrature and discretize the boundary integral equation.
 - **Solver**: With a mesh and an accompanying quadrature, Inti.jl's routines
   provide ways to assemble and solve the system of equations arising from the
-  discretization of the integral operators. The core of the library lies in this
-  step.
+  discretization of the integral operators. The core of the library lies in
+  service of this step.
 - **Visualization**: Visualize the solution using a plotting library such as
   Makie.jl, or export it to a file for further analysis.
 
@@ -129,9 +134,9 @@ end
 msh = Inti.meshgen(Γ; meshsize = 0.1)
 Q = Inti.Quadrature(msh; qorder = 5)
 # create the integral operators
-pde = Inti.Laplace(;dim=2)
+op = Inti.Laplace(;dim=2)
 S, _ = Inti.single_double_layer(;
-    pde, 
+    op, 
     target = Q,
     source = Q,
     compression = (method = :none,),
@@ -143,7 +148,7 @@ g = map(q -> uₑ(q.coords), Q) # value at quad nodes
 # solve for σ
 σ = S \ g
 # use the single-layer potential to evaluate the solution
-𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
 uₕ = x -> 𝒮[σ](x)
 ```
 
@@ -186,7 +191,7 @@ While the example above is a simple one, Inti.jl can handle significantly more
 complex problems involving multiple domains, heterogeneous coefficients,
 vector-valued PDEs, and three-dimensional geometries. The best way to dive
 deeper into Inti.jl's capabilities is the [tutorials](@ref "Getting started")
-section. You can also find more advanced usage in the [examples](@ref "Toy
+section. More advanced usage can be found in the [examples](@ref "Toy
 example") section.
 
 ## Contributing

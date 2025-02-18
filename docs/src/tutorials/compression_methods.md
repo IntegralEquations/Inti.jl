@@ -23,7 +23,7 @@ of the operator. The following methods are available:
   [`HMatrices`](https://github.com/IntegralEquations/HMatrices.jl) library.
 - [`assemble_fmm`](@ref): return a `LinearMap` object that represents the
   operator using the fast multipole method. This method is powered by the
-  [`FMM2D`](https://github.com/flatironinstitute/fmm2d/) and
+  [`FMM2D`](https://github.com/flatironinstitute/fmm2d/), [`FMMLIB2D`](https://github.com/zgimbutas/fmmlib2d) and
   [`FMM3D`](https://fmm3d.readthedocs.io) libraries, and is only available for
   certain kernels.
 
@@ -46,8 +46,8 @@ geo = Inti.GeometricEntity("ellipsoid")
 Γ = Inti.boundary(Ω)
 Q = Inti.Quadrature(Γ; meshsize = 0.4, qorder = 5)
 # create the operator
-pde = Inti.Helmholtz(; dim = 3, k = 2π)
-K = Inti.SingleLayerKernel(pde)
+op = Inti.Helmholtz(; dim = 3, k = 2π)
+K = Inti.SingleLayerKernel(op)
 Sop = Inti.IntegralOperator(K, Q, Q)
 x = rand(eltype(Sop), length(Q))
 rtol = 1e-8
@@ -98,7 +98,7 @@ println("Forward map error: $er")
 
 Note that `HMatrices` are said to be *kernel-independent*, meaning that they
 efficiently compress a wide range of integral operators provided they satisfy a
-certain asymptotically smooth criterion (see e.g. [bebendorf2008hierarchical,
+certain asymptotic smoothness criterion (see e.g. [bebendorf2008hierarchical,
 hackbusch2015hierarchical](@cite)).
 
 The `HMatrix` object can be used to solve linear systems, both iteratively
@@ -133,12 +133,12 @@ the available hardware. Here is a rough guide on how to choose a compression:
    matrix representation. It is the simplest and most straightforward method,
    and does not require any additional packages. It is also the most accurate
    since it does not introduce any approximation errors.
-2. If the integral operator is supported by the `assemble_fmm`, and if you can
-   afford an iterative solver, use it. The FMM is a very efficient method for
-   certain types of kernels, and can handle problems with up to a few million
-   degrees of freedom on a laptop.
+2. If the integral operator is supported by the `assemble_fmm`, and if an
+   iterative solver is acceptable, use it. The FMM is a very efficient method
+   for certain types of kernels, and can handle problems with up to a few
+   million degrees of freedom on a laptop.
 3. If the kernel is not supported by `assemble_fmm`, if iterative solvers are
-   not an option, or if you need to solve your system for many right-hand sides,
+   not an option, or if the system needs solution for many right-hand sides,
    use the `assemble_hmatrix` method. It is a very general method that can
    handle a wide range of kernels, and although assembling the `HMatrix` can be
    time and memory consuming (the complexity is still log-linear in the DOFs for

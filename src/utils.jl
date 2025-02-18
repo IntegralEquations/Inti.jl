@@ -408,3 +408,30 @@ function _rotation_matrix_3d(rot)
     Rz = @SMatrix [cos(rot[3]) sin(rot[3]) 0; -sin(rot[3]) cos(rot[3]) 0; 0 0 1]
     return Rz * Ry * Rx
 end
+
+"""
+    kress_change_of_variables(P)
+
+Return a change of variables mapping `[0,1]` to `[0,1]` with the property that
+the first `P-1` derivatives of the transformation vanish at `x=0`.
+"""
+function kress_change_of_variables(P)
+    v = x -> (1 / P - 1 / 2) * ((1 - x))^3 + 1 / P * ((x - 1)) + 1 / 2
+    return x -> 2v(x)^P / (v(x)^P + v(2 - x)^P)
+end
+
+"""
+    kress_change_of_variables_periodic(P)
+
+Like [`kress_change_of_variables`](@ref), this change of variables maps the interval `[0,1]` onto
+itself, but the first `P` derivatives of the transformation vanish at **both**
+endpoints (thus making it a periodic function).
+
+This change of variables can be used to *periodize* integrals over the interval
+`[0,1]` by mapping the integrand into a new integrand that vanishes (to order P)
+at both endpoints.
+"""
+function kress_change_of_variables_periodic(P)
+    v = (x) -> (1 / P - 1 / 2) * ((1 - 2x))^3 + 1 / P * ((2x - 1)) + 1 / 2
+    return x -> v(x)^P / (v(x)^P + v(1 - x)^P)
+end
