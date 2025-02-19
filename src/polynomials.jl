@@ -62,16 +62,17 @@ function monomial_basis(::PolynomialSpace{ReferenceLine,K}) where {K}
     return b
 end
 
-# function monomial_basis(::PolynomialSpace{ReferenceSquare,K}) where {K}
-#     # the K+1 monomials x^(0,0), x^(0,1),x^(1,0), ..., x^(K,K)
-#     I = CartesianIndices((K + 1, K + 1)) .- CartesianIndex(1, 1)
-#     N = length(I)
-#     b = ntuple(N) do i
-#         θ = Tuple(I[i]) # map linear to cartesian index
-#         return x -> prod(x .^ θ)
-#     end
-#     return b
-# end
+function monomial_basis(::PolynomialSpace{Inti.ReferenceSquare,K}) where {K}
+    # the K+1 monomials x^(0,0), x^(0,1),x^(1,0), ..., x^(K,K)
+    I = CartesianIndices((K + 1, K + 1)) .- CartesianIndex(1, 1)
+    N = Val((K + 1) * (K + 1))
+    b = x -> begin
+        Inti.svector(N) do i
+            return x[1]^I[i][1] * x[2]^I[i][2]
+        end
+    end
+    return b
+end
 
 function monomial_basis(::PolynomialSpace{ReferenceTriangle,K}) where {K}
     # the (K+1)*(K+2)/2 monomials x^(a,b) with a+b ≤ K
