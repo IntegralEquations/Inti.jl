@@ -4,7 +4,7 @@ Implementation of the singular integration method of Guiggiani et al. (1992)
 
 @kwdef struct GuiggianiParameters
 	polar_quadrature_order::Int   = 20
-	angular_quadrature_order::Int = 20
+	angular_quadrature_order::Int = 40
 end
 
 """
@@ -31,6 +31,27 @@ function polar_decomposition(::ReferenceSquare, x::SVector{2, Float64})
 end
 
 """
+	polar_decomposition(shape::ReferenceTriangle, x̂::SVector{2,Float64})
+
+Decompose the triangle `{̂x, ̂y ≥ 0, ̂x + ̂y ≤ 1}` into three triangles, and return three tuples of the form
+`θₛ, θₑ, ρ` where `θₛ` and `θₑ` are the initial and final angles of the triangle, and `ρ` is
+the function that gives the distance from `x̂` to the border of the square in the direction
+`θ`. rho1 is the mapping of the first triangle that does not intersect the x-axis, in the trigonometric 
+direction, defined in the interval [theta1, theta2].
+"""
+function polar_decomposition(::ReferenceTriangle, x::SVector{2, Float64})
+	theta1 = atan(x[1], 1 - x[2]) + π / 2
+	theta2 = atan(x[2], x[1]) + π
+	theta3 = atan(1 - x[1], x[2]) + 3π / 2
+	rho1 = θ -> x[1] / (-cos(θ))
+	rho2 = θ -> x[2] / (-sin(θ))
+	rho3 = θ -> (1 - x[1] - x[2]) / (sqrt(2) * cos(θ - π / 4))
+	return (theta1, theta2, rho1),
+	(theta2, theta3, rho2),
+	(theta3, theta1 + 2π, rho3)
+end
+
+"""
 	laurent_coefficients(f, order::Val{N}, h = 0.2) where {N}
 
 Compute the Laurent coefficients of a function `f` at the origin. The function `f` is
@@ -49,7 +70,7 @@ function laurent_coefficients(f, order::Val{N}, h = 0.2) where {N}
 		return g′(x)
 	end
 	# f₋₁, e₋₁ = extrapolate(h; atol) do x
-	#     return x * f(x) - f₋₂ / x
+	# 	return x * f(x) - f₋₂ / x
 	# end
 	return f₋₂, f₋₁
 end
