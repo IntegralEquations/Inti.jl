@@ -57,28 +57,99 @@ using LinearAlgebra
 	@inferred Inti.laurent_coefficients(g, (Val(2)), 1e-3)
 end
 
-@testset "Polar decomposition" begin
+@testset "Polar decomposition - Reference square" begin
 	# FIXME: write a test for the polar decomposition. E.g. test that it a quadrature in
 	# rho/theta correctly integrates all some function over the square.
 	ref = Inti.ReferenceSquare()
 	x̂  = SVector(0.2, 0.5)
 
-	# quad_rho   = Inti.GaussLegendre(; order = 10)
-	# quad_theta = Inti.GaussLegendre(; order = 10)
-	# fig        = Figure()
-	# ax         = Axis(fig[1, 1])
-	# for (θmin, θmax, ρ) in Inti.polar_decomposition(ref, x̂)
-	#     @test θmin ≤ θmax
-	#     x = SVector{2,Float64}[]
-	#     for θ in θmin:0.1:θmax
-	#         ρmax = ρ(θ)
-	#         @show θ, ρmax
-	#         for ρ in 0:0.1:ρmax
-	#             push!(x, x̂ + ρ * SVector(cos(θ), sin(θ)))
-	#         end
-	#     end
-	#     scatter!(ax, x; label = "")
-	# end
+	quad_rho                 = Inti.GaussLegendre(; order = 10)
+	quad_theta               = Inti.GaussLegendre(; order = 10)
+	x_rho_ref, w_rho_ref     = Inti.qcoords(quad_rho), Inti.qweights(quad_rho) # nodes and weights on [0,1]
+	x_theta_ref, w_theta_ref = Inti.qcoords(quad_theta), Inti.qweights(quad_theta) # nodes and weights on [0,2π]
+	n_rho, n_theta           = length(x_rho_ref), length(x_theta_ref)
+	fig                      = Figure()
+	ax                       = Axis(fig[1, 1])
+	for (θmin, θmax, ρ) in Inti.polar_decomposition(ref, x̂)
+		@test θmin ≤ θmax
+		x = SVector{2, Float64}[]
+		for θ in θmin:0.1:θmax
+			ρmax = ρ(θ)
+			# @show θ, ρmax
+			for ρ in 0:0.1:ρmax
+				push!(x, x̂ + ρ * SVector(cos(θ), sin(θ)))
+			end
+		end
+		scatter!(ax, x; label = "")
+		# draw the line from x to x + ρmax * [cos(θ), sin(θ)]
+		x = x̂ + ρ(θmin) * SVector(cos(θmin), sin(θmin))
+		lines!(ax, [x̂, x]; label = "")
+	end
+	res = 0.0
+	function _function_to_integrate_1(ρ, θ)
+		ρ
+	end
+	for (theta_min, theta_max, rho) in Inti.polar_decomposition(ref, x̂) # loop over the four triangles
+		delta_theta = theta_max - theta_min
+		for m in 1:n_theta
+			theta = theta_min + x_theta_ref[m][1] * delta_theta
+			w_theta = w_theta_ref[m] * delta_theta
+			rho_max = rho(theta)::Float64
+			for n in 1:n_rho
+				ρₙ = x_rho_ref[n][1] * rho_max
+				w_rho = w_rho_ref[n] * rho_max
+				res += _function_to_integrate_1(ρₙ, theta) * w_theta * w_rho
+			end
+		end
+	end
+	@test isapprox(res, 1.0, atol = 1e-2)
+	# fig
+end
+
+@testset "Polar decomposition - Reference triangle" begin
+	ref = Inti.ReferenceTriangle()
+	x̂  = SVector(0.2, 0.5)
+
+	quad_rho                 = Inti.GaussLegendre(; order = 10)
+	quad_theta               = Inti.GaussLegendre(; order = 10)
+	x_rho_ref, w_rho_ref     = Inti.qcoords(quad_rho), Inti.qweights(quad_rho) # nodes and weights on [0,1]
+	x_theta_ref, w_theta_ref = Inti.qcoords(quad_theta), Inti.qweights(quad_theta) # nodes and weights on [0,2π]
+	n_rho, n_theta           = length(x_rho_ref), length(x_theta_ref)
+	fig                      = Figure()
+	ax                       = Axis(fig[1, 1])
+	for (θmin, θmax, ρ) in Inti.polar_decomposition(ref, x̂)
+		@test θmin ≤ θmax
+		x = SVector{2, Float64}[]
+		for θ in θmin:0.01:θmax
+			ρmax = ρ(θ)
+			# @show θ, ρmax
+			for ρ in 0:0.1:ρmax
+				push!(x, x̂ + ρ * SVector(cos(θ), sin(θ)))
+			end
+		end
+		scatter!(ax, x; label = "")
+		# draw the line from x to x + ρmax * [cos(θ), sin(θ)]
+		x = x̂ + ρ(θmin) * SVector(cos(θmin), sin(θmin))
+		lines!(ax, [x̂, x]; label = "")
+	end
+	res1 = 0.0
+	function _function_to_integrate_1(ρ, θ)
+		ρ
+	end
+	for (theta_min, theta_max, rho) in Inti.polar_decomposition(ref, x̂) # loop over the four triangles
+		delta_theta = theta_max - theta_min
+		for m in 1:n_theta
+			theta = theta_min + x_theta_ref[m][1] * delta_theta
+			w_theta = w_theta_ref[m] * delta_theta
+			rho_max = rho(theta)::Float64
+			for n in 1:n_rho
+				ρₙ = x_rho_ref[n][1] * rho_max
+				w_rho = w_rho_ref[n] * rho_max
+				res1 += _function_to_integrate_1(ρₙ, theta) * w_theta * w_rho
+			end
+		end
+	end
+	@test isapprox(res, 1 / 2, atol = 1e-2)
 	# fig
 end
 
@@ -161,7 +232,7 @@ end
 	T₀ = Inti.assemble_matrix(T)
 	δT = Inti.guiggiani_correction(
 		T;
-		nearfield_distance = 1 * meshsize,
+		nearfield_distance = 2 * meshsize,
 		nearfield_qorder = 40,
 	)
 	Tnew = T₀ + δT
