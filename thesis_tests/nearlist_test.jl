@@ -1,4 +1,5 @@
 using LinearAlgebra
+using StaticArrays
 using Inti
 using Random
 using Meshes
@@ -22,6 +23,8 @@ Random.seed!(1)
 
 h = 0.2
 
+t = :interior
+N = 2
 GEOMETRY = "geometries/circle_with_narrow_connection.jl"
 Inti.clear_entities!()
 include(GEOMETRY)
@@ -30,8 +33,7 @@ msh = Inti.meshgen(Γ; meshsize = h)
 Γ_msh = msh[Γ]
 ee = Inti.element_types(Γ_msh)
 E = first(ee)
-
-# Q = Inti.Quadrature(Γ_msh; qorder = 2)
+Q = Inti.Quadrature(Γ_msh; qorder = 2)
 
 # hmin = Inf
 # for idxs in eachcol(Inti.etype2qtags(Q, E))
