@@ -8,10 +8,11 @@ using Gmsh
 using LinearAlgebra
 using HMatrices
 using FMMLIB2D
-using GLMakie
+using CairoMakie
 using Meshes
 
 #meshsize = 0.001/8
+#meshsize = 0.125/8
 meshsize = 0.000125
 interpolation_order = 4
 VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(4)
