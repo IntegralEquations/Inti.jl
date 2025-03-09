@@ -10,6 +10,7 @@ using QuadGK
 using ForwardDiff
 
 SAVE = true
+TEST_TYPE = "K"
 
 include("test_utils.jl")
 Random.seed!(1)
@@ -19,14 +20,14 @@ t = :interior
 # pde = Inti.Laplace(; dim = N)
 # pde = Inti.Helmholtz(; k = 2.1, dim = N)
 pde = Inti.Stokes(; dim = N, μ = 1.2)
-Q = (3, 5)
+qorder = 5
+K = (3, 5, 10)
 
 ii = 1:5
 H = [0.1 * 2.0^(-i) for i in ii]
 
-Err0 = Dict(qorder => Float64[] for qorder in Q)
-Errl = Dict(qorder => Float64[] for qorder in Q)
-Errg = Dict(qorder => Float64[] for qorder in Q)
+Errl = Dict(k => Float64[] for k in K)
+Errg = Float64[]
 
 ##
 ##
@@ -59,26 +60,28 @@ Makie.set_theme!(theme)
 ##
 fig = Figure()
 ax = Axis(fig[1, 1])
-for qorder in Q
+for (i, k) in enumerate(K)
     # err0 = Err0[qorder]
-    errl = Errl[qorder]
-    errg = Errg[qorder]
+    errl = Errl[k]
     # scatterlines!(ax, H, err0;colormap=:tab10, colorrange=(1, 10), color=3, marker = :x,    label=qorder == Q[1] ? "no correction" : nothing)
-    scatterlines!(ax, H, errg;colormap=:tab10, colorrange=(1, 10), color=2, marker=:circle, label=qorder == Q[1] ? L"\text{global}" : nothing)
-    scatterlines!(ax, H, errl;colormap=:tab10, colorrange=(1, 10), color=1, marker=:rect,   label=qorder == Q[1] ? L" \text{local}" : nothing)
+    scatterlines!(ax, H, errl;colormap=:tab10, colorrange=(1, 10), color=i+1, marker=:rect, label=L"k=%$k")
 
-    # add some reference slopes
-    P = div(qorder + 1, 2)
-    slope = P + 1
-    ref = 0.8 * errl[1] / H[1]^slope
-    lines!(ax, H, ref * H .^ slope;color=:black, linestyle = :dash, label =nothing)
-    text!(ax, H[2]*1.2, errg[2], text=L"$P=%$P$";align=(:left, :top))
-    text!(ax, H[2]*0.99, 0.4*errg[2], text=L"$\text{slope}=%$slope$";align=(:left, :top))
+    
 end
+
+scatterlines!(ax, H, Errg;colormap=:tab10, colorrange=(1, 10), color=1, marker=:circle, label=L"\text{global}")
+
+# add reference slopes
+P = div(qorder + 1, 2)
+slope = P + 1
+ref = 0.8 * Errg[1] / H[1]^slope
+lines!(ax, H, ref * H .^ slope;color=:black, linestyle = :dash, label =nothing)
+text!(ax, H[2]*1.2, Errg[2], text=L"$P=%$P$";align=(:left, :top))
+text!(ax, H[2]*0.99, 0.4*Errg[2], text=L"$\text{slope}=%$slope$";align=(:left, :top))
 axislegend(; position = :lt)
 
 display(fig)
 ##
 GEOM = splitdir(GEOMETRY)[2][1:end-3]
 TEST = splitdir(TESTFILE)[2][1:end-3]
-SAVE && save("thesis_tests/plots/$(GEOM)_$(TEST).png", fig)
+SAVE && save("thesis_tests/ktest_plots/$(GEOM)_$(TEST).png", fig)
