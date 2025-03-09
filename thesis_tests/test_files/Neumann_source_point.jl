@@ -18,8 +18,8 @@ qorder = 5
 
 K = 5:5
 H = [0.2 * 2.0^(-i) for i in 2:6]
-err1 = Float64[]
-err2 = Float64[]
+errl = Float64[]
+errg = Float64[]
 
 FIG = Figure()
 AX  = Axis(FIG[1, 1]; aspect=1)
@@ -138,7 +138,7 @@ for h in H
     # )
     σ    = (Sdim + I/2) \ ubnd
     usol = Inti.IntegralOperator(G, tset, quad) * σ
-    e1   = norm(usol - utst, Inf) / utst_norm
+    eloc   = norm(usol - utst, Inf) / utst_norm
 
     tdim = @elapsed δS, δD =
         Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
@@ -146,25 +146,25 @@ for h in H
     Ddim = Dmat + δD
     σ    = (Sdim + I/2) \ ubnd
     usol = Inti.IntegralOperator(G, tset, quad) * σ
-    e2   = norm(usol - utst, Inf) / utst_norm
+    eglo   = norm(usol - utst, Inf) / utst_norm
     # @show norm(e0, Inf)
-    @show e1
-    @show e2
+    @show eloc
+    @show eglo
     @show tldim
     @show tdim
-    push!(err1, e1)
-    push!(err2, e2)
+    push!(errl, eloc)
+    push!(errg, eglo)
 end
 
 fig = Figure()
 ax = Axis(fig[1, 1]; xlabel = "h", ylabel = "error", xscale = log10, yscale = log10)
 
-scatterlines!(ax, H, err1; linewidth = 2, marker = :circle, label = " local")
-scatterlines!(ax, H, err2; linewidth = 2, marker = :circle, label = "global")
+scatterlines!(ax, H, errl; linewidth = 2, marker = :circle, label = " local")
+scatterlines!(ax, H, errg; linewidth = 2, marker = :circle, label = "global")
 
 # add some reference slopes
 for slope in (qorder-2):(qorder+2)
-    ref = err2[end] / H[end]^slope
+    ref = errg[end] / H[end]^slope
     lines!(ax, H, ref * H .^ slope; linestyle = :dash, label = "slope $slope")
 end
 axislegend(; position = :lt)

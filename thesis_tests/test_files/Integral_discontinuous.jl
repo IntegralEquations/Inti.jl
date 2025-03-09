@@ -9,8 +9,8 @@ u = x -> x[2] > 0 ? 1 : 0
 # u = x -> 1
 
 for qorder in Q
-    err1 = Err1[qorder]
-    err2 = Err2[qorder]
+    errl = Errl[qorder]
+    errg = Errg[qorder]
     for h in H
         # k = ceil(Int, 0.1 / h)
         
@@ -76,20 +76,20 @@ for qorder in Q
         #     compression = (method = :none,),
         #     correction  = (method = :ldim,),
         # )
-        e1 = norm(Sdim ⋅ uvec - ref, Inf) / uvec_norm
+        eloc = norm(Sdim ⋅ uvec - ref, Inf) / uvec_norm
 
         tdim = @elapsed δS, δD =
             Inti.bdim_correction(pde, [xs], quad, Smat, Dmat; green_multiplier)
         Sdim = Smat + δS
         Ddim = Dmat + δD
-        e2 = norm(Sdim ⋅ uvec - ref, Inf) / uvec_norm
+        eglo = norm(Sdim ⋅ uvec - ref, Inf) / uvec_norm
         # @show norm(e0, Inf)
-        @show e1
-        @show e2
+        @show eloc
+        @show eglo
         @show tldim
         @show tdim
-        push!(err1, e1)
-        push!(err2, e2)
+        push!(errl, eloc)
+        push!(errg, eglo)
     end
 end
 

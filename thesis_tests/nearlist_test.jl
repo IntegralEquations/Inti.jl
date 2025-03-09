@@ -36,7 +36,7 @@ E = first(ee)
 Q = Inti.Quadrature(Γ_msh; qorder = 2)
 
 # hmin = Inf
-# for idxs in eachcol(Inti.etype2qtags(Q, E))
+# for idxs in eachcol(Inti.etypegloqtags(Q, E))
 #     @show sum(Inti.weight(Q[i]) for i in idxs)
 # end
 
@@ -137,13 +137,13 @@ maxdist = 3 * h
 
 viz(Γ_msh; showsegments = true)
 
-e2t = Inti.local_bdim_element_to_target(X, Γ_msh; maxdist)
+eglot = Inti.local_bdim_element_to_target(X, Γ_msh; maxdist)
 
 etag = 15
 colors = (:red, :green, :blue)
 el = Inti.elements(Γ_msh, E)[etag]
 viz!(el; color = :red, segmentsize = 10)
-for i in e2t[E][etag]
+for i in eglot[E][etag]
     scatter!(X[i]; color = :black, markersize = 10)
 end
 

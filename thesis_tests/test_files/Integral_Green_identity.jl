@@ -5,8 +5,8 @@ u = (qnode) -> Inti.SingleLayerKernel(pde)(qnode, xs) * c
 dudn = (qnode) -> Inti.AdjointDoubleLayerKernel(pde)(qnode, xs) * c
 
 for qorder in Q
-    err1 = Err1[qorder]
-    err2 = Err2[qorder]
+    errl = Errl[qorder]
+    errg = Errg[qorder]
     for h in H
         msh = Inti.meshgen(Γ; meshsize = h)
         Γ_msh = msh[Γ]
@@ -58,19 +58,19 @@ for qorder in Q
         #     compression = (method = :none,),
         #     correction  = (method = :ldim,),
         # )
-        e1 = norm(Sdim * γ₁u - Ddim * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
+        eloc = norm(Sdim * γ₁u - Ddim * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
 
         tdim = @elapsed δS, δD =
             Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
         Sdim = Smat + δS
         Ddim = Dmat + δD
-        e2 = norm(Sdim * γ₁u - Ddim * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
+        eglo = norm(Sdim * γ₁u - Ddim * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
         # @show norm(e0, Inf)
-        @show e1
-        @show e2
+        @show eloc
+        @show eglo
         @show tldim
         @show tdim
-        push!(err1, e1)
-        push!(err2, e2)
+        push!(errl, eloc)
+        push!(errg, eglo)
     end
 end

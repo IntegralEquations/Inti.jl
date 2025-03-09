@@ -5,8 +5,8 @@ u = (qnode) -> Inti.SingleLayerKernel(pde)(qnode, xs) * c
 # u = qnode -> 1
 for qorder in Q
     err0 = Err0[qorder]
-    err1 = Err1[qorder]
-    err2 = Err2[qorder]
+    errl = Errl[qorder]
+    errg = Errg[qorder]
     for h in H
         # k = ceil(Int, 0.1 / h)
 
@@ -75,7 +75,7 @@ for qorder in Q
         # )
         σ    = (α * Sdim + β * (Ddim + μ*I)) \ ubnd
         usol = (α * Stest + β * Dtest) * σ
-        e1   = norm(usol - utst, Inf) / utst_norm
+        eloc   = norm(usol - utst, Inf) / utst_norm
 
         tdim = @elapsed δS, δD =
             Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
@@ -83,15 +83,15 @@ for qorder in Q
         Ddim = Dmat + δD
         σ    = (α * Sdim + β * (Ddim + μ*I)) \ ubnd
         usol = (α * Stest + β * Dtest) * σ
-        e2   = norm(usol - utst, Inf) / utst_norm
+        eglo   = norm(usol - utst, Inf) / utst_norm
         # @show norm(e0, Inf)
         @show e0
-        @show e1
-        @show e2
+        @show eloc
+        @show eglo
         @show tldim
         @show tdim
         push!(err0, e0)
-        push!(err1, e1)
-        push!(err2, e2)
+        push!(errl, eloc)
+        push!(errg, eglo)
     end
 end
