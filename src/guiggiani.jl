@@ -3,7 +3,7 @@ Implementation of the singular integration method of Guiggiani et al. (1992)
 =#
 
 @kwdef struct GuiggianiParameters
-	polar_quadrature_order::Int   = 20
+	polar_quadrature_order::Int   = 40
 	angular_quadrature_order::Int = 40
 end
 
@@ -62,16 +62,16 @@ function laurent_coefficients(f, order::Val{N}, h = 0.2) where {N}
 	atol = 1e-12
 	N == 2 || throw(ArgumentError("only N=2 is supported"))
 	g = x -> x^N * f(x)
-	g′ = x -> ForwardDiff.derivative(g, x)
+	# g′ = x -> ForwardDiff.derivative(g, x)
 	f₋₂, e₋₂ = extrapolate(h; atol, x0 = 0) do x
 		return g(x)
 	end
-	f₋₁, e₋₁ = extrapolate(h; atol, x0 = 0) do x
-		return g′(x)
-	end
-	# f₋₁, e₋₁ = extrapolate(h; atol) do x
-	# 	return x * f(x) - f₋₂ / x
+	# f₋₁, e₋₁ = extrapolate(h; atol, x0 = 0) do x
+	# 	return g′(x)
 	# end
+	f₋₁, e₋₁ = extrapolate(h; atol) do x
+		return x * f(x) - f₋₂ / x
+	end
 	return f₋₂, f₋₁
 end
 

@@ -4,6 +4,7 @@ using Inti
 using StaticArrays
 using Gmsh
 using LinearAlgebra
+using GLMakie
 
 @testset "Laurent coefficients" begin
 	f = ρ -> ρ^2 + 2ρ + 1
@@ -149,7 +150,7 @@ end
 			end
 		end
 	end
-	@test isapprox(res, 1 / 2, atol = 1e-2)
+	@test isapprox(res1, 1 / 2, atol = 1e-2)
 	# fig
 end
 
@@ -196,22 +197,47 @@ end
 	gmsh.finalize()
 	Γ = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, msh)
 	Γ_msh = msh[Γ]
-	Γ_quad = Inti.Quadrature(Γ_msh; qorder = 5)
+	Γ_quad = Inti.Quadrature(Γ_msh; qorder = 2)
 
 	##
 	op = Inti.Laplace(; dim = 3)
-	K = Inti.HyperSingularKernel(op)
-	T = Inti.IntegralOperator(K, Γ_quad, Γ_quad)
-	T₀ = Inti.assemble_matrix(T)
-	δT = Inti.guiggiani_correction(
-		T;
-		nearfield_distance = 4 * meshsize,
+	K′ = Inti.AdjointDoubleLayerKernel(op)
+	T = Inti.HyperSingularKernel(op)
+
+	K′_op = Inti.IntegralOperator(K′, Γ_quad, Γ_quad)
+	T_op = Inti.IntegralOperator(T, Γ_quad, Γ_quad)
+
+	K′₀ = Inti.assemble_matrix(K′_op)
+	T₀ = Inti.assemble_matrix(T_op)
+
+	δK′ = Inti.guiggiani_correction(
+		K′_op;
+		nearfield_distance = 3 * meshsize,
 		nearfield_qorder = 40,
 	)
+	K′new = K′₀ + δK′
 
+	δT = Inti.guiggiani_correction(
+		T_op;
+		nearfield_distance = 3 * meshsize,
+		nearfield_qorder = 60,
+	)
 	Tnew = T₀ + δT
-	rhs = ones(Float64, size(T, 1))
-	@test norm(Tnew * rhs, Inf) < 1e-2
+
+	U = ones(Float64, size(T_op, 1))
+	γ₁ₓU = zeros(Float64, size(K′_op, 1))
+	lhs = γ₁ₓU
+	rhs = K′new * γ₁ₓU - Tnew * U
+	# @test norm(rhs - lhs) < 1e-6
+
+	U₀ = SVector(ones(Float64, 3)...)
+	u₁ = 1.5
+	U = [transpose(U₀) * node.coords + u₁ for node in Γ_quad]
+	Tₙ = [transpose(U₀) * node.normal for node in Γ_quad]
+
+	lhs = Tₙ / 2
+	rhs = K′new * Tₙ - Tnew * U
+	@test norm(rhs - lhs) < 1e-6
 
 	##
 	op = Inti.Elastostatic(; dim = 3, μ = 1, λ = 1)
@@ -221,7 +247,7 @@ end
 	δT = Inti.guiggiani_correction(
 		T;
 		nearfield_distance = 3 * meshsize,
-		nearfield_qorder = 40,
+		nearfield_qorder = 60,
 	)
 	Tnew = T₀ + δT
 	rhs = [SVector(1.0, 1.0, 1.0) for _ in 1:size(T, 1)]
@@ -232,10 +258,12 @@ end
 	T₀ = Inti.assemble_matrix(T)
 	δT = Inti.guiggiani_correction(
 		T;
-		nearfield_distance = 2 * meshsize,
+		nearfield_distance = 3 * meshsize,
 		nearfield_qorder = 40,
 	)
 	Tnew = T₀ + δT
 	rhs = [SVector(1.0, 1.0, 1.0) for _ in 1:size(T, 1)]
 	@test norm(Tnew * rhs + 0.5 * rhs, Inf) < 1e-2
+
+	op = Inti.Elastostatic(; dim = 3, μ = 1, λ = 1)
 end
