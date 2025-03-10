@@ -9,7 +9,7 @@ using LaTeXStrings
 using QuadGK
 using ForwardDiff
 
-SAVE = false
+SAVE = true
 TEST_TYPE = "QORDER"
 
 include("test_utils.jl")
@@ -50,6 +50,7 @@ theme = Theme(;
         yscale = log10,
         xticks = (H, [L"$0.1\times2^{-%$i}$" for i in ii]),
         linewidth = 2,
+        
         # autolimitaspect = 1,
         # aspect = DataAspect(),
     ),
@@ -64,17 +65,17 @@ for qorder in Q
     # err0 = Err0[qorder]
     errl = Errl[qorder]
     errg = Errg[qorder]
-    # scatterlines!(ax, H, err0;colormap=:tab10, colorrange=(1, 10), color=3, marker = :x,    label=qorder == Q[1] ? "no correction" : nothing)
-    scatterlines!(ax, H, errg;colormap=:tab10, colorrange=(1, 10), color=2, marker=:circle, label=qorder == Q[1] ? L"\text{global}" : nothing)
-    scatterlines!(ax, H, errl;colormap=:tab10, colorrange=(1, 10), color=1, marker=:rect,   label=qorder == Q[1] ? L" \text{local}" : nothing)
-
-    # add some reference slopes
     P = div(qorder + 1, 2)
+    # scatterlines!(ax, H, err0;colormap=:tab10, colorrange=(1, 10), color=3, marker = :x,    label=qorder == Q[1] ? "no correction" : nothing)
+    scatterlines!(ax, H, errg;colormap=:viridis, colorrange=(1, 10), color=qorder, marker=:circle, markersize=15, label=L"\text{global }P=%$P")
+    scatterlines!(ax, H, errl;colormap=:viridis, colorrange=(1, 10), color=5+P, marker=:rect, markersize=15, label=L"\text{  local }P=%$P")
+
+    # add reference slopes
     slope = P + 1
     ref = 0.8 * errl[1] / H[1]^slope
     lines!(ax, H, ref * H .^ slope;color=:black, linestyle = :dash, label =nothing)
-    text!(ax, H[2]*1.2, errg[2], text=L"$P=%$P$";align=(:left, :top))
-    text!(ax, H[2]*0.99, 0.4*errg[2], text=L"$\text{slope}=%$slope$";align=(:left, :top))
+    # text!(ax, H[2]*1.2, 0.4*errl[2], text=L"$P=%$P$";align=(:left, :top))
+    text!(ax, H[2]*0.99, 0.4*errl[2], text=L"$\text{slope}=%$slope$";align=(:left, :top))
 end
 axislegend(; position = :lt)
 

@@ -64,12 +64,10 @@ for (i, k) in enumerate(K)
     # err0 = Err0[qorder]
     errl = Errl[k]
     # scatterlines!(ax, H, err0;colormap=:tab10, colorrange=(1, 10), color=3, marker = :x,    label=qorder == Q[1] ? "no correction" : nothing)
-    scatterlines!(ax, H, errl;colormap=:tab10, colorrange=(1, 10), color=i+1, marker=:rect, label=L"k=%$k")
-
-    
+    scatterlines!(ax, H, errl;colormap=Reverse(:viridis), colorrange=(1, 10), color=k-3, marker=:rect, markersize=15, label=L"k=%$k")
 end
 
-scatterlines!(ax, H, Errg;colormap=:tab10, colorrange=(1, 10), color=1, marker=:circle, label=L"\text{global}")
+scatterlines!(ax, H, Errg;colormap=Reverse(:viridis), colorrange=(1, 10), color=8, marker=:circle, markersize=15, label=L"\text{global}")
 
 # add reference slopes
 P = div(qorder + 1, 2)
