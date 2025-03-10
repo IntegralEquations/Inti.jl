@@ -17,14 +17,14 @@ Random.seed!(1)
 
 N = 2
 t = :interior
-# pde = Inti.Laplace(; dim = N)
+pde = Inti.Laplace(; dim = N)
 # pde = Inti.Helmholtz(; k = 2.1, dim = N)
-pde = Inti.Stokes(; dim = N, μ = 1.2)
-qorder = 5
+# pde = Inti.Stokes(; dim = N, μ = 1.2)
+qorder = 3
 K = (3, 5, 10)
 
 ii = 1:5
-H = [0.1 * 2.0^(-i) for i in ii]
+H = [0.1*2.0^(-i) for i in ii]
 
 Errl = Dict(k => Float64[] for k in K)
 Errg = Float64[]
