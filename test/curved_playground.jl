@@ -23,7 +23,7 @@ function domain_and_mesh(; meshsize, meshorder = 1)
     return Ω, msh
 end
 
-meshsize = 0.1/16
+meshsize = 0.1
 qorder = 2
 
 tmesh = @elapsed begin
@@ -72,9 +72,9 @@ nvol_els = size(msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, 
 # generate volume parametrizations
 circarea = 0.0
 #elind = 747
+els = []
 for elind = 1:nvol_els
     global circarea
-    global ncurv
     node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{2, Float64}}][:, elind]
     nodes = msh.nodes[node_indices]
 
@@ -83,11 +83,14 @@ for elind = 1:nvol_els
     if length(verts_on_bdry) > 1
         node_indices_on_bdry = node_indices[verts_on_bdry]
 
-        α₁ = node_to_param[node_indices_on_bdry[1]]
-        α₂ = node_to_param[node_indices_on_bdry[2]]
+        # Need parametric coordinates of curved mapping to be consistent with straight simplex nodes
+        α₁ = min(node_to_param[node_indices_on_bdry[1]], node_to_param[node_indices_on_bdry[2]])
+        α₂ = max(node_to_param[node_indices_on_bdry[1]], node_to_param[node_indices_on_bdry[2]])
         # HACK: handle wrap-around in parameter space when using a global parametrization
         if abs(α₁ - α₂) > 0.5
-            α₁ = 1.0
+            α₁ = α₂
+            α₂ = 1.0
+            print(elind)
         end
         a₁ = ψ(α₁)
         a₂ = ψ(α₂)
@@ -149,6 +152,10 @@ for elind = 1:nvol_els
 
         # Full transformation
         Fₖ = (x₁, x₂) -> F̃ₖ(x₁, x₂) + Φₖ(x₁, x₂)
+        D = Inti.ReferenceTriangle
+        T = SVector{2,Float64}
+        el = Inti.ParametricElement{D,T}(x -> Fₖ(x[1], x[2]))
+        push!(els, el)
         Jₖ = (x₁, x₂) -> [cₖ[1]-bₖ[1] + Φₖ_der_x1(x₁, x₂)[1]; aₖ[1]-bₖ[1] + Φₖ_der_x2(x₁, x₂)[1];; cₖ[2]-bₖ[2] + Φₖ_der_x1(x₁, x₂)[2]; aₖ[2]-bₖ[2] + Φₖ_der_x2(x₁, x₂)[2]]
         Jₖ_l2 = (x₁, x₂) -> [cₖ[1]-bₖ[1] + Φₖ_l2_der_x1(x₁, x₂)[1]; aₖ[1]-bₖ[1] + Φₖ_l2_der_x2(x₁, x₂)[1];; cₖ[2]-bₖ[2] + Φₖ_l2_der_x1(x₁, x₂)[2]; aₖ[2]-bₖ[2] + Φₖ_l2_der_x2(x₁, x₂)[2]]
         Fₖ_Z = (x₁, x₂) -> F̃ₖ(x₁, x₂) + Φₖ_Z(x₁, x₂)
@@ -160,6 +167,7 @@ for elind = 1:nvol_els
         cₖ = nodes[3]
         Fₖ = (x₁, x₂) -> [(cₖ[1] - bₖ[1])*x₁ + (aₖ[1] - bₖ[1])*x₂ + bₖ[1], (cₖ[2] - bₖ[2])*x₁ + (aₖ[2] - bₖ[2])*x₂ + bₖ[2]]
         Jₖ = (x₁, x₂) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
+        Jₖ_l2 = (x₁, x₂) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
         Jₖ_Z = (x₁, x₂) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
     end
 
