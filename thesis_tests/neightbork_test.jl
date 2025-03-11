@@ -8,6 +8,8 @@ using CairoMakie
 using LaTeXStrings
 using QuadGK
 using ForwardDiff
+using LinearMaps
+using IterativeSolvers
 
 SAVE = true
 TEST_TYPE = "K"
@@ -17,9 +19,9 @@ Random.seed!(1)
 
 N = 2
 t = :interior
-pde = Inti.Laplace(; dim = N)
+# pde = Inti.Laplace(; dim = N)
 # pde = Inti.Helmholtz(; k = 2.1, dim = N)
-# pde = Inti.Stokes(; dim = N, μ = 1.2)
+pde = Inti.Stokes(; dim = N, μ = 1.2)
 qorder = 3
 K = (3, 5, 10)
 

@@ -128,13 +128,13 @@ elseif TEST_TYPE == "K"
         Dtest = Inti.IntegralOperator(dG, tset, quad)
 
         μ = t == :interior ? -0.5 : 0.5
-        σ    = (α * Smat + β * (Dmat + μ*I)) \ ubnd
-        # @show norm(α * Smat * σ - ubnd, Inf)
-        # @show norm(ubnd, Inf)
-        # @show norm(Stest, Inf)
-        usol = (α * Stest + β * Dtest) * σ
-        # @show  utst
-        e0   = norm(usol - utst, Inf) / utst_norm
+        # σ    = (α * Smat + β * (Dmat + μ*I)) \ ubnd
+        # # @show norm(α * Smat * σ - ubnd, Inf)
+        # # @show norm(ubnd, Inf)
+        # # @show norm(Stest, Inf)
+        # usol = (α * Stest + β * Dtest) * σ
+        # # @show  utst
+        # e0   = norm(usol - utst, Inf) / utst_norm
 
         green_multiplier = fill(-0.5, length(quad))
         # δS, δD = Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
@@ -158,6 +158,7 @@ elseif TEST_TYPE == "K"
             )
             Sdim = Smat + δS
             Ddim = Dmat + δD
+            
             # Sdim, Ddim = Inti.single_double_layer(;
             #     pde,
             #     target      = quad,
@@ -165,8 +166,13 @@ elseif TEST_TYPE == "K"
             #     compression = (method = :none,),
             #     correction  = (method = :ldim,),
             # )
-            σ    = (α * Sdim + β * (Ddim + μ*I)) \ ubnd
-            usol = (α * Stest + β * Dtest) * σ
+            lm =  FunctionMap{Float64}(N*length(quad)) do x
+                xs = reinterpret(T, x)
+                ys = (α * Sdim + β * (Ddim + μ*I)) * xs
+                reinterpret(Float64, ys)
+            end
+            σ = gmres(lm, reinterpret(Float64, ubnd))
+            usol = (α * Stest + β * Dtest) * reinterpret(T, σ)
             eloc   = norm(usol - utst, Inf) / utst_norm
             @show eloc, tldim
             push!(Errl[k], eloc) 
@@ -176,8 +182,13 @@ elseif TEST_TYPE == "K"
             Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
         Sdim = Smat + δS
         Ddim = Dmat + δD
-        σ    = (α * Sdim + β * (Ddim + μ*I)) \ ubnd
-        usol = (α * Stest + β * Dtest) * σ
+        lm =  FunctionMap{Float64}(N*length(quad)) do x
+            xs = reinterpret(T, x)
+            ys = (α * Sdim + β * (Ddim + μ*I)) * xs
+            reinterpret(Float64, ys)
+        end
+        σ = gmres(lm, reinterpret(Float64, ubnd))
+        usol = (α * Stest + β * Dtest) * reinterpret(T, σ)
         eglo   = norm(usol - utst, Inf) / utst_norm
         # @show norm(e0, Inf)
         @show eglo
