@@ -96,7 +96,7 @@ function guiggiani_singular_integral(K, û, x̂, el, quad_rho, quad_theta)
 		v = û(ŷ)
 		ρ * map(v -> M * v, v) * μ
 	end
-	acc = zero(return_type(F, Float64, Float64))
+	acc = zero(typeof(F(1.0, 0.0)))
 	# integrate
 	for (theta_min, theta_max, rho) in polar_decomposition(ref_shape, x̂) # loop over the four triangles
 		delta_theta = theta_max - theta_min
