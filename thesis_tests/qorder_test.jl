@@ -9,7 +9,7 @@ using LaTeXStrings
 using QuadGK
 using ForwardDiff
 
-SAVE = true
+SAVE = false
 TEST_TYPE = "QORDER"
 
 include("test_utils.jl")
@@ -67,8 +67,8 @@ for qorder in Q
     errg = Errg[qorder]
     P = div(qorder + 1, 2)
     # scatterlines!(ax, H, err0;colormap=:tab10, colorrange=(1, 10), color=3, marker = :x,    label=qorder == Q[1] ? "no correction" : nothing)
-    scatterlines!(ax, H, errg;colormap=:viridis, colorrange=(1, 10), color=qorder, marker=:circle, markersize=15, label=L"\text{global }P=%$P")
-    scatterlines!(ax, H, errl;colormap=:viridis, colorrange=(1, 10), color=5+P, marker=:rect, markersize=15, label=L"\text{  local }P=%$P")
+    scatterlines!(ax, H, errl;colormap=Reverse(:viridis), colorrange=(1, 10), color=P-1, marker=:rect, markersize=15, label=L"\text{  local }P=%$P")
+    scatterlines!(ax, H, errg;colormap=Reverse(:viridis), colorrange=(1, 10), color=qorder+5, marker=:circle, markersize=15, label=L"\text{global }P=%$P")
 
     # add reference slopes
     slope = P + 1
