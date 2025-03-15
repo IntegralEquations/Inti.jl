@@ -97,7 +97,7 @@ for elind = 1:nvol_els
         α₁hat = (α₁ - 0)/(1 - 0)
         α₂hat = (α₂ - 0)/(1 - 0)
         f̂ₖ = (t) -> 0 + t
-        f̂ₖ_comp = (x₁, x₂) -> f̂ₖ( (x₁ * α₁hat + x₂ * α₂hat)/(x₁ + x₂) )
+        f̂ₖ_comp = (x) -> f̂ₖ( (x[1] * α₁hat + x[2] * α₂hat)/(x[1] + x[2]) )
 
         # l = 1 projection onto linear FE space
         πₖ¹ψ = (α) -> ψ(α₁) + (α - α₁)/(α₂ - α₁) * (ψ(α₂) - ψ(α₁))
@@ -130,52 +130,52 @@ for elind = 1:nvol_els
         πₖ³ψ_der = (α) -> psi_div1_10_l3 + (α - β₁_l3) * psi_div2_210_l3 + (α - β₀_l3) * psi_div2_210_l3 + (α - β₁_l3)*(α - β₂_l3)*psi_div3_3210_l3 + (α - β₀_l3)*(α - β₂_l3)*psi_div3_3210_l3 + (α - β₀_l3)*(α - β₁_l3)*psi_div3_3210_l3
 
         # Nonlinear map
-        Φₖ_l2 = (x₁, x₂) -> (x₁ + x₂)^4 * (ψ(f̂ₖ_comp(x₁, x₂)) - πₖ²ψ(f̂ₖ_comp(x₁, x₂))) + (x₁ + x₂)^2*(πₖ²ψ(f̂ₖ_comp(x₁, x₂)) - πₖ¹ψ(f̂ₖ_comp(x₁, x₂)))
-        Φₖ_l2_der_x1 = (x₁, x₂) -> (4*(x₁ + x₂)^3 * (ψ(f̂ₖ_comp(x₁, x₂)) - πₖ²ψ(f̂ₖ_comp(x₁, x₂))) + 2*(x₁ + x₂) * ( πₖ²ψ(f̂ₖ_comp(x₁, x₂)) - πₖ¹ψ(f̂ₖ_comp(x₁, x₂)))) + ((x₁ + x₂)^4 * (ψ_der(f̂ₖ_comp(x₁, x₂)) - πₖ²ψ_der(f̂ₖ_comp(x₁, x₂))) + (x₁ + x₂)^2*(πₖ²ψ_der(f̂ₖ_comp(x₁, x₂)) - πₖ¹ψ_der(f̂ₖ_comp(x₁, x₂)))) * ( α₁/(x₁ + x₂) - (x₁*α₁ + x₂*α₂)/(x₁ + x₂)^2 )
-        Φₖ_l2_der_x2 = (x₁, x₂) -> (4*(x₁ + x₂)^3 * (ψ(f̂ₖ_comp(x₁, x₂)) - πₖ²ψ(f̂ₖ_comp(x₁, x₂))) + 2*(x₁ + x₂) * ( πₖ²ψ(f̂ₖ_comp(x₁, x₂)) - πₖ¹ψ(f̂ₖ_comp(x₁, x₂)))) + ((x₁ + x₂)^4 * (ψ_der(f̂ₖ_comp(x₁, x₂)) - πₖ²ψ_der(f̂ₖ_comp(x₁, x₂))) + (x₁ + x₂)^2*(πₖ²ψ_der(f̂ₖ_comp(x₁, x₂)) - πₖ¹ψ_der(f̂ₖ_comp(x₁, x₂)))) * ( α₂/(x₁ + x₂) - (x₁*α₁ + x₂*α₂)/(x₁ + x₂)^2 )
+        Φₖ_l2 = (x) -> (x[1] + x[2])^4 * (ψ(f̂ₖ_comp(x)) - πₖ²ψ(f̂ₖ_comp(x))) + (x[1] + x[2])^2*(πₖ²ψ(f̂ₖ_comp(x)) - πₖ¹ψ(f̂ₖ_comp(x)))
+        Φₖ_l2_der_x1 = (x) -> (4*(x[1] + x[2])^3 * (ψ(f̂ₖ_comp(x)) - πₖ²ψ(f̂ₖ_comp(x))) + 2*(x[1] + x[2]) * ( πₖ²ψ(f̂ₖ_comp(x)) - πₖ¹ψ(f̂ₖ_comp(x)))) + ((x[1] + x[2])^4 * (ψ_der(f̂ₖ_comp(x)) - πₖ²ψ_der(f̂ₖ_comp(x))) + (x[1] + x[2])^2*(πₖ²ψ_der(f̂ₖ_comp(x)) - πₖ¹ψ_der(f̂ₖ_comp(x)))) * ( α₁/(x[1] + x[2]) - (x[1]*α₁ + x[2]*α₂)/(x[1] + x[2])^2 )
+        Φₖ_l2_der_x2 = (x) -> (4*(x[1] + x[2])^3 * (ψ(f̂ₖ_comp(x)) - πₖ²ψ(f̂ₖ_comp(x))) + 2*(x[1] + x[2]) * ( πₖ²ψ(f̂ₖ_comp(x)) - πₖ¹ψ(f̂ₖ_comp(x)))) + ((x[1] + x[2])^4 * (ψ_der(f̂ₖ_comp(x)) - πₖ²ψ_der(f̂ₖ_comp(x))) + (x[1] + x[2])^2*(πₖ²ψ_der(f̂ₖ_comp(x)) - πₖ¹ψ_der(f̂ₖ_comp(x)))) * ( α₂/(x[1] + x[2]) - (x[1]*α₁ + x[2]*α₂)/(x[1] + x[2])^2 )
 
         # l = 3
-        Φₖ = (x₁, x₂) -> (x₁ + x₂)^5 * (ψ(f̂ₖ_comp(x₁, x₂)) - πₖ³ψ(f̂ₖ_comp(x₁, x₂))) + (x₁ + x₂)^2*(πₖ²ψ(f̂ₖ_comp(x₁, x₂)) - πₖ¹ψ(f̂ₖ_comp(x₁, x₂))) + (x₁ + x₂)^3*(πₖ³ψ(f̂ₖ_comp(x₁, x₂)) - πₖ²ψ(f̂ₖ_comp(x₁, x₂)))
-        Φₖ_der_x1 = (x₁, x₂) -> (5*(x₁ + x₂)^4 * (ψ(f̂ₖ_comp(x₁, x₂)) - πₖ³ψ(f̂ₖ_comp(x₁, x₂))) + 2*(x₁ + x₂)*(πₖ²ψ(f̂ₖ_comp(x₁, x₂)) - πₖ¹ψ(f̂ₖ_comp(x₁, x₂))) + 3*(x₁ + x₂)^2*(πₖ³ψ(f̂ₖ_comp(x₁, x₂)) - πₖ²ψ(f̂ₖ_comp(x₁, x₂)))) + ((x₁ + x₂)^5 * (ψ_der(f̂ₖ_comp(x₁, x₂)) - πₖ³ψ_der(f̂ₖ_comp(x₁, x₂))) + (x₁ + x₂)^2*(πₖ²ψ_der(f̂ₖ_comp(x₁, x₂)) - πₖ¹ψ_der(f̂ₖ_comp(x₁, x₂))) + (x₁ + x₂)^3*(πₖ³ψ_der(f̂ₖ_comp(x₁, x₂)) - πₖ²ψ_der(f̂ₖ_comp(x₁, x₂)))) * ( α₁/(x₁ + x₂) - (x₁*α₁ + x₂*α₂)/(x₁ + x₂)^2 )
-        Φₖ_der_x2 = (x₁, x₂) -> (5*(x₁ + x₂)^4 * (ψ(f̂ₖ_comp(x₁, x₂)) - πₖ³ψ(f̂ₖ_comp(x₁, x₂))) + 2*(x₁ + x₂)*(πₖ²ψ(f̂ₖ_comp(x₁, x₂)) - πₖ¹ψ(f̂ₖ_comp(x₁, x₂))) + 3*(x₁ + x₂)^2*(πₖ³ψ(f̂ₖ_comp(x₁, x₂)) - πₖ²ψ(f̂ₖ_comp(x₁, x₂)))) + ((x₁ + x₂)^5 * (ψ_der(f̂ₖ_comp(x₁, x₂)) - πₖ³ψ_der(f̂ₖ_comp(x₁, x₂))) + (x₁ + x₂)^2*(πₖ²ψ_der(f̂ₖ_comp(x₁, x₂)) - πₖ¹ψ_der(f̂ₖ_comp(x₁, x₂))) + (x₁ + x₂)^3*(πₖ³ψ_der(f̂ₖ_comp(x₁, x₂)) - πₖ²ψ_der(f̂ₖ_comp(x₁, x₂)))) * ( α₂/(x₁ + x₂) - (x₁*α₁ + x₂*α₂)/(x₁ + x₂)^2 )
+        Φₖ = (x) -> (x[1] + x[2])^5 * (ψ(f̂ₖ_comp(x)) - πₖ³ψ(f̂ₖ_comp(x))) + (x[1] + x[2])^2*(πₖ²ψ(f̂ₖ_comp(x)) - πₖ¹ψ(f̂ₖ_comp(x))) + (x[1] + x[2])^3*(πₖ³ψ(f̂ₖ_comp(x)) - πₖ²ψ(f̂ₖ_comp(x)))
+        Φₖ_der_x1 = (x) -> (5*(x[1] + x[2])^4 * (ψ(f̂ₖ_comp(x)) - πₖ³ψ(f̂ₖ_comp(x))) + 2*(x[1] + x[2])*(πₖ²ψ(f̂ₖ_comp(x)) - πₖ¹ψ(f̂ₖ_comp(x))) + 3*(x[1] + x[2])^2*(πₖ³ψ(f̂ₖ_comp(x)) - πₖ²ψ(f̂ₖ_comp(x)))) + ((x[1] + x[2])^5 * (ψ_der(f̂ₖ_comp(x)) - πₖ³ψ_der(f̂ₖ_comp(x))) + (x[1] + x[2])^2*(πₖ²ψ_der(f̂ₖ_comp(x)) - πₖ¹ψ_der(f̂ₖ_comp(x))) + (x[1] + x[2])^3*(πₖ³ψ_der(f̂ₖ_comp(x)) - πₖ²ψ_der(f̂ₖ_comp(x)))) * ( α₁/(x[1] + x[2]) - (x[1]*α₁ + x[2]*α₂)/(x[1] + x[2])^2 )
+        Φₖ_der_x2 = (x) -> (5*(x[1] + x[2])^4 * (ψ(f̂ₖ_comp(x)) - πₖ³ψ(f̂ₖ_comp(x))) + 2*(x[1] + x[2])*(πₖ²ψ(f̂ₖ_comp(x)) - πₖ¹ψ(f̂ₖ_comp(x))) + 3*(x[1] + x[2])^2*(πₖ³ψ(f̂ₖ_comp(x)) - πₖ²ψ(f̂ₖ_comp(x)))) + ((x[1] + x[2])^5 * (ψ_der(f̂ₖ_comp(x)) - πₖ³ψ_der(f̂ₖ_comp(x))) + (x[1] + x[2])^2*(πₖ²ψ_der(f̂ₖ_comp(x)) - πₖ¹ψ_der(f̂ₖ_comp(x))) + (x[1] + x[2])^3*(πₖ³ψ_der(f̂ₖ_comp(x)) - πₖ²ψ_der(f̂ₖ_comp(x)))) * ( α₂/(x[1] + x[2]) - (x[1]*α₁ + x[2]*α₂)/(x[1] + x[2])^2 )
 
         # Zlamal nonlinear map
-        Φₖ_Z = (x₁, x₂) -> x₂/(1 - x₁) * (ψ(x₁ * α₁ + (1 - x₁) * α₂) - x₁ * a₁ - (1 - x₁)*a₂)
-        Φₖ_Z_der_x1 = (x₁, x₂) -> x₂/(1 - x₁)^2 * (ψ(x₁ * α₁ + (1 - x₁) * α₂) - x₁ * a₁ - (1 - x₁)*a₂) + x₂/(1 - x₁) * (ψ_der(x₁ * α₁ + (1 - x₁)*α₂)*(α₁ - α₂) - a₁ + a₂)
-        Φₖ_Z_der_x2 = (x₁, x₂) -> 1/(1 - x₁) * (ψ(x₁ * α₁ + (1 - x₁) * α₂) - x₁ * a₁ - (1 - x₁)*a₂)
+        Φₖ_Z = (x) -> x[2]/(1 - x[1]) * (ψ(x[1] * α₁ + (1 - x[1]) * α₂) - x[1] * a₁ - (1 - x[1])*a₂)
+        Φₖ_Z_der_x1 = (x) -> x[2]/(1 - x[1])^2 * (ψ(x[1] * α₁ + (1 - x[1]) * α₂) - x[1] * a₁ - (1 - x[1])*a₂) + x[2]/(1 - x[1]) * (ψ_der(x[1] * α₁ + (1 - x[1])*α₂)*(α₁ - α₂) - a₁ + a₂)
+        Φₖ_Z_der_x2 = (x) -> 1/(1 - x[1]) * (ψ(x[1] * α₁ + (1 - x[1]) * α₂) - x[1] * a₁ - (1 - x[1])*a₂)
 
         # Affine map
         aₖ = msh.nodes[node_indices_on_bdry[1]]
         bₖ = msh.nodes[setdiff(node_indices, node_indices[verts_on_bdry])[1]]
         cₖ = msh.nodes[node_indices_on_bdry[2]]
-        F̃ₖ = (x₁, x₂) -> [(cₖ[1] - bₖ[1])*x₁ + (aₖ[1] - bₖ[1])*x₂ + bₖ[1], (cₖ[2] - bₖ[2])*x₁ + (aₖ[2] - bₖ[2])*x₂ + bₖ[2]]
+        F̃ₖ = (x) -> [(cₖ[1] - bₖ[1])*x[1] + (aₖ[1] - bₖ[1])*x[2] + bₖ[1], (cₖ[2] - bₖ[2])*x[1] + (aₖ[2] - bₖ[2])*x[2] + bₖ[2]]
 
         # Full transformation
-        Fₖ = (x₁, x₂) -> F̃ₖ(x₁, x₂) + Φₖ(x₁, x₂)
+        Fₖ = (x) -> F̃ₖ(x) + Φₖ(x)
         D = Inti.ReferenceTriangle
         T = SVector{2,Float64}
-        el = Inti.ParametricElement{D,T}(x -> Fₖ(x[1], x[2]))
+        el = Inti.ParametricElement{D,T}(x -> Fₖ(x))
         push!(els, el)
-        Jₖ = (x₁, x₂) -> [cₖ[1]-bₖ[1] + Φₖ_der_x1(x₁, x₂)[1]; aₖ[1]-bₖ[1] + Φₖ_der_x2(x₁, x₂)[1];; cₖ[2]-bₖ[2] + Φₖ_der_x1(x₁, x₂)[2]; aₖ[2]-bₖ[2] + Φₖ_der_x2(x₁, x₂)[2]]
-        Jₖ_l2 = (x₁, x₂) -> [cₖ[1]-bₖ[1] + Φₖ_l2_der_x1(x₁, x₂)[1]; aₖ[1]-bₖ[1] + Φₖ_l2_der_x2(x₁, x₂)[1];; cₖ[2]-bₖ[2] + Φₖ_l2_der_x1(x₁, x₂)[2]; aₖ[2]-bₖ[2] + Φₖ_l2_der_x2(x₁, x₂)[2]]
-        Fₖ_Z = (x₁, x₂) -> F̃ₖ(x₁, x₂) + Φₖ_Z(x₁, x₂)
-        Jₖ_Z = (x₁, x₂) -> [cₖ[1]-bₖ[1] + Φₖ_Z_der_x1(x₁, x₂)[1]; aₖ[1]-bₖ[1] + Φₖ_Z_der_x2(x₁, x₂)[1];; cₖ[2]-bₖ[2] + Φₖ_Z_der_x1(x₁, x₂)[2]; aₖ[2]-bₖ[2] + Φₖ_Z_der_x2(x₁, x₂)[2]]
+        Jₖ = (x) -> [cₖ[1]-bₖ[1] + Φₖ_der_x1(x)[1]; aₖ[1]-bₖ[1] + Φₖ_der_x2(x)[1];; cₖ[2]-bₖ[2] + Φₖ_der_x1(x)[2]; aₖ[2]-bₖ[2] + Φₖ_der_x2(x)[2]]
+        Jₖ_l2 = (x) -> [cₖ[1]-bₖ[1] + Φₖ_l2_der_x1(x)[1]; aₖ[1]-bₖ[1] + Φₖ_l2_der_x2(x)[1];; cₖ[2]-bₖ[2] + Φₖ_l2_der_x1(x)[2]; aₖ[2]-bₖ[2] + Φₖ_l2_der_x2(x)[2]]
+        Fₖ_Z = (x) -> F̃ₖ(x) + Φₖ_Z(x)
+        Jₖ_Z = (x) -> [cₖ[1]-bₖ[1] + Φₖ_Z_der_x1(x)[1]; aₖ[1]-bₖ[1] + Φₖ_Z_der_x2(x)[1];; cₖ[2]-bₖ[2] + Φₖ_Z_der_x1(x)[2]; aₖ[2]-bₖ[2] + Φₖ_Z_der_x2(x)[2]]
     else
         # Full transformation: Affine map
         aₖ = nodes[1]
         bₖ = nodes[2]
         cₖ = nodes[3]
-        Fₖ = (x₁, x₂) -> [(cₖ[1] - bₖ[1])*x₁ + (aₖ[1] - bₖ[1])*x₂ + bₖ[1], (cₖ[2] - bₖ[2])*x₁ + (aₖ[2] - bₖ[2])*x₂ + bₖ[2]]
-        Jₖ = (x₁, x₂) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
-        Jₖ_l2 = (x₁, x₂) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
-        Jₖ_Z = (x₁, x₂) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
+        Fₖ = (x) -> [(cₖ[1] - bₖ[1])*x[1] + (aₖ[1] - bₖ[1])*x[2] + bₖ[1], (cₖ[2] - bₖ[2])*x[1] + (aₖ[2] - bₖ[2])*x[2] + bₖ[2]]
+        Jₖ = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
+        Jₖ_l2 = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
+        Jₖ_Z = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
     end
 
     Q = Inti.VioreanuRokhlin(; domain=Inti.ReferenceTriangle(), order=qorder)()
     nq = length(Q[2])
     for q in 1:nq
         global circarea
-        circarea += Q[2][q] * abs(det(Jₖ(Q[1][q][1], Q[1][q][2])))
+        circarea += Q[2][q] * abs(det(Jₖ(Q[1][q])))
     end
 end
 
@@ -191,8 +191,8 @@ end
 #vgrid = Array{Float64}(undef, 200, 200)
 #for i = 1:200
 #    for j = 1:200
-#        ugrid[i, j] = Fₖ(x1grid[i, j], y1grid[i, j])[1]
-#        vgrid[i, j] = Fₖ(x1grid[i, j], y1grid[i, j])[2]
+#        ugrid[i, j] = Fₖ((x1grid[i, j], y1grid[i, j]))[1]
+#        vgrid[i, j] = Fₖ((x1grid[i, j], y1grid[i, j]))[2]
 #    end
 #end
 #f = Figure()
