@@ -3,8 +3,8 @@ Implementation of the singular integration method of Guiggiani et al. (1992)
 =#
 
 @kwdef struct GuiggianiParameters
-    polar_quadrature_order::Int   = 20
-    angular_quadrature_order::Int = 40
+    radial_quadrature  = GaussLegendre(; order = 5)
+    angular_quadrature = GaussLegendre(; order = 40)
 end
 
 """
@@ -55,13 +55,10 @@ function laurent_coefficients(f, order::Val{N}, h = 0.2) where {N}
 end
 
 function guiggiani_singular_integral(K, û, x̂, el, quad_rho, quad_theta)
-    x_rho_ref, w_rho_ref     = qcoords(quad_rho), qweights(quad_rho) # nodes and weights on [0,1]
-    x_theta_ref, w_theta_ref = qcoords(quad_theta), qweights(quad_theta) # nodes and weights on [0,2π]
-    n_rho, n_theta           = length(x_rho_ref), length(x_theta_ref)
-    ref_shape                = domain(el)
-    x                        = el(x̂)
-    nx                       = normal(el, x̂)
-    qx                       = (coords = x, normal = nx)
+    ref_shape = domain(el)
+    x         = el(x̂)
+    nx        = normal(el, x̂)
+    qx        = (coords = x, normal = nx)
     # function to integrate in polar coordinates
     F = (ρ, θ) -> begin
         s, c = sincos(θ)
@@ -77,20 +74,20 @@ function guiggiani_singular_integral(K, û, x̂, el, quad_rho, quad_theta)
     end
     acc = zero(return_type(F, Float64, Float64))
     # integrate
-    for (theta_min, theta_max, rho) in polar_decomposition(ref_shape, x̂) # loop over the four triangles
+    for (theta_min, theta_max, rho_func) in polar_decomposition(ref_shape, x̂) # loop over the four triangles
         delta_theta = theta_max - theta_min
-        for m in 1:n_theta
-            theta = theta_min + x_theta_ref[m][1] * delta_theta
-            w_theta = w_theta_ref[m] * delta_theta
-            rho_max = rho(theta)::Float64
+        I_theta = quad_theta() do (theta_ref,)
+            theta = theta_min + theta_ref * delta_theta
+            rho_max = rho_func(theta)::Float64
             F₋₂, F₋₁ = laurent_coefficients(rho -> F(rho, theta), Val(2), 1e-2)
-            acc += w_theta * (F₋₁ * log(rho_max) - F₋₂ / rho_max)
-            for n in 1:n_rho
-                ρₙ = x_rho_ref[n][1] * rho_max
-                w_rho = w_rho_ref[n] * rho_max
-                acc += (F(ρₙ, theta) - F₋₂ / ρₙ^2 - F₋₁ / ρₙ) * w_theta * w_rho
+            I_rho = quad_rho() do (rho_ref,)
+                rho = rho_ref * rho_max
+                return F(rho, theta) - F₋₂ / rho^2 - F₋₁ / rho
             end
+            return (F₋₁ * log(rho_max) - F₋₂ / rho_max) + I_rho * rho_max
         end
+        I_theta *= delta_theta
+        acc += I_theta
     end
     return acc
 end
@@ -129,10 +126,10 @@ function guiggiani_correction(
         nearlist = dict_near[E]
         iter = elements(msh, E)
         quads = (
-            regular_quad = quadrature_rule(Y, E),
+            regular_quad   = quadrature_rule(Y, E),
             nearfield_quad = _qrule_for_reference_shape(τ̂, nearfield_qorder),
-            radial_quad = GaussLegendre(; order = p.polar_quadrature_order),
-            angular_quad = GaussLegendre(; order = p.angular_quadrature_order),
+            radial_quad    = p.radial_quadrature,
+            angular_quad   = p.angular_quadrature,
         )
         L = lagrange_basis(quads.regular_quad)
         _guiggiani_correction_etype!(

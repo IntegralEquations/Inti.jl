@@ -60,6 +60,13 @@ function integrate(f, x, w)
     end
 end
 
+function (q::ReferenceQuadrature)(f)
+    x, w = qcoords(q), qweights(q)
+    sum(zip(x, w)) do (x, w)
+        return f(x) * prod(w)
+    end
+end
+
 ## Define some one-dimensional quadrature rules
 """
     struct Fejer{N}
