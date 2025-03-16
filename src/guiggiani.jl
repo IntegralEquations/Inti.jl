@@ -13,7 +13,7 @@ The specialized integration is precomputed on the reference element for each
 quadrature node of the standard quadrature.
 =#
 """
-    local_correction(iop::IntegralOperator; maxdist, tol)
+    local_correction(iop::IntegralOperator; maxdist, tol, threads = true)
 
 Given an integral operator `iop`, this function provides a sparse correction to `iop` for
 the entries `i,j` such that the distance between the `i`-th target and the `j`-th source is
@@ -26,7 +26,7 @@ Similarly, the smaller the value of `tol`, the more accurate the correction, but
 expensive the computation. The optimal values of `maxdist` and `tol` depend on the kernel
 and the quadrature rule used.
 """
-function local_correction(iop::IntegralOperator; maxdist, tol)
+function local_correction(iop::IntegralOperator; maxdist, tol, threads = true)
     msh = mesh(target(iop))
     quads_dict = Dict()
     for E in element_types(msh)
@@ -38,11 +38,11 @@ function local_correction(iop::IntegralOperator; maxdist, tol)
         )
         quads_dict[E] = quads
     end
-    return local_correction(iop, maxdist, quads_dict)
+    return local_correction(iop, maxdist, quads_dict, threads)
 end
 
 """
-    local_correction(iop::IntegralOperator, maxdist, quads_dict::Dict)
+    local_correction(iop::IntegralOperator, maxdist, quads_dict::Dict, threads = true)
 
 Similar to `local_correction(iop::IntegralOperator; maxdist, tol)`, but allows the user to
 pass a dictionary `quads_dict` with precomputed quadrature rules for each element type in
@@ -56,7 +56,7 @@ The dictionary `quads_dict` should have the following structure:
 - `quads_dict[E].angular_quad` should be a function that integrates a function over the
   angular direction of the reference element `E`.
 """
-function local_correction(iop, maxdist, quads_dict::Dict)
+function local_correction(iop, maxdist, quads_dict::Dict, threads = true)
     # unpack type-unstable fields in iop, allocate output, and dispatch
     X, Y, K = target(iop), source(iop), kernel(iop)
     @assert X === Y "source and target of integraloperator must coincide"
@@ -95,6 +95,7 @@ function local_correction(iop, maxdist, quads_dict::Dict)
             K,
             Val(sing_order),
             maxdist,
+            threads,
         )
     end
     m, n = size(iop)
@@ -112,6 +113,7 @@ end
     K,
     sorder, # singularity order in polar coordinates
     nearfield_distance,
+    threads,
 )
     E = eltype(el_iter)
     Xqnodes = collect(X)
@@ -122,7 +124,7 @@ end
     nel = length(el_iter)
     lck = Threads.SpinLock()
     # lck = ReentrantLock()
-    Threads.@threads for n in 1:nel
+    @maybe_threads threads for n in 1:nel
         el = el_iter[n]
         jglob = view(el2qtags, :, n)
         # inear = union(nearlist[n], jglob) # make sure to include nearfield nodes AND the element nodes
@@ -366,11 +368,14 @@ function laurent_coefficients(f, h, ::Val{1}; kwargs...)
     f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
         return f(x) - f₋₁ / x
     end
-    return f₋₁, f₀, 0
+    return 0, f₋₁, f₀
 end
 function laurent_coefficients(f, h, ::Val{0}; kwargs...)
     f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
         return f(x)
     end
-    return f₀, 0, 0
+    return 0, 0, f₀
+end
+function laurent_coefficients(f, h, ::Val{N}; kwargs...) where {N}
+    return error("laurent_coefficients: order $N not implemented")
 end
