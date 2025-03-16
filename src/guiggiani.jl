@@ -54,8 +54,15 @@ function laurent_coefficients(f, order::Val{N}, h = 0.2) where {N}
     return f₋₂, f₋₁
 end
 
-function guiggiani_singular_integral(K, û, x̂, el, quad_rho, quad_theta)
-    ref_shape = domain(el)
+function guiggiani_singular_integral(
+    K,
+    û,
+    x̂,
+    el::ReferenceInterpolant{<:Union{ReferenceTriangle,ReferenceSquare}},
+    quad_rho,
+    quad_theta,
+)
+    ref_shape = reference_domain(el)
     x         = el(x̂)
     nx        = normal(el, x̂)
     qx        = (coords = x, normal = nx)
@@ -74,7 +81,7 @@ function guiggiani_singular_integral(K, û, x̂, el, quad_rho, quad_theta)
     end
     acc = zero(return_type(F, Float64, Float64))
     # integrate
-    for (theta_min, theta_max, rho_func) in polar_decomposition(ref_shape, x̂) # loop over the four triangles
+    for (theta_min, theta_max, rho_func) in polar_decomposition(ref_shape, x̂)
         delta_theta = theta_max - theta_min
         I_theta = quad_theta() do (theta_ref,)
             theta = theta_min + theta_ref * delta_theta
@@ -92,8 +99,45 @@ function guiggiani_singular_integral(K, û, x̂, el, quad_rho, quad_theta)
     return acc
 end
 
+function guiggiani_singular_integral(
+    K,
+    û,
+    x̂,
+    el::ReferenceInterpolant{ReferenceLine},
+    quad_rho,
+    quad_theta, # unused, but kept for consistency with the 2D case
+)
+    x  = el(x̂)
+    nx = normal(el, x̂)
+    qx = (coords = x, normal = nx)
+    # function to integrate in 1D "polar" coordinates. We use `s ∈ {-1,1}` to denote the
+    # angles `π` and `0`.
+    F = (ρ, s) -> begin
+        ŷ = x̂ + SVector(ρ * s)
+        y = el(ŷ)
+        jac = jacobian(el, ŷ)
+        ny = _normal(jac)
+        μ = _integration_measure(jac)
+        qy = (coords = y, normal = ny)
+        M = K(qx, qy)
+        v = û(ŷ)
+        map(v -> M * v, v) * μ
+    end
+    acc = zero(return_type(F, Float64, Int))
+    # integrate
+    for (s, rho_max) in ((-1, x̂[1]), (1, 1 - x̂[1]))
+        F₋₂, F₋₁ = laurent_coefficients(rho -> F(rho, s), Val(2), 1e-2)
+        I_rho = quad_rho() do (rho_ref,)
+            rho = rho_ref * rho_max
+            return F(rho, s) - F₋₂ / rho^2 - F₋₁ / rho
+        end
+        acc += (F₋₁ * log(rho_max) - F₋₂ / rho_max) + I_rho * rho_max
+    end
+    return acc
+end
+
 """
-    guiggiani_laplace_correction(iop::IntegralOperator; nearfield_distance, nearfield_qorder)
+    guiggiani_correction(iop::IntegralOperator; nearfield_distance, nearfield_qorder)
 
 Routine for correcting the hypersingular operator for Laplace in 3D. Works by identifying (a
 priori) the entries of the integral operator which need to be corrected. This is done based

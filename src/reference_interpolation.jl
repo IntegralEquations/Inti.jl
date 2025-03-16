@@ -108,6 +108,9 @@ end
 domain(::ReferenceInterpolant{D,T}) where {D,T} = D()
 domain(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = D()
 
+# TODO: deprecate `domain` in favor of `reference_domain` for clarity
+reference_domain(el) = domain(el)
+
 return_type(::ReferenceInterpolant{D,T}) where {D,T} = T
 return_type(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = T
 domain_dimension(t::ReferenceInterpolant{D,T}) where {D,T} = domain(t) |> center |> length
