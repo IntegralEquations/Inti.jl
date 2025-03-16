@@ -435,39 +435,3 @@ function kress_change_of_variables_periodic(P)
     v = (x) -> (1 / P - 1 / 2) * ((1 - 2x))^3 + 1 / P * ((2x - 1)) + 1 / 2
     return x -> v(x)^P / (v(x)^P + v(1 - x)^P)
 end
-
-"""
-    laurent_coefficients(f, h, order::Val{N}) where {N}
-
-Compute the Laurent coefficients of a function `f` at the origin. The function `f` is
-assumed to diverge as `1/ρ^N` at the origin, and this function returns the negative Laurent
-coefficients associated to the diverging terms.
-"""
-function laurent_coefficients(f, h, order::Val{2}; kwargs...)
-    g = x -> x^2 * f(x)
-    f₋₂, e₋₂ = extrapolate(h; x0 = 0, kwargs...) do x
-        return g(x)
-    end
-    f₋₁, e₋₁ = extrapolate(h; x0 = 0, kwargs...) do x
-        return x * f(x) - f₋₂ / x
-    end
-    f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
-        return f(x) - f₋₂ / x^2 - f₋₁ / x
-    end
-    return f₋₂, f₋₁, f₀
-end
-function laurent_coefficients(f, h, ::Val{1}; kwargs...)
-    f₋₁, e₋₁ = extrapolate(h; x0 = 0, kwargs...) do x
-        return x * f(x)
-    end
-    f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
-        return f(x) - f₋₁ / x
-    end
-    return f₋₁, f₀
-end
-function laurent_coefficients(f, h, ::Val{0}; kwargs...)
-    f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
-        return f(x)
-    end
-    return f₀
-end

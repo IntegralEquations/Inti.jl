@@ -63,16 +63,39 @@ function local_correction(iop, maxdist, quads_dict::Dict)
     dict_near = near_interaction_list(X, Y; tol = maxdist)
     T = eltype(iop)
     msh = mesh(Y)
+    # use the singularity order of the kernel and the geometric dimension to compute the
+    # singularity order of the kernel in polar/spherical coordinates
+    geo_dim    = geometric_dimension(msh)
+    p          = singularity_order(K) # K(x,y) ~ |x-y|^{-p} as y -> 0
+    sing_order = if isnothing(p)
+        @warn "missing method `singularity_order` for kernel. Assuming finite part integral."
+        2
+    else
+        p - (geo_dim - 1) # in polar coordinates you muliply by r^{geo_dim-1}
+    end
+    # allocate output in a sparse matrix style
     correction = (I = Int[], J = Int[], V = T[])
     # loop over element types in the source mesh, unpack, and dispatch to type-stable
     # function
     for E in element_types(msh)
         nearlist = dict_near[E]
-        els      = elements(msh, E)
+        els = elements(msh, E)
         # append the regular quadrature rule to the list of quads for the element type E
+        # radial singularity order
         quads = merge(quads_dict[E], (regular_quad = quadrature_rule(Y, E),))
         L = lagrange_basis(quads.regular_quad)
-        _local_correction_etype!(correction, els, quads, L, nearlist, X, Y, K, maxdist)
+        _local_correction_etype!(
+            correction,
+            els,
+            quads,
+            L,
+            nearlist,
+            X,
+            Y,
+            K,
+            Val(sing_order),
+            maxdist,
+        )
     end
     m, n = size(iop)
     return sparse(correction.I, correction.J, correction.V, m, n)
@@ -87,6 +110,7 @@ end
     X,
     Y,
     K,
+    sorder, # singularity order in polar coordinates
     nearfield_distance,
 )
     E = eltype(el_iter)
@@ -121,6 +145,7 @@ end
                     el,
                     quads.radial_quad,
                     quads.angular_quad,
+                    sorder,
                 )
             else
                 integrand = (ŷ) -> begin
@@ -193,17 +218,8 @@ function guiggiani_singular_integral(
     el::ReferenceInterpolant{<:Union{ReferenceTriangle,ReferenceSquare}},
     quad_rho,
     quad_theta,
-)
-    dec_val(::Val{N}) where {N} = Val{N - 1}()
-    P_ = singularity_order(K)
-    P = if isnothing(P_)
-        @warn "missing `singularity_order` for kernel. Assuming P = 3 (finite part)." maxlog =
-            1
-        Val(3)
-    else
-        P_
-    end
-
+    sorder::Val{P} = Val(2),
+) where {P}
     ref_shape = reference_domain(el)
     x         = el(x̂)
     nx        = normal(el, x̂)
@@ -231,7 +247,7 @@ function guiggiani_singular_integral(
             F₋₂, F₋₁, F₀ = laurent_coefficients(
                 rho -> F(rho, theta),
                 rho_max / 2,
-                dec_val(P);
+                sorder;
                 atol = 1e-10,
                 rtol = 1e-8,
                 contract = 1 / 2,
@@ -239,21 +255,25 @@ function guiggiani_singular_integral(
             I_rho = quad_rho() do (rho_ref,)
                 rho = rho_ref * rho_max
                 rho < 1e-4 && (return F₀)
-                # return F(rho, theta) - F₋₁ / rho - F₋₂ / rho^2
-                # NOTE: instead of returning the line above, we try to efficiently handle
-                # cases where F₋₁ or F₋₂ are zero (signaled by `nothing`)
-                val_rho = F(rho, theta)
-                isnothing(F₋₂) || (val_rho -= F₋₂ / rho^2)
-                isnothing(F₋₁) || (val_rho -= F₋₁ / rho)
-                return val_rho
+                # compute F(rho, theta) - F₋₁ / rho - F₋₂ / rho^2, but ignore terms that are
+                # known to be zero
+                if P == 2
+                    return F(rho, theta) - F₋₁ / rho - F₋₂ / rho^2
+                elseif P == 1
+                    return F(rho, theta) - F₋₁ / rho
+                else
+                    return F(rho, theta)
+                end
             end
-            # return I_rho * rho_max + F₋₁ * log(rho_max) - F₋₂ / rho_max
-            # NOTE: instead of returning the line above, we try to efficiently handle
-            # cases where F₋₁ or F₋₂ are zero (signaled by `nothing`)
-            val_theta = I_rho * rho_max
-            isnothing(F₋₁) || (val_theta += F₋₁ * log(rho_max))
-            isnothing(F₋₂) || (val_theta -= F₋₂ / rho_max)
-            return val_theta
+            # compute I_rho * rho_max + F₋₁ * log(rho_max) - F₋₂ / rho_max but manually
+            # ignore terms that are known to be zero
+            if P == 2
+                return I_rho * rho_max + F₋₁ * log(rho_max) - F₋₂ / rho_max
+            elseif P == 1
+                return I_rho * rho_max + F₋₁ * log(rho_max)
+            else
+                return I_rho * rho_max
+            end
         end
         I_theta *= delta_theta
         acc += I_theta
@@ -268,7 +288,8 @@ function guiggiani_singular_integral(
     el::ReferenceInterpolant{ReferenceLine},
     quad_rho,
     quad_theta, # unused, but kept for consistency with the 2D case
-)
+    sorder::Val{P} = Val(2),
+) where {P}
     x  = el(x̂)
     nx = normal(el, x̂)
     qx = (coords = x, normal = nx)
@@ -288,12 +309,68 @@ function guiggiani_singular_integral(
     acc = zero(return_type(F, Float64, Int))
     # integrate
     for (s, rho_max) in ((-1, x̂[1]), (1, 1 - x̂[1]))
-        F₋₂, F₋₁, F₀ = laurent_coefficients(rho -> F(rho, s), Val(2), 1e-2)
+        F₋₂, F₋₁, F₀ =
+            F₋₂, F₋₁, F₀ = laurent_coefficients(
+                rho -> F(rho, s),
+                rho_max / 2,
+                sorder;
+                atol = 1e-10,
+                rtol = 1e-8,
+                contract = 1 / 2,
+            )
         I_rho = quad_rho() do (rho_ref,)
             rho = rho_ref * rho_max
-            return F(rho, s) - F₋₂ / rho^2 - F₋₁ / rho
+            rho < 1e-4 && (return F₀)
+            if P == 2
+                return F(rho, s) - F₋₂ / rho^2 - F₋₁ / rho
+            elseif P == 1
+                return F(rho, s) - F₋₁ / rho
+            else
+                return F(rho, s)
+            end
         end
-        acc += (F₋₁ * log(rho_max) - F₋₂ / rho_max) + I_rho * rho_max
+        if P == 2
+            acc += (F₋₁ * log(rho_max) - F₋₂ / rho_max) + I_rho * rho_max
+        elseif P == 1
+            acc += F₋₁ * log(rho_max) + I_rho * rho_max
+        else
+            acc += I_rho * rho_max
+        end
     end
     return acc
+end
+
+"""
+    laurent_coefficients(f, h, order::Val{N}) where {N}
+
+Given a one-dimensional function `f`, return `f₋₂, f₋₁, f₀` such that `f(x) = f₋₂ / x^2 +
+f₋₁ / x + f₀ + 𝒪(x)` as `x -> 0`, where we assume that `f₋ₙ = 0` for `n > N`.
+"""
+function laurent_coefficients(f, h, order::Val{2}; kwargs...)
+    g = x -> x^2 * f(x)
+    f₋₂, e₋₂ = extrapolate(h; x0 = 0, kwargs...) do x
+        return g(x)
+    end
+    f₋₁, e₋₁ = extrapolate(h; x0 = 0, kwargs...) do x
+        return x * f(x) - f₋₂ / x
+    end
+    f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
+        return f(x) - f₋₂ / x^2 - f₋₁ / x
+    end
+    return f₋₂, f₋₁, f₀
+end
+function laurent_coefficients(f, h, ::Val{1}; kwargs...)
+    f₋₁, e₋₁ = extrapolate(h; x0 = 0, kwargs...) do x
+        return x * f(x)
+    end
+    f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
+        return f(x) - f₋₁ / x
+    end
+    return f₋₁, f₀, 0
+end
+function laurent_coefficients(f, h, ::Val{0}; kwargs...)
+    f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
+        return f(x)
+    end
+    return f₀, 0, 0
 end

@@ -51,6 +51,11 @@ struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
 end
 
+function singularity_order(K::SingleLayerKernel)
+    N = ambient_dimension(K.op)
+    return N - 2
+end
+
 """
     struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
 
@@ -61,6 +66,11 @@ derivative of the fundamental solution respect to the source variable.
 """
 struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
+end
+
+function singularity_order(K::DoubleLayerKernel)
+    N = ambient_dimension(K.op)
+    return N - 1
 end
 
 """
@@ -76,6 +86,11 @@ struct AdjointDoubleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
 end
 
+function singularity_order(K::AdjointDoubleLayerKernel)
+    N = ambient_dimension(K.op)
+    return N - 1
+end
+
 """
     struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
 
@@ -87,6 +102,11 @@ variable of the `DoubleLayerKernel`.
 """
 struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
     op::Op
+end
+
+function singularity_order(K::HyperSingularKernel)
+    N = ambient_dimension(K.op)
+    return N
 end
 
 ################################################################################
