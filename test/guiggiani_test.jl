@@ -113,6 +113,7 @@ end
     ## create a mesh and quadrature
     meshsize = 0.4
     gmsh.initialize(String[], false)
+    gmsh.option.setNumber("General.Verbosity", 2)
     gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
     gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
     gmsh.model.occ.addSphere(0.0, 0.0, 0.0, 1.0)
@@ -137,7 +138,8 @@ end
     )
 
     Tnew = T₀ + δT
-    @test norm(Tnew * rhs, Inf) < 1e-1
+    rhs = ones(Float64, size(T, 1))
+    @test norm(Tnew * rhs, Inf) < 1e-2
 
     ##
     op = Inti.Elastostatic(; dim = 3, μ = 1, λ = 1)
@@ -150,5 +152,6 @@ end
         nearfield_qorder = 40,
     )
     Tnew = T₀ + δT
-    @test norm(Tnew * rhs, Inf) < 1e-1
+    rhs = [SVector(1.0, 1.0, 1.0) for _ in 1:size(T, 1)]
+    @test norm(Tnew * rhs, Inf) < 1e-2
 end

@@ -28,6 +28,8 @@ using Aqua
 
 @safetestset "Adaptive integration" include("adaptive_test.jl")
 
+@safetestset "Guiggiani correction" include("guiggiani_test.jl")
+
 @safetestset "Gmsh extension" include("gmsh_test.jl")
 
 @safetestset "Meshes extension" include("meshes_test.jl")
