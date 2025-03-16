@@ -137,11 +137,7 @@ end
     K = Inti.HyperSingularKernel(op)
     T = Inti.IntegralOperator(K, Γ_quad, Γ_quad)
     T₀ = Inti.assemble_matrix(T)
-    δT = Inti.guiggiani_correction(
-        T;
-        nearfield_distance = 4 * meshsize,
-        nearfield_qorder = 40,
-    )
+    δT = Inti.local_correction(T; nearfield_distance = 4 * meshsize, nearfield_qorder = 40)
 
     Tnew = T₀ + δT
     rhs = ones(Float64, size(T, 1))
@@ -152,11 +148,7 @@ end
     K = Inti.HyperSingularKernel(op)
     T = Inti.IntegralOperator(K, Γ_quad, Γ_quad)
     T₀ = Inti.assemble_matrix(T)
-    δT = Inti.guiggiani_correction(
-        T;
-        nearfield_distance = 3 * meshsize,
-        nearfield_qorder = 40,
-    )
+    δT = Inti.local_correction(T; nearfield_distance = 3 * meshsize, nearfield_qorder = 40)
     Tnew = T₀ + δT
     rhs = [SVector(1.0, 1.0, 1.0) for _ in 1:size(T, 1)]
     @test norm(Tnew * rhs, Inf) < 1e-2

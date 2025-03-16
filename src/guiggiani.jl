@@ -1,81 +1,148 @@
 #=
-Implementation of the singular integration method of Guiggiani et al. (1992)
+A generic routines for correcting the singular or nearly singular entries of an integral
+operator based on:
+    1. Identifying (a priori) the entries of the integral operator which need to
+    be corrected. This is done based on distance between points/elements and
+    analytical knowldge of the convergence rate of the quadrature and the
+    underlying kernels
+    2. Performing a change-of-variables to alleviate the singularity of the
+    integrand
+    3. Doing an adaptive quadrature on the new integrand using HCubature.jl
+
+The specialized integration is precomputed on the reference element for each
+quadrature node of the standard quadrature.
 =#
+"""
+    local_correction(iop::IntegralOperator; maxdist, tol)
 
-@kwdef struct GuiggianiParameters
-    radial_quadrature  = GaussLegendre(; order = 5)
-    angular_quadrature = GaussLegendre(; order = 40)
-end
+Given an integral operator `iop`, this function provides a sparse correction to `iop` for
+the entries `i,j` such that the distance between the `i`-th target and the `j`-th source is
+less than `maxdist`. Each entry of the correction matrix is computed by using an adaptive
+integration routine with an absolute tolerance `tol`.
 
-function GuiggianiParameters(tol)
-    segment = HAdaptiveIntegration.segment(0.0, 1.0)
-    quad_func = (f) -> begin
-        I, E = HAdaptiveIntegration.integrate(f, segment; atol = tol)
-        if E > tol
-            error("adaptive integration failed to converge: E = $E")
-        end
-        return I
+Choosing `maxdist` and `tol` is a trade-off between accuracy and efficiency. The smaller the
+value of `maxdist`, the fewer corrections are needed, but this may compromise the accuracy.
+Similarly, the smaller the value of `tol`, the more accurate the correction, but the more
+expensive the computation. The optimal values of `maxdist` and `tol` depend on the kernel
+and the quadrature rule used.
+"""
+function local_correction(iop::IntegralOperator; maxdist, tol)
+    msh = mesh(target(iop))
+    quads_dict = Dict()
+    for E in element_types(msh)
+        ref_domain = reference_domain(E)
+        quads = (
+            nearfield_quad = adaptive_quadrature(ref_domain; atol = tol),
+            radial_quad    = adaptive_quadrature(ReferenceLine(); atol = tol),
+            angular_quad   = adaptive_quadrature(ReferenceLine(); atol = tol),
+        )
+        quads_dict[E] = quads
     end
-    quad_gauss = GaussLegendre(; order = 5)
-    return GuiggianiParameters(quad_func, quad_func)
-    # return GuiggianiParameters(quad_gauss, quad_func)
+    return local_correction(iop, maxdist, quads_dict)
 end
 
 """
-    guiggiani_correction(iop::IntegralOperator; nearfield_distance, nearfield_qorder)
+    local_correction(iop::IntegralOperator, maxdist, quads_dict::Dict)
 
-Routine for correcting the hypersingular operator for Laplace in 3D. Works by identifying (a
-priori) the entries of the integral operator which need to be corrected. This is done based
-on distance between target points and source elements, and the parameter
-`nearfield_distance` controls the threshold for this. For strongly singular entries
-corresponding to target points on the source element, we use Guiggiani's method to compute
-the correction. For nearly singular entries, we use an oversampled quadrature rule of order
-`nearfield_qorder`.
+Similar to `local_correction(iop::IntegralOperator; maxdist, tol)`, but allows the user to
+pass a dictionary `quads_dict` with precomputed quadrature rules for each element type in
+the mesh of `target(iop)`.
+
+The dictionary `quads_dict` should have the following structure:
+- `quads_dict[E].nearfield_quad` should be a function that integrates a function over the
+  nearfield of the reference element `E`.
+- `quads_dict[E].radial_quad` should be a function that integrates a function over the
+  radial direction of the reference element `E`.
+- `quads_dict[E].angular_quad` should be a function that integrates a function over the
+  angular direction of the reference element `E`.
 """
-function guiggiani_correction(
-    iop::IntegralOperator;
-    nearfield_distance,
-    nearfield_qorder,
-    p::GuiggianiParameters = GuiggianiParameters(1e-5),
-)
+function local_correction(iop, maxdist, quads_dict::Dict)
     # unpack type-unstable fields in iop, allocate output, and dispatch
     X, Y, K = target(iop), source(iop), kernel(iop)
     @assert X === Y "source and target of integraloperator must coincide"
-    # @assert K isa HyperSingularKernel{<:Any,Laplace{3}} "integral operator must be associated to Laplace's hypersingular kernel in 3D"
-    dict_near = near_interaction_list(X, Y; tol = nearfield_distance)
+    dict_near = near_interaction_list(X, Y; tol = maxdist)
     T = eltype(iop)
     msh = mesh(Y)
     correction = (I = Int[], J = Int[], V = T[])
-    # create quadratures (since they are their own type, we need to create them here for a
-    # type-stable inner loop)
-
+    # loop over element types in the source mesh, unpack, and dispatch to type-stable
+    # function
     for E in element_types(msh)
-        # dispatch on element type
-        τ̂ = domain(E)
         nearlist = dict_near[E]
-        iter = elements(msh, E)
-        quads = (
-            regular_quad   = quadrature_rule(Y, E),
-            nearfield_quad = _qrule_for_reference_shape(τ̂, nearfield_qorder),
-            radial_quad    = p.radial_quadrature,
-            angular_quad   = p.angular_quadrature,
-        )
+        els      = elements(msh, E)
+        # append the regular quadrature rule to the list of quads for the element type E
+        quads = merge(quads_dict[E], (regular_quad = quadrature_rule(Y, E),))
         L = lagrange_basis(quads.regular_quad)
-        _guiggiani_correction_etype!(
-            correction,
-            iter,
-            quads,
-            L,
-            nearlist,
-            X,
-            Y,
-            K,
-            nearfield_distance,
-            p,
-        )
+        _local_correction_etype!(correction, els, quads, L, nearlist, X, Y, K, maxdist)
     end
     m, n = size(iop)
     return sparse(correction.I, correction.J, correction.V, m, n)
+end
+
+@noinline function _local_correction_etype!(
+    correction,
+    el_iter,
+    quads,
+    L,
+    nearlist,
+    X,
+    Y,
+    K,
+    nearfield_distance,
+)
+    E = eltype(el_iter)
+    Xqnodes = collect(X)
+    Yqnodes = collect(Y)
+    # reference quadrature nodes and weights
+    x̂ = qcoords(quads.regular_quad) |> collect
+    el2qtags = etype2qtags(Y, E)
+    nel = length(el_iter)
+    lck = Threads.SpinLock()
+    # lck = ReentrantLock()
+    Threads.@threads for n in 1:nel
+        el = el_iter[n]
+        jglob = view(el2qtags, :, n)
+        # inear = union(nearlist[n], jglob) # make sure to include nearfield nodes AND the element nodes
+        inear = nearlist[n]
+        for i in inear
+            xnode = Xqnodes[i]
+            # closest quadrature node
+            dmin, j = findmin(
+                n -> norm(coords(xnode) - coords(Yqnodes[jglob[n]])),
+                1:length(jglob),
+            )
+            x̂nearest = x̂[j]
+            dmin > nearfield_distance && continue
+            # If singular, use Guiggiani's method. Otherwise use an ovesampled quadrature
+            if iszero(dmin)
+                W = guiggiani_singular_integral(
+                    K,
+                    L,
+                    x̂nearest,
+                    el,
+                    quads.radial_quad,
+                    quads.angular_quad,
+                )
+            else
+                integrand = (ŷ) -> begin
+                    y = el(ŷ)
+                    jac = jacobian(el, ŷ)
+                    ν = _normal(jac)
+                    τ′ = _integration_measure(jac)
+                    M = K(xnode, (coords = y, normal = ν))
+                    v = L(ŷ)
+                    map(v -> M * v, v) * τ′
+                end
+                W = quads.nearfield_quad(integrand)
+            end
+            @lock lck for (k, j) in enumerate(jglob)
+                qx, qy = Xqnodes[i], Yqnodes[j]
+                push!(correction.I, i)
+                push!(correction.J, j)
+                push!(correction.V, W[k] - K(qx, qy) * weight(qy))
+            end
+        end
+    end
+    return correction
 end
 
 """
@@ -219,79 +286,4 @@ function guiggiani_singular_integral(
         acc += (F₋₁ * log(rho_max) - F₋₂ / rho_max) + I_rho * rho_max
     end
     return acc
-end
-
-@noinline function _guiggiani_correction_etype!(
-    correction,
-    el_iter,
-    quads,
-    L,
-    nearlist,
-    X,
-    Y,
-    K,
-    nearfield_distance,
-    p,
-)
-    qreg = quads.regular_quad
-    nearfield_quad = quads.nearfield_quad
-    angular_quad = quads.angular_quad
-    radial_quad = quads.radial_quad
-
-    E = eltype(el_iter)
-    Xqnodes = collect(X)
-    Yqnodes = collect(Y)
-    τ̂ = domain(E)
-
-    # reference quadrature nodes and weights
-    x̂ = qcoords(qreg) |> collect
-    x̂_near = qcoords(nearfield_quad) |> collect
-    ŵ_near = qweights(nearfield_quad) |> collect
-
-    N = geometric_dimension(τ̂)
-    el2qtags = etype2qtags(Y, E)
-    for n in eachindex(el_iter)
-        el = el_iter[n]
-        jglob = view(el2qtags, :, n)
-        inear = union(nearlist[n], jglob) # make sure to include nearfield nodes AND the element nodes
-        for i in inear
-            xnode = Xqnodes[i]
-            # closest quadrature node
-            dmin, j = findmin(
-                n -> norm(coords(xnode) - coords(Yqnodes[jglob[n]])),
-                1:length(jglob),
-            )
-            x̂nearest = x̂[j]
-            dmin > nearfield_distance && continue
-            # If singular, use Guiggiani's method. Otherwise use an ovesampled quadrature
-            if iszero(dmin)
-                W = guiggiani_singular_integral(
-                    K,
-                    L,
-                    x̂nearest,
-                    el,
-                    radial_quad,
-                    angular_quad,
-                )
-            else
-                integrand = (ŷ) -> begin
-                    y = el(ŷ)
-                    jac = jacobian(el, ŷ)
-                    ν = _normal(jac)
-                    τ′ = _integration_measure(jac)
-                    M = K(xnode, (coords = y, normal = ν))
-                    v = L(ŷ)
-                    map(v -> M * v, v) * τ′
-                end
-                W = integrate(integrand, x̂_near, ŵ_near)
-            end
-            for (k, j) in enumerate(jglob)
-                qx, qy = Xqnodes[i], Yqnodes[j]
-                push!(correction.I, i)
-                push!(correction.J, j)
-                push!(correction.V, W[k] - K(qx, qy) * weight(qy))
-            end
-        end
-    end
-    return correction
 end

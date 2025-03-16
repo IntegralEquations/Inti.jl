@@ -575,3 +575,23 @@ function interpolation_order(qrule::Inti.TensorProductQuadrature)
     @assert allequal(k1d) "interpolation order must be the same in all dimensions"
     return first(k1d)
 end
+
+"""
+    adaptive_quadrature(ref_domain::ReferenceShape; kwargs...)
+
+Return a function `quad` callable as `quad(f)` that integrates the function `f` over the
+reference shape `ref_domain`. The keyword arguments are passed to
+`HAdaptiveIntegration.integrate`.
+"""
+function adaptive_quadrature(ref_domain::ReferenceLine; kwargs...)
+    seg = HAdaptiveIntegration.segment(0.0, 1.0)
+    return (f) -> HAdaptiveIntegration.integrate(f, seg; kwargs...)[1]
+end
+function adaptive_quadrature(ref_domain::ReferenceTriangle; kwargs...)
+    tri = HAdaptiveIntegration.triangle((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))
+    return (f) -> HAdaptiveIntegration.integrate(f, tri; kwargs...)[1]
+end
+function adaptive_quadrature(ref_domain::ReferenceSquare; kwargs...)
+    sq = HAdaptiveIntegration.rectangle((0.0, 0.0), (1.0, 1.0))
+    return (f) -> HAdaptiveIntegration.integrate(f, sq; kwargs...)[1]
+end
