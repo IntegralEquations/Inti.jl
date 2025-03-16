@@ -18,7 +18,7 @@ order to obtain accurate results in the approximation of the underlying integral
 operator by a quadrature. At present, Inti.jl provides the following functions
 to correct for singularities:
 
-- [`adaptive_correction`](@ref)
+- [`local_correction`](@ref)
 - [`bdim_correction`](@ref)
 - [`vdim_correction`](@ref)
 
@@ -33,7 +33,9 @@ following sections.
     integral operators; see the documentation of these functions for more
     details.
 
-## Adaptive correction
+## Local correction
+
+[guiggiani1992general](@cite)
 
 ## Boundary density interpolation method
 

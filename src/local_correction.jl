@@ -65,6 +65,11 @@ The dictionary `quads_dict` must adhere to the following structure:
 
 This flexibility enables to fine-tune the quadrature rules for specific element types,
 improving accuracy or performance based on the problem's requirements.
+
+!!! note "Finite part integrals"
+    This function handles strongly singular integrals by implementing the method of
+    Guiggiani [guiggiani1992general(@cite), which consists of a polar change of variables
+    followed by a Laurent series expansion of the integrand.
 """
 function local_correction(iop, maxdist, quads_dict::Dict, threads = true)
     # unpack type-unstable fields in iop, allocate output, and dispatch

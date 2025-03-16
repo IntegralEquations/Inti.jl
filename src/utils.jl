@@ -235,7 +235,7 @@ function _normalize_compression(compression, target, source)
 end
 
 function _normalize_correction(correction, target, source)
-    methods = (:dim, :adaptive, :none)
+    methods = (:dim, :local, :none)
     # check that method is valid
     correction.method ∈ methods ||
         error("Unknown correction.method $(correction.method). Available options: $methods")
@@ -256,9 +256,8 @@ function _normalize_correction(correction, target, source)
             (maxdist = Inf, interpolation_order = nothing, center = nothing),
             correction,
         )
-    elseif correction.method == :adaptive
-        haskey(correction, :tol) || error("missing tol field in correction")
-        correction = merge((maxsplit = 10_000, maxdist = nothing), correction)
+    elseif correction.method == :local
+        correction = merge((maxdist = nothing, tol = nothing), correction)
     end
     return correction
 end
