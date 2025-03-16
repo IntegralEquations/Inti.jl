@@ -24,9 +24,9 @@ using Aqua
 
 @safetestset "Integral operators" include("integral_operator_test.jl")
 
-@safetestset "Local correction" include("local_correction_test.jl")
+@safetestset "Guiggiani" include("guiggiani_test.jl")
 
-@safetestset "Density interpolation method" include("dim_test.jl")
+@safetestset "Corrections (Green identities)" include("green_identities_test.jl")
 
 @safetestset "Gmsh extension" include("gmsh_test.jl")
 
