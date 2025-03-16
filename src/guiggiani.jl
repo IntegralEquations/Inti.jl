@@ -186,35 +186,6 @@ function polar_decomposition(::ReferenceTriangle, x::SVector{2,<:Number})
     return (theta1, theta2, rho1), (theta2, theta3, rho2), (theta3, theta1 + 2π, rho3)
 end
 
-"""
-    laurent_coefficients(f, h, order::Val{N}) where {N}
-
-Compute the Laurent coefficients of a function `f` at the origin. The function `f` is
-assumed to diverge as `1/ρ^N` at the origin, and this function returns the negative Laurent
-coefficients associated to the diverging terms.
-"""
-function laurent_coefficients(f, h = 1, ::Val{N} = Val(2); kwargs...) where {N}
-    N == 2 || throw(ArgumentError("only N=2 is supported"))
-    g = x -> x^N * f(x)
-    f₋₂, e₋₂ = extrapolate(h; x0 = 0, kwargs...) do x
-        return g(x)
-    end
-    # f₋₁, e₋₁ = extrapolate(h; x0 = 0, kwargs...) do x
-    #     return ForwardDiff.derivative(g, x)
-    # end
-    # f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
-    #     return ForwardDiff.derivative(x -> ForwardDiff.derivative(g, x), x) / 2
-    # end
-    f₋₁, e₋₁ = extrapolate(h; x0 = 0, kwargs...) do x
-        return x * f(x) - f₋₂ / x
-    end
-    f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
-        return f(x) - f₋₂ / x^2 - f₋₁ / x
-    end
-    # @show e₋₂, e₋₁, e₀
-    return f₋₂, f₋₁, f₀
-end
-
 function guiggiani_singular_integral(
     K,
     û,
@@ -223,6 +194,16 @@ function guiggiani_singular_integral(
     quad_rho,
     quad_theta,
 )
+    dec_val(::Val{N}) where {N} = Val{N - 1}()
+    P_ = singularity_order(K)
+    P = if isnothing(P_)
+        @warn "missing `singularity_order` for kernel. Assuming P = 3 (finite part)." maxlog =
+            1
+        Val(3)
+    else
+        P_
+    end
+
     ref_shape = reference_domain(el)
     x         = el(x̂)
     nx        = normal(el, x̂)
@@ -250,19 +231,29 @@ function guiggiani_singular_integral(
             F₋₂, F₋₁, F₀ = laurent_coefficients(
                 rho -> F(rho, theta),
                 rho_max / 2,
-                Val(2);
+                dec_val(P);
                 atol = 1e-10,
                 rtol = 1e-8,
                 contract = 1 / 2,
             )
             I_rho = quad_rho() do (rho_ref,)
                 rho = rho_ref * rho_max
-                if rho < 1e-4
-                    return F₀
-                end
-                return F(rho, theta) - F₋₂ / rho^2 - F₋₁ / rho
+                rho < 1e-4 && (return F₀)
+                # return F(rho, theta) - F₋₁ / rho - F₋₂ / rho^2
+                # NOTE: instead of returning the line above, we try to efficiently handle
+                # cases where F₋₁ or F₋₂ are zero (signaled by `nothing`)
+                val_rho = F(rho, theta)
+                isnothing(F₋₂) || (val_rho -= F₋₂ / rho^2)
+                isnothing(F₋₁) || (val_rho -= F₋₁ / rho)
+                return val_rho
             end
-            return (F₋₁ * log(rho_max) - F₋₂ / rho_max) + I_rho * rho_max
+            # return I_rho * rho_max + F₋₁ * log(rho_max) - F₋₂ / rho_max
+            # NOTE: instead of returning the line above, we try to efficiently handle
+            # cases where F₋₁ or F₋₂ are zero (signaled by `nothing`)
+            val_theta = I_rho * rho_max
+            isnothing(F₋₁) || (val_theta += F₋₁ * log(rho_max))
+            isnothing(F₋₂) || (val_theta -= F₋₂ / rho_max)
+            return val_theta
         end
         I_theta *= delta_theta
         acc += I_theta

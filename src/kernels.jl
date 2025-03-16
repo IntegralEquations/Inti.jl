@@ -14,6 +14,14 @@ abstract type AbstractKernel{T} end
 return_type(::AbstractKernel{T}, args...) where {T} = T
 
 """
+    singularity_order(K)
+
+Given a kernel `K` with signature `K(target,source)::T`, return the order of the singularity
+of `K` at `target = source`.
+"""
+singularity_order(K) = nothing
+
+"""
     abstract type AbstractDifferentialOperator{N}
 
 A partial differential operator in dimension `N`.
