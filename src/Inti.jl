@@ -47,10 +47,9 @@ include("quadrature.jl")
 # Nyström methods
 include("kernels.jl")
 include("nystrom.jl")
+include("local_correction.jl")
 include("bdim.jl")
 include("vdim.jl")
-include("adaptive.jl")
-include("local_correction.jl")
 
 # some zero-argument methods for the Inti's gmsh extension
 include("gmsh_api.jl")

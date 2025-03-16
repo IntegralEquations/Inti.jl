@@ -55,6 +55,11 @@ atol = 1e-4
                         e1 = norm(Smat * γ₁u - Dmat * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
                         @test norm(e0, Inf) > 10 * norm(e1, Inf)
                         @test norm(e1, Inf) < 10 * atol
+                        δS = Inti.local_correction(S)
+                        δD = Inti.local_correction(D)
+                        Smat, Dmat = S0 + δS, D0 + δD
+                        e2 = norm(Smat * γ₁u - Dmat * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
+                        @test norm(e2, Inf) < 10 * atol
                     end
                     @testset "Adjoint double-layer/hypersingular $(string(op))" begin
                         op isa Inti.Stokes && continue # TODO: implement hypersingular for Stokes?

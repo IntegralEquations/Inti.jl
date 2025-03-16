@@ -15,8 +15,6 @@ include("quad_rules_tables_tetrahedron.jl")
 # for various `ReferenceShape`. The dictionary
 # key represents the number of quadrature nodes.
 
-const SEGMENT_GAUSS_QRULES = Dict(7 => SEGMENT_G13N7)
-
 const TRIANGLE_GAUSS_QRULES = Dict(
     1 => TRIANGLE_G1N1,
     3 => TRIANGLE_G2N3,
