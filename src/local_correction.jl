@@ -27,6 +27,7 @@ expensive the computation. The optimal values of `maxdist` and `tol` depend on t
 and the quadrature rule used.
 """
 function local_correction(iop::IntegralOperator; maxdist, tol, threads = true)
+    isnothing(tol) && (tol = farfield_accuracy(iop))
     msh = mesh(target(iop))
     quads_dict = Dict()
     for E in element_types(msh)

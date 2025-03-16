@@ -50,7 +50,7 @@ include("nystrom.jl")
 include("bdim.jl")
 include("vdim.jl")
 include("adaptive.jl")
-include("guiggiani.jl")
+include("local_correction.jl")
 
 # some zero-argument methods for the Inti's gmsh extension
 include("gmsh_api.jl")

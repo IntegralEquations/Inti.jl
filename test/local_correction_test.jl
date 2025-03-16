@@ -39,6 +39,7 @@ atol = 1e-4
                     γ₁u = map(dudn, Γ_quad)
                     γ₀u_norm = norm(norm.(γ₀u, Inf), Inf)
                     γ₁u_norm = norm(norm.(γ₁u, Inf), Inf)
+                    maxdist = 2 * meshsize
                     # single and double layer
                     @testset "Single/double layer $(string(op))" begin
                         G = Inti.SingleLayerKernel(op)
@@ -48,7 +49,6 @@ atol = 1e-4
                         D = Inti.IntegralOperator(dG, Γ_quad)
                         D0 = Inti.assemble_matrix(D)
                         e0 = norm(S0 * γ₁u - D0 * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
-                        maxdist = 2 * meshsize
                         δS = Inti.local_correction(S; maxdist, tol = atol)
                         δD = Inti.local_correction(D; maxdist, tol = atol)
                         Smat, Dmat = S0 + δS, D0 + δD

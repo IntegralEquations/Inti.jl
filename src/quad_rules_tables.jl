@@ -7,7 +7,6 @@ Also includes Vioreanu-Rokhlin interpolating quadratures, see
 `Spectra of Multiplication Operators as a Numerical Tool', B. Vioreanu and V. Rokhlin, SIAM J Sci. Comput. (2014).
 =#
 
-include("quad_rules_tables_segment.jl")
 include("quad_rules_tables_triangle.jl")
 include("quad_rules_tables_tetrahedron.jl")
 

@@ -6,22 +6,20 @@ using LinearAlgebra
 
 @testset "Laurent coefficients" begin
     f = ρ -> ρ^2 + 2ρ + 1
-    f₋₂, f₋₁, f₀ = @inferred Inti.laurent_coefficients(f, 1e-2)
-    @test norm(f₋₂) < 1e-10
-    @test norm(f₋₁) < 1e-10
-    @test norm(f₀ - 1) < 1e-10
+    f₋₂, f₋₁, f₀ = @inferred Inti.laurent_coefficients(f, 1e-2, Val(2))
+    @test norm((f₋₂, f₋₁, f₀) .- (0, 0, 1)) < 1e-10
+    f₋₂, f₋₁, f₀ = @inferred Inti.laurent_coefficients(f, 1e-2, Val(0))
+    @test norm((f₋₂, f₋₁, f₀) .- (0, 0, 1)) < 1e-10
     f = ρ -> cos(ρ) / ρ^2 + exp(ρ) / ρ + exp(ρ)
     f₋₂, f₋₁, f₀ = Inti.laurent_coefficients(
         f,
-        1e-1,
+        1e-0,
         Val(2);
-        atol = 1e-20,
+        atol = 1e-12,
         breaktol = 2,
-        contract = 1 / 4,
+        contract = 1 / 2,
     )
-    @test f₋₂ ≈ 1.0
-    @test f₋₁ ≈ 1.0
-    @test f₀ ≈ 1.5
+    @test norm((f₋₂, f₋₁, f₀) .- (1, 1, 1.5)) < 1e-10
 
     f = ρ -> SVector(cos(ρ), sin(ρ)) / ρ^2 + SVector(exp(ρ), 0.2) / ρ
     f₋₂, f₋₁, f₀ = Inti.laurent_coefficients(f, 1e-1, Val(2))
