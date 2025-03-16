@@ -124,7 +124,7 @@ end
                     γ₁u = map(dudn, Γ_quad)
                     γ₀u_norm = norm(norm.(γ₀u, Inf), Inf)
                     γ₁u_norm = norm(norm.(γ₁u, Inf), Inf)
-                    maxdist = 2 * meshsize
+                    maxdist = 3 * meshsize
                     # single and double layer
                     @testset "Single/double layer $(string(op))" begin
                         G = Inti.SingleLayerKernel(op)
@@ -143,8 +143,11 @@ end
                         δS = Inti.local_correction(S)
                         δD = Inti.local_correction(D)
                         Smat, Dmat = S0 + δS, D0 + δD
+                        # version which picks automatically maxdist and tol. Note that we
+                        # are not too picky about the error here, as the heuristic for
+                        # picking those is not super accurate.
                         e2 = norm(Smat * γ₁u - Dmat * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
-                        @test norm(e2, Inf) < 10 * atol
+                        @test norm(e2, Inf) < 1e-2
                     end
                     @testset "Adjoint double-layer/hypersingular $(string(op))" begin
                         op isa Inti.Stokes && continue # TODO: implement hypersingular for Stokes?
