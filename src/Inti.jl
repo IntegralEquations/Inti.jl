@@ -24,6 +24,7 @@ using Richardson
 import ElementaryPDESolutions
 import SpecialFunctions
 import Bessels # faster than SpecialFunctions for Bessel functions with real args
+import HAdaptiveIntegration
 
 # helper functions
 include("utils.jl")

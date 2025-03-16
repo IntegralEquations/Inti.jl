@@ -7,133 +7,18 @@ Implementation of the singular integration method of Guiggiani et al. (1992)
     angular_quadrature = GaussLegendre(; order = 40)
 end
 
-"""
-    polar_decomposition(shape::ReferenceSquare, x̂::SVector{2,Float64})
-
-Decompose the square `[0,1] × [0,1]` into four triangles, and return four tuples of the form
-`θₛ, θₑ, ρ` where `θₛ` and `θₑ` are the initial and final angles of the triangle, and `ρ` is
-the function that gives the distance from `x̂` to the border of the square in the direction
-`θ`.
-"""
-function polar_decomposition(::ReferenceSquare, x::SVector{2,Float64})
-    theta1 = atan(1 - x[2], 1 - x[1])
-    theta2 = atan(x[1], 1 - x[2]) + π / 2
-    theta3 = atan(x[2], x[1]) + π
-    theta4 = atan(1 - x[1], x[2]) + 3π / 2
-    rho1 = θ -> (1 - x[2]) / sin(θ)
-    rho2 = θ -> x[1] / (-cos(θ))
-    rho3 = θ -> x[2] / (-sin(θ))
-    rho4 = θ -> (1 - x[1]) / cos(θ)
-    return (theta1, theta2, rho1),
-    (theta2, theta3, rho2),
-    (theta3, theta4, rho3),
-    (theta4, theta1 + 2π, rho4)
-end
-
-"""
-    laurent_coefficients(f, order::Val{N}, h = 0.2) where {N}
-
-Compute the Laurent coefficients of a function `f` at the origin. The function `f` is
-assumed to diverge as `1/ρ^N` at the origin, and this function returns the negative Laurent
-coefficients associated to the diverging terms.
-"""
-function laurent_coefficients(f, order::Val{N}, h = 0.2) where {N}
-    atol = 1e-12
-    N == 2 || throw(ArgumentError("only N=2 is supported"))
-    g = x -> x^N * f(x)
-    g′ = x -> ForwardDiff.derivative(g, x)
-    f₋₂, e₋₂ = extrapolate(h; atol, x0 = 0) do x
-        return g(x)
-    end
-    f₋₁, e₋₁ = extrapolate(h; atol, x0 = 0) do x
-        return g′(x)
-    end
-    # f₋₁, e₋₁ = extrapolate(h; atol) do x
-    #     return x * f(x) - f₋₂ / x
-    # end
-    return f₋₂, f₋₁
-end
-
-function guiggiani_singular_integral(
-    K,
-    û,
-    x̂,
-    el::ReferenceInterpolant{<:Union{ReferenceTriangle,ReferenceSquare}},
-    quad_rho,
-    quad_theta,
-)
-    ref_shape = reference_domain(el)
-    x         = el(x̂)
-    nx        = normal(el, x̂)
-    qx        = (coords = x, normal = nx)
-    # function to integrate in polar coordinates
-    F = (ρ, θ) -> begin
-        s, c = sincos(θ)
-        ŷ = x̂ + ρ * SVector(c, s)
-        y = el(ŷ)
-        jac = jacobian(el, ŷ)
-        ny = _normal(jac)
-        μ = _integration_measure(jac)
-        qy = (coords = y, normal = ny)
-        M = K(qx, qy)
-        v = û(ŷ)
-        ρ * map(v -> M * v, v) * μ
-    end
-    acc = zero(return_type(F, Float64, Float64))
-    # integrate
-    for (theta_min, theta_max, rho_func) in polar_decomposition(ref_shape, x̂)
-        delta_theta = theta_max - theta_min
-        I_theta = quad_theta() do (theta_ref,)
-            theta = theta_min + theta_ref * delta_theta
-            rho_max = rho_func(theta)::Float64
-            F₋₂, F₋₁ = laurent_coefficients(rho -> F(rho, theta), Val(2), 1e-2)
-            I_rho = quad_rho() do (rho_ref,)
-                rho = rho_ref * rho_max
-                return F(rho, theta) - F₋₂ / rho^2 - F₋₁ / rho
-            end
-            return (F₋₁ * log(rho_max) - F₋₂ / rho_max) + I_rho * rho_max
+function GuiggianiParameters(tol)
+    segment = HAdaptiveIntegration.segment(0.0, 1.0)
+    quad_func = (f) -> begin
+        I, E = HAdaptiveIntegration.integrate(f, segment; atol = tol)
+        if E > tol
+            error("adaptive integration failed to converge: E = $E")
         end
-        I_theta *= delta_theta
-        acc += I_theta
+        return I
     end
-    return acc
-end
-
-function guiggiani_singular_integral(
-    K,
-    û,
-    x̂,
-    el::ReferenceInterpolant{ReferenceLine},
-    quad_rho,
-    quad_theta, # unused, but kept for consistency with the 2D case
-)
-    x  = el(x̂)
-    nx = normal(el, x̂)
-    qx = (coords = x, normal = nx)
-    # function to integrate in 1D "polar" coordinates. We use `s ∈ {-1,1}` to denote the
-    # angles `π` and `0`.
-    F = (ρ, s) -> begin
-        ŷ = x̂ + SVector(ρ * s)
-        y = el(ŷ)
-        jac = jacobian(el, ŷ)
-        ny = _normal(jac)
-        μ = _integration_measure(jac)
-        qy = (coords = y, normal = ny)
-        M = K(qx, qy)
-        v = û(ŷ)
-        map(v -> M * v, v) * μ
-    end
-    acc = zero(return_type(F, Float64, Int))
-    # integrate
-    for (s, rho_max) in ((-1, x̂[1]), (1, 1 - x̂[1]))
-        F₋₂, F₋₁ = laurent_coefficients(rho -> F(rho, s), Val(2), 1e-2)
-        I_rho = quad_rho() do (rho_ref,)
-            rho = rho_ref * rho_max
-            return F(rho, s) - F₋₂ / rho^2 - F₋₁ / rho
-        end
-        acc += (F₋₁ * log(rho_max) - F₋₂ / rho_max) + I_rho * rho_max
-    end
-    return acc
+    quad_gauss = GaussLegendre(; order = 5)
+    return GuiggianiParameters(quad_func, quad_func)
+    # return GuiggianiParameters(quad_gauss, quad_func)
 end
 
 """
@@ -151,7 +36,7 @@ function guiggiani_correction(
     iop::IntegralOperator;
     nearfield_distance,
     nearfield_qorder,
-    p::GuiggianiParameters = GuiggianiParameters(),
+    p::GuiggianiParameters = GuiggianiParameters(1e-5),
 )
     # unpack type-unstable fields in iop, allocate output, and dispatch
     X, Y, K = target(iop), source(iop), kernel(iop)
@@ -191,6 +76,149 @@ function guiggiani_correction(
     end
     m, n = size(iop)
     return sparse(correction.I, correction.J, correction.V, m, n)
+end
+
+"""
+    polar_decomposition(shape::ReferenceSquare, x̂::SVector{2,Float64})
+
+Decompose the square `[0,1] × [0,1]` into four triangles, and return four tuples of the form
+`θₛ, θₑ, ρ` where `θₛ` and `θₑ` are the initial and final angles of the triangle, and `ρ` is
+the function that gives the distance from `x̂` to the border of the square in the direction
+`θ`.
+"""
+function polar_decomposition(::ReferenceSquare, x::SVector{2,Float64})
+    theta1 = atan(1 - x[2], 1 - x[1])
+    theta2 = atan(x[1], 1 - x[2]) + π / 2
+    theta3 = atan(x[2], x[1]) + π
+    theta4 = atan(1 - x[1], x[2]) + 3π / 2
+    rho1 = θ -> (1 - x[2]) / sin(θ)
+    rho2 = θ -> x[1] / (-cos(θ))
+    rho3 = θ -> x[2] / (-sin(θ))
+    rho4 = θ -> (1 - x[1]) / cos(θ)
+    return (theta1, theta2, rho1),
+    (theta2, theta3, rho2),
+    (theta3, theta4, rho3),
+    (theta4, theta1 + 2π, rho4)
+end
+
+"""
+    laurent_coefficients(f, h, order::Val{N}) where {N}
+
+Compute the Laurent coefficients of a function `f` at the origin. The function `f` is
+assumed to diverge as `1/ρ^N` at the origin, and this function returns the negative Laurent
+coefficients associated to the diverging terms.
+"""
+function laurent_coefficients(f, h = 1, ::Val{N} = Val(2); kwargs...) where {N}
+    N == 2 || throw(ArgumentError("only N=2 is supported"))
+    g = x -> x^N * f(x)
+    f₋₂, e₋₂ = extrapolate(h; x0 = 0, kwargs...) do x
+        return g(x)
+    end
+    # f₋₁, e₋₁ = extrapolate(h; x0 = 0, kwargs...) do x
+    #     return ForwardDiff.derivative(g, x)
+    # end
+    # f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
+    #     return ForwardDiff.derivative(x -> ForwardDiff.derivative(g, x), x) / 2
+    # end
+    f₋₁, e₋₁ = extrapolate(h; x0 = 0, kwargs...) do x
+        return x * f(x) - f₋₂ / x
+    end
+    f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
+        return f(x) - f₋₂ / x^2 - f₋₁ / x
+    end
+    # @show e₋₂, e₋₁, e₀
+    return f₋₂, f₋₁, f₀
+end
+
+function guiggiani_singular_integral(
+    K,
+    û,
+    x̂,
+    el::ReferenceInterpolant{<:Union{ReferenceTriangle,ReferenceSquare}},
+    quad_rho,
+    quad_theta,
+)
+    ref_shape = reference_domain(el)
+    x         = el(x̂)
+    nx        = normal(el, x̂)
+    qx        = (coords = x, normal = nx)
+    # function to integrate in polar coordinates
+    F = (ρ, θ) -> begin
+        s, c = sincos(θ)
+        ŷ = x̂ + ρ * SVector(c, s)
+        y = el(ŷ)
+        jac = jacobian(el, ŷ)
+        ny = _normal(jac)
+        μ = _integration_measure(jac)
+        qy = (coords = y, normal = ny)
+        M = K(qx, qy)
+        v = û(ŷ)
+        return ρ * map(v -> M * v, v) * μ
+    end
+    acc = zero(return_type(F, Float64, Float64))
+    # integrate
+    for (theta_min, theta_max, rho_func) in polar_decomposition(ref_shape, x̂)
+        delta_theta = theta_max - theta_min
+        I_theta = quad_theta() do (theta_ref,)
+            theta = theta_min + theta_ref * delta_theta
+            rho_max = rho_func(theta)::Float64
+            F₋₂, F₋₁, F₀ = laurent_coefficients(
+                rho -> F(rho, theta),
+                rho_max / 2,
+                Val(2);
+                atol = 1e-12,
+                contract = 1 / 2,
+            )
+            I_rho = quad_rho() do (rho_ref,)
+                rho = rho_ref * rho_max
+                if rho < 1e-4
+                    return F₀
+                end
+                return F(rho, theta) - F₋₂ / rho^2 - F₋₁ / rho
+            end
+            return (F₋₁ * log(rho_max) - F₋₂ / rho_max) + I_rho * rho_max
+        end
+        I_theta *= delta_theta
+        acc += I_theta
+    end
+    return acc
+end
+
+function guiggiani_singular_integral(
+    K,
+    û,
+    x̂,
+    el::ReferenceInterpolant{ReferenceLine},
+    quad_rho,
+    quad_theta, # unused, but kept for consistency with the 2D case
+)
+    x  = el(x̂)
+    nx = normal(el, x̂)
+    qx = (coords = x, normal = nx)
+    # function to integrate in 1D "polar" coordinates. We use `s ∈ {-1,1}` to denote the
+    # angles `π` and `0`.
+    F = (ρ, s) -> begin
+        ŷ = x̂ + SVector(ρ * s)
+        y = el(ŷ)
+        jac = jacobian(el, ŷ)
+        ny = _normal(jac)
+        μ = _integration_measure(jac)
+        qy = (coords = y, normal = ny)
+        M = K(qx, qy)
+        v = û(ŷ)
+        map(v -> M * v, v) * μ
+    end
+    acc = zero(return_type(F, Float64, Int))
+    # integrate
+    for (s, rho_max) in ((-1, x̂[1]), (1, 1 - x̂[1]))
+        F₋₂, F₋₁, F₀ = laurent_coefficients(rho -> F(rho, s), Val(2), 1e-2)
+        I_rho = quad_rho() do (rho_ref,)
+            rho = rho_ref * rho_max
+            return F(rho, s) - F₋₂ / rho^2 - F₋₁ / rho
+        end
+        acc += (F₋₁ * log(rho_max) - F₋₂ / rho_max) + I_rho * rho_max
+    end
+    return acc
 end
 
 @noinline function _guiggiani_correction_etype!(

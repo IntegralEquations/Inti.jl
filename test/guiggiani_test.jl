@@ -6,21 +6,27 @@ using LinearAlgebra
 
 @testset "Laurent coefficients" begin
     f = ρ -> ρ^2 + 2ρ + 1
-    f₋₂, f₋₁ = @inferred Inti.laurent_coefficients(f, Val(2))
+    f₋₂, f₋₁, f₀ = @inferred Inti.laurent_coefficients(f, 1e-2)
     @test norm(f₋₂) < 1e-10
     @test norm(f₋₁) < 1e-10
-    f = ρ -> cos(ρ) / ρ^2 + exp(ρ) / ρ
-    f₋₂, f₋₁ = Inti.laurent_coefficients(f, Val(2))
+    @test norm(f₀ - 1) < 1e-10
+    f = ρ -> cos(ρ) / ρ^2 + exp(ρ) / ρ + exp(ρ)
+    f₋₂, f₋₁, f₀ = Inti.laurent_coefficients(
+        f,
+        1e-1,
+        Val(2);
+        atol = 1e-20,
+        breaktol = 2,
+        contract = 1 / 4,
+    )
     @test f₋₂ ≈ 1.0
     @test f₋₁ ≈ 1.0
+    @test f₀ ≈ 1.5
 
     f = ρ -> SVector(cos(ρ), sin(ρ)) / ρ^2 + SVector(exp(ρ), 0.2) / ρ
-    f₋₂, f₋₁ = Inti.laurent_coefficients(f, Val(2))
+    f₋₂, f₋₁, f₀ = Inti.laurent_coefficients(f, 1e-1, Val(2))
     @test f₋₂ ≈ SVector(1.0, 0.0)
     @test f₋₁ ≈ SVector(1.0, 1.2)
-
-    f = ρ -> π / ρ
-    f₋₂, f₋₁ = Inti.laurent_coefficients(f, Val(2))
 
     ## Laplace kernel
     v1 = SVector(0.0, 0.0, 0.0)
@@ -53,7 +59,7 @@ using LinearAlgebra
     g = let F = F
         (ρ) -> F(ρ, 1)
     end
-    @inferred Inti.laurent_coefficients(g, (Val(2)), 1e-3)
+    @inferred Inti.laurent_coefficients(g, 1e-3, (Val(2)))
 end
 
 @testset "Polar decomposition" begin
