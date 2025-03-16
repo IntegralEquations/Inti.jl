@@ -60,6 +60,13 @@ function integrate(f, x, w)
     end
 end
 
+function (q::ReferenceQuadrature)(f)
+    x, w = qcoords(q), qweights(q)
+    sum(zip(x, w)) do (x, w)
+        return f(x) * prod(w)
+    end
+end
+
 ## Define some one-dimensional quadrature rules
 """
     struct Fejer{N}
@@ -393,128 +400,6 @@ function integrate_with_error_estimate(
 end
 
 """
-    adaptive_integration(f, τ̂::RefernceShape; kwargs...)
-    adaptive_integration(f, qrule::EmbeddedQuadrature; kwargs...)
-
-Use an adaptive procedure to estimate the integral of `f` over `τ̂ =
-domain(qrule)`. The following optional keyword arguments are available:
-- `atol::Real=0.0`: absolute tolerance for the integral estimate
-- `rtol::Real=0.0`: relative tolerance for the integral estimate
-- `maxsplit::Int=1000`: maximum number of times to split the domain
-- `norm::Function=LinearAlgebra.norm`: norm to use for error estimates
-- `buffer::BinaryHeap`: a pre-allocated buffer to use for the adaptive procedure
-  (see [allocate_buffer](@ref))
-"""
-function adaptive_integration(
-    f,
-    quad::EmbeddedQuadrature;
-    atol = 0.0,
-    rtol = iszero(atol) ? sqrt(eps()) : 0.0,
-    maxsplit = 1000,
-    norm = LinearAlgebra.norm,
-    buffer = nothing,
-)
-    return _adaptive_integration(f, quad, atol, rtol, maxsplit, norm, buffer)
-end
-function adaptive_integration(f, τ̂::ReferenceShape; kwargs...)
-    return adaptive_integration(f, default_embedded_quadrature(τ̂); kwargs...)
-end
-
-function _adaptive_integration(f, quad::EmbeddedQuadrature, atol, rtol, maxsplit, norm, buf)
-    τ̂ = domain(quad)
-    nsplit = 0
-    I, E = integrate_with_error_estimate(f, quad)
-    # a quick check to see if splitting is really needed
-    if E < atol || E < rtol * norm(I) || nsplit >= maxsplit
-        return I, E
-    end
-    # split is needed, so prepare heap if needed, push the element to the heap
-    # and begin
-    heap = if isnothing(buf)
-        allocate_buffer(f, quad)
-    else
-        empty!(buf.valtree)
-        buf
-    end
-    # create a first (non-singleton) element, push it to the heap, and begin
-    push!(heap, (LagrangeElement(τ̂), I, E))
-    while E > atol && E > rtol * norm(I) && nsplit < maxsplit
-        el, Ic, Ec = pop!(heap)
-        I -= Ic
-        E -= Ec
-        for child in subdivide(el)
-            μ = integration_measure(child)
-            Inew, Enew = μ .* integrate_with_error_estimate(x -> f(child(x)), quad)
-            I += Inew
-            E += Enew
-            push!(heap, (child, Inew, Enew))
-        end
-        nsplit += 1
-    end
-    # nsplit >= maxsplit && @warn "maximum number of steps reached"
-    return I, E
-end
-
-"""
-    allocate_buffer(f, quad::EmbeddedQuadrature)
-
-Create the `buffer` needed for the call [`adaptive_integration(f, τ̂; buffer,
-...)`](@ref adaptive_integration).
-"""
-function allocate_buffer(f, quad::EmbeddedQuadrature)
-    T = Float64 # TODO: make this a parameter so that we can do single precision?
-    τ̂ = domain(quad)
-    # type of element that will be returned by by quad. Pay the cost of single
-    # call to figure this out
-    I, E = integrate_with_error_estimate(f, quad)
-    # the heap of adaptive quadratures have elements of the form (s,I,E), where
-    # I and E are the value and error estimate over the simplex s. The ordering
-    # used is based the maximum error
-    ord = Base.Order.By(el -> -el[3])
-    # figure out the shape of the domains that will be needed for the heap
-    S = if τ̂ isa ReferenceLine
-        Line1D{T}
-    elseif τ̂ isa ReferenceTriangle
-        Triangle2D{T}
-        error("not implemented")
-    end
-    heap = BinaryHeap{Tuple{S,typeof(I),typeof(E)}}(ord)
-    return heap
-end
-allocate_buffer(f, τ̂::ReferenceShape) = allocate_buffer(f, default_embedded_quadrature(τ̂))
-
-function subdivide(ln::Line1D)
-    # @assert x ∈ ln
-    a, b = vertices(ln)
-    m = (a + b) / 2
-    return LagrangeLine(a, m), LagrangeLine(m, b)
-end
-
-function default_embedded_quadrature(::ReferenceLine)
-    qhigh = Kronrod{ReferenceLine,15}()
-    qlow = Gauss(; domain = ReferenceLine(), order = 13)
-    return EmbeddedQuadrature(qlow, qhigh)
-end
-
-# some tabulated rules used for EmbeddedQuadrature
-"""
-    struct Kronrod{D,N} <: ReferenceQuadrature{D}
-
-`N`-point Kronrod rule obtained by adding `n+1` points to a Gauss quadrature
-containing `n` points. The order is either `3n + 1` for `n` even or `3n + 2` for
-`n` odd.
-"""
-struct Kronrod{D,N} <: ReferenceQuadrature{D} end
-
-function (qrule::Gauss{ReferenceLine,7})()
-    return SEGMENT_G13N7
-end
-
-function (qrule::Kronrod{ReferenceLine,15})()
-    return SEGMENT_K23N15
-end
-
-"""
     lagrange_basis(qrule::ReferenceQuadrature)
 
 Return a function `L : ℝᴺ → ℝᵖ` where `N` is the dimension of the domain of
@@ -561,4 +446,36 @@ nodes.
 function interpolation_order(qrule::ReferenceQuadrature{ReferenceLine})
     N = length(qrule)
     return N - 1
+end
+
+function interpolation_order(qrule::ReferenceQuadrature{ReferenceTriangle})
+    N = length(qrule)
+    # the last triangular number less than N
+    return floor(Int, (sqrt(8N + 1) - 3) / 2)
+end
+
+function interpolation_order(qrule::Inti.TensorProductQuadrature)
+    k1d = map(Inti.interpolation_order, qrule.quads1d)
+    @assert allequal(k1d) "interpolation order must be the same in all dimensions"
+    return first(k1d)
+end
+
+"""
+    adaptive_quadrature(ref_domain::ReferenceShape; kwargs...)
+
+Return a function `quad` callable as `quad(f)` that integrates the function `f` over the
+reference shape `ref_domain`. The keyword arguments are passed to
+`HAdaptiveIntegration.integrate`.
+"""
+function adaptive_quadrature(ref_domain::ReferenceLine; kwargs...)
+    seg = HAdaptiveIntegration.segment(0.0, 1.0)
+    return (f) -> HAdaptiveIntegration.integrate(f, seg; kwargs...)[1]
+end
+function adaptive_quadrature(ref_domain::ReferenceTriangle; kwargs...)
+    tri = HAdaptiveIntegration.triangle((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))
+    return (f) -> HAdaptiveIntegration.integrate(f, tri; kwargs...)[1]
+end
+function adaptive_quadrature(ref_domain::ReferenceSquare; kwargs...)
+    sq = HAdaptiveIntegration.rectangle((0.0, 0.0), (1.0, 1.0))
+    return (f) -> HAdaptiveIntegration.integrate(f, sq; kwargs...)[1]
 end

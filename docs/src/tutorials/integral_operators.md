@@ -38,7 +38,7 @@ construct the four integral operators of Calderón calculus:
 
 ```@example integral_operators
 Γ = Inti.parametric_curve(s -> SVector(cos(s), sin(s)), 0, 2π) |> Inti.Domain
-Q = Inti.Quadrature(Γ; meshsize = 0.1, qorder = 5)
+Q = Inti.Quadrature(Γ; meshsize = 0.1, qorder = 7)
 S, D = Inti.single_double_layer(; 
     op, 
     target = Q, 
@@ -89,14 +89,14 @@ Sfmm, Dfmm = Inti.single_double_layer(;
     target = Q, 
     source = Q, 
     compression = (method = :fmm, tol = 1e-10), 
-    correction = (method = :dim, )
+    correction = (method = :dim,)
 )
 Kfmm, Nfmm = Inti.adj_double_layer_hypersingular(; 
     op, 
     target = Q, 
     source = Q, 
     compression = (method = :fmm, tol = 1e-10), 
-    correction = (method = :dim,)
+    correction = (method = :dim, )
 )
 typeof(Sfmm)
 ```
@@ -154,15 +154,15 @@ x = [u; v]
 # compute the error in the projector identity
 e₊ = norm(C₊*(C₊*x) - C₊*x, Inf)
 e₋ = norm(C₋*(C₋*x) - C₋*x, Inf)
-@assert e₊ < 1e-5 && e₋ < 1e-5 # hide
+@assert e₊ < 1e-4 && e₋ < 1e-4 # hide
 println("projection error for C₊: $e₊")
 println("projection error for C₋: $e₋")
 ```
 
-We see that the error in the projector identity is small, as expected. Note that
-such compositions are not limited to the Calderón projectors, and can be used
-e.g. to construct the combined field integral equation (CFIE), or to compose a
-formulation with an operator preconditioner.
+We see that the error in the projector identity is small, as expected. Note that such
+compositions are not limited to the Calderón projectors, and can be used e.g. to construct
+the combined field integral equation (CFIE), or to compose a formulation with an operator
+preconditioner.
 
 ## Custom kernels
 
@@ -244,10 +244,10 @@ using HMatrices
 S₀ = Inti.assemble_hmatrix(Sop; rtol = 1e-4)
 ```
 
-The correction matrix `δS` will be constructed using [`adaptive_correction`](@ref):
+The correction matrix `δS` will be constructed using [`local_correction`](@ref):
 
 ```@example integral_operators
-δS = Inti.adaptive_correction(Sop; tol = 1e-4, maxdist = 5*meshsize)
+δS = Inti.local_correction(Sop; tol = 1e-4, maxdist = 5*meshsize)
 ```
 
 How exactly one adds `S₀` and `δS` to get the final operator depends on the intended

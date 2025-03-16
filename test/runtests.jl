@@ -1,5 +1,6 @@
 using Inti
 using SafeTestsets
+using Test
 using Aqua
 
 @safetestset "Code quality" include("aqua_test.jl")
@@ -24,9 +25,11 @@ using Aqua
 
 @safetestset "Integral operators" include("integral_operator_test.jl")
 
-@safetestset "Density interpolation method" include("dim_test.jl")
+@safetestset "Guiggiani" include("guiggiani_test.jl")
 
-@safetestset "Adaptive integration" include("adaptive_test.jl")
+@testset verbose = true "Corrections (Green identities)" begin
+    include("green_identities_test.jl")
+end
 
 @safetestset "Gmsh extension" include("gmsh_test.jl")
 

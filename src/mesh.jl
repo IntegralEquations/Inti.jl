@@ -272,7 +272,7 @@ function meshgen!(msh::Mesh, Ω::Domain, dict::Dict)
     d = geometric_dimension(Ω)
     for k in keys(Ω)
         if d == 1
-            haskey(dict, k) || error(msg1(k))
+            haskey(dict, k) || error("missing num_elements entry for entity $k")
             sz = dict[k]
             _meshgen!(msh, k, (sz,))
         elseif d == 2
@@ -289,8 +289,8 @@ function meshgen!(msh::Mesh, Ω::Domain, dict::Dict)
                         dict[l] != dict[op_l] &&
                         @warn "num_elements for $l and $op_l must be the same"
                     return dict[l]
-                elseif haskey(dict, l_op)
-                    return dict[l_op]
+                elseif haskey(dict, op_l)
+                    return dict[op_l]
                 else
                     error("missing num_elements entry for entity $b1")
                 end

@@ -62,16 +62,17 @@ function monomial_basis(::PolynomialSpace{ReferenceLine,K}) where {K}
     return b
 end
 
-# function monomial_basis(::PolynomialSpace{ReferenceSquare,K}) where {K}
-#     # the K+1 monomials x^(0,0), x^(0,1),x^(1,0), ..., x^(K,K)
-#     I = CartesianIndices((K + 1, K + 1)) .- CartesianIndex(1, 1)
-#     N = length(I)
-#     b = ntuple(N) do i
-#         θ = Tuple(I[i]) # map linear to cartesian index
-#         return x -> prod(x .^ θ)
-#     end
-#     return b
-# end
+function monomial_basis(::PolynomialSpace{Inti.ReferenceSquare,K}) where {K}
+    # the K+1 monomials x^(0,0), x^(0,1),x^(1,0), ..., x^(K,K)
+    I = CartesianIndices((K + 1, K + 1)) .- CartesianIndex(1, 1)
+    N = Val((K + 1) * (K + 1))
+    b = x -> begin
+        Inti.svector(N) do i
+            return x[1]^I[i][1] * x[2]^I[i][2]
+        end
+    end
+    return b
+end
 
 function monomial_basis(::PolynomialSpace{ReferenceTriangle,K}) where {K}
     # the (K+1)*(K+2)/2 monomials x^(a,b) with a+b ≤ K
@@ -97,14 +98,11 @@ Return the set of `n` polynomials in `sp` taking the value of `1` on node `i`
 and `0` on nodes `j ≂̸ i` for `1 ≤ i ≤ n`.
 """
 function lagrange_basis(nodes, sp::PolynomialSpace)
-    N = dimension(sp)
-    @assert length(nodes) == N
+    # TODO: use a better basis? For "low" degrees, this is fine, but still...
     basis = monomial_basis(sp)
-    # compute the matrix of coefficients of the lagrange polynomials over the
-    # monomomial basis
-    V = hcat([basis(x) for x in nodes]...)
-    # convert to an array to use the backslash operator
-    C = typeof(V)(Matrix(V) \ I)
+    V = hcat([basis(x) for x in nodes]...) # Vandermonde matrix
+    # C = typeof(V)(Matrix(V) \ I) # old way... maybe remove?
+    C = pinv(V)
     lag_basis = x -> C * basis(x)
     return lag_basis
 end

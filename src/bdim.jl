@@ -12,7 +12,7 @@ end
 """
     bdim_correction(op,X,Y,S,D; green_multiplier, kwargs...)
 
-Given a `op` and a (possibly innacurate) discretizations of its single and
+Given a `op` and a (possibly inaccurate) discretizations of its single and
 double-layer operators `S` and `D` (taking a vector of values on `Y` and
 returning a vector on of values on `X`), compute corrections `δS` and `δD` such
 that `S + δS` and `D + δD` are more accurate approximations of the underlying
