@@ -570,6 +570,12 @@ function interpolation_order(qrule::ReferenceQuadrature{ReferenceLine})
     return N - 1
 end
 
+function interpolation_order(qrule::ReferenceQuadrature{ReferenceTriangle})
+    N = length(qrule)
+    # the last triangular number less than N
+    return floor(Int, (sqrt(8N + 1) - 3) / 2)
+end
+
 function interpolation_order(qrule::Inti.TensorProductQuadrature)
     k1d = map(Inti.interpolation_order, qrule.quads1d)
     @assert allequal(k1d) "interpolation order must be the same in all dimensions"

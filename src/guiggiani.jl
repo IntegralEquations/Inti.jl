@@ -153,7 +153,7 @@ Decompose the square `[0,1] × [0,1]` into four triangles, and return four tuple
 the function that gives the distance from `x̂` to the border of the square in the direction
 `θ`.
 """
-function polar_decomposition(::ReferenceSquare, x::SVector{2,Float64})
+function polar_decomposition(::ReferenceSquare, x::SVector{2,<:Number})
     theta1 = atan(1 - x[2], 1 - x[1])
     theta2 = atan(x[1], 1 - x[2]) + π / 2
     theta3 = atan(x[2], x[1]) + π
@@ -166,6 +166,24 @@ function polar_decomposition(::ReferenceSquare, x::SVector{2,Float64})
     (theta2, theta3, rho2),
     (theta3, theta4, rho3),
     (theta4, theta1 + 2π, rho4)
+end
+
+"""
+	polar_decomposition(shape::ReferenceTriangle, x̂::SVector{2,Float64})
+
+Decompose the triangle `{x,y ≥ 0, x + y ≤ 1}` into three triangles, and return three tuples
+of the form `θₛ, θₑ, ρ` where `θₛ` and `θₑ` are the initial and final angles of the
+triangle, and `ρ` is the function that gives the distance from `x̂` to the border of the
+triangle in the direction `θ`
+"""
+function polar_decomposition(::ReferenceTriangle, x::SVector{2,<:Number})
+    theta1 = atan(x[1], 1 - x[2]) + π / 2
+    theta2 = atan(x[2], x[1]) + π
+    theta3 = atan(1 - x[1], x[2]) + 3π / 2
+    rho1 = θ -> x[1] / (-cos(θ))
+    rho2 = θ -> x[2] / (-sin(θ))
+    rho3 = θ -> (1 - x[1] - x[2]) / (sqrt(2) * cos(θ - π / 4))
+    return (theta1, theta2, rho1), (theta2, theta3, rho2), (theta3, theta1 + 2π, rho3)
 end
 
 """
@@ -233,7 +251,8 @@ function guiggiani_singular_integral(
                 rho -> F(rho, theta),
                 rho_max / 2,
                 Val(2);
-                atol = 1e-12,
+                atol = 1e-10,
+                rtol = 1e-8,
                 contract = 1 / 2,
             )
             I_rho = quad_rho() do (rho_ref,)

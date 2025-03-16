@@ -98,14 +98,11 @@ Return the set of `n` polynomials in `sp` taking the value of `1` on node `i`
 and `0` on nodes `j ≂̸ i` for `1 ≤ i ≤ n`.
 """
 function lagrange_basis(nodes, sp::PolynomialSpace)
-    N = dimension(sp)
-    @assert length(nodes) == N
+    # TODO: use a better basis? For "low" degrees, this is fine, but still...
     basis = monomial_basis(sp)
-    # compute the matrix of coefficients of the lagrange polynomials over the
-    # monomomial basis
-    V = hcat([basis(x) for x in nodes]...)
-    # convert to an array to use the backslash operator
-    C = typeof(V)(Matrix(V) \ I)
+    V = hcat([basis(x) for x in nodes]...) # Vandermonde matrix
+    # C = typeof(V)(Matrix(V) \ I) # old way... maybe remove?
+    C = pinv(V)
     lag_basis = x -> C * basis(x)
     return lag_basis
 end
