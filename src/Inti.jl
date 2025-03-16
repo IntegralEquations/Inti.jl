@@ -19,6 +19,7 @@ using SparseArrays
 using StaticArrays
 using Printf
 using TOML
+using Richardson
 
 import ElementaryPDESolutions
 import SpecialFunctions
@@ -48,6 +49,7 @@ include("nystrom.jl")
 include("bdim.jl")
 include("vdim.jl")
 include("adaptive.jl")
+include("guiggiani.jl")
 
 # some zero-argument methods for the Inti's gmsh extension
 include("gmsh_api.jl")

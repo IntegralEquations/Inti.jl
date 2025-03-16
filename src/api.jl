@@ -6,7 +6,7 @@ Available compression methods for the dense linear operators in [`Inti`](@ref).
 const COMPRESSION_METHODS = [:none, :hmatrix, :fmm]
 
 """
-    const CORRECTION_METHODS = [:none, :dim, :hcubature]
+    const CORRECTION_METHODS = [:none, :dim, :adaptive]
 
 Available correction methods for the singular and nearly-singular integrals in
 [`Inti`](@ref).

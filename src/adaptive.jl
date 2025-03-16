@@ -91,7 +91,6 @@ end
     a, b = svector(i -> 0.0, N), svector(i -> 1.0, N)
     x̂, ŵ = collect.(qreg())
     el2qtags = etype2qtags(Y, E)
-    # buffers = [hcubature_buffer(x -> one(eltype(correction.V)) * L(a) * first(ŵ), a, b) for _ in 1:Threads.nthreads()]
     buffer = allocate_buffer(x -> one(eltype(correction.V)) * L(a) * first(ŵ), τ̂)
     max_abser = 0.0
     max_reler = 0.0

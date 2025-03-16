@@ -11,7 +11,7 @@ See also: [`SingleLayerKernel`](@ref),
 """
 abstract type AbstractKernel{T} end
 
-return_type(::AbstractKernel{T}) where {T} = T
+return_type(::AbstractKernel{T}, args...) where {T} = T
 
 """
     abstract type AbstractDifferentialOperator{N}
@@ -156,7 +156,7 @@ function (HS::HyperSingularKernel{T,Laplace{N}})(
     target,
     source,
     r = coords(target) - coords(source),
-)::T where {N,T}
+) where {N,T}
     nx = normal(target)
     ny = normal(source)
     d = norm(r)
@@ -550,7 +550,7 @@ function (ADL::AdjointDoubleLayerKernel{T,<:Elastostatic{N}})(target, source)::T
     end
 end
 
-function (HS::HyperSingularKernel{T,<:Elastostatic{N}})(target, source)::T where {N,T}
+function (HS::HyperSingularKernel{T,<:Elastostatic{N}})(target, source) where {N,T}
     μ, λ = HS.op.μ, HS.op.λ
     ν = λ / (2 * (μ + λ))
     x = coords(target)

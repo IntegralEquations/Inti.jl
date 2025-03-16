@@ -562,3 +562,9 @@ function interpolation_order(qrule::ReferenceQuadrature{ReferenceLine})
     N = length(qrule)
     return N - 1
 end
+
+function interpolation_order(qrule::Inti.TensorProductQuadrature)
+    k1d = map(Inti.interpolation_order, qrule.quads1d)
+    @assert allequal(k1d) "interpolation order must be the same in all dimensions"
+    return first(k1d)
+end
