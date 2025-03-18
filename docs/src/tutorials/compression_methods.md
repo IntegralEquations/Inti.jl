@@ -30,12 +30,10 @@ of the operator. The following methods are available:
 !!! warning "Singular kernels"
     Acceleration methods do not correct for singular or nearly-singular
     interactions. When the underlying kernel is singular, a *correction* is
-    usually necessary in order to obtain accurate results (see the [section on
-    correction methods](@ref "Correction methods") for more details).
+    usually necessary in order to obtain accurate results (see the section on
+    [correction methods](@ref "Correction methods") for more details).
   
-To illustrate the use of compression methods, we will use the following problem
-as an example. Note that for such a small problem, compression methods are not
-likely not necessary, but they are useful for larger problems.
+To demonstrate the use of compression methods, we will compress the single-layer operator for the Helmholtz equation on an ellipsoid. While compression methods may not be necessary for small problems like this, they become essential -- and often indispensable -- for tackling larger-scale problems efficiently.
 
 ```@example compression
 using Inti
@@ -49,7 +47,7 @@ Q = Inti.Quadrature(Γ; meshsize = 0.4, qorder = 5)
 op = Inti.Helmholtz(; dim = 3, k = 2π)
 K = Inti.SingleLayerKernel(op)
 Sop = Inti.IntegralOperator(K, Q, Q)
-x = rand(eltype(Sop), length(Q))
+x = rand(ComplexF64, length(Q))
 rtol = 1e-8
 nothing # hide
 ```
@@ -129,19 +127,17 @@ println("Forward map error: $er")
 The choice of compression method depends on the problem at hand, as well as on
 the available hardware. Here is a rough guide on how to choose a compression:
 
-1. For small problems (say less than 5k degrees of freedom), use the dense
-   matrix representation. It is the simplest and most straightforward method,
-   and does not require any additional packages. It is also the most accurate
-   since it does not introduce any approximation errors.
-2. If the integral operator is supported by the `assemble_fmm`, and if an
-   iterative solver is acceptable, use it. The FMM is a very efficient method
-   for certain types of kernels, and can handle problems with up to a few
-   million degrees of freedom on a laptop.
-3. If the kernel is not supported by `assemble_fmm`, if iterative solvers are
-   not an option, or if the system needs solution for many right-hand sides,
-   use the `assemble_hmatrix` method. It is a very general method that can
-   handle a wide range of kernels, and although assembling the `HMatrix` can be
-   time and memory consuming (the complexity is still log-linear in the DOFs for
-   many kernels of interest, but the constants can be large), the resulting
-   `HMatrix` object is very efficient to use. For example, the forward map is
+1. For small problems (say less than 5k degrees of freedom), use the dense matrix
+   representation. It is the simplest and most straightforward method, and does not require
+   any additional packages. It is also the most accurate since it does not introduce any
+   additional approximation errors.
+2. If the integral operator is supported by the `assemble_fmm`, and if an iterative solver
+   is acceptable, use it. The FMM is a very efficient method for certain types of kernels,
+   and can handle problems with up to a few million degrees of freedom on a laptop.
+3. If the kernel is not supported by `assemble_fmm`, if iterative solvers are not an option,
+   or if the system needs solution for many right-hand sides, use the `assemble_hmatrix`
+   method. It is a very general method that can handle a wide range of kernels, and although
+   assembling the `HMatrix` can be time and memory consuming (the complexity is still
+   log-linear in the DOFs for many kernels of interest, but the constants can be large), the
+   resulting `HMatrix` object is very efficient to use. For example, the forward map is
    usually significantly faster than the one obtained through `assemble_fmm`.
