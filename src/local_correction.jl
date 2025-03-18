@@ -1,7 +1,9 @@
 """
     local_correction(iop::IntegralOperator; [maxdist, tol, threads = true, kwargs...])
+    local_correction(iop::IntegralOperator, maxdist, quads_dict::Dict, threads = true)
 
-This function computes a sparse correction for the integral operator `iop`, addressing its singular or nearly singular entries.
+This function computes a sparse correction for the integral operator `iop`, addressing its
+singular or nearly singular entries.
 
 The parameter `maxdist` specifies the maximum distance between target points  and source
 elements to be considered for correction (only interactions within this distance are
@@ -21,6 +23,42 @@ manually tunning these parameters.
 
 Additional keyword arguments are passed to [`adaptive_quadrature`](@ref); see its
 documentation for more information.
+
+# Advanced usage
+
+Instead of passing a `tol` and a `maxdist`, you can provide a dictionary `quads_dict` that
+contains quadrature rules for each reference element type present in the mesh of
+`source(iop)`. This allows you to fine-tune the quadrature rules for specific element types
+(e.g. use a fixed quadrature rule instead of an adaptive one).
+
+The dictionary `quads_dict` must adhere to the following structure:
+- `quads_dict[E].nearfield_quad`: A function that integrates over the nearfield of the
+  reference element type `E`. Used in the nearly-singular correction.
+- `quads_dict[E].radial_quad`: A function that integrates over the radial direction of the
+  reference element type `E`. Used in the singular correction.
+- `quads_dict[E].angular_quad`: A function that integrates over the angular direction of the
+  reference element type `E`. Used in the singular correction.
+
+Here is an example of how to implement a custom `quads_dict` given an `iop`:
+
+```julia
+quads_dict = Dict()
+msh = Inti.mesh(source(iop))
+for E in Inti.element_types(msh)
+    ref_domain = Inti.reference_domain(E)
+    quads = (
+        nearfield_quad = Inti.adaptive_quadrature(ref_domain; atol),
+        radial_quad    = Inti.GaussLegendre(;order=5),
+        angular_quad   = Inti.GuassLegendre(;order=20),
+    )
+    quads_dict[E] = quads
+end
+```
+
+This will use an adaptive quadrature rule for the nearfield and fixed Gauss-Legendre
+quadrature rules for the radial and angular directions when computing the singular
+correction in polar coordinates on the reference domain. You can then call
+`local_correction(iop, maxdist, quads_dict)` to use the custom quadrature.
 """
 function local_correction(
     iop::IntegralOperator;
@@ -49,27 +87,9 @@ function local_correction(
 end
 
 """
-    local_correction(iop::IntegralOperator, maxdist, quads_dict::Dict, threads = true)
 
-This method extends `local_correction(iop::IntegralOperator; maxdist, tol)` by allowing the
-user to provide a custom dictionary `quads_dict` containing quadrature rules for each
-reference element type present in the mesh of `source(iop)`.
 
-The dictionary `quads_dict` must adhere to the following structure:
-- `quads_dict[E].nearfield_quad`: A function that integrates over the nearfield of the
-  reference element type `E`. Used in the nearly-singular correction.
-- `quads_dict[E].radial_quad`: A function that integrates over the radial direction of the
-  reference element type `E`. Used in the singular correction.
-- `quads_dict[E].angular_quad`: A function that integrates over the angular direction of the
-  reference element type `E`. Used in the singular correction.
 
-This flexibility enables to fine-tune the quadrature rules for specific element types,
-improving accuracy or performance based on the problem's requirements.
-
-!!! note "Finite part integrals"
-    This function handles strongly singular integrals by implementing the method of
-    Guiggiani [guiggiani1992general(@cite), which consists of a polar change of variables
-    followed by a Laurent series expansion of the integrand.
 """
 function local_correction(iop, maxdist, quads_dict::Dict, threads = true)
     # unpack type-unstable fields in iop, allocate output, and dispatch
@@ -271,12 +291,13 @@ function guiggiani_singular_integral(
             )
             I_rho = quad_rho() do (rho_ref,)
                 rho = rho_ref * rho_max
-                rho < 1e-4 && (return F₀)
                 # compute F(rho, theta) - F₋₁ / rho - F₋₂ / rho^2, but ignore terms that are
                 # known to be zero
                 if P == 2
+                    rho < cbrt(eps()) && (return F₀)
                     return F(rho, theta) - F₋₁ / rho - F₋₂ / rho^2
                 elseif P == 1
+                    rho < sqrt(eps()) && (return F₀)
                     return F(rho, theta) - F₋₁ / rho
                 else
                     return F(rho, theta)
@@ -332,15 +353,15 @@ function guiggiani_singular_integral(
                 rho_max / 2,
                 sorder;
                 atol = 1e-10,
-                rtol = 1e-8,
                 contract = 1 / 2,
             )
         I_rho = quad_rho() do (rho_ref,)
             rho = rho_ref * rho_max
-            rho < 1e-4 && (return F₀)
             if P == 2
+                rho < cbrt(eps()) && (return F₀)
                 return F(rho, s) - F₋₂ / rho^2 - F₋₁ / rho
             elseif P == 1
+                rho < sqrt(eps()) && (return F₀)
                 return F(rho, s) - F₋₁ / rho
             else
                 return F(rho, s)
