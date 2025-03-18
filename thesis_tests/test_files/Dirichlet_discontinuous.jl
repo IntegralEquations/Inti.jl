@@ -1,7 +1,25 @@
-α, β = 0, 1
-δ = 1e-8
-u = (qnode) -> (Inti.coords(qnode)[2] + δ) / (2δ)
+G = Inti.SingleLayerKernel(pde)
+dG = Inti.DoubleLayerKernel(pde)
+α, β = 1, 1
+# δ = 1e-8
+# u = (qnode) -> (Inti.coords(qnode)[2] + δ) / (2δ)
+σ_ref = (qnode) -> Inti.coords(qnode)[2] > 0 ? 1 : 0
+u = x -> quadgk(a, b, atol=1e-15) do s
+    χ_ = s -> ForwardDiff.derivative(χ, s)
+    n  = s -> normalize(SVector(χ_(s)[2], -χ_(s)[1]))
+    y  = s -> (coords=χ(s), normal=n(s))
+    (α * G(x, χ(s)) * σ_ref(χ(s)) + β * dG(x, y(s)) * σ_ref(χ(s))) * norm(χ_(s))        
+end[1]
 # u = qnode -> 1
+# qorder = 3
+# h = 0.1
+# msh = Inti.meshgen(Γ; meshsize = h)
+# Γ_msh = msh[Γ]
+# quad = Inti.Quadrature(Γ_msh; qorder)
+# ubnd = map(u, quad) + μ * map(σ_ref, quad)
+# (α * Sdim + β * (Ddim + μ*I)) \ ubnd
+# σ_vec = map(σ_ref, quad)
+
 for qorder in Q
     err0 = Err0[qorder]
     errl = Errl[qorder]
@@ -20,29 +38,19 @@ for qorder in Q
         @info h, k, nel
         ##
 
+        μ = t == :interior ? -0.5 : 0.5
         quad = Inti.Quadrature(Γ_msh; qorder)
-        ubnd = map(u, quad)
+        ubnd = map(u, quad) + μ * map(σ_ref, quad)
         utst = map(u, tset)
         utst_norm = norm(utst, Inf)
         # single and double layer
-        G = Inti.SingleLayerKernel(pde)
         S = Inti.IntegralOperator(G, quad)
         Smat  = Inti.assemble_matrix(S)
         Stest = Inti.IntegralOperator(G, tset, quad)
 
-        dG = Inti.DoubleLayerKernel(pde)
         D = Inti.IntegralOperator(dG, quad)
         Dmat  = Inti.assemble_matrix(D)
         Dtest = Inti.IntegralOperator(dG, tset, quad)
-
-        μ = t == :interior ? -0.5 : 0.5
-        σ    = (α * Smat + β * (Dmat + μ*I)) \ ubnd
-        # @show norm(α * Smat * σ - ubnd, Inf)
-        # @show norm(ubnd, Inf)
-        # @show norm(Stest, Inf)
-        usol = (α * Stest + β * Dtest) * σ
-        # @show  utst
-        e0   = norm(usol - utst, Inf) / utst_norm
 
         green_multiplier = fill(-0.5, length(quad))
         # δS, δD = Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
@@ -73,6 +81,7 @@ for qorder in Q
         #     correction  = (method = :ldim,),
         # )
         σ    = (α * Sdim + β * (Ddim + μ*I)) \ ubnd
+        # @show σ
         usol = (α * Stest + β * Dtest) * σ
         eloc   = norm(usol - utst, Inf) / utst_norm
 
@@ -81,15 +90,14 @@ for qorder in Q
         Sdim = Smat + δS
         Ddim = Dmat + δD
         σ    = (α * Sdim + β * (Ddim + μ*I)) \ ubnd
+        # @show σ
         usol = (α * Stest + β * Dtest) * σ
         eglo   = norm(usol - utst, Inf) / utst_norm
         # @show norm(e0, Inf)
-        @show e0
         @show eloc
         @show eglo
         @show tldim
         @show tdim
-        push!(err0, e0)
         push!(errl, eloc)
         push!(errg, eglo)
     end
