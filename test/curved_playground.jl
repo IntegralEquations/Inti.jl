@@ -74,7 +74,6 @@ circarea = 0.0
 #elind = 747
 els = []
 for elind = 1:nvol_els
-    global circarea
     node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{2, Float64}}][:, elind]
     nodes = msh.nodes[node_indices]
 

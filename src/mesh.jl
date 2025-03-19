@@ -611,3 +611,27 @@ end
 Call `Domain(f, ents)` on `ents = entities(msh).`
 """
 Domain(f::Function, msh::AbstractMesh) = Domain(f, entities(msh))
+
+function node2etags(msh)
+    # dictionary mapping a node index to all elements containing it. Note
+    # that the elements are stored as a tuple (type, index)
+    T = Vector{Int}
+    node2els = Dict{Int,Vector{T}}()
+    for E in Inti.element_types(msh)
+        mat = Inti.connectivity(msh, E)::Matrix{Int} # connectivity matrix
+        np, Nel = size(mat)
+        for n in 1:Nel
+            tags = mat[:, n]
+            for i in tags
+                etags = get!(node2els, i, Vector{T}())
+                push!(etags, tags)
+            end
+        end
+    end
+    return node2els
+end
+
+function elements_containing_nodes(n2e, nodes)
+    els = map(i -> n2e[i], nodes)
+    return intersect(els...)
+end
