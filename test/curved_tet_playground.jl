@@ -65,20 +65,24 @@ node_to_param = Dict(zip(bdry_node_idx, bdry_node_param_loc))
 nvol_els = size(msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}])[2]
 spharea = 0.0
 els = []
-#for elind = 1:nvol_els
+for elind = 1:nvol_els
 #elind = 1 # 0 verts on bdry meshsize .1
-elind = 20402 # 2 verts on bdry meshsize .1
+#elind = 480
+#elind = 4162
+#elind = 19507
+#elind = 20396
+#elind = 20398
+#elind = 20402 # 2 verts on bdry meshsize .1
 #elind = 20386 # 3 verts on bdry meshsize .1
 #elind = 20396
 #elind = 152422 # 3 verts on bdry meshsize .1/2
+#elind = 98351 # 2 verts on bdry meshsize .1/2
     node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}][:, elind]
     nodes = msh.nodes[node_indices]
     
     verts_on_bdry = findall(x -> x ∈ bdry_node_idx, node_indices)
     j = length(verts_on_bdry)
     if j > 1
-        println(length(verts_on_bdry))
-        println(elind)
         node_indices_on_bdry = node_indices[verts_on_bdry]
         α₁ = node_to_param[node_indices_on_bdry[1]]
         α₂ = node_to_param[node_indices_on_bdry[2]]
@@ -91,23 +95,86 @@ elind = 20402 # 2 verts on bdry meshsize .1
             candidate_els = candidate_els[length.(candidate_els).==3]
             α₃ = node_to_param[candidate_els[1][3]] #FIXME
         end
-        a₁ = ψ(α₁)
-        a₂ = ψ(α₂)
-        a₃ = ψ(α₃)
-        α₁hat = SVector{2,Float64}(0.0, 1.0)
-        α₂hat = SVector{2,Float64}(0.0, 0.0)
-        α₃hat = SVector{2,Float64}(1.0, 0.0)
+        # Try to handle periodicity in ϕ
+        if (α₂[2] ≈ 0.0) && (abs(α₂[2] - α₁[2]) > π || abs(α₂[2] - α₃[2]) > π)
+            α₂[2] = 2*π
+        end
+        if (α₃[2] ≈ 0.0) && (abs(α₃[2] - α₁[2]) > π || abs(α₃[2] - α₂[2]) > π)
+            α₃[2] = 2*π
+        end
+        if (α₁[2] ≈ 0.0) && (abs(α₁[2] - α₂[2]) > π || abs(α₁[2] - α₃[2]) > π)
+            α₁[2] = 2*π
+        end
+        if (α₂[2] ≈ 2*π) && (abs(α₂[2] - α₁[2]) > π || abs(α₂[2] - α₃[2]) > π)
+            α₂[2] = 0.0
+        end
+        if (α₃[2] ≈ 2*π) && (abs(α₃[2] - α₁[2]) > π || abs(α₃[2] - α₂[2]) > π)
+            α₃[2] = 0.0
+        end
+        if (α₁[2] ≈ 2*π) && (abs(α₁[2] - α₂[2]) > π || abs(α₁[2] - α₃[2]) > π)
+            α₁[2] = 0.0
+        end
+        if !((abs(α₁[1] - α₂[1]) < π/2) && (abs(α₂[1] - α₃[1]) < π/2) && (abs(α₁[1] - α₃[1]) < π/2))
+            @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", max(α₁[1], α₂[1], α₃[1])
+            @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", min(α₁[1], α₂[1], α₃[1])
+        end
+        if !((abs(α₁[2] - α₂[2]) < π) && (abs(α₂[2] - α₃[2]) < π) && (abs(α₁[2] - α₃[2]) < π))
+            @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", max(α₁[1], α₂[1], α₃[1])
+            @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", min(α₁[1], α₂[1], α₃[1])
+        end
+        a₁ = SVector{3,Float64}(ψ(α₁))
+        a₂ = SVector{3,Float64}(ψ(α₂))
+        a₃ = SVector{3,Float64}(ψ(α₃))
+        α₁hat = SVector{2,Float64}(0.0, 0.0)
+        α₂hat = SVector{2,Float64}(1.0, 0.0)
+        α₃hat = SVector{2,Float64}(0.0, 1.0)
         κ = Inti.LagrangeElement{Inti.ReferenceTriangle,3,SVector{2,Float64}}(SVector{3,SVector{2,Float64}}(α₁, α₂, α₃))
-        f̂ₖ = (x) -> [(α₃[1] - α₂[1])*x[1] + (α₁[1] - α₂[1])*x[2] + α₂[1], (α₃[2] - α₂[2])*x[1] + (α₁[2] - α₂[2])*x[2] + α₂[2]]
+        f̂ₖ = (x) -> [(α₂[1] - α₁[1])*x[1] + (α₃[1] - α₁[1])*x[2] + α₁[1], (α₂[2] - α₁[2])*x[1] + (α₃[2] - α₁[2])*x[2] + α₁[2]]
         @assert (f̂ₖ(α₁hat) ≈ α₁) && (f̂ₖ(α₂hat) ≈ α₂) && (f̂ₖ(α₃hat) ≈ α₃)
+        
+        # Affine map
+        # Vertices aₖ and bₖ always lay on surface. Vertex dₖ always lays in volume.
+        aₖ = a₁
+        bₖ = a₂
+        cₖ = a₃
+        atol = 10^-13
+        facenodes = [a₁, a₂, a₃]
+        skipnode = 0
+        if all(norm.(Ref(nodes[1]) .- facenodes) .> atol)
+            dₖ = nodes[1]
+            skipnode = 1
+        elseif all(norm.(Ref(nodes[2]) .- facenodes) .> atol)
+            dₖ = nodes[2]
+            skipnode = 2
+        elseif all(norm.(Ref(nodes[3]) .- facenodes) .> atol)
+            dₖ = nodes[3]
+            skipnode = 3
+        elseif all(norm.(Ref(nodes[4]) .- facenodes) .> atol)
+            dₖ = nodes[4]
+            skipnode = 4
+        else
+            error("Uhoh")
+        end
+        if j == 2
+            if all(norm.(Ref(nodes[1]) .- facenodes) .> atol)
+                (skipnode == 1) || (cₖ = nodes[1])
+            elseif all(norm.(Ref(nodes[2]) .- facenodes) .> atol)
+                (skipnode == 2) || (cₖ = nodes[2])
+            elseif all(norm.(Ref(nodes[3]) .- facenodes) .> atol)
+                (skipnode == 3) || (cₖ = nodes[3])
+            elseif all(norm.(Ref(nodes[4]) .- facenodes) .> atol)
+                (skipnode == 4) || (cₖ = nodes[4])
+            else
+                error("Uhoh")
+            end
+        end
+        F̃ₖ = (x) -> [(aₖ[1] - dₖ[1])*x[1] + (bₖ[1] - dₖ[1])*x[2] + (cₖ[1] - dₖ[1])*x[3] + dₖ[1], (aₖ[2] - dₖ[2])*x[1] + (bₖ[2] - dₖ[2])*x[2] + (cₖ[2] - dₖ[2])*x[3] + dₖ[2], (aₖ[3] - dₖ[3])*x[1] + (bₖ[3] - dₖ[3])*x[2] + (cₖ[3] - dₖ[3])*x[3] + dₖ[3]]
 
         # l = 1
         πₖ¹_nodes = Inti.reference_nodes(typeof(κ))
         πₖ¹ψ_reference_nodes = Vector{SVector{3,Float64}}(undef, length(πₖ¹_nodes))
         for i in eachindex(πₖ¹_nodes)
             πₖ¹ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ¹_nodes[i]))
-            #πₖ¹ψ_reference_nodes[i] = ψ(f̂ₖ((πₖ¹_nodes[i][1], πₖ¹_nodes[i][2])))
-            #πₖ¹ψ_reference_nodes[i] = ψ((f̂ₖ((πₖ¹_nodes[i][1], πₖ¹_nodes[i][2]))[1], f̂ₖ((πₖ¹_nodes[i][1], πₖ¹_nodes[i][2]))[2]))
         end
         πₖ¹ψ = (x) -> κ(x; f = πₖ¹ψ_reference_nodes)
         #l = 2
@@ -115,23 +182,13 @@ elind = 20402 # 2 verts on bdry meshsize .1
 
         # l = 1
         # Nonlinear map
-        # FIXME need to sum through j for j < d
         if j == 3
             f̂ₖ_comp = (x) -> f̂ₖ( (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat)/(x[1] + x[2] + x[3]) )
             Φₖ = (x) -> ( (x[1] + x[2] + x[3])^3 * (ψ(f̂ₖ_comp(x)) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])))) 
         else
             f̂ₖ_comp = (x) -> f̂ₖ( (x[1] * α₁hat + x[2] * α₂hat)/(x[1] + x[2]) )
-            Φₖ = (x) -> ( (x[1] + x[2])^3 * (ψ(f̂ₖ_comp(x)) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])))) 
+            Φₖ = (x) -> ( (x[1] + x[2])^3 * (ψ(f̂ₖ_comp(x)) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))))
         end
-        # Affine map
-        # FIXME: set up aₖ ... so that they match x_1, x_2, x_3 in above map
-        # should have bₖ be the node that doesn't match a₁, a₂, a₃.
-        # works for j=3
-        aₖ = nodes[2]
-        bₖ = nodes[1]
-        cₖ = nodes[3]
-        dₖ = nodes[4]
-        F̃ₖ = (x) -> [(aₖ[1] - bₖ[1])*x[1] + (cₖ[1] - bₖ[1])*x[2] + (dₖ[1] - bₖ[1])*x[3] + bₖ[1], (aₖ[2] - bₖ[2])*x[1] + (cₖ[2] - bₖ[2])*x[2] + (dₖ[2] - bₖ[2])*x[3] + bₖ[2], (aₖ[3] - bₖ[3])*x[1] + (cₖ[3] - bₖ[3])*x[2] + (dₖ[3] - bₖ[3])*x[3] + bₖ[3]]
 
         # Full transformation
         Fₖ = (x) -> F̃ₖ(x) + Φₖ(x)
@@ -150,20 +207,14 @@ elind = 20402 # 2 verts on bdry meshsize .1
     nq = length(Q[2])
     for q in 1:nq
         global spharea
-        spharea += Q[2][q] * abs(det(Jₖ(Q[1][q])))
+        tmp = Q[2][q] * abs(det(Jₖ(Q[1][q])))
+        if tmp > .0004
+            println(elind)
+            println(q)
+            println(tmp)
+            error("large integral value")
+        end
+        spharea += tmp
+        #spharea += Q[2][q] * abs(det(Jₖ(Q[1][q])))
     end
-#end
-
-#
-#ugrid = Array{Float64}(undef, 200, 200)
-#vgrid = Array{Float64}(undef, 200, 200)
-#for i = 1:200
-#    for j = 1:200
-#        ugrid[i, j] = Fₖ((x1grid[i, j], y1grid[i, j]))[1]
-#        vgrid[i, j] = Fₖ((x1grid[i, j], y1grid[i, j]))[2]
-#    end
-#end
-#f = Figure()
-#Makie.scatter(reduce(vcat, ugrid), reduce(vcat, vgrid), label="")
-#Makie.scatter!(stack(nodes, dims=1)[:, 1], stack(nodes, dims=1)[:, 2], color = :magenta)
-#Makie.lines!(stack(nodes, dims=1)[:, 1], stack(nodes, dims=1)[:, 2], color = :red)
+end
