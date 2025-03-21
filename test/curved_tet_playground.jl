@@ -114,10 +114,6 @@ for elind = 1:nvol_els
         if (α₁[2] ≈ 2*π) && (abs(α₁[2] - α₂[2]) > π || abs(α₁[2] - α₃[2]) > π)
             α₁[2] = 0.0
         end
-        if !((abs(α₁[1] - α₂[1]) < π/2) && (abs(α₂[1] - α₃[1]) < π/2) && (abs(α₁[1] - α₃[1]) < π/2))
-            @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", max(α₁[1], α₂[1], α₃[1])
-            @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", min(α₁[1], α₂[1], α₃[1])
-        end
         if !((abs(α₁[2] - α₂[2]) < π) && (abs(α₂[2] - α₃[2]) < π) && (abs(α₁[2] - α₃[2]) < π))
             @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", max(α₁[1], α₂[1], α₃[1])
             @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", min(α₁[1], α₂[1], α₃[1])
@@ -128,7 +124,6 @@ for elind = 1:nvol_els
         α₁hat = SVector{2,Float64}(0.0, 0.0)
         α₂hat = SVector{2,Float64}(1.0, 0.0)
         α₃hat = SVector{2,Float64}(0.0, 1.0)
-        κ = Inti.LagrangeElement{Inti.ReferenceTriangle,3,SVector{2,Float64}}(SVector{3,SVector{2,Float64}}(α₁, α₂, α₃))
         f̂ₖ = (x) -> [(α₂[1] - α₁[1])*x[1] + (α₃[1] - α₁[1])*x[2] + α₁[1], (α₂[2] - α₁[2])*x[1] + (α₃[2] - α₁[2])*x[2] + α₁[2]]
         @assert (f̂ₖ(α₁hat) ≈ α₁) && (f̂ₖ(α₂hat) ≈ α₂) && (f̂ₖ(α₃hat) ≈ α₃)
         
@@ -171,12 +166,13 @@ for elind = 1:nvol_els
         F̃ₖ = (x) -> [(aₖ[1] - dₖ[1])*x[1] + (bₖ[1] - dₖ[1])*x[2] + (cₖ[1] - dₖ[1])*x[3] + dₖ[1], (aₖ[2] - dₖ[2])*x[1] + (bₖ[2] - dₖ[2])*x[2] + (cₖ[2] - dₖ[2])*x[3] + dₖ[2], (aₖ[3] - dₖ[3])*x[1] + (bₖ[3] - dₖ[3])*x[2] + (cₖ[3] - dₖ[3])*x[3] + dₖ[3]]
 
         # l = 1
-        πₖ¹_nodes = Inti.reference_nodes(typeof(κ))
+        πₖ¹_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, 3, SVector{2,Float64}})
         πₖ¹ψ_reference_nodes = Vector{SVector{3,Float64}}(undef, length(πₖ¹_nodes))
         for i in eachindex(πₖ¹_nodes)
             πₖ¹ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ¹_nodes[i]))
         end
-        πₖ¹ψ = (x) -> κ(x; f = πₖ¹ψ_reference_nodes)
+        πₖ¹ψ_reference_nodes = SVector{3}(πₖ¹ψ_reference_nodes)
+        πₖ¹ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ¹ψ_reference_nodes)(x)
         #l = 2
         # ...
 

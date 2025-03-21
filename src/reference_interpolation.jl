@@ -427,11 +427,9 @@ function reference_nodes(::Type{<:LagrangeTriangle{3}})
     return SVector(SVector(0.0, 0.0), SVector(1.0, 0.0), SVector(0.0, 1.0))
 end
 
-# Default: interpolate the vertex values, giving physical space coordinates
-# If f given, interpolate its values provided at the reference nodes
-function (el::LagrangeTriangle{3})(u; f = nothing)
-    isnothing(f) && (f = vals(el))
-    return f[1] + (f[2] - f[1]) * u[1] + (f[3] - f[1]) * u[2]
+function (el::LagrangeTriangle{3})(u)
+    v = vals(el)
+    return v[1] + (v[2] - v[1]) * u[1] + (v[3] - v[1]) * u[2]
 end
 
 # P2 for ReferenceTriangle
