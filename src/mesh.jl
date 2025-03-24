@@ -644,8 +644,7 @@ function target_to_near_elements(
         els = elements(Y, E)
         centers = map(center, els)
         idxs = inrange(balltree, centers, tol_)
-        # the idxs[j] entry contains the indices of the targets X which are closer than tol
-        # to the center of the j-th element.
+        # idxs[j] = {i: |X[i] - center of Y[j]| < tol} .
         for (j, near_idxs) in enumerate(idxs)
             for i in near_idxs
                 push!(t2e[i], (E, j))
@@ -714,14 +713,15 @@ function nearest_element_in_connected_components(
 )
     topo_nei = topological_neighbors(Y, 1)
     t2e = target_to_near_elements(X, Y; tol = maxdist)
+    # t2e[i] = {j: |center of Y[j] - X[i]| < maxdist}
     nearest_els = [Tuple{DataType,Int}[] for _ in 1:length(X)]
     for i in eachindex(X)
         for comp in connected_components(t2e[i], topo_nei)
-            kmin = argmin(comp) do (E, j)
+            rep = argmin(comp) do (E, j)
                 el = elements(Y, E)[j]
                 return norm(X[i] - center(el))
             end
-            push!(nearest_els[i], kmin)
+            push!(nearest_els[i], rep)
         end
     end
     return nearest_els
