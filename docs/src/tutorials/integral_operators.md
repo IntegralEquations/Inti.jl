@@ -245,7 +245,7 @@ S₀ = Inti.assemble_hmatrix(Sop; rtol = 1e-4)
 The correction matrix `δS` will be constructed using [`local_correction`](@ref):
 
 ```@example integral_operators
-δS = Inti.local_correction(Sop; tol = 1e-4, maxdist = 3*meshsize)
+δS = Inti.local_correction(Sop; rtol = 1e-4, maxdist = 3*meshsize)
 ```
 
 How exactly one adds `S₀` and `δS` to get the final operator depends on the intended

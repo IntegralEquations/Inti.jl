@@ -106,23 +106,23 @@ end
 end
 
 """
-    assemble_fmm(iop; atol)
+    assemble_fmm(iop; rtol)
 
-Set up a 2D or 3D FMM for evaluating the discretized integral operator `iop`
-associated with the `op`. In 2D the `FMM2D` or `FMMLIB2D` library is used
-(whichever was most recently loaded) while in 3D `FMM3D` is used.
+Set up a 2D or 3D FMM for evaluating the discretized integral operator `iop` associated with
+the `op`. In 2D the `FMM2D` or `FMMLIB2D` library is used (whichever was most recently
+loaded) while in 3D `FMM3D` is used.
 
 !!! warning "FMMLIB2D"
     FMMLIB2D does *no* checking for if the targets and sources coincide, and
     will return `Inf` values if `iop.target !== iop.source`, but there is a
     point `x ∈ iop.target` such that `x ∈ iop.source`.
 """
-function assemble_fmm(iop::IntegralOperator, args...; kwargs...)
+function assemble_fmm(iop::IntegralOperator; rtol)
     N = ambient_dimension(iop.source)
     if N == 2
-        return _assemble_fmm2d(iop, args...; kwargs...)
+        return _assemble_fmm2d(iop; rtol)
     elseif N == 3
-        return _assemble_fmm3d(iop, args...; kwargs...)
+        return _assemble_fmm3d(iop; rtol)
     else
         return error("Only 2D and 3D FMMs are supported")
     end
