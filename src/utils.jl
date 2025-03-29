@@ -257,7 +257,7 @@ function _normalize_correction(correction, target, source)
             correction,
         )
     elseif correction.method == :local
-        correction = merge((maxdist = nothing, tol = nothing), correction)
+        correction = merge((maxdist = nothing, rtol = nothing), correction)
     end
     return correction
 end

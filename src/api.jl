@@ -154,8 +154,8 @@ function single_double_layer(;
             )
         end
     elseif correction.method == :local
-        δS = local_correction(Sop; correction.maxdist, correction.tol)
-        δD = local_correction(Dop; correction.maxdist, correction.tol)
+        δS = local_correction(Sop; correction.maxdist, correction.rtol)
+        δD = local_correction(Dop; correction.maxdist, correction.rtol)
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end

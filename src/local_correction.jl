@@ -1,5 +1,5 @@
 """
-    local_correction(iop::IntegralOperator; [maxdist, tol, threads = true, kwargs...])
+    local_correction(iop::IntegralOperator; [maxdist, rtol, threads = true, kwargs...])
     local_correction(iop::IntegralOperator, maxdist, quads_dict::Dict, threads = true)
 
 This function computes a sparse correction for the integral operator `iop`, addressing its
@@ -9,27 +9,27 @@ The parameter `maxdist` specifies the maximum distance between target points  an
 elements to be considered for correction (only interactions within this distance are
 corrected).
 
-The parameter `tol` defines the tolerance for the adaptive quadrature used to compute the
+The parameter `rtol` defines the tolerance for the adaptive quadrature used to compute the
 corrections for singular or nearly singular entries.
 
-Selecting `maxdist` and `tol` involves balancing accuracy and computational cost. A smaller
-`maxdist` reduces the number of corrections but may impact accuracy. Conversely, a smaller
-`tol` improves correction accuracy but increases computational expense. The ideal values for
-`maxdist` and `tol` depend on the kernel and the mesh/quadrature rule applied.
+Additional `kwargs` arguments are passed to [`adaptive_quadrature`](@ref); see its
+documentation for more information.
 
-By default, `maxdist` and `tol` are estimated using the
+Selecting `maxdist` and `rtol` involves balancing accuracy and computational cost. A smaller
+`maxdist` reduces the number of corrections but may impact accuracy. Conversely, a smaller
+`rtol` improves correction accuracy but increases computational expense. The ideal values
+for `maxdist` and `rtol` depend on the kernel and the mesh/quadrature rule applied.
+
+By default, `maxdist` and `rtol` are estimated using the
 [`local_correction_dist_and_tol`](@ref), but it is often possible to improve performance by
 manually tunning these parameters.
 
-Additional keyword arguments are passed to [`adaptive_quadrature`](@ref); see its
-documentation for more information.
-
 # Advanced usage
 
-Instead of passing a `tol` and a `maxdist`, you can provide a dictionary `quads_dict` that
-contains quadrature rules for each reference element type present in the mesh of
-`source(iop)`. This allows you to fine-tune the quadrature rules for specific element types
-(e.g. use a fixed quadrature rule instead of an adaptive one).
+For finer control, you can provide a dictionary `quads_dict` that contains quadrature rules
+for each reference element type present in the mesh of `source(iop)`. This allows you to
+fine-tune the quadrature rules for specific element types (e.g. use a fixed quadrature rule
+instead of an adaptive one).
 
 The dictionary `quads_dict` must adhere to the following structure:
 - `quads_dict[E].nearfield_quad`: A function that integrates over the nearfield of the
@@ -63,34 +63,29 @@ correction in polar coordinates on the reference domain. You can then call
 function local_correction(
     iop::IntegralOperator;
     maxdist = nothing,
-    tol = nothing,
+    rtol = nothing,
     threads = true,
     kwargs...,
 )
-    if isnothing(maxdist) || isnothing(tol)
-        maxdist_, tol_ = local_correction_dist_and_tol(iop)
+    if isnothing(maxdist) || isnothing(rtol)
+        maxdist_, rtol_ = local_correction_dist_and_tol(iop)
     end
     maxdist    = isnothing(maxdist) ? maxdist_ : maxdist
-    tol        = isnothing(tol) ? 10 * tol_ : tol
+    rtol       = isnothing(rtol) ? rtol_ : rtol
     msh        = mesh(target(iop))
     quads_dict = Dict()
     for E in element_types(msh)
         ref_domain = reference_domain(E)
         quads = (
-            nearfield_quad = adaptive_quadrature(ref_domain; atol = tol, kwargs...),
-            radial_quad    = adaptive_quadrature(ReferenceLine(); atol = tol, kwargs...),
-            angular_quad   = adaptive_quadrature(ReferenceLine(); atol = tol, kwargs...),
+            nearfield_quad = adaptive_quadrature(ref_domain; rtol, kwargs...),
+            radial_quad    = adaptive_quadrature(ReferenceLine(); rtol, kwargs...),
+            angular_quad   = adaptive_quadrature(ReferenceLine(); rtol, kwargs...),
         )
         quads_dict[E] = quads
     end
     return local_correction(iop, maxdist, quads_dict, threads)
 end
 
-"""
-
-
-
-"""
 function local_correction(iop, maxdist, quads_dict::Dict, threads = true)
     # unpack type-unstable fields in iop, allocate output, and dispatch
     X, Y, K = target(iop), source(iop), kernel(iop)
@@ -419,13 +414,13 @@ end
 """
     local_correction_dist_and_tol(iop::IntegralOperator, kmax)
 
-Try to estimate resonable `maxdist` and `tol` parameters for the [`local_correction`](@ref)
+Try to estimate resonable `maxdist` and `rtol` parameters for the [`local_correction`](@ref)
 function, where `maxdist` is at most `kmax` times the radius of the largest element in the
 source mesh of `iop`.
 
 !!! note
     This is a heuristic and may not be accurate/efficient in all cases. It is recommended to
-    test different values of `maxdist` and `tol` to find the optimal values for your
+    test different values of `maxdist` and `rtol` to find the optimal values for your
     problem.
 
 # Extended help
@@ -435,38 +430,38 @@ mesh(source(iop))`:
 
 1. Pick the largest element in `msh`
 2. Let `h` be the radius of `el`
-3. For `k` between `1` and `kmax`, estimate the quadrature
+3. For `k` between `1` and `kmax`, estimate the (relative) quadrature
    error when integrating `y -> K(x,y)` for `x` at a distance `k * h` from
    the center of the element using a regular quadrature rule
 4. Find a `k` such that ratio between errors at distances `k * h` and `(k + 1) * h` is below
    a certain threshold. This indicates stagnation in the error, and suggests that little is
    gained by increasing the distance.
-5. Return `maxdist = k * h` and `tol` as the error at distance `k * h`.
+5. Return `maxdist = k * h` and `rtol` as the error at distance `k * h`.
 """
 function local_correction_dist_and_tol(iop::IntegralOperator, kmax = 10)
     K       = kernel(iop)
     Q       = source(iop)
     msh     = mesh(Q)
     maxdist = 0.0
-    tol     = 0.0
+    rtol    = 0.0
     for E in element_types(msh)
         ref_domain     = reference_domain(E)
         els            = elements(msh, E)
         regular_quad   = quadrature_rule(Q, E)
-        reference_quad = adaptive_quadrature(ref_domain; atol = 1e-8, maxsubdiv = 10_000)
+        reference_quad = adaptive_quadrature(ref_domain; rtol = 1e-12, maxsubdiv = 10_000)
         # pick the biggest element as a reference
         qtags = etype2qtags(Q, E)
         a, i = @views findmax(j -> sum(weight, Q[qtags[:, j]]), 1:size(qtags, 2))
-        dist, er =
+        dist, rel_er =
             _regular_integration_errors(els[i], K, regular_quad, reference_quad, kmax)
         # find first index such that er[i+1] > er[i] / ratio
         ratio = 8
-        i = findfirst(i -> er[i+1] > er[i] / ratio, 1:(kmax-1))
-        isnothing(i) && (i = kmax)
+        i = findfirst(i -> rel_er[i+1] > rel_er[i] / ratio, 1:(kmax-1))
+        isnothing(i) && (i = kmax; @warn "using $kmax as maxdist")
         maxdist = max(maxdist, dist[i])
-        tol     = max(tol, er[i])
+        rtol = max(rtol, rel_er[i])
     end
-    return maxdist, tol
+    return maxdist, rtol
 end
 
 function _regular_integration_errors(el, K, qreg, qref, maxiter)
@@ -495,7 +490,7 @@ function _regular_integration_errors(el, K, qreg, qref, maxiter)
             x  = setindex(x₀, x₀[k] + sign(N) * cc * h, k)
             I  = qref(ŷ -> f(x, ŷ))
             Ia = qreg(ŷ -> f(x, ŷ))
-            er = max(er, norm(Ia - I))
+            er = max(er, norm(Ia - I, Inf) / norm(I, Inf))
         end
         push!(ers, er)
         push!(dists, cc * h)

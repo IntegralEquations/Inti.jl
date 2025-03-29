@@ -19,7 +19,7 @@ rtol2 = 5e-2 # hypersingular (higher tolerance to avoid use of fine mesh + long 
 dims = (2, 3)
 types = (:interior, :exterior)
 
-corrections = [(method = :dim,), (method = :local,)]
+corrections = [(method = :dim,), (method = :local, rtol = rtol1)]
 
 for correction in corrections
     @testset "Method = $(correction.method)" begin
@@ -58,20 +58,20 @@ for correction in corrections
                         γ₁u_norm = norm(norm.(γ₁u, Inf), Inf)
                         # single and double layer
                         G = Inti.SingleLayerKernel(op)
-                        S = Inti.IntegralOperator(G, quad)
-                        Smat = Inti.assemble_matrix(S)
+                        Sop = Inti.IntegralOperator(G, quad)
+                        Smat = Inti.assemble_matrix(Sop)
                         dG = Inti.DoubleLayerKernel(op)
-                        D = Inti.IntegralOperator(dG, quad)
-                        Dmat = Inti.assemble_matrix(D)
+                        Dop = Inti.IntegralOperator(dG, quad)
+                        Dmat = Inti.assemble_matrix(Dop)
                         e0 = norm(Smat * γ₁u - Dmat * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
-                        Sdim, Ddim = Inti.single_double_layer(;
+                        S, D = Inti.single_double_layer(;
                             op,
                             target      = quad,
                             source      = quad,
                             compression = (method = :none,),
                             correction,
                         )
-                        e1 = norm(Sdim * γ₁u - Ddim * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
+                        e1 = norm(S * γ₁u - D * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
                         @testset "Single/double layer $(string(op))" begin
                             @test norm(e0, Inf) > norm(e1, Inf)
                             @test norm(e1, Inf) < rtol1
@@ -79,19 +79,19 @@ for correction in corrections
                         # adjoint double-layer and hypersingular.
                         op isa Inti.Stokes && continue # TODO: implement hypersingular for Stokes?
 
-                        K = Inti.IntegralOperator(Inti.AdjointDoubleLayerKernel(op), quad)
-                        Kmat = Inti.assemble_matrix(K)
-                        H = Inti.IntegralOperator(Inti.HyperSingularKernel(op), quad)
-                        Hmat = Inti.assemble_matrix(H)
+                        Kop = Inti.IntegralOperator(Inti.AdjointDoubleLayerKernel(op), quad)
+                        Kmat = Inti.assemble_matrix(Kop)
+                        Hop = Inti.IntegralOperator(Inti.HyperSingularKernel(op), quad)
+                        Hmat = Inti.assemble_matrix(Hop)
                         e0 = norm(Kmat * γ₁u - Hmat * γ₀u - σ * γ₁u, Inf) / γ₁u_norm
-                        Kdim, Hdim = Inti.adj_double_layer_hypersingular(;
+                        K, H = Inti.adj_double_layer_hypersingular(;
                             op = op,
                             target = quad,
                             source = quad,
                             compression = (method = :none,),
                             correction,
                         )
-                        e1 = norm(Kdim * γ₁u - Hdim * γ₀u - σ * γ₁u, Inf) / γ₁u_norm
+                        e1 = norm(K * γ₁u - H * γ₀u - σ * γ₁u, Inf) / γ₁u_norm
                         @testset "Adjoint double-layer/hypersingular $(string(op))" begin
                             @test norm(e0, Inf) > norm(e1, Inf)
                             @test norm(e1, Inf) < rtol2
