@@ -154,8 +154,10 @@ function single_double_layer(;
             )
         end
     elseif correction.method == :local
-        δS = local_correction(Sop; correction.maxdist, correction.rtol)
-        δD = local_correction(Dop; correction.maxdist, correction.rtol)
+        # strip `method` from correction and pass it on
+        correction_kw = Base.structdiff(correction, NamedTuple{(:method,)})
+        δS = local_correction(Sop; correction_kw...)
+        δD = local_correction(Dop; correction_kw...)
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end

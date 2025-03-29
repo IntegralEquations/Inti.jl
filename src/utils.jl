@@ -256,8 +256,6 @@ function _normalize_correction(correction, target, source)
             (maxdist = Inf, interpolation_order = nothing, center = nothing),
             correction,
         )
-    elseif correction.method == :local
-        correction = merge((maxdist = nothing, rtol = nothing), correction)
     end
     return correction
 end
