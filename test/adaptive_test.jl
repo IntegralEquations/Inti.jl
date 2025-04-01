@@ -85,9 +85,9 @@ end
                     D0 = Inti.assemble_matrix(D)
                     e0 = norm(S0 * γ₁u - D0 * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
                     # @test d > meshsize
-                    maxdist = Inti.farfield_distance(S; tol = atol)
+                    maxdist = Inti.local_correction_dist_and_tol(S; tol = atol)
                     δS = Inti.adaptive_correction(S; maxdist, tol = atol)
-                    maxdist = Inti.farfield_distance(D; tol = atol)
+                    maxdist = Inti.local_correction_dist_and_tol(D; tol = atol)
                     δD = Inti.adaptive_correction(D; maxdist, tol = atol)
                     Smat, Dmat = S0 + δS, D0 + δD
                     e1 = norm(Smat * γ₁u - Dmat * γ₀u - σ * γ₀u, Inf) / γ₀u_norm

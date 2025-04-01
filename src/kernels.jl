@@ -11,7 +11,15 @@ See also: [`SingleLayerKernel`](@ref),
 """
 abstract type AbstractKernel{T} end
 
-return_type(::AbstractKernel{T}) where {T} = T
+return_type(::AbstractKernel{T}, args...) where {T} = T
+
+"""
+    singularity_order(K)
+
+Given a kernel `K` with signature `K(target,source)::T`, return the order of the singularity
+of `K` at `target = source`.
+"""
+singularity_order(K) = nothing
 
 """
     abstract type AbstractDifferentialOperator{N}
@@ -43,6 +51,11 @@ struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
 end
 
+function singularity_order(K::SingleLayerKernel)
+    N = ambient_dimension(K.op)
+    return N - 2
+end
+
 """
     struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
 
@@ -53,6 +66,11 @@ derivative of the fundamental solution respect to the source variable.
 """
 struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
+end
+
+function singularity_order(K::DoubleLayerKernel)
+    N = ambient_dimension(K.op)
+    return N - 1
 end
 
 """
@@ -68,6 +86,11 @@ struct AdjointDoubleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
 end
 
+function singularity_order(K::AdjointDoubleLayerKernel)
+    N = ambient_dimension(K.op)
+    return N - 1
+end
+
 """
     struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
 
@@ -79,6 +102,11 @@ variable of the `DoubleLayerKernel`.
 """
 struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
     op::Op
+end
+
+function singularity_order(K::HyperSingularKernel)
+    N = ambient_dimension(K.op)
+    return N
 end
 
 ################################################################################
@@ -156,7 +184,7 @@ function (HS::HyperSingularKernel{T,Laplace{N}})(
     target,
     source,
     r = coords(target) - coords(source),
-)::T where {N,T}
+) where {N,T}
     nx = normal(target)
     ny = normal(source)
     d = norm(r)
@@ -550,7 +578,7 @@ function (ADL::AdjointDoubleLayerKernel{T,<:Elastostatic{N}})(target, source)::T
     end
 end
 
-function (HS::HyperSingularKernel{T,<:Elastostatic{N}})(target, source)::T where {N,T}
+function (HS::HyperSingularKernel{T,<:Elastostatic{N}})(target, source) where {N,T}
     μ, λ = HS.op.μ, HS.op.λ
     ν = λ / (2 * (μ + λ))
     x = coords(target)

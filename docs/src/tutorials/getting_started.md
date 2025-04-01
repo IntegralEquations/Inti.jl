@@ -10,7 +10,7 @@ CurrentModule = Inti
       - Visualize the solution
 
 This first tutorial will be a guided tour through the basic steps of setting up a
-boundary integral equation and solving it using Inti.jl. 
+boundary integral equation and solving it using Inti.jl.
 
 ## Mathematical formulation
 
@@ -39,7 +39,7 @@ The first step is to define the PDE under consideration:
 
 ```@example getting_started
 using Inti
-Inti.stack_weakdeps_env!() # add weak dependencies 
+Inti.stack_weakdeps_env!() # shortcut to add all dependencies 
 # PDE
 k = 2π
 op = Inti.Helmholtz(; dim = 2, k)
@@ -61,11 +61,12 @@ end
 Γ = kite ∪ circle
 ```
 
-Inti.jl expects the parametrization of the curve to be a function mapping
-scalars to points in space represented by `SVector`s. The `labels` argument is
-optional, and can be used to identify the different parts of the boundary. The
-`Domain` object `Γ` represents the boundary of the geometry, and can be used to
-create a mesh:
+Inti.jl expects the parametrization of the curve to be a function mapping scalars to points
+in space represented by `SVector`s (defined in the
+[`StaticArrays`](https://github.com/JuliaArrays/StaticArrays.jl) package). The `labels`
+argument is optional, and can be used to identify the different parts of the boundary. The
+`Domain` object `Γ` represents the boundary of the geometry, and can be used to create a
+mesh:
 
 ```@example getting_started
 # Create a mesh for the geometry
@@ -155,12 +156,11 @@ and `D` are matrix-like objects that can be used to solve the boundary integral
 equation. For that, we need to provide the boundary data ``g``.
 
 !!! tip "Fast algorithms"
-    Powered by external libraries, Inti.jl supports several acceleration methods
-    for matrix-vector multiplication, including so far:
-    - **Fast multipole method** (FMM) ``\mapsto`` `correction = (method = :fmm, tol = 1e-8)`
-    - **Hierarchical matrix** (H-matrix) ``\mapsto`` `correction = (method = :hmatrix, tol = 1e-8)`
-  
-    Note that in such cases only the matrix-vector product may not be available, and therefore iterative solvers such as GMRES are required for the solution of the resulting linear systems.
+    Powered by external libraries, Inti.jl supports several acceleration methods for
+    matrix-vector multiplication. See the [compression methods](@ref "Compression methods")
+    section for more details. Note that in such cases only the matrix-vector product may not
+    be available, and therefore iterative solvers such as GMRES are required for the
+    solution of the resulting linear systems.
 
 ## Source term and solution
 

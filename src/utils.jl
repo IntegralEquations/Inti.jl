@@ -235,7 +235,7 @@ function _normalize_compression(compression, target, source)
 end
 
 function _normalize_correction(correction, target, source)
-    methods = (:dim, :adaptive, :none)
+    methods = (:dim, :local, :none)
     # check that method is valid
     correction.method ∈ methods ||
         error("Unknown correction.method $(correction.method). Available options: $methods")
@@ -256,9 +256,6 @@ function _normalize_correction(correction, target, source)
             (maxdist = Inf, interpolation_order = nothing, center = nothing),
             correction,
         )
-    elseif correction.method == :adaptive
-        haskey(correction, :tol) || error("missing tol field in correction")
-        correction = merge((maxsplit = 10_000, maxdist = nothing), correction)
     end
     return correction
 end
@@ -434,4 +431,14 @@ at both endpoints.
 function kress_change_of_variables_periodic(P)
     v = (x) -> (1 / P - 1 / 2) * ((1 - 2x))^3 + 1 / P * ((2x - 1)) + 1 / 2
     return x -> v(x)^P / (v(x)^P + v(1 - x)^P)
+end
+
+macro maybe_threads(bool, expr)
+    return quote
+        if $(bool)
+            Threads.@threads $expr
+        else
+            $expr
+        end
+    end |> esc
 end

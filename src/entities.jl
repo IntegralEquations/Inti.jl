@@ -146,7 +146,7 @@ with a relative tolerance `rtol`. Assumes that the entity has an explicit
 parametrization.
 """
 function measure(k::EntityKey, rtol = 1e-2)
-    ent = global_get_entity(k)
+    ent = global_get_entity(k)::GeometricEntity
     geometric_dimension(ent) == 1 || error("measure only supports 1d entities")
     hasparametrization(ent) || error("$k has no parametrization")
     d = domain(ent)
@@ -154,7 +154,8 @@ function measure(k::EntityKey, rtol = 1e-2)
     a, b = low_corner(d), high_corner(d)
     l = norm(b - a)
     f = parametrization(ent) # map from [a,b] to the curve
-    I, E = adaptive_integration(τ̂; rtol) do s
+    quad = adaptive_quadrature(τ̂; rtol)
+    I = quad() do s
         x = d(s)
         μ = integration_measure(f, x)
         return l * μ

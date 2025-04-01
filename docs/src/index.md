@@ -37,8 +37,8 @@ the latest stable version of Julia, although `Inti.jl` should work with
 
 ## Installing Inti.jl
 
-Inti.jl is registered in the Julia General registry and can be installed by 
-launching a Julia REPL and typing the following command:
+Inti.jl is registered in the Julia General registry and can be installed by launching a
+Julia REPL and typing the following command:
 
 ```julia
 ]add Inti
@@ -77,7 +77,7 @@ by recasting them as integral equations. The general workflow for solving a
 problem consists of the following steps:
 
 ```math
-    \underbrace{\fbox{Geometry} \rightarrow \fbox{Mesh}}_{\textbf{pre-processing}} \rightarrow \fbox{\color{red}{Solver}} \rightarrow \underbrace{\fbox{Visualization}}_{\textbf{post-processing}}
+    \underbrace{\fbox{Geometry} \rightarrow \fbox{Mesh}}_{\textbf{pre-processing}} \rightarrow {\color{red}\fbox{Solver}} \rightarrow \underbrace{\fbox{Visualization}}_{\textbf{post-processing}}
 ```
 
 - **Geometry**: Define the domain of interest using simple shapes
@@ -125,22 +125,20 @@ Expressing the problem above in Inti.jl looks like this:
 
 ```@example lap2d
 using Inti, LinearAlgebra, StaticArrays
-# create a geometry given by a function f : [0,1] → Γ ⊂ R^2. 
+# a parametric curve given by a function f : [0,1] → Γ ⊂ R^2. 
 geo = Inti.parametric_curve(0, 1) do s
     SVector(0.25, 0.0) + SVector(cos(2π * s) + 0.65 * cos(4π * s[1]) - 0.65, 1.5 * sin(2π * s))
 end
 Γ = Inti.Domain(geo)
-# create a mesh and quadrature
+# mesh and quadrature
 msh = Inti.meshgen(Γ; meshsize = 0.1)
 Q = Inti.Quadrature(msh; qorder = 5)
-# create the integral operators
+# integral operators
 op = Inti.Laplace(;dim=2)
 S, _ = Inti.single_double_layer(;
     op, 
     target = Q,
     source = Q,
-    compression = (method = :none,),
-    correction = (method = :dim,)
 )
 # manufacture a harmonic function (exact solution) and take its trace on Γ
 uₑ = x -> x[1] + x[2] + x[1]*x[2] + x[1]^2 - x[2]^2  - 2 * log(norm(x .- SVector(-0.5, -1.5)))
@@ -150,6 +148,7 @@ g = map(q -> uₑ(q.coords), Q) # value at quad nodes
 # use the single-layer potential to evaluate the solution
 𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
 uₕ = x -> 𝒮[σ](x)
+pt = SVector(0.5, 0.1)
 ```
 
 The function `uₕ` is now a numerical approximation of the solution to the
@@ -212,5 +211,3 @@ There are several ways to contribute to Inti.jl:
 - **Documentation**: If you find any part of the documentation unclear or
   incomplete, please let us know. Or even better, submit a PR with the improved
   documentation.
-
-## Acknowledgements
