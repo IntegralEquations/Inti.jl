@@ -20,7 +20,7 @@ dims = (2, 3)
 meshsize = 0.5
 types = (:interior, :exterior)
 
-corrections = [(method = :dim,), (method = :local, maxdist = 2 * meshsize, rtol = 1e-2)]
+corrections = [(method = :dim,), (method = :adaptive, maxdist = 2 * meshsize, rtol = 1e-2)]
 
 for correction in corrections
     @testset "Method = $(correction.method)" begin

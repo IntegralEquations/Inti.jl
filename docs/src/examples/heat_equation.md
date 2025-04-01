@@ -163,7 +163,7 @@ op = Inti.Yukawa(; dim = 2, λ)
 Next, we create a volume potential operator mapping values from ``\Omega`` to ``\Gamma``:
 
 ```@example heat_equation
-correction = (method = :local, threads=false)
+correction = (method = :adaptive, threads=false)
 compression = (method = :none, )
 V_d2b = Inti.volume_potential(;
 	op,

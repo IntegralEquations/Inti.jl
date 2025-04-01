@@ -6,12 +6,12 @@ Available compression methods for the dense linear operators in [`Inti`](@ref).
 const COMPRESSION_METHODS = [:none, :hmatrix, :fmm]
 
 """
-    const CORRECTION_METHODS = [:none, :dim, :local]
+    const CORRECTION_METHODS = [:none, :dim, :adaptive]
 
 Available correction methods for the singular and nearly-singular integrals in
 [`Inti`](@ref).
 """
-const CORRECTION_METHODS = [:none, :dim, :local]
+const CORRECTION_METHODS = [:none, :dim, :adaptive]
 
 """
     single_double_layer(; op, target, source::Quadrature, compression,
@@ -48,7 +48,7 @@ integrals should be computed. The available options are:
   - `(method = :none, )`: no correction is performed. This is not recommended, as the
     resulting approximation will be inaccurate if the kernel is singular and source and
     target are not sufficiently far from each other.
-  - `(method = :local, maxdist, tol)`: correct interactions corresponding to entries of
+  - `(method = :adaptive, maxdist, tol)`: correct interactions corresponding to entries of
     `target` and elements of `source` that are within `maxdist` of each other. The singular
     (including finite part) interactions are computed in polar coordinates, while the
     near-singular interactions are computing using an adaptive quadrature rule. The `tol`
@@ -67,7 +67,7 @@ function single_double_layer(;
     target,
     source,
     compression = (method = :none,),
-    correction = (method = :local,),
+    correction = (method = :adaptive,),
     derivative = false,
 )
     compression = _normalize_compression(compression, target, source)
@@ -153,7 +153,7 @@ function single_double_layer(;
                 derivative,
             )
         end
-    elseif correction.method == :local
+    elseif correction.method == :adaptive
         # strip `method` from correction and pass it on
         correction_kw = Base.structdiff(correction, NamedTuple{(:method,)})
         δS = adaptive_correction(Sop; correction_kw...)
@@ -189,7 +189,7 @@ function adj_double_layer_hypersingular(;
     target,
     source = target,
     compression = (method = :none,),
-    correction = (method = :local,),
+    correction = (method = :adaptive,),
 )
     return single_double_layer(;
         op,
@@ -287,7 +287,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
     # compute correction
     if correction.method == :none
         return Vmat
-    elseif correction.method == :local
+    elseif correction.method == :adaptive
         # strip `method` from correction and pass it on
         correction_kw = Base.structdiff(correction, NamedTuple{(:method,)})
         δV = local_correction(V; correction_kw...)
