@@ -106,6 +106,9 @@ Return the normal vector of `el` at the parametric coordinate `x̂`.
 """
 function normal(el, x)
     jac = jacobian(el, x)
+    N, M = size(jac)
+    msg = "computing the normal vector requires the element to be of co-dimension one."
+    @assert (N - M == 1) msg
     return _normal(jac)
 end
 
@@ -116,8 +119,7 @@ Given a an `M` by `N` matrix representing the jacobian of a codimension one
 object, compute the normal vector.
 """
 function _normal(jac::SMatrix{N,M}) where {N,M}
-    msg = "computing the normal vector requires the element to be of co-dimension one."
-    @assert (N - M == 1) msg
+    (N - M == 1) || (return nothing) # not a codimension one object
     if M == 1 # a line in 2d
         t = jac[:, 1] # tangent vector
         n = SVector(t[2], -t[1]) |> normalize
