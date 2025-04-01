@@ -17,9 +17,10 @@ Random.seed!(1)
 rtol1 = 1e-2 # single and double layer
 rtol2 = 5e-2 # hypersingular (higher tolerance to avoid use of fine mesh + long unit tests)
 dims = (2, 3)
+meshsize = 0.5
 types = (:interior, :exterior)
 
-corrections = [(method = :dim,), (method = :local, rtol = rtol1)]
+corrections = [(method = :dim,), (method = :local, maxdist = 2 * meshsize, rtol = 1e-2)]
 
 for correction in corrections
     @testset "Method = $(correction.method)" begin
@@ -30,12 +31,12 @@ for correction in corrections
                 Γ =
                     Inti.parametric_curve(x -> SVector(cos(x), sin(x)), 0.0, 2π) |>
                     Inti.Domain
-                quad = Inti.Quadrature(Γ; meshsize = 0.5, qorder = 5)
+                quad = Inti.Quadrature(Γ; meshsize, qorder = 5)
             else
                 # Ω, msh = gmsh_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = 0.2)
                 Ω = Inti.GeometricEntity("ellipsoid") |> Inti.Domain
                 Γ = Inti.external_boundary(Ω)
-                quad = Inti.Quadrature(Γ; meshsize = 0.5, qorder = 5)
+                quad = Inti.Quadrature(Γ; meshsize, qorder = 5)
             end
             for t in types
                 σ = t == :interior ? 1 / 2 : -1 / 2
