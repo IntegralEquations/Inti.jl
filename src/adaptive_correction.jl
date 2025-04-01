@@ -89,7 +89,6 @@ end
 function adaptive_correction(iop, maxdist, quads_dict::Dict, threads = true)
     # unpack type-unstable fields in iop, allocate output, and dispatch
     X, Y, K = target(iop), source(iop), kernel(iop)
-    @assert X === Y "source and target of integraloperator must coincide"
     dict_near = near_interaction_list([coords(x) for x in X], mesh(Y); tol = maxdist)
     T = eltype(iop)
     msh = mesh(Y)
@@ -254,7 +253,7 @@ function guiggiani_singular_integral(
 ) where {P}
     ref_shape = reference_domain(el)
     x         = el(x̂)
-    nx        = normal(el, x̂)
+    nx        = jacobian(el, x̂) |> _normal
     qx        = (coords = x, normal = nx)
     # function to integrate in polar coordinates
     F = (ρ, θ) -> begin

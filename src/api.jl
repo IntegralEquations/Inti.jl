@@ -287,6 +287,10 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
     # compute correction
     if correction.method == :none
         return Vmat
+    elseif correction.method == :local
+        # strip `method` from correction and pass it on
+        correction_kw = Base.structdiff(correction, NamedTuple{(:method,)})
+        δV = local_correction(V; correction_kw...)
     elseif correction.method == :dim
         loc = target === source ? :inside : correction.target_location
         μ = _green_multiplier(loc)
