@@ -86,9 +86,9 @@ end
                     e0 = norm(S0 * γ₁u - D0 * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
                     # @test d > meshsize
                     maxdist = Inti.local_correction_dist_and_tol(S; tol = atol)
-                    δS = Inti.local_correction(S; maxdist, tol = atol)
+                    δS = Inti.adaptive_correction(S; maxdist, tol = atol)
                     maxdist = Inti.local_correction_dist_and_tol(D; tol = atol)
-                    δD = Inti.local_correction(D; maxdist, tol = atol)
+                    δD = Inti.adaptive_correction(D; maxdist, tol = atol)
                     Smat, Dmat = S0 + δS, D0 + δD
                     e1 = norm(Smat * γ₁u - Dmat * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
                     @testset "Single/double layer $(string(op))" begin

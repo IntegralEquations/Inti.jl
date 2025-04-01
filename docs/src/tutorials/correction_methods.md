@@ -13,7 +13,7 @@ When the underlying kernel is singular, a *correction* is usually necessary to o
 accurate results in the approximation of the underlying integral operator by a quadrature.
 Currently, Inti.jl provides the following functions to correct for singularities:
 
-- [`local_correction`](@ref)
+- [`adaptive_correction`](@ref)
 - [`bdim_correction`](@ref)
 - [`vdim_correction`](@ref)
 
@@ -27,9 +27,9 @@ sections.
     constructing the integral operators. See the documentation of these functions for more
     details.
 
-## Local Correction
+## Adaptive Correction
 
-The [`local_correction`](@ref) method combines adaptive quadrature for nearly singular
+The [`adaptive_correction`](@ref) method combines adaptive quadrature for nearly singular
 integrals with a direct evaluation method for singular integrals, based on
 [guiggiani1992general](@cite). It is a robust method suitable for a wide range of kernels,
 as long as the singularities are no worse than a Hadamard finite-part (e.g., ``1/r^3`` in 3D
@@ -50,7 +50,7 @@ and ``1/r^2`` in 2D). This makes it a good default choice for most problems.
 ### Docstrings
 
 ```@docs; canonical = false
-local_correction
+adaptive_correction
 ```
 
 ## Boundary Density Interpolation Method

@@ -53,7 +53,7 @@ integrals should be computed. The available options are:
     (including finite part) interactions are computed in polar coordinates, while the
     near-singular interactions are computing using an adaptive quadrature rule. The `tol`
     argument specifies the tolerance of the adaptive integration. See
-    [`local_correction`](@ref) for more details.
+    [`adaptive_correction`](@ref) for more details.
   - `(method = :dim, maxdist, target_location)`: use the density interpolation method to
     compute the correction. `maxdist` specifies the distance between source and target
     points above which no correction is performed (defaults to `Inf`). `target_location`
@@ -156,8 +156,8 @@ function single_double_layer(;
     elseif correction.method == :local
         # strip `method` from correction and pass it on
         correction_kw = Base.structdiff(correction, NamedTuple{(:method,)})
-        δS = local_correction(Sop; correction_kw...)
-        δD = local_correction(Dop; correction_kw...)
+        δS = adaptive_correction(Sop; correction_kw...)
+        δD = adaptive_correction(Dop; correction_kw...)
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end

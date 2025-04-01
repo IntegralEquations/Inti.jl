@@ -47,7 +47,7 @@ include("quadrature.jl")
 # Nyström methods
 include("kernels.jl")
 include("nystrom.jl")
-include("local_correction.jl")
+include("adaptive_correction.jl")
 include("bdim.jl")
 include("vdim.jl")
 

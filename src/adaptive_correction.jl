@@ -1,6 +1,6 @@
 """
-    local_correction(iop::IntegralOperator; [maxdist, rtol, threads = true, kwargs...])
-    local_correction(iop::IntegralOperator, maxdist, quads_dict::Dict, threads = true)
+    adaptive_correction(iop::IntegralOperator; [maxdist, rtol, threads = true, kwargs...])
+    adaptive_correction(iop::IntegralOperator, maxdist, quads_dict::Dict, threads = true)
 
 This function computes a sparse correction for the integral operator `iop`, addressing its
 singular or nearly singular entries.
@@ -58,9 +58,9 @@ end
 This will use an adaptive quadrature rule for the nearfield and fixed Gauss-Legendre
 quadrature rules for the radial and angular directions when computing the singular
 correction in polar coordinates on the reference domain. You can then call
-`local_correction(iop, maxdist, quads_dict)` to use the custom quadrature.
+`adaptive_correction(iop, maxdist, quads_dict)` to use the custom quadrature.
 """
-function local_correction(
+function adaptive_correction(
     iop::IntegralOperator;
     maxdist = nothing,
     rtol = nothing,
@@ -83,10 +83,10 @@ function local_correction(
         )
         quads_dict[E] = quads
     end
-    return local_correction(iop, maxdist, quads_dict, threads)
+    return adaptive_correction(iop, maxdist, quads_dict, threads)
 end
 
-function local_correction(iop, maxdist, quads_dict::Dict, threads = true)
+function adaptive_correction(iop, maxdist, quads_dict::Dict, threads = true)
     # unpack type-unstable fields in iop, allocate output, and dispatch
     X, Y, K = target(iop), source(iop), kernel(iop)
     @assert X === Y "source and target of integraloperator must coincide"
@@ -114,7 +114,7 @@ function local_correction(iop, maxdist, quads_dict::Dict, threads = true)
         # radial singularity order
         quads = merge(quads_dict[E], (regular_quad = quadrature_rule(Y, E),))
         L = lagrange_basis(quads.regular_quad)
-        _local_correction_etype!(
+        _adaptive_correction_etype!(
             correction,
             els,
             quads,
@@ -132,7 +132,7 @@ function local_correction(iop, maxdist, quads_dict::Dict, threads = true)
     return sparse(correction.I, correction.J, correction.V, m, n)
 end
 
-@noinline function _local_correction_etype!(
+@noinline function _adaptive_correction_etype!(
     correction,
     el_iter,
     quads,
@@ -168,7 +168,7 @@ end
             )
             x̂nearest = x̂[j]
             dmin > nearfield_distance && continue
-            # If singular, use Guiggiani's method. Otherwise use an ovesampled quadrature
+            # If singular, use Guiggiani's method. Otherwise use an oversampled quadrature
             if iszero(dmin)
                 W = guiggiani_singular_integral(
                     K,
@@ -412,11 +412,11 @@ function laurent_coefficients(f, h, ::Val{N}; kwargs...) where {N}
 end
 
 """
-    local_correction_dist_and_tol(iop::IntegralOperator, kmax)
+    local_correction_dist_and_tol(iop::IntegralOperator, kmax = 10, ratio = 8)
 
-Try to estimate resonable `maxdist` and `rtol` parameters for the [`local_correction`](@ref)
+Try to estimate resonable `maxdist` and `rtol` parameters for the [`adaptive_correction`](@ref)
 function, where `maxdist` is at most `kmax` times the radius of the largest element in the
-source mesh of `iop`.
+source mesh of `iop`. See the Extended help for more details.
 
 !!! note
     This is a heuristic and may not be accurate/efficient in all cases. It is recommended to
@@ -434,11 +434,11 @@ mesh(source(iop))`:
    error when integrating `y -> K(x,y)` for `x` at a distance `k * h` from
    the center of the element using a regular quadrature rule
 4. Find a `k` such that ratio between errors at distances `k * h` and `(k + 1) * h` is below
-   a certain threshold. This indicates stagnation in the error, and suggests that little is
-   gained by increasing the distance.
+   `ratio`. This indicates stagnation in the error, and suggests that little is gained by
+   increasing the distance.
 5. Return `maxdist = k * h` and `rtol` as the error at distance `k * h`.
 """
-function local_correction_dist_and_tol(iop::IntegralOperator, kmax = 10)
+function local_correction_dist_and_tol(iop::IntegralOperator, kmax = 10, ratio = 8)
     K       = kernel(iop)
     Q       = source(iop)
     msh     = mesh(Q)
@@ -455,7 +455,6 @@ function local_correction_dist_and_tol(iop::IntegralOperator, kmax = 10)
         dist, rel_er =
             _regular_integration_errors(els[i], K, regular_quad, reference_quad, kmax)
         # find first index such that er[i+1] > er[i] / ratio
-        ratio = 8
         i = findfirst(i -> rel_er[i+1] > rel_er[i] / ratio, 1:(kmax-1))
         isnothing(i) && (i = kmax; @warn "using $kmax as maxdist")
         maxdist = max(maxdist, dist[i])
