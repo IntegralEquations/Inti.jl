@@ -171,7 +171,7 @@ elseif TEST_TYPE == "K"
                 ys = (α * Sdim + β * (Ddim + μ*I)) * xs
                 reinterpret(Float64, ys)
             end
-            σ = gmres(lm, reinterpret(Float64, ubnd))
+            σ = gmres(lm, reinterpret(Float64, ubnd), reltol=1e-15)
             usol = (α * Stest + β * Dtest) * reinterpret(T, σ)
             eloc   = norm(usol - utst, Inf) / utst_norm
             @show eloc, tldim
@@ -187,7 +187,7 @@ elseif TEST_TYPE == "K"
             ys = (α * Sdim + β * (Ddim + μ*I)) * xs
             reinterpret(Float64, ys)
         end
-        σ = gmres(lm, reinterpret(Float64, ubnd))
+        σ = gmres(lm, reinterpret(Float64, ubnd), reltol=1e-15)
         usol = (α * Stest + β * Dtest) * reinterpret(T, σ)
         eglo   = norm(usol - utst, Inf) / utst_norm
         # @show norm(e0, Inf)

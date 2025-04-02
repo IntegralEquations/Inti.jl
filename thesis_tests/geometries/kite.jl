@@ -4,6 +4,7 @@
     1.5 * sin(s),
 )
 Γ = Inti.parametric_curve(χ, 0.0, 2π)
+a, b = 0.0, 2π
 if t == :interior
     xs = ntuple(i -> 3, N)
     tset = [SVector(0.5cos(s)+2.5, 0.5sin(s)) for s in LinRange(-π, π, 10)]

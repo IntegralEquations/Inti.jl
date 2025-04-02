@@ -8,7 +8,15 @@
 # u = x -> x[2]
 # u = x -> x[2] / norm(x)
 # u = x -> 1
-u = x -> cos(x[1]) * exp(x[2])
+u = x -> cos(x.coords[1]) * exp(x.coords[2])
+# u = x ->
+# u = x -> cos(x[1])
+
+qorder_ref, h_ref = 5, 0.5*1e-4
+msh = Inti.meshgen(Γ; meshsize = h_ref)
+Γ_msh = msh[Γ]
+quad_ref = Inti.Quadrature(Γ_msh; qorder=qorder_ref)
+uref = map(u, quad_ref)
 
 for qorder in Q
     errl = Errl[qorder]
@@ -31,25 +39,13 @@ for qorder in Q
         xs = qs.coords
         @info xs
 
-        uvec = map(u, Inti.coords.(quad))
+        uvec = map(u, quad)
         # uvec = [bu(atan(x[2], x[1])) for x in Inti.coords.(quad)]
         uvec_norm = norm(uvec, Inf)
         # single and double layer
-        G = Inti.SingleLayerKernel(pde)
-        S = Inti.IntegralOperator(G, [xs], quad)
-        Smat = Inti.assemble_matrix(S)
-        dG = Inti.DoubleLayerKernel(pde)
-        D = Inti.IntegralOperator(dG, [xs], quad)
-        Dmat = Inti.assemble_matrix(D)
+        
 
-        ref, err_ref = quadgk(a, b, atol=1e-15) do s
-            G(xs, χ(s)) * u(χ(s)) * norm(ForwardDiff.derivative(χ, s))        
-        end
-        @show err_ref
-
-        e0 = norm((Smat * uvec)[1] - ref, Inf) / uvec_norm
-
-        green_multiplier = fill(-0.5, length(quad))
+        green_multiplier = [-0.5]
         # δS, δD = Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
 
         # qnodes = Inti.local_bdim_correction(pde, quad, quad; green_multiplier)
@@ -58,6 +54,21 @@ for qorder in Q
         # fig, _, _ = scatter(X, Y)
         # arrows!(X, Y, u, v, lengthscale=0.01)
         # display(fig)
+        S = Inti.IntegralOperator(G, [xs], quad_ref)
+        Smat = Inti.assemble_matrix(S)
+        D = Inti.IntegralOperator(dG, [xs], quad_ref)
+        Dmat = Inti.assemble_matrix(D)
+
+        δS, δD = Inti.bdim_correction(pde, [xs], quad_ref, Smat, Dmat; green_multiplier)
+        Sref = Smat + δS
+        Dref = Dmat + δD
+        ref = ((α*Sref + β*Dref) * uref)[1]
+        @show ref
+
+        S = Inti.IntegralOperator(G, [xs], quad)
+        Smat = Inti.assemble_matrix(S)
+        D = Inti.IntegralOperator(dG, [xs], quad)
+        Dmat = Inti.assemble_matrix(D)
 
         tldim = @elapsed δS, δD = Inti.local_bdim_correction(
             pde,
@@ -77,13 +88,13 @@ for qorder in Q
         #     compression = (method = :none,),
         #     correction  = (method = :ldim,),
         # )
-        eloc = norm((Sdim * uvec)[1] - ref, Inf) / uvec_norm
+        eloc = abs(((α*Sdim + β*Ddim) * uvec)[1] - ref) / abs(ref)
 
         tdim = @elapsed δS, δD =
             Inti.bdim_correction(pde, [xs], quad, Smat, Dmat; green_multiplier)
         Sdim = Smat + δS
         Ddim = Dmat + δD
-        eglo = norm((Sdim * uvec)[1] - ref, Inf) / uvec_norm
+        eglo = abs(((α*Sdim + β*Ddim) * uvec)[1] - ref) / abs(ref)
         # @show norm(e0, Inf)
         @show eloc
         @show eglo

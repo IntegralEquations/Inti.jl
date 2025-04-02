@@ -22,7 +22,7 @@ t = :interior
 # pde = Inti.Laplace(; dim = N)
 # pde = Inti.Helmholtz(; k = 2.1, dim = N)
 pde = Inti.Stokes(; dim = N, μ = 1.2)
-qorder = 3
+qorder = 5
 K = (3, 5, 10)
 
 ii = 1:5
@@ -38,7 +38,7 @@ GEOMETRY = "geometries/kite.jl"
 # k = 10      # number of neighbors for local correction
 # α, β = 0, 1 # coefficients for single, double layer
 ## suggested values are include in geometry files
-TESTFILE = "test_files/Integral_Green_identity.jl"
+TESTFILE = "test_files/Dirichlet_source_point.jl"
 
 Inti.clear_entities!()
 include(GEOMETRY)
@@ -84,4 +84,4 @@ display(fig)
 ##
 GEOM = splitdir(GEOMETRY)[2][1:end-3]
 TEST = splitdir(TESTFILE)[2][1:end-3]
-SAVE && save("thesis_tests/ktest_plots/$(GEOM)_$(TEST).png", fig)
+SAVE && save("thesis_tests/ktest_plots/$(GEOM)_$(TEST)_P_$(P).png", fig)

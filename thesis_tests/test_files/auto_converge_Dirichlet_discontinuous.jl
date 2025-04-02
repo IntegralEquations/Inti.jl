@@ -2,26 +2,21 @@ T = Inti.default_density_eltype(pde)
 G = Inti.SingleLayerKernel(pde)
 dG = Inti.DoubleLayerKernel(pde)
 # u = x -> SVector(cos(Inti.coords(x)[1]), Inti.coords(x)[2]*sin(Inti.coords(x)[1]))
-u = x -> cos(Inti.coords(x)[1]) * exp(Inti.coords(x)[2])
-# σ_ref = x -> cos(Inti.coords(x)[1]) * exp(Inti.coords(x)[2])
-# δ = 1e-8
-# u = (qnode) -> (Inti.coords(qnode)[2] + δ) / (2δ)
-# σ_ref = (qnode) -> Inti.coords(qnode)[2] > 0 ? 1 : 0
-# u = x -> quadgk(a, b, atol=1e-15) do s
-#     χ_ = s -> ForwardDiff.derivative(χ, s)
-#     n  = s -> normalize(SVector(χ_(s)[2], -χ_(s)[1]))
-#     y  = s -> (coords=χ(s), normal=n(s))
-#     (α * G(x, χ(s)) * σ_ref(χ(s)) + β * dG(x, y(s)) * σ_ref(χ(s))) * norm(χ_(s))        
-# end[1]
-# u = qnode -> 1
-# qorder = 3
-# h = 0.1
-# msh = Inti.meshgen(Γ; meshsize = h)
-# Γ_msh = msh[Γ]
-# quad = Inti.Quadrature(Γ_msh; qorder)
-# ubnd = map(u, quad) + μ * map(σ_ref, quad)
-# (α * Sdim + β * (Ddim + μ*I)) \ ubnd
-# σ_vec = map(σ_ref, quad)
+σ = x -> cos(Inti.coords(x)[1]) * exp(Inti.coords(x)[2])
+
+qorder_ref, h_ref = 5, 1e-4
+msh = Inti.meshgen(Γ; meshsize = h_ref)
+Γ_msh = msh[Γ]
+quad_ref = Inti.Quadrature(Γ_msh; qorder = qorder_ref)
+σ_ref = map(σ, quad_ref)
+σref_norm = norm(σ_ref, Inf)
+
+if !onSurf
+    Stest = Inti.IntegralOperator(G, tset, quad_ref)
+    Dtest = Inti.IntegralOperator(dG, tset, quad_ref)
+    utst = (α * Stest + β * Dtest) * σ_ref
+    utst_norm = norm(utst, Inf)
+end
 
 for qorder in Q
     err0 = Err0[qorder]
@@ -42,21 +37,30 @@ for qorder in Q
         ##
 
         μ = t == :interior ? -0.5 : 0.5
+        # reference values
         quad = Inti.Quadrature(Γ_msh; qorder)
-        ubnd = map(u, quad)
-        # σ_vec = map(σ_ref, quad)
-        utst = map(u, tset)
-        utst_norm = norm(utst, Inf)
-        # single and double layer
+        green_multiplier = fill(-0.5, length(quad))
+        S = Inti.IntegralOperator(G, quad, quad_ref)
+        Sref  = Inti.assemble_matrix(S)
+        D = Inti.IntegralOperator(dG, quad, quad_ref)
+        Dref  = Inti.assemble_matrix(D)
+        δS, δD = Inti.bdim_correction(pde, quad, quad_ref, Sref, Dref; green_multiplier)
+        Sdim = Sref + δS
+        Ddim = Dref + δD
+        σ_vec = map(σ, quad)
+        ubnd = (α*Sdim + β*Ddim) * σ_ref + β*μ*σ_vec
+
+        # for calculating αS[σ] + βD[σ] on test set
+        Stest = Inti.IntegralOperator(G, tset, quad)
+        Dtest = Inti.IntegralOperator(dG, tset, quad)
+
+        # solve for numeric σ
         S = Inti.IntegralOperator(G, quad)
         Smat  = Inti.assemble_matrix(S)
-        Stest = Inti.IntegralOperator(G, tset, quad)
 
         D = Inti.IntegralOperator(dG, quad)
         Dmat  = Inti.assemble_matrix(D)
-        Dtest = Inti.IntegralOperator(dG, tset, quad)
 
-        green_multiplier = fill(-0.5, length(quad))
         # δS, δD = Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
 
         # qnodes = Inti.local_bdim_correction(pde, quad, quad; green_multiplier)
@@ -84,8 +88,13 @@ for qorder in Q
         #     compression = (method = :none,),
         #     correction  = (method = :ldim,),
         # )
-        σ    = (α * Sdim + β * (Ddim + μ*I)) \ ubnd
-        usol = (α * Stest + β * Dtest) * σ
+        σl   = (α*Sdim + β*(Ddim + μ*I)) \ ubnd
+        if onSurf
+            eloc = norm(σl - σ_vec, Inf) / σref_norm
+        else
+            usol = (α * Stest + β * Dtest) * σl
+            eloc   = norm(usol - utst, Inf) / utst_norm
+        end
         # lm =  FunctionMap{Float64}(N*length(quad)) do x
         #     xs = reinterpret(T, x)
         #     ys = (α * Sdim + β * (Ddim + μ*I)) * xs
@@ -93,14 +102,18 @@ for qorder in Q
         # end
         # σ = gmres(lm, reinterpret(Float64, ubnd))
         # usol = (α * Stest + β * Dtest) * reinterpret(T, σ)
-        eloc   = norm(usol - utst, Inf) / utst_norm
 
         tdim = @elapsed δS, δD =
             Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
         Sdim = Smat + δS
         Ddim = Dmat + δD
-        σ    = (α * Sdim + β * (Ddim + μ*I)) \ ubnd
-        usol = (α * Stest + β * Dtest) * σ
+        σg   = (α*Sdim + β*(Ddim + μ*I)) \ ubnd
+        if onSurf
+            eglo = norm(σg - σ_vec, Inf) / σref_norm
+        else
+            usol = (α * Stest + β * Dtest) * σg
+            eglo   = norm(usol - utst, Inf) / utst_norm
+        end
         # lm =  FunctionMap{Float64}(N*length(quad)) do x
         #     xs = reinterpret(T, x)
         #     ys = (α * Sdim + β * (Ddim + μ*I)) * xs
@@ -108,7 +121,6 @@ for qorder in Q
         # end
         # σ = gmres(lm, reinterpret(Float64, ubnd))
         # usol = (α * Stest + β * Dtest) * reinterpret(T, σ)
-        eglo   = norm(usol - utst, Inf) / utst_norm
         # @show norm(e0, Inf)
         @show eloc
         @show eglo
