@@ -35,6 +35,7 @@ function Inti.import_mesh(filename = nothing; dim = 3)
     else
         error("filename must be a string or nothing to import current gmsh model")
     end
+    Inti.build_orientation!(msh)
     return msh
 end
 
@@ -59,12 +60,15 @@ function _import_mesh!(msh)
     gmsh_dim_tags = gmsh.model.getEntities()
     gmsh2loc_ent_tags = Dict{Int,Int}() # local to gmsh entity tags
     for (dim, gmsh_ent_tag) in gmsh_dim_tags
+        # getEntites will always return positive tags
+        @assert gmsh_ent_tag > 0
         pgroups = gmsh.model.getPhysicalGroupsForEntity(dim, gmsh_ent_tag)
         labels = map(t -> gmsh.model.getPhysicalName(dim, t), pgroups)
         combined, oriented, recursive = true, true, false
         bnd_dim_tags =
             gmsh.model.getBoundary((dim, gmsh_ent_tag), combined, oriented, recursive)
         bnd = map(bnd_dim_tags) do t
+            # a negative value of the tag indicates that the entity's orientation is flipped
             return Inti.EntityKey(t[1], sign(t[2]) * gmsh2loc_ent_tags[abs(t[2])])
         end
         # add entity to global dictionary. The sign of tag is ignored,
@@ -73,8 +77,8 @@ function _import_mesh!(msh)
         # set it to nothing.
         push_forward = nothing
         # create a new tag for the entity, possibly different from the gmsh one
-        tag = sign(gmsh_ent_tag) * Inti.new_tag(dim)
-        gmsh2loc_ent_tags[abs(gmsh_ent_tag)] = abs(tag)
+        tag = Inti.new_tag(dim)
+        gmsh2loc_ent_tags[gmsh_ent_tag] = tag
         Inti.GeometricEntity(dim, tag, bnd, labels, push_forward)
         key = Inti.EntityKey(dim, tag) # key for the entity
         _ent_to_mesh!(

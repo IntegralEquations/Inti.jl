@@ -72,7 +72,7 @@ function adaptive_correction(
     end
     maxdist    = isnothing(maxdist) ? maxdist_ : maxdist
     rtol       = isnothing(rtol) ? rtol_ : rtol
-    msh        = mesh(target(iop))
+    msh        = mesh(source(iop))
     quads_dict = Dict()
     for E in element_types(msh)
         ref_domain = reference_domain(E)
@@ -109,6 +109,7 @@ function adaptive_correction(iop, maxdist, quads_dict::Dict, threads = true)
     for E in element_types(msh)
         nearlist = dict_near[E]
         els = elements(msh, E)
+        ori = orientation(msh, E)
         # append the regular quadrature rule to the list of quads for the element type E
         # radial singularity order
         quads = merge(quads_dict[E], (regular_quad = quadrature_rule(Y, E),))
@@ -116,6 +117,7 @@ function adaptive_correction(iop, maxdist, quads_dict::Dict, threads = true)
         _adaptive_correction_etype!(
             correction,
             els,
+            ori,
             quads,
             L,
             nearlist,
@@ -134,6 +136,7 @@ end
 @noinline function _adaptive_correction_etype!(
     correction,
     el_iter,
+    orientation,
     quads,
     L,
     nearlist,
@@ -155,6 +158,7 @@ end
     # lck = ReentrantLock()
     @maybe_threads threads for n in 1:nel
         el = el_iter[n]
+        ori = orientation[n]
         jglob = view(el2qtags, :, n)
         # inear = union(nearlist[n], jglob) # make sure to include nearfield nodes AND the element nodes
         inear = nearlist[n]
@@ -174,6 +178,7 @@ end
                     L,
                     x̂nearest,
                     el,
+                    ori,
                     quads.radial_quad,
                     quads.angular_quad,
                     sorder,
@@ -182,7 +187,7 @@ end
                 integrand = (ŷ) -> begin
                     y = el(ŷ)
                     jac = jacobian(el, ŷ)
-                    ν = _normal(jac)
+                    ν = _normal(jac, ori)
                     τ′ = _integration_measure(jac)
                     M = K(xnode, (coords = y, normal = ν))
                     v = L(ŷ)
@@ -247,13 +252,15 @@ function guiggiani_singular_integral(
     û,
     x̂,
     el::ReferenceInterpolant{<:Union{ReferenceTriangle,ReferenceSquare}},
+    ori,
     quad_rho,
     quad_theta,
     sorder::Val{P} = Val(-2),
 ) where {P}
     ref_shape = reference_domain(el)
     x         = el(x̂)
-    nx        = jacobian(el, x̂) |> _normal
+    jac_x     = jacobian(el, x̂)
+    nx        = _normal(jac_x, ori)
     qx        = (coords = x, normal = nx)
     # function to integrate in polar coordinates
     F = (ρ, θ) -> begin
@@ -261,7 +268,7 @@ function guiggiani_singular_integral(
         ŷ = x̂ + ρ * SVector(c, s)
         y = el(ŷ)
         jac = jacobian(el, ŷ)
-        ny = _normal(jac)
+        ny = _normal(jac, ori)
         μ = _integration_measure(jac)
         qy = (coords = y, normal = ny)
         M = K(qx, qy)
@@ -318,12 +325,14 @@ function guiggiani_singular_integral(
     û,
     x̂,
     el::ReferenceInterpolant{ReferenceLine},
+    ori,
     quad_rho,
     quad_theta, # unused, but kept for consistency with the 2D case
     sorder::Val{P} = Val(-2),
 ) where {P}
-    x  = el(x̂)
-    nx = normal(el, x̂)
+    x = el(x̂)
+    jac_x = jacobian(el, x̂)
+    nx = _normal(jac_x, ori)
     qx = (coords = x, normal = nx)
     # function to integrate in 1D "polar" coordinates. We use `s ∈ {-1,1}` to denote the
     # angles `π` and `0`.
@@ -331,7 +340,7 @@ function guiggiani_singular_integral(
         ŷ = x̂ + SVector(ρ * s)
         y = el(ŷ)
         jac = jacobian(el, ŷ)
-        ny = _normal(jac)
+        ny = _normal(jac, ori)
         μ = _integration_measure(jac)
         qy = (coords = y, normal = ny)
         M = K(qx, qy)
@@ -404,16 +413,20 @@ function laurent_coefficients(f, h, ::Val{-1}; kwargs...)
     f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
         return f(x) - f₋₁ / x
     end
-    return 0, f₋₁, f₀
+    return zero(f₀), f₋₁, f₀
 end
 function laurent_coefficients(f, h, ::Val{0}; kwargs...)
     f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
         return f(x)
     end
-    return 0, 0, f₀
+    return zero(f₀), zero(f₀), f₀
 end
 function laurent_coefficients(f, h, ::Val{N}; kwargs...) where {N}
-    return error("laurent_coefficients: order $N not implemented")
+    if N > 0
+        return 0.0, 0.0, 0.0
+    else
+        throw(ArgumentError("order must be >= -2"))
+    end
 end
 
 """
