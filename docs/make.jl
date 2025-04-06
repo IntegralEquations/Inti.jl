@@ -151,7 +151,7 @@ makedocs(;
             "tutorials/correction_methods.md",
             "tutorials/solvers.md",
         ],
-        "Notebooks" => notebook_examples,
+        "Examples" => notebook_examples,
         "References" => "references.md",
         "Docstrings" => "docstrings.md",
     ],
