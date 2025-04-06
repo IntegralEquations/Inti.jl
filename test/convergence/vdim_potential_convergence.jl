@@ -46,7 +46,7 @@ function test_volume_potential(; meshsize, bdry_qorder, interpolation_order)
 
     k0 = π
     k  = 2π
-    θ  = (cos(π / 3), sin(π / 3))
+    θ = (cos(π / 3), sin(π / 3))
     u  = (x) -> exp(im * k0 * dot(x, θ))
     du = (x, n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
     f  = (x) -> (k^2 - k0^2) * u(x)
