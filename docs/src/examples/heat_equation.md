@@ -55,8 +55,7 @@ u^n &= g^n, \quad && \text{on } \partial\Omega \tag{Yukawa equation}
 \end{align*}
 ```
 
-This is now amenable to an integral equation formulation. To do so, we follow the same
-process as in the [Poisson problem tutorial](@ref "Poisson Problem"), and split the solution
+This is now amenable to an integral equation formulation. To do so we split the solution
 into a particular solution $u^n_p$ and a homogeneous solution $u^n_h$:
 
 ```math
@@ -95,7 +94,7 @@ yields
 
 The steps outlined above reduce the time-dependent heat equation to a sequence forced Yukawa
 equations which can be solved using the same techniques as in the [Poisson problem
-tutorial](@ref), as illustrated next.
+tutorial](@ref "Poisson Problem"), as illustrated next.
 
 ## Spatial discretization
 
