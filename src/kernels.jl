@@ -252,7 +252,6 @@ function (DL::DoubleLayerKernel{T,Yukawa{N,K}})(target, source)::T where {N,T,K}
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        k = im * λ
         return λ / (2 * π * d) * Bessels.besselk(1, λ * d) .* dot(r, ny)
     elseif N == 3
         return 1 / (4π) / d^2 * exp(-λ * d) * (λ + 1 / d) * dot(r, ny)

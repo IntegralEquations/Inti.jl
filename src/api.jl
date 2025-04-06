@@ -167,8 +167,13 @@ function single_double_layer(;
         S = axpy!(true, δS, Smat)
         D = axpy!(true, δD, Dmat)
     elseif compression.method == :hmatrix
-        S = LinearMap(Smat) + LinearMap(δS)
-        D = LinearMap(Dmat) + LinearMap(δD)
+        if target === source
+            S = axpy!(true, δS, Smat)
+            D = axpy!(true, δD, Dmat)
+        else
+            S = LinearMap(Smat) + LinearMap(δS)
+            D = LinearMap(Dmat) + LinearMap(δD)
+        end
     elseif compression.method == :fmm
         S = Smat + LinearMap(δS)
         D = Dmat + LinearMap(δD)
@@ -290,7 +295,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
     elseif correction.method == :adaptive
         # strip `method` from correction and pass it on
         correction_kw = Base.structdiff(correction, NamedTuple{(:method,)})
-        δV = local_correction(V; correction_kw...)
+        δV = adaptive_correction(V; correction_kw...)
     elseif correction.method == :dim
         loc = target === source ? :inside : correction.target_location
         μ = _green_multiplier(loc)

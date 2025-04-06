@@ -113,22 +113,22 @@ function normal(el, x)
 end
 
 """
-    _normal(jac::SMatrix{M,N})
+    _normal(jac::SMatrix{M,N}, s = 1)
 
-Given a an `M` by `N` matrix representing the jacobian of a codimension one
-object, compute the normal vector.
+Given a an `M` by `N` matrix representing the jacobian of a codimension one object, compute
+the normal vector. If `s=-1`, the normal vector is flipped.
 """
-function _normal(jac::SMatrix{N,M}) where {N,M}
+function _normal(jac::SMatrix{N,M}, s = 1) where {N,M}
     (N - M == 1) || (return nothing) # not a codimension one object
     if M == 1 # a line in 2d
         t = jac[:, 1] # tangent vector
         n = SVector(t[2], -t[1]) |> normalize
-        return n
+        return s * n
     elseif M == 2 # a surface in 3d
         t₁ = jac[:, 1]
         t₂ = jac[:, 2]
         n = cross(t₁, t₂) |> normalize
-        return n
+        return s * n
     else
         notimplemented()
     end
