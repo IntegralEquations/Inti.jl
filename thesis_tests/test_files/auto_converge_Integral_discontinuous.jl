@@ -8,8 +8,8 @@
 # u = x -> x[2]
 # u = x -> x[2] / norm(x)
 # u = x -> 1
-u = x -> cos(x.coords[1]) * exp(x.coords[2])
-# u = x ->
+# u = x -> cos(x.coords[1]) * exp(x.coords[2])
+# u = x -> SVector(-sin(x.coords[1])*exp(x.coords[2]), cos(x.coords[1])*exp(x.coords[2])) ⋅ x.normal
 # u = x -> cos(x[1])
 
 qorder_ref, h_ref = 5, 0.5*1e-4
@@ -37,6 +37,7 @@ for qorder in Q
             norm(q.coords-xt)
         end
         xs = qs.coords
+        # xs = xt
         @info xs
 
         uvec = map(u, quad)

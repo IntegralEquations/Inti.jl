@@ -1,5 +1,6 @@
 using Inti
 using Gmsh
+using LaTeXStrings
 
 function gmsh_disk(; center, rx, ry, meshsize, order)
     msh = try
@@ -42,4 +43,18 @@ function gmsh_ball(; center, radius, meshsize)
         return Inti.geometric_dimension(e) == 3
     end
     return Ω, msh
+end
+
+function Lpower(e, i, times=nothing)
+    if i == 0
+        return ""
+    elseif i == 1
+        res = L"{%$e}"
+    else
+        res = L"{%$e}^{%$i}"
+    end
+    if times == :x
+        res = string(res, L"\times")
+    end
+    return res
 end

@@ -18,5 +18,3 @@ else
     xs = SVector(1, 0.1)
     tset = [SVector(5cos(s), 5sin(s)) for s in LinRange(-π, π, 10)]
 end
-
-k = 20

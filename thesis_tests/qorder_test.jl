@@ -43,8 +43,9 @@ TESTFILE = "test_files/auto_converge_Integral_discontinuous.jl"
 Inti.clear_entities!()
 include(GEOMETRY)
 xt = χ((3a+b)/4)
+# xt = χ(0)
 k = 10
-α, β = 0, 1 # coefficients for single, double layer
+α, β = 1, 0 # coefficients for single, double layer
 onSurf = true
 include(TESTFILE)
 
