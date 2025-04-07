@@ -75,6 +75,7 @@ end
     y⁴         = SVector(-1.0, 1.0, z)
     nodes      = (y¹, y², y³, y⁴)
     el         = Inti.LagrangeSquare(nodes)
+    ori        = 1
     K          = (p, q) -> begin
         x = Inti.coords(p)
         y = Inti.coords(q)
@@ -86,8 +87,8 @@ end
     b          = SVector(1.66 / 2, 0.5)
     quad_rho   = Inti.GaussLegendre(; order = 10)
     quad_theta = Inti.GaussLegendre(; order = 20)
-    va         = Inti.guiggiani_singular_integral(K, û, a, el, quad_rho, quad_theta)
-    vb         = Inti.guiggiani_singular_integral(K, û, b, el, quad_rho, quad_theta)
+    va         = Inti.guiggiani_singular_integral(K, û, a, el, ori, quad_rho, quad_theta)
+    vb         = Inti.guiggiani_singular_integral(K, û, b, el, ori, quad_rho, quad_theta)
     @test isapprox(va, -5.749237; atol = 1e-4)
     @test isapprox(vb, -9.154585; atol = 1e-4)
     # TODO: add point c and more tests from table 2
