@@ -298,20 +298,16 @@ function quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
     areas = zeros(length(inodes)) # area of neighboring triangles
     for (E, mat) in etype2mat(msh)
         qrule = Q.etype2qrule[E]
-        coords = qcoords(qrule)
-        if length(coords) == 1
-            # hack needed mapreduce below generates an SVector if coords is a single point,
-            # and Matrix(::SVector) fails
-            V = lagrange_basis(E)(coords[1]) |> hcat |> Matrix
-        else
-            V = mapreduce(lagrange_basis(E), hcat, coords) |> Matrix
-        end
+        L = lagrange_basis(qrule)
+        coords = reference_nodes(E)
+        # precompute value of quadrature basis at the interpolation nodes
+        Q2I = mapreduce(L, hcat, coords) |> transpose
         ni, nel = size(mat) # number of interpolation nodes by number of elements
         for n in 1:nel
             qtags = Q.etype2qtags[E][:, n]
             itags = mat[:, n]
             area = sum(q -> weight(q), view(Q.qnodes, qtags))
-            ivals[itags] .+= area .* (transpose(V) \ qvals[qtags])
+            ivals[itags] .+= area .* (Q2I * qvals[qtags])
             areas[itags] .+= area
         end
     end

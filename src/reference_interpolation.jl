@@ -458,7 +458,7 @@ end
 
 # P3 for ReferenceTriangle
 # source: https://www.math.uci.edu/~chenlong/iFEM/doc/html/dofP3doc.html
-function reference_nodes(::LagrangeTriangle{10})
+function reference_nodes(::Type{<:LagrangeTriangle{10}})
     return SVector(
         SVector(0.0, 0.0),
         SVector(1.0, 0.0),
