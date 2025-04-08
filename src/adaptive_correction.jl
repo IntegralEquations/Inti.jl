@@ -64,22 +64,28 @@ function adaptive_correction(
     iop::IntegralOperator;
     maxdist = nothing,
     rtol = nothing,
+    atol = nothing,
     threads = true,
     kwargs...,
 )
-    if isnothing(maxdist) || isnothing(rtol)
-        maxdist_, rtol_ = local_correction_dist_and_tol(iop)
+    # check if we need to compute a tolerance and/or a maxdist
+    hastol = ((rtol !== nothing) || (atol !== nothing))
+    if isnothing(maxdist) || !hastol
+        maxdist_, rtol_, atol_ = local_correction_dist_and_tol(iop)
     end
-    maxdist    = isnothing(maxdist) ? maxdist_ : maxdist
-    rtol       = isnothing(rtol) ? rtol_ : rtol
+    # normalize inputs
+    maxdist = isnothing(maxdist) ? maxdist_ : maxdist
+    rtol = isnothing(rtol) ? (hastol ? 0.0 : rtol_) : rtol
+    atol = isnothing(atol) ? (hastol ? 0.0 : atol_) : atol
+    # go on and compute the correction
     msh        = mesh(source(iop))
     quads_dict = Dict()
     for E in element_types(msh)
         ref_domain = reference_domain(E)
         quads = (
-            nearfield_quad = adaptive_quadrature(ref_domain; rtol, kwargs...),
-            radial_quad    = adaptive_quadrature(ReferenceLine(); rtol, kwargs...),
-            angular_quad   = adaptive_quadrature(ReferenceLine(); rtol, kwargs...),
+            nearfield_quad = adaptive_quadrature(ref_domain; rtol, atol, kwargs...),
+            radial_quad    = adaptive_quadrature(ReferenceLine(); rtol, atol, kwargs...),
+            angular_quad   = adaptive_quadrature(ReferenceLine(); rtol, atol, kwargs...),
         )
         quads_dict[E] = quads
     end
@@ -462,23 +468,26 @@ function local_correction_dist_and_tol(iop::IntegralOperator, kmax = 10, ratio =
     msh     = mesh(Q)
     maxdist = 0.0
     rtol    = 0.0
+    atol    = 0.0
     for E in element_types(msh)
-        ref_domain     = reference_domain(E)
-        els            = elements(msh, E)
-        regular_quad   = quadrature_rule(Q, E)
-        reference_quad = adaptive_quadrature(ref_domain; rtol = 1e-12, maxsubdiv = 10_000)
+        ref_domain = reference_domain(E)
+        els = elements(msh, E)
+        regular_quad = quadrature_rule(Q, E)
+        reference_quad =
+            adaptive_quadrature(ref_domain; rtol = 1e-8, atol = 1e-12, maxsubdiv = 10_000)
         # pick the biggest element as a reference
         qtags = etype2qtags(Q, E)
         a, i = @views findmax(j -> sum(weight, Q[qtags[:, j]]), 1:size(qtags, 2))
-        dist, rel_er =
+        dist, rel_er, abs_er =
             _regular_integration_errors(els[i], K, regular_quad, reference_quad, kmax)
         # find first index such that er[i+1] > er[i] / ratio
         i = findfirst(i -> rel_er[i+1] > rel_er[i] / ratio, 1:(kmax-1))
         isnothing(i) && (i = kmax; @warn "using $kmax as maxdist")
         maxdist = max(maxdist, dist[i])
         rtol = max(rtol, rel_er[i])
+        atol = max(atol, abs_er[i])
     end
-    return maxdist, rtol
+    return maxdist, rtol, atol
 end
 
 function _regular_integration_errors(el, K, qreg, qref, maxiter)
@@ -495,22 +504,26 @@ function _regular_integration_errors(el, K, qreg, qref, maxiter)
     N = length(x₀)
     er = 0.0
     cc = 0
-    ers = Float64[]
+    rel_ers = Float64[]
+    abs_ers = Float64[]
     dists = Float64[]
     while cc < maxiter
         cc += 1
         # explore a few directions and pick the worst error
-        er = 0.0
+        rel_er = 0.0
+        abs_er = 0.0
         for dir in -N:N
             iszero(dir) && continue
-            k  = abs(dir)
-            x  = setindex(x₀, x₀[k] + sign(N) * cc * h, k)
-            I  = qref(ŷ -> f(x, ŷ))
+            k = abs(dir)
+            x = setindex(x₀, x₀[k] + sign(N) * cc * h, k)
+            I = qref(ŷ -> f(x, ŷ))
             Ia = qreg(ŷ -> f(x, ŷ))
-            er = max(er, norm(Ia - I, Inf) / norm(I, Inf))
+            abs_er = max(abs_er, norm(Ia - I, Inf))
+            rel_er = max(er, norm(Ia - I, Inf) / norm(I, Inf))
         end
-        push!(ers, er)
+        push!(rel_ers, rel_er)
+        push!(abs_ers, abs_er)
         push!(dists, cc * h)
     end
-    return dists, ers
+    return dists, rel_ers, abs_ers
 end
