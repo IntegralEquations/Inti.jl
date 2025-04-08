@@ -17,7 +17,7 @@ return_type(::AbstractKernel{T}, args...) where {T} = T
     singularity_order(K)
 
 Given a kernel `K` with signature `K(target,source)::T`, return the order of the singularity
-of `K` at `target = source`.
+of `K` at `target = source`. Order `n` means that `K(x,y) ∼ (x - y)^n` as `x -> y`.
 """
 singularity_order(K) = nothing
 
@@ -53,7 +53,7 @@ end
 
 function singularity_order(K::SingleLayerKernel)
     N = ambient_dimension(K.op)
-    return N - 2
+    return 2 - N
 end
 
 """
@@ -70,7 +70,7 @@ end
 
 function singularity_order(K::DoubleLayerKernel)
     N = ambient_dimension(K.op)
-    return N - 1
+    return 1 - N
 end
 
 """
@@ -88,7 +88,7 @@ end
 
 function singularity_order(K::AdjointDoubleLayerKernel)
     N = ambient_dimension(K.op)
-    return N - 1
+    return 1 - N
 end
 
 """
@@ -106,7 +106,7 @@ end
 
 function singularity_order(K::HyperSingularKernel)
     N = ambient_dimension(K.op)
-    return N
+    return -N
 end
 
 ################################################################################
@@ -252,7 +252,6 @@ function (DL::DoubleLayerKernel{T,Yukawa{N,K}})(target, source)::T where {N,T,K}
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        k = im * λ
         return λ / (2 * π * d) * Bessels.besselk(1, λ * d) .* dot(r, ny)
     elseif N == 3
         return 1 / (4π) / d^2 * exp(-λ * d) * (λ + 1 / d) * dot(r, ny)

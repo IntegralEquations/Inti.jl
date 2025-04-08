@@ -91,6 +91,23 @@ function monomial_basis(::PolynomialSpace{ReferenceTriangle,K}) where {K}
     return b
 end
 
+function monomial_basis(::PolynomialSpace{ReferenceTetrahedron,K}) where {K}
+    # the (K+1)*(K+2)*(K+3)/6 monomials x^(a,b,c) with a+b+c ≤ K
+    # construct first the indices for the square, then filter only those for
+    # which the sum is less than K.
+    Isq = CartesianIndices((K + 1, K + 1, K + 1)) .- CartesianIndex(1, 1, 1)
+    I = filter(Isq) do idx
+        return sum(Tuple(idx)) ≤ K
+    end
+    N = Val((K + 1) * (K + 2) * (K + 3) ÷ 6)
+    b = x -> begin
+        svector(N) do i
+            return x[1]^I[i][1] * x[2]^I[i][2] * x[3]^I[i][3]
+        end
+    end
+    return b
+end
+
 """
     lagrange_basis(nodes,[sp::AbstractPolynomialSpace])
 

@@ -111,20 +111,10 @@ function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
     # loop element types and generate quadrature for each
     for E in element_types(msh)
         els = elements(msh, E)
+        ori = orientation(msh, E)
         qrule = etype2qrule[E]
         # dispatch to type-stable method
-        _build_quadrature!(quad, els, qrule)
-    end
-    # check for entities with negative orientation and flip normal vectors if
-    # present
-    for ent in entities(msh)
-        if (sign(tag(ent)) < 0) && (N - geometric_dimension(ent) == 1)
-            @debug "Flipping normals of $ent"
-            tags = dom2qtags(quad, Domain(ent))
-            for i in tags
-                quad[i] = flip_normal(quad[i])
-            end
-        end
+        _build_quadrature!(quad, els, ori, qrule)
     end
     return quad
 end
@@ -143,6 +133,7 @@ end
 @noinline function _build_quadrature!(
     quad::Quadrature{N,T},
     els::AbstractVector{E},
+    orientation::Vector{Int},
     qrule::ReferenceQuadrature,
 ) where {N,T,E}
     x̂ = map(x̂ -> T.(x̂), qcoords(qrule))
@@ -151,14 +142,15 @@ end
     M = geometric_dimension(domain(E))
     codim = N - M
     istart = length(quad.qnodes) + 1
-    for el in els
+    @assert length(els) == length(orientation)
+    for (s, el) in zip(orientation, els)
         # and all qnodes for that element
         for (x̂i, ŵi) in zip(x̂, ŵ)
             x = el(x̂i)
             jac = jacobian(el, x̂i)
             μ = _integration_measure(jac)
             w = μ * ŵi
-            ν = codim == 1 ? T.(_normal(jac)) : nothing
+            ν = codim == 1 ? T.(s * _normal(jac)) : nothing
             qnode = QuadratureNode(T.(x), T.(w), ν)
             push!(quad.qnodes, qnode)
         end
@@ -306,13 +298,16 @@ function quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
     areas = zeros(length(inodes)) # area of neighboring triangles
     for (E, mat) in etype2mat(msh)
         qrule = Q.etype2qrule[E]
-        V = mapreduce(lagrange_basis(E), hcat, qcoords(qrule)) |> Matrix
+        L = lagrange_basis(qrule)
+        coords = reference_nodes(E)
+        # precompute value of quadrature basis at the interpolation nodes
+        Q2I = mapreduce(L, hcat, coords) |> transpose
         ni, nel = size(mat) # number of interpolation nodes by number of elements
         for n in 1:nel
             qtags = Q.etype2qtags[E][:, n]
             itags = mat[:, n]
             area = sum(q -> weight(q), view(Q.qnodes, qtags))
-            ivals[itags] .+= area .* (transpose(V) \ qvals[qtags])
+            ivals[itags] .+= area .* (Q2I * qvals[qtags])
             areas[itags] .+= area
         end
     end

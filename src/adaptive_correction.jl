@@ -72,7 +72,7 @@ function adaptive_correction(
     end
     maxdist    = isnothing(maxdist) ? maxdist_ : maxdist
     rtol       = isnothing(rtol) ? rtol_ : rtol
-    msh        = mesh(target(iop))
+    msh        = mesh(source(iop))
     quads_dict = Dict()
     for E in element_types(msh)
         ref_domain = reference_domain(E)
@@ -89,7 +89,6 @@ end
 function adaptive_correction(iop, maxdist, quads_dict::Dict, threads = true)
     # unpack type-unstable fields in iop, allocate output, and dispatch
     X, Y, K = target(iop), source(iop), kernel(iop)
-    @assert X === Y "source and target of integraloperator must coincide"
     dict_near = near_interaction_list([coords(x) for x in X], mesh(Y); tol = maxdist)
     T = eltype(iop)
     msh = mesh(Y)
@@ -99,9 +98,9 @@ function adaptive_correction(iop, maxdist, quads_dict::Dict, threads = true)
     p          = singularity_order(K) # K(x,y) ~ |x-y|^{-p} as y -> 0
     sing_order = if isnothing(p)
         @warn "missing method `singularity_order` for kernel. Assuming finite part integral."
-        2
+        -2
     else
-        p - (geo_dim - 1) # in polar coordinates you muliply by r^{geo_dim-1}
+        p + (geo_dim - 1) # in polar coordinates you muliply by r^{geo_dim-1}
     end
     # allocate output in a sparse matrix style
     correction = (I = Int[], J = Int[], V = T[])
@@ -110,6 +109,7 @@ function adaptive_correction(iop, maxdist, quads_dict::Dict, threads = true)
     for E in element_types(msh)
         nearlist = dict_near[E]
         els = elements(msh, E)
+        ori = orientation(msh, E)
         # append the regular quadrature rule to the list of quads for the element type E
         # radial singularity order
         quads = merge(quads_dict[E], (regular_quad = quadrature_rule(Y, E),))
@@ -117,6 +117,7 @@ function adaptive_correction(iop, maxdist, quads_dict::Dict, threads = true)
         _adaptive_correction_etype!(
             correction,
             els,
+            ori,
             quads,
             L,
             nearlist,
@@ -135,6 +136,7 @@ end
 @noinline function _adaptive_correction_etype!(
     correction,
     el_iter,
+    orientation,
     quads,
     L,
     nearlist,
@@ -156,6 +158,7 @@ end
     # lck = ReentrantLock()
     @maybe_threads threads for n in 1:nel
         el = el_iter[n]
+        ori = orientation[n]
         jglob = view(el2qtags, :, n)
         # inear = union(nearlist[n], jglob) # make sure to include nearfield nodes AND the element nodes
         inear = nearlist[n]
@@ -175,6 +178,7 @@ end
                     L,
                     x̂nearest,
                     el,
+                    ori,
                     quads.radial_quad,
                     quads.angular_quad,
                     sorder,
@@ -183,7 +187,7 @@ end
                 integrand = (ŷ) -> begin
                     y = el(ŷ)
                     jac = jacobian(el, ŷ)
-                    ν = _normal(jac)
+                    ν = _normal(jac, ori)
                     τ′ = _integration_measure(jac)
                     M = K(xnode, (coords = y, normal = ν))
                     v = L(ŷ)
@@ -248,13 +252,15 @@ function guiggiani_singular_integral(
     û,
     x̂,
     el::ReferenceInterpolant{<:Union{ReferenceTriangle,ReferenceSquare}},
+    ori,
     quad_rho,
     quad_theta,
-    sorder::Val{P} = Val(2),
+    sorder::Val{P} = Val(-2),
 ) where {P}
     ref_shape = reference_domain(el)
     x         = el(x̂)
-    nx        = normal(el, x̂)
+    jac_x     = jacobian(el, x̂)
+    nx        = _normal(jac_x, ori)
     qx        = (coords = x, normal = nx)
     # function to integrate in polar coordinates
     F = (ρ, θ) -> begin
@@ -262,7 +268,7 @@ function guiggiani_singular_integral(
         ŷ = x̂ + ρ * SVector(c, s)
         y = el(ŷ)
         jac = jacobian(el, ŷ)
-        ny = _normal(jac)
+        ny = _normal(jac, ori)
         μ = _integration_measure(jac)
         qy = (coords = y, normal = ny)
         M = K(qx, qy)
@@ -288,10 +294,10 @@ function guiggiani_singular_integral(
                 rho = rho_ref * rho_max
                 # compute F(rho, theta) - F₋₁ / rho - F₋₂ / rho^2, but ignore terms that are
                 # known to be zero
-                if P == 2
+                if P == -2
                     rho < cbrt(eps()) && (return F₀)
                     return F(rho, theta) - F₋₁ / rho - F₋₂ / rho^2
-                elseif P == 1
+                elseif P == -1
                     rho < sqrt(eps()) && (return F₀)
                     return F(rho, theta) - F₋₁ / rho
                 else
@@ -300,9 +306,9 @@ function guiggiani_singular_integral(
             end
             # compute I_rho * rho_max + F₋₁ * log(rho_max) - F₋₂ / rho_max but manually
             # ignore terms that are known to be zero
-            if P == 2
+            if P == -2
                 return I_rho * rho_max + F₋₁ * log(rho_max) - F₋₂ / rho_max
-            elseif P == 1
+            elseif P == -1
                 return I_rho * rho_max + F₋₁ * log(rho_max)
             else
                 return I_rho * rho_max
@@ -319,12 +325,14 @@ function guiggiani_singular_integral(
     û,
     x̂,
     el::ReferenceInterpolant{ReferenceLine},
+    ori,
     quad_rho,
     quad_theta, # unused, but kept for consistency with the 2D case
-    sorder::Val{P} = Val(2),
+    sorder::Val{P} = Val(-2),
 ) where {P}
-    x  = el(x̂)
-    nx = normal(el, x̂)
+    x = el(x̂)
+    jac_x = jacobian(el, x̂)
+    nx = _normal(jac_x, ori)
     qx = (coords = x, normal = nx)
     # function to integrate in 1D "polar" coordinates. We use `s ∈ {-1,1}` to denote the
     # angles `π` and `0`.
@@ -332,7 +340,7 @@ function guiggiani_singular_integral(
         ŷ = x̂ + SVector(ρ * s)
         y = el(ŷ)
         jac = jacobian(el, ŷ)
-        ny = _normal(jac)
+        ny = _normal(jac, ori)
         μ = _integration_measure(jac)
         qy = (coords = y, normal = ny)
         M = K(qx, qy)
@@ -352,19 +360,19 @@ function guiggiani_singular_integral(
             )
         I_rho = quad_rho() do (rho_ref,)
             rho = rho_ref * rho_max
-            if P == 2
+            if P == -2
                 rho < cbrt(eps()) && (return F₀)
                 return F(rho, s) - F₋₂ / rho^2 - F₋₁ / rho
-            elseif P == 1
+            elseif P == -1
                 rho < sqrt(eps()) && (return F₀)
                 return F(rho, s) - F₋₁ / rho
             else
                 return F(rho, s)
             end
         end
-        if P == 2
+        if P == -2
             acc += (F₋₁ * log(rho_max) - F₋₂ / rho_max) + I_rho * rho_max
-        elseif P == 1
+        elseif P == -1
             acc += F₋₁ * log(rho_max) + I_rho * rho_max
         else
             acc += I_rho * rho_max
@@ -374,12 +382,18 @@ function guiggiani_singular_integral(
 end
 
 """
-    laurent_coefficients(f, h, order::Val{N}) where {N}
+    laurent_coefficients(f, h, order) --> f₋₂, f₋₁, f₀
 
 Given a one-dimensional function `f`, return `f₋₂, f₋₁, f₀` such that `f(x) = f₋₂ / x^2 +
-f₋₁ / x + f₀ + 𝒪(x)` as `x -> 0`, where we assume that `f₋ₙ = 0` for `n > N`.
+f₋₁ / x + f₀ + 𝒪(x)` as `x -> 0`, where we assume that `fₙ = 0` for `n < N`.
+
+The `order` argument is an integer that indicates the order of the singularity at the
+origin:
+- `Val{-2}`: The function has a singularity of order `-2` at the origin.
+- `Val{-1}`: The function has a singularity of order `-1` at the origin, so `f₋₂ = 0`.
+- `Val{0}`: The function has a finite part at the origin, so `f₋₂ = f₋₁ = 0`.
 """
-function laurent_coefficients(f, h, order::Val{2}; kwargs...)
+function laurent_coefficients(f, h, order::Val{-2}; kwargs...)
     g = x -> x^2 * f(x)
     f₋₂, e₋₂ = extrapolate(h; x0 = 0, kwargs...) do x
         return g(x)
@@ -392,23 +406,27 @@ function laurent_coefficients(f, h, order::Val{2}; kwargs...)
     end
     return f₋₂, f₋₁, f₀
 end
-function laurent_coefficients(f, h, ::Val{1}; kwargs...)
+function laurent_coefficients(f, h, ::Val{-1}; kwargs...)
     f₋₁, e₋₁ = extrapolate(h; x0 = 0, kwargs...) do x
         return x * f(x)
     end
     f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
         return f(x) - f₋₁ / x
     end
-    return 0, f₋₁, f₀
+    return zero(f₀), f₋₁, f₀
 end
 function laurent_coefficients(f, h, ::Val{0}; kwargs...)
     f₀, e₀ = extrapolate(h; x0 = 0, kwargs...) do x
         return f(x)
     end
-    return 0, 0, f₀
+    return zero(f₀), zero(f₀), f₀
 end
 function laurent_coefficients(f, h, ::Val{N}; kwargs...) where {N}
-    return error("laurent_coefficients: order $N not implemented")
+    if N > 0
+        return 0.0, 0.0, 0.0
+    else
+        throw(ArgumentError("order must be >= -2"))
+    end
 end
 
 """

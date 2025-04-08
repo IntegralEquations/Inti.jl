@@ -458,7 +458,7 @@ end
 
 # P3 for ReferenceTriangle
 # source: https://www.math.uci.edu/~chenlong/iFEM/doc/html/dofP3doc.html
-function reference_nodes(::LagrangeTriangle{10})
+function reference_nodes(::Type{<:LagrangeTriangle{10}})
     return SVector(
         SVector(0.0, 0.0),
         SVector(1.0, 0.0),
@@ -514,7 +514,7 @@ function (el::LagrangeElement{ReferenceSquare,4})(u)
 end
 
 # P1 for ReferenceTetrahedron
-function reference_nodes(::LagrangeTetrahedron{4})
+function reference_nodes(::Type{<:LagrangeTetrahedron{4}})
     return SVector(SVector(0, 0, 0), SVector(1, 0, 0), SVector(0, 1, 0), SVector(0, 0, 1))
 end
 

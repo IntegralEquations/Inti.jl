@@ -80,6 +80,8 @@ struct Mesh{N,T} <: AbstractMesh{N,T}
     etype2els::Dict{DataType,AbstractVector}
     # mapping from entity to a dict containing (etype=>tags)
     ent2etags::Dict{EntityKey,Dict{DataType,Vector{Int}}}
+    # keep track if the element orientation should be inverted
+    etype2orientation::Dict{DataType,Vector{Int}}
 end
 
 # empty constructor
@@ -89,6 +91,7 @@ function Mesh{N,T}() where {N,T}
         Dict{DataType,Matrix{Int}}(),
         Dict{DataType,AbstractVector{<:ReferenceInterpolant}}(),
         Dict{EntityKey,Dict{DataType,Vector{Int}}}(),
+        Dict{DataType,Vector{Int}}(),
     )
 end
 
@@ -121,6 +124,14 @@ tags in the matrix refer to the points in `nodes(msh)`
 """
 connectivity(msh::Mesh, E::DataType) = msh.etype2mat[E]
 
+"""
+    orientation(msh::AbstractMesh,E::DataType)
+
+Return the orientation of the elements of type `E` in `msh` (`1` if normal and `-1` if
+inverted).
+"""
+orientation(msh::AbstractMesh, E::DataType) = msh.etype2orientation[E]
+
 function ent2nodetags(msh::Mesh, ent::EntityKey)
     tags = Int[]
     for (E, t) in msh.ent2etags[ent]
@@ -150,6 +161,26 @@ function dom2elt(m::AbstractMesh, Ω::Domain, E::DataType)
         append!(idxs, tags)
     end
     return idxs
+end
+
+function build_orientation!(msh::AbstractMesh)
+    # allocate the orientation vector for each element type
+    for E in element_types(msh)
+        E <: SVector && continue # skip points
+        haskey(msh.etype2orientation, E) && (@warn "recomputing orientation for $E")
+        msh.etype2orientation[E] = Vector{Int}(undef, length(elements(msh, E)))
+    end
+    # for each entity, set the orientation of the elements
+    e2t = ent2etags(msh)
+    for ent in entities(msh)
+        geometric_dimension(ent) == 0 && continue # skip points
+        s = sign(tag(ent))
+        for (E, tags) in e2t[ent]
+            for i in tags
+                msh.etype2orientation[E][i] = s
+            end
+        end
+    end
 end
 
 function Base.getindex(msh::Mesh{N,T}, Ω::Domain) where {N,T}
@@ -190,6 +221,7 @@ function Base.getindex(msh::Mesh{N,T}, Ω::Domain) where {N,T}
         end
         isempty(mat) || (etype2mat[E] = reshape(mat, np, :))
     end
+    build_orientation!(new_msh)
     return new_msh
 end
 Base.getindex(msh::Mesh, ent::EntityKey) = getindex(msh, Domain(ent))
@@ -307,6 +339,7 @@ function meshgen!(msh::Mesh, Ω::Domain, dict::Dict)
         end
     end
     _build_connectivity!(msh)
+    build_orientation!(msh)
     return msh
 end
 
@@ -403,6 +436,7 @@ Base.size(iter::ElementIterator{E,<:Mesh}) where {E} = (length(iter),)
 function Base.getindex(iter::ElementIterator{E,<:Mesh}, i::Int) where {E<:LagrangeElement}
     tags = iter.mesh.etype2mat[E]::Matrix{Int}
     node_tags = view(tags, :, i)
+    orientation = iter.mesh.etype2orientation[E][i]
     vtx = view(iter.mesh.nodes, node_tags)
     el = E(vtx)
     return el
@@ -482,15 +516,18 @@ struct SubMesh{N,T} <: AbstractMesh{N,T}
     # etype2etags maps E => indices of elements in parent mesh contained in the
     # submesh
     etype2etags::Dict{DataType,Vector{Int}}
+    etype2orientation::Dict{DataType,Vector{Int}}
     function SubMesh(mesh::Mesh{N,T}, Ω::Domain) where {N,T}
         etype2etags = Dict{DataType,Vector{Int}}()
         for E in element_types(mesh)
-            # add the indices of the elements of type E in the submesh. Skip if
-            # empty
+            # add the indices of the elements of type E in the submesh. Skip if empty
             idxs = dom2elt(mesh, Ω, E)
             isempty(idxs) || (etype2etags[E] = idxs)
         end
-        return new{N,T}(mesh, Ω, etype2etags)
+        etype2orientation = Dict{DataType,Vector{Bool}}()
+        submsh = new{N,T}(mesh, Ω, etype2etags, etype2orientation)
+        build_orientation!(submsh)
+        return submsh
     end
 end
 

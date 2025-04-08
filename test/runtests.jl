@@ -21,6 +21,8 @@ using Aqua
 
 @safetestset "Quadrature" include("quadrature_test.jl")
 
+@safetestset "Normal orientation" include("normal_orientation_test.jl")
+
 @safetestset "Kernels" include("kernels_test.jl")
 
 @safetestset "Integral operators" include("integral_operator_test.jl")

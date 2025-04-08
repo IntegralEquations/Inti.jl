@@ -450,8 +450,19 @@ end
 
 function interpolation_order(qrule::ReferenceQuadrature{ReferenceTriangle})
     N = length(qrule)
-    # the last triangular number less than N
+    # the last triangular less than or equal to N
     return floor(Int, (sqrt(8N + 1) - 3) / 2)
+end
+
+function interpolation_order(qrule::ReferenceQuadrature{ReferenceTetrahedron})
+    N = length(qrule)
+    # the last tetrahedral number less than or equal to N. For example P1 has at most 4
+    # nodes, P2 has at most 10 nodes, P3 has at most 20 nodes, etc...
+    P = 0
+    while (P + 1) * (P + 2) * (P + 3) / 6 < N
+        P += 1
+    end
+    return P - 1
 end
 
 function interpolation_order(qrule::Inti.TensorProductQuadrature)
