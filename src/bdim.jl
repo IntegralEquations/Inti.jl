@@ -113,8 +113,25 @@ function bdim_correction(
             Θ[i, k] = μ * v
         end
     end
-    @views mul!(Θ, Sop, γ₁B, 1, 1)
-    @views mul!(Θ, Dop, γ₀B, -1, 1)
+    if Dense <: Array || (Sop isa BlockArray && Dop isa BlockArray)
+        mul!(Θ, Sop, γ₁B, 1, 1)
+        mul!(Θ, Dop, γ₀B, -1, 1)
+    else
+        # for vector value problems, we only assume that Sop and Dop can be multiplied by
+        # Vectors of SVectors, and so we need to perform multiplication column by column
+        P, Q = size(T)
+        S = eltype(T)
+        Θ_data = parent(Θ)
+        γ₀B_data = parent(γ₀B)
+        γ₁B_data = parent(γ₁B)
+        for k in 1:size(Θ_data, 2)
+            y = reinterpret(SVector{P,S}, @view Θ_data[:, k])
+            x = reinterpret(SVector{Q,S}, @view γ₁B_data[:, k])
+            mul!(y, Sop, x, 1, 1)
+            x = reinterpret(SVector{Q,S}, @view γ₀B_data[:, k])
+            mul!(y, Dop, x, -1, 1)
+        end
+    end
 
     # finally compute the corrected weights as sparse matrices
     Is, Js, Ss, Ds = Int[], Int[], T[], T[]

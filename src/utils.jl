@@ -170,45 +170,6 @@ function fibonnaci_points_sphere(N, r, center)
     return pts
 end
 
-"""
-    _copyto!(target,source)
-
-Defaults to `Base.copyto!`, but includes some specialized methods to copy from a
-`Matrix` of `SMatrix` to a `Matrix` of `Number`s and viceversa.
-"""
-function _copyto!(dest::AbstractMatrix{<:Number}, src::AbstractMatrix{<:SMatrix})
-    S = eltype(src)
-    sblock = size(S)
-    ss = size(src) .* sblock # matrix size when viewed as matrix over T
-    @assert size(dest) == ss
-    for i in 1:ss[1], j in 1:ss[2]
-        bi, ind_i = divrem(i - 1, sblock[1]) .+ (1, 1)
-        bj, ind_j = divrem(j - 1, sblock[2]) .+ (1, 1)
-        dest[i, j] = src[bi, bj][ind_i, ind_j]
-    end
-    return dest
-end
-function _copyto!(dest::AbstractMatrix{<:SMatrix}, src::AbstractMatrix{<:Number})
-    T = eltype(dest)
-    sblock = size(T)
-    nblock = div.(size(src), sblock)
-    for i in 1:nblock[1]
-        istart = (i - 1) * sblock[1] + 1
-        iend = i * sblock[1]
-        for j in 1:nblock[2]
-            jstart = (j - 1) * sblock[2] + 1
-            jend = j * sblock[2]
-            dest[i, j] = T(view(src, istart:iend, jstart:jend))
-        end
-    end
-    return dest
-end
-
-# defaults to Base.copyto!
-function _copyto!(dest, src)
-    return copyto!(dest, src)
-end
-
 # https://discourse.julialang.org/t/putting-threads-threads-or-any-macro-in-an-if-statement/41406/7
 macro usethreads(multithreaded, expr::Expr)
     ex = quote

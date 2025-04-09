@@ -41,6 +41,8 @@ function (::Type{K})(
     return K{T,Op}(op)
 end
 
+operator(K::AbstractKernel) = K.op
+
 """
     struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
 

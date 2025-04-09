@@ -136,7 +136,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
     elseif K isa Inti.SingleLayerKernel{SMatrix{3,3,Float64,9},<:Inti.Stokes{3,Float64}}
         T = SVector{3,Float64}
         stoklet = Matrix{Float64}(undef, 3, n)
-        return LinearMaps.LinearMap{SVector{3,Float64}}(m, n) do y, x
+        return LinearMaps.LinearMap{SMatrix{3,3,Float64,9}}(m, n) do y, x
             # multiply by weights and constant
             stoklet[:] = 1 / (4 * π * K.op.μ) .* reinterpret(Float64, weights .* x)
             out = FMM3D.stfmm3d(rtol, sources; stoklet, targets, ppregt = 1)
@@ -154,7 +154,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         for j in 1:n
             strsvec[:, j] = -1 / (4 * π) * view(normals, :, j) .* weights[j]
         end
-        return LinearMaps.LinearMap{SVector{3,Float64}}(m, n) do y, x
+        return LinearMaps.LinearMap{SMatrix{3,3,Float64,9}}(m, n) do y, x
             strslet[:] = reinterpret(Float64, x)
             out = FMM3D.stfmm3d(rtol, sources; strslet, strsvec, targets, ppregt = 1)
             return copyto!(y, reinterpret(T, out.pottarg))
