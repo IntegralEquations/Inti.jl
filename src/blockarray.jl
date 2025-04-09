@@ -110,7 +110,7 @@ function _blockindex(A::BlockArray{T,N}, I_::Vararg{Int,N}) where {T,N}
     bsz_ = blocksize(A)
     bsz, I = one_padding(bsz_, I_)
     idxs = ntuple(length(I)) do dim
-        return (I[dim]-1)*bsz[dim]+1:I[dim]*bsz[dim]
+        return ((I[dim]-1)*bsz[dim]+1):(I[dim]*bsz[dim])
     end
     return idxs
 end
