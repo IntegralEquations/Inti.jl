@@ -13,7 +13,7 @@ B = Inti.BlockArray{T}([i*j for i in 1:4, j in 1:4])
 
 # output
 
-2×2 Inti.BlockArray{SMatrix{2, 2, Int64, 4}, 2, Int64}:
+2×2 Inti.BlockArray{SMatrix{2, 2, Int64, 4}, 2, Int64, 2}:
  [1 2; 2 4]  [3 4; 6 8]
  [3 6; 4 8]  [9 12; 12 16]
 
