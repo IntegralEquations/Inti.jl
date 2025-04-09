@@ -152,7 +152,7 @@ Base.iterate(Ω::Domain, state = 1) = iterate(entities(Ω), state)
 Base.isempty(Ω::Domain) = isempty(entities(Ω))
 
 Base.in(ent::EntityKey, Ω::Domain) = in(ent, entities(Ω))
-Base.in(Ω1::Domain, Ω2::Domain) = all(ent ∈ Ω2 for ent in entities(Ω1))
+Base.in(Ω1::Domain, Ω2::Domain) = all(ent in Ω2 for ent in entities(Ω1))
 
 Base.union(Ω1::Domain, Ωs...) = Domain(union(Ω1.keys, map(ω -> keys(ω), Ωs)...))
 Base.union(e1::EntityKey, e2::EntityKey) = Domain(e1, e2)
