@@ -108,7 +108,7 @@ order(::Fejer{N}) where {N} = N - 1
     w = zero(x)
     for j in 1:N
         tmp = 0.0
-        for l in 1:floor(N / 2)
+        for l in 1:floor(N/2)
             tmp += 1 / (4 * l^2 - 1) * cos(2 * l * theta[j])
         end
         w[j] = 2 / N * (1 - 2 * tmp)
@@ -392,7 +392,7 @@ function integrate_with_error_estimate(
         I_low += v * w_low[i]
     end
     # now compute the rest of the high order quadrature
-    for i in nlow+1:nhigh
+    for i in (nlow+1):nhigh
         v = f(x[i])
         I_high += v * w_high[i]
     end

@@ -67,12 +67,12 @@ end
 
 @testset "Plane distorted element" begin
     # Guiggiani plane distoreted element (table 1)
-    δ          = 0.5
+    δ         = 0.5
     z          = 0.0
-    y¹         = SVector(-1.0, -1.0, z)
-    y²         = SVector(1.0 + δ, -1.0, z)
-    y³         = SVector(1.0 - δ, 1.0, z)
-    y⁴         = SVector(-1.0, 1.0, z)
+    y¹        = SVector(-1.0, -1.0, z)
+    y²        = SVector(1.0 + δ, -1.0, z)
+    y³        = SVector(1.0 - δ, 1.0, z)
+    y⁴       = SVector(-1.0, 1.0, z)
     nodes      = (y¹, y², y³, y⁴)
     el         = Inti.LagrangeSquare(nodes)
     ori        = 1
@@ -82,7 +82,7 @@ end
         d = norm(x - y)
         1 / (d^3)
     end
-    û         = (x̂) -> 1
+    û        = (x̂) -> 1
     a          = SVector(0.5, 0.5)
     b          = SVector(1.66 / 2, 0.5)
     quad_rho   = Inti.GaussLegendre(; order = 10)

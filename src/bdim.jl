@@ -91,7 +91,7 @@ function bdim_correction(
         error("only 2D and 3D supported")
     end
     # compute traces of monopoles on the source mesh
-    G   = SingleLayerKernel(op, T)
+    G = SingleLayerKernel(op, T)
     γ₁G = AdjointDoubleLayerKernel(op, T)
     γ₀B = Dense{T}(undef, length(source), ns)
     γ₁B = Dense{T}(undef, length(source), ns)
@@ -140,7 +140,7 @@ function bdim_correction(
             # copy the monopoles/dipoles for the current element
             jglob = @view qtags[:, n]
             M[1:nq, :] .= γ₀B[jglob, :]
-            M[nq+1:2nq, :] .= γ₁B[jglob, :]
+            M[(nq+1):2nq, :] .= γ₁B[jglob, :]
             # TODO: get ride of all this transposing mumble jumble by assembling
             # the matrix in the correct orientation in the first place
             F = qr!(transpose(Mdata))
