@@ -45,6 +45,12 @@ function gmsh_ball(; center, radius, meshsize)
     return Ω, msh
 end
 
+function get_quad(Γ, h, qorder)
+    msh = Inti.meshgen(Γ; meshsize = h)
+    Γ_msh = msh[Γ]
+    return Inti.Quadrature(Γ_msh; qorder)
+end
+
 function Lpower(e, i, times=nothing)
     if i == 0
         return ""

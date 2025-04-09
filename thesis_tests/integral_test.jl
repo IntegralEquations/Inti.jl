@@ -45,18 +45,23 @@ include(GEOMETRY)
 xt = χ((3a+b)/4)
 # xt = χ(0)
 k = 10
-α, β = 1, 0 # coefficients for single, double layer
+α, β = 0, 1 # coefficients for single, double layer
 Dirichlet = false
 if Dirichlet
     u = x -> cos(x.coords[1]) * exp(x.coords[2])
 else
     u = x -> SVector(-sin(x.coords[1])*exp(x.coords[2]), cos(x.coords[1])*exp(x.coords[2])) ⋅ x.normal
 end
+# if Dirichlet
+#     u = x -> cos(x.coords[1])
+# else
+#     u = x -> SVector(-sin(x.coords[1]), 0) ⋅ x.normal
+# end
 include(TESTFILE)
 
 theme = Theme(;
     Axis = (
-        xlabel = L"Average mesh size $(h)$",
+        # xlabel = L"Average mesh size $(h)$",
         xscale = log2,
         yscale = log10,
         linewidth = 2,
@@ -68,9 +73,13 @@ theme = Theme(;
 Makie.set_theme!(theme)
 
 ##
-fig = Figure(size=(1500,400))
+fig = Figure(size=(1400,400))
 ax1 = Axis(fig[1, 2], xticks=(H[1:5], [Lpower(2, -i) for i in ii]))
-ax2 = Axis(fig[1, 1], xticks=(H[6:9], [L"10^{-4}", L"2\times10^{-4}", L"2^{2}\times10^{-4}", L"2^{3}\times10^{-4}"]), ylabel = L"\text{Relative error}")
+ax2 = Axis(fig[1, 1], xticks=(H[6:9], [L"10^{-4}", L"2\times10^{-4}", L"2^{2}\times10^{-4}", L"2^{3}\times10^{-4}"]))
+# , ylabel = L"\text{Relative error}"
+# hidexdecorations!(ax1)
+# hidexdecorations!(ax2)
+
 for qorder in Q
     P = div(qorder + 1, 2)
     # coarse mesh
@@ -89,7 +98,7 @@ end
 # add reference slopes
 # coarse
 params = [(1, Errg[5][1:5], 2, 0.99, 0.6),
-          (3, Errl[3][1:5], 2, 0.99, 0.4),
+          (2, Errl[3][1:5], 2, 0.99, 0.4),
           (4, Errl[5][1:5], 2, 0.99, 0.4)]
 for (slope, err, i, tx, ty) in params
     ref = 0.7 * err[i] / Hi[i]^slope
