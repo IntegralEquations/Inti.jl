@@ -15,3 +15,4 @@
 .markdownlint.json
 Inti.code-workspace
 docs/src/examples/heat.gif
+docs/src/.DS_Store
