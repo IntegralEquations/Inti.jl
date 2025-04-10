@@ -19,11 +19,15 @@ possible to show that the problem can be reduced to a boundary integral equation
 form:
 
 ```math
-T[\boldsymbol{u}] = -\boldsymbol{f},
+T[\boldsymbol{\phi}] = -\boldsymbol{f},
 ```
 
-where $T$ represents the integral operator associated with the hypersingular kernel, and
-$\boldsymbol{f}$ is the applied traction on the boundary. This example demonstrates the
+where $T$ represents the integral operator associated with the hypersingular kernel, defined on the crack surface $\Gamma$; $\boldsymbol{f}$ is the applied traction on the boundary, which is symmetric on the two crack lips, and $\boldsymbol{\phi}$ is the so-called crack opening displacement (COD), defined as the "displacement" jump that occurs through the crack : $\boldsymbol{\phi}=\boldsymbol u^+-\boldsymbol u^-$. 
+
+!!! details "Details"
+    Being considered an open surface, the crack $\Gamma$ is arbitrarily extended onto a closed surface $\tilde\Gamma$. Then, we consider $\boldsymbol{u}^+$ and $\boldsymbol{u}^-$ as the interior and exterior displacements, depending on the convention used. The crack opening displacement is then defined as the difference between the two displacements at the two crack lips, mathematically superposed. It has to be understood as a mathematical limit of the displacement field as a point approaches one lip or the other. This method is called the Displacement Discontinuity Method.
+
+This example demonstrates the
 formulation, solution, and visualization of the problem, highlighting the use of integral
 operators.
 
@@ -99,7 +103,7 @@ uexact(x) = SVector(0, 0, uz(norm(x)))
 To compute the approximate solution, we will need to solve the linear system:
 
 ```math
-T[\boldsymbol{u}] = \boldsymbol{f},
+T[\boldsymbol{\phi}] = \boldsymbol{f},
 ```
 
 where $\boldsymbol{u}$ is the unknown vector of displacements. One difficulty that arises is
@@ -155,7 +159,9 @@ current_figure()
 
 ## Improving the accuracy
 
-It is beneficial to add a weight function:
+It is beneficial to add a weight function to help the solution being more accurate near the crack, where the displacement is singular, asymptotically equal to $d^{1/2}$ ($d$ is the distance from a point to the crack front) according to the Williams' asymptotical expansion. The weight function is defined as:
+
+$$w(\boldsymbol x):=\sqrt{1-||\boldsymbol x||}\underset{d\rightarrow 0}{\sim}\sqrt{d(\boldsymbol x)}$$
 
 ```@example crack_elasticity
 weight(x) = sqrt(1 - norm(x))
