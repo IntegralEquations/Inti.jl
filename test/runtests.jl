@@ -33,6 +33,8 @@ using Aqua
     include("green_identities_test.jl")
 end
 
+@testset "Accelerated density interpolation" include("dim_test.jl")
+
 @safetestset "Gmsh extension" include("gmsh_test.jl")
 
 @safetestset "Meshes extension" include("meshes_test.jl")

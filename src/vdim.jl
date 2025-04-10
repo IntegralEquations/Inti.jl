@@ -324,8 +324,8 @@ function polynomial_solutions_vdim(
         sum(I) > order && continue
         # define the monomial basis functions, and the corresponding solutions.
         # TODO: adapt this to vectorial case
-        p   = ElementaryPDESolutions.Polynomial(I => 1 / factorial(MultiIndex(I)))
-        P   = polynomial_solution(op, p)
+        p = ElementaryPDESolutions.Polynomial(I => 1 / factorial(MultiIndex(I)))
+        P = polynomial_solution(op, p)
         γ₁P = neumann_trace(op, P)
         push!(multiindices, MultiIndex(I))
         push!(monomials, p)
