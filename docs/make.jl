@@ -125,6 +125,7 @@ for notebook in notebooks
     push!(notebook_examples, title => joinpath("pluto-examples", basename(file_out)))
 end
 push!(notebook_examples, "Heat equation" => joinpath("examples", "heat_equation.md"))
+push!(notebook_examples, "Elastic crack" => joinpath("examples", "crack_elasticity.md"))
 size_threshold_ignore = last.(notebook_examples)
 
 makedocs(;
