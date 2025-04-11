@@ -89,61 +89,34 @@ Ddim = Dmat + δD
 σg   = (α*Sdim + β*(Ddim + μ*I)) \ ubnd
 errg = abs.(σg - σ_vec)
 
-# separate low-error points from high-error ones
-El_low = Float64[]
-Eg_low = Float64[]
-quad_low = Tuple{Float64, Float64}[]
-El_high = Float64[]
-Eg_high = Float64[]
-quad_high = Tuple{Float64, Float64}[]
-for (el, eg, q) in zip(errl, errg, quad) 
-    x = Tuple(Inti.coords(q))
-    if abs(x[1]) > 0.1
-        push!(El_low, el)
-        push!(Eg_low, eg)
-        push!(quad_low, x)
-    else
-        push!(El_high, el)
-        push!(Eg_high, eg)
-        push!(quad_high, x)
-    end
-end
+# normalize data
+q = map(Inti.coords, quad)
+# Merr = max(maximum(errl), maximum(errg))
+errl = log10.(errl)
+errg = log10.(errg)
 
 theme = Theme(;
     Axis = (     
         autolimitaspect = 1,
+        markersize = 30,
         # aspect = DataAspect(),
     ),
     fontsize = 20,
 )
 Makie.set_theme!(theme)
 
-fig = Figure(size=(1400,1000))
+fig = Figure(size=(1400,500))
 ax1 = Axis(fig[1, 1])
 ax2 = Axis(fig[1, 2])
 hideydecorations!(ax2)
-ax3 = Axis(fig[2, 1])
-ax4 = Axis(fig[2, 2])
-hideydecorations!(ax4)
 m, M = min(minimum(errl), minimum(errg)), max(maximum(errl), maximum(errg))
 
-q = quad_low
-El = El_low
-Eg = Eg_low
 cmap = :viridis
+ms = 20
 # m, M = min(minimum(El), minimum(Eg)), max(maximum(El), maximum(Eg))
-scatter!(ax1, q, color=El, colormap=cmap, colorrange=[m,M])
-scatter!(ax2, q, color=Eg, colormap=cmap, colorrange=[m,M])
+scatter!(ax1, q, color=errl, colormap=cmap, markersize=ms, colorrange=[m,M])
+scatter!(ax2, q, color=errg, colormap=cmap, markersize=ms, colorrange=[m,M])
 Colorbar(fig[1, 3], colormap=cmap, colorrange=[m,M])
-
-q = quad_high
-El = El_high
-Eg = Eg_high
-cmap = :viridis
-# m, M = min(minimum(El), minimum(Eg)), max(maximum(El), maximum(Eg))
-scatter!(ax3, q, color=El, colormap=cmap, colorrange=[m,M])
-scatter!(ax4, q, color=Eg, colormap=cmap, colorrange=[m,M])
-Colorbar(fig[2, 3], colormap=cmap, colorrange=[m,M])
 
 display(fig)
 

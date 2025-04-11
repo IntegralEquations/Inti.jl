@@ -22,8 +22,6 @@ Q = (3, 5)
 
 ii = 3:7; H = [2.0^(-i) for i in ii]
 
-Err = Dict(qorder => Float64[] for qorder in Q)
-Err_oppo = Dict(qorder => Float64[] for qorder in Q)
 ##
 ##
 
@@ -36,8 +34,26 @@ Inti.clear_entities!()
 include(GEOMETRY)
 xt = χ((3a+b)/4)
 # xt = χ(0)
-α, β = 1, 0      # coefficients for basis of interpolants
-Dirichlet = false # type of the density to be interpolated
+theme = Theme(;
+    Axis = (
+        xlabel = L"Average mesh size $(h)$",
+        xscale = log2,
+        yscale = log10,
+        xticks = (H, [L"$2^{-%$i}$" for i in ii]),
+        linewidth = 2,
+        # autolimitaspect = 1,
+        # aspect = DataAspect(),
+    ),
+    fontsize = 20,
+)
+Makie.set_theme!(theme)
+
+##
+fig = Figure(size=(700,1000))
+row = 0
+for (α, β) in ((0, 1), (1, 0)) # coefficients for basis of interpolants
+for Dirichlet in (true, false) # type of the density to be interpolated
+row += 1
 if Dirichlet
     u = x -> cos(x.coords[1]) * exp(x.coords[2])
 else
@@ -49,6 +65,8 @@ end
 #     u = x -> SVector(-sin(x.coords[1]), 0) ⋅ x.normal
 # end
 
+Err = Dict(qorder => Float64[] for qorder in Q)
+Err_oppo = Dict(qorder => Float64[] for qorder in Q)
 for qorder in Q
     for h in H
         P = div(qorder + 1, 2)
@@ -93,31 +111,19 @@ for qorder in Q
     end    
 end
 
-theme = Theme(;
-    Axis = (
-        xlabel = L"Average mesh size $(h)$",
-        xscale = log2,
-        yscale = log10,
-        xticks = (H, [L"$2^{-%$i}$" for i in ii]),
-        linewidth = 2,
-        # autolimitaspect = 1,
-        # aspect = DataAspect(),
-    ),
-    fontsize = 20,
-)
-Makie.set_theme!(theme)
-
-##
-fig = Figure(size=(700,1200))
-ax = Axis(fig[1, 1])
-# hidexdecorations!(ax)
+j = α == 1 ? 0 : 1
+i = Dirichlet ? 0 : 1
+ax = Axis(fig[row, 1], ylabel=L"|\gamma_%$j\sigma^{h,p}_{\mathbf{x}_t}-\gamma_%$i\sigma|")
+if row != 4
+    hidexdecorations!(ax)    
+end
 for q in Q
     P = div(q + 1, 2)
     scatterlines!(ax, H, Err[q];colormap=Reverse(:viridis), colorrange=(1, 10), color=P, marker=:rect, markersize=15, label=L"P=%$P,\text{ target's side}")
     scatterlines!(ax, H, Err_oppo[q];colormap=Reverse(:viridis), colorrange=(1, 10), color=5+q, marker=:circle, markersize=15, label=L"P=%$P,\text{ opposite side}")
 end
 # axislegend(ax; position=:lt)
-fig[1,2] = Legend(fig, ax, framevisible=false, valign=:top)
+fig[row,2] = Legend(fig, ax, framevisible=false, valign=:top)
 
 params = [(2, Err[3], 3, 5, 0.99, 0.6),
           (4, Err[5], 3, 3, 0.99, 0.6),
@@ -128,11 +134,11 @@ for (slope, err, i, ti, tx, ty) in params
     # text!(ax, H[2]*1.2, 0.4*errl[2], text=L"$P=%$P$";align=(:left, :top))
     text!(ax, H[ti]*tx, ty*err[ti], text=L"$\text{slope}=%$slope$";align=(:left, :top))
 end
+end
+end
 
 display(fig)
 ##
 GEOM = splitdir(GEOMETRY)[2][1:end-3]
 # TEST = splitdir(TESTFILE)[2][1:end-3]
-basis = α == 1 ? "Dirichlet" : "Neumann"
-interpolee = Dirichlet ? "Dirichlet" : "Neumann"
-SAVE && save("thesis_tests/interpolant_error/$(GEOM)_$(interpolee)_by_$(basis).png", fig)
+SAVE && save("thesis_tests/interpolant_error/$(GEOM)_interpolant_error.png", fig)
