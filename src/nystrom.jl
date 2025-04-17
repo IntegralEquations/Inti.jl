@@ -183,6 +183,8 @@ function _green_multiplier(s::Symbol)
         return 0.0
     elseif s == :on
         return -0.5
+    elseif s == :on_normal_inside
+        return 0.5
     else
         return error("Unknown target location $s. Expected :inside, :outside, or :on")
     end

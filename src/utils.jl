@@ -206,7 +206,8 @@ function _normalize_correction(correction, target, source)
     if correction.method == :dim
         haskey(correction, :target_location) &&
             target === source &&
-            correction.target_location != :on &&
+            correction.target_location != :on ||
+            correction.target_location != :on_normal_inside &&
             @warn("ignoring target_location field in correction since target === source")
         # target location required unless target === source
         haskey(correction, :target_location) ||

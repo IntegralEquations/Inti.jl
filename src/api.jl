@@ -94,7 +94,11 @@ function single_double_layer(;
     if correction.method == :none
         return Smat, Dmat # shortcircuit case without correction
     elseif correction.method == :dim
-        loc = target === source ? :on : correction.target_location
+        loc = if (target === source && !haskey(correction, :target_location))
+            :on
+        else
+            correction.target_location
+        end
         μ = _green_multiplier(loc)
         green_multiplier = fill(μ, length(target))
         dict_near = etype_to_nearest_points(target, source; correction.maxdist)
