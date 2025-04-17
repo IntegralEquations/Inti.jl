@@ -204,11 +204,14 @@ function _normalize_correction(correction, target, source)
         error("Unknown correction.method $(correction.method). Available options: $methods")
     # set default values if absent
     if correction.method == :dim
-        haskey(correction, :target_location) &&
-            target === source &&
-            correction.target_location != :on ||
-            correction.target_location != :on_normal_inside &&
-            @warn("ignoring target_location field in correction since target === source")
+        if haskey(correction, :target_location) && target === source
+            if correction.target_location != :on &&
+               correction.target_location != :on_normal_inside
+                @warn(
+                    "ignoring target_location field in correction since target === source"
+                )
+            end
+        end
         # target location required unless target === source
         haskey(correction, :target_location) ||
             target === source ||
