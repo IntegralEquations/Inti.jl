@@ -74,6 +74,18 @@ function monomial_basis(::PolynomialSpace{Inti.ReferenceSquare,K}) where {K}
     return b
 end
 
+function Inti.monomial_basis(::Inti.PolynomialSpace{Inti.ReferenceCube,K}) where {K}
+    I = CartesianIndices(ntuple(i -> K + 1, 3)) .- CartesianIndex(ntuple(i -> 1, 3))
+    M = Val(length(I))
+    b = x -> begin
+        Inti.svector(M) do n
+            i, j, k = Tuple(I[n])
+            return x[1]^i * x[2]^j * x[3]^k
+        end
+    end
+    return b
+end
+
 function monomial_basis(::PolynomialSpace{ReferenceTriangle,K}) where {K}
     # the (K+1)*(K+2)/2 monomials x^(a,b) with a+b ≤ K
     # construct first the indices for the square, then filter only those for

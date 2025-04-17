@@ -86,7 +86,8 @@ function bdim_correction(
     xs = if N === 2
         uniform_points_circle(ns, R, xc)
     elseif N === 3
-        fibonnaci_points_sphere(ns, R, xc)
+        # fibonnaci_points_sphere(ns, R, xc)
+        lebedev_points_sphere(ns, R, xc)
     else
         error("only 2D and 3D supported")
     end
