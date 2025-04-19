@@ -15,13 +15,17 @@ const CORRECTION_METHODS = [:none, :dim, :adaptive]
 
 """
     single_double_layer(; op, target, source::Quadrature, compression,
-    correction, derivative = false)
+    correction, derivative = false, combine = true)
 
 Construct a discrete approximation to the single- and double-layer integral operators for
 `op`, mapping values defined on the quadrature nodes of `source` to values defined on the
 nodes of `target`. If `derivative = true`, return instead the adjoint double-layer and
 hypersingular operators (which are the generalized Neumann trace of the single- and
 double-layer, respectively).
+
+If `combine = true`, return a tuple `(S, D)` with the single- and double-layer operators. If
+`combine = false`, return a tuple of tuples `((S, δS), (D, δD))` with the compressed and
+corrected part of each operator separately.
 
 For finer control, you must choose a `compression` method and a `correction` method, as
 described below.
@@ -69,6 +73,7 @@ function single_double_layer(;
     compression = (method = :none,),
     correction = (method = :adaptive,),
     derivative = false,
+    combine = true,
 )
     compression = _normalize_compression(compression, target, source)
     correction  = _normalize_correction(correction, target, source)
@@ -166,23 +171,27 @@ function single_double_layer(;
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end
 
-    # combine near and far field
-    if compression.method == :none
-        S = axpy!(true, δS, Smat)
-        D = axpy!(true, δD, Dmat)
-    elseif compression.method == :hmatrix
-        if target === source
+    if combine
+        # combine near and far field
+        if compression.method == :none
             S = axpy!(true, δS, Smat)
             D = axpy!(true, δD, Dmat)
-        else
-            S = LinearMap(Smat) + LinearMap(δS)
-            D = LinearMap(Dmat) + LinearMap(δD)
+        elseif compression.method == :hmatrix
+            if target === source
+                S = axpy!(true, δS, Smat)
+                D = axpy!(true, δD, Dmat)
+            else
+                S = LinearMap(Smat) + LinearMap(δS)
+                D = LinearMap(Dmat) + LinearMap(δD)
+            end
+        elseif compression.method == :fmm
+            S = Smat + LinearMap(δS)
+            D = Dmat + LinearMap(δD)
         end
-    elseif compression.method == :fmm
-        S = Smat + LinearMap(δS)
-        D = Dmat + LinearMap(δD)
+        return S, D
+    else
+        return (Smat, δS), (Dmat, δD)
     end
-    return S, D
 end
 
 """
