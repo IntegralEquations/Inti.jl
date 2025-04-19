@@ -400,16 +400,6 @@ function kress_change_of_variables_periodic(P)
     return x -> v(x)^P / (v(x)^P + v(1 - x)^P)
 end
 
-macro maybe_threads(bool, expr)
-    return quote
-        if $(bool)
-            Threads.@threads $expr
-        else
-            $expr
-        end
-    end |> esc
-end
-
 """
     lebedev_points_sphere(n, r, c)
 

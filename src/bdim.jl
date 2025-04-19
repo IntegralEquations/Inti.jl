@@ -120,8 +120,9 @@ function bdim_correction(
         mul!(Θ, Sop, γ₁B, 1, 1)
         mul!(Θ, Dop, γ₀B, -1, 1)
     else
-        # for vector value problems, we only assume that Sop and Dop can be multiplied by
-        # Vectors of SVectors, and so we need to perform multiplication column by column
+        # TODO: ideally we should be able to use the same product as above, but some of the
+        # acceleration interfaces are not fully compatible with multiplication by matrices,
+        # so we split the product into a product over vectors
         P, Q = size(T)
         S = eltype(T)
         Θ_data = parent(Θ)

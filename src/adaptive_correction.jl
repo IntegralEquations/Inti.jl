@@ -156,7 +156,7 @@ end
     nel = length(el_iter)
     lck = Threads.SpinLock()
     # lck = ReentrantLock()
-    @maybe_threads threads for n in 1:nel
+    @usethreads threads for n in 1:nel
         el = el_iter[n]
         ori = orientation[n]
         jglob = view(el2qtags, :, n)
