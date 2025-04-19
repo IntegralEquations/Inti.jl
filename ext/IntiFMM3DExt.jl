@@ -133,7 +133,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
         end
         # Stokes
-    elseif K isa Inti.SingleLayerKernel{SMatrix{3,3,Float64,9},<:Inti.Stokes{3,Float64}}
+    elseif K isa Inti.SingleLayerKernel{SMatrix{3,3,Float64,9},<:Inti.Stokes{3}}
         T = SVector{3,Float64}
         stoklet = Matrix{Float64}(undef, 3, n)
         return LinearMaps.LinearMap{SMatrix{3,3,Float64,9}}(m, n) do y, x
@@ -142,7 +142,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             out = FMM3D.stfmm3d(rtol, sources; stoklet, targets, ppregt = 1)
             return copyto!(y, reinterpret(T, out.pottarg))
         end
-    elseif K isa Inti.DoubleLayerKernel{SMatrix{3,3,Float64,9},<:Inti.Stokes{3,Float64}}
+    elseif K isa Inti.DoubleLayerKernel{SMatrix{3,3,Float64,9},<:Inti.Stokes{3}}
         T = SVector{3,Float64}
         normals = Matrix{Float64}(undef, 3, n)
         for j in 1:n
@@ -160,7 +160,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             return copyto!(y, reinterpret(T, out.pottarg))
         end
     else
-        error("integral operator not supported by Inti's FMM3D wrapper")
+        error("integral operator not supported by Inti's FMM3D wrapper $K")
     end
 end
 
