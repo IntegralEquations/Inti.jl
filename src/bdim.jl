@@ -77,20 +77,22 @@ function bdim_correction(
     end
     # find first an appropriate set of source points to center the monopoles
     qmax = sum(size(mat, 1) for mat in values(source.etype2qtags)) # max number of qnodes per el
-    ns   = ceil(Int, parameters.sources_oversample_factor * qmax)
+    ns_target = ceil(Int, parameters.sources_oversample_factor * qmax)
     # compute a bounding box for source points
     low_corner = reduce((p, q) -> min.(coords(p), coords(q)), source)
     high_corner = reduce((p, q) -> max.(coords(p), coords(q)), source)
     xc = (low_corner + high_corner) / 2
     R = parameters.sources_radius_multiplier * norm(high_corner - low_corner) / 2
     xs = if N === 2
-        uniform_points_circle(ns, R, xc)
+        uniform_points_circle(ns_target, R, xc)
     elseif N === 3
         # fibonnaci_points_sphere(ns, R, xc)
-        lebedev_points_sphere(ns, R, xc)
+        lebedev_points_sphere(ns_target, R, xc)
     else
         error("only 2D and 3D supported")
     end
+    ns = length(xs)
+    @debug "using $(length(xs)) monopoles"
     # compute traces of monopoles on the source mesh
     G = SingleLayerKernel(op, T)
     γ₁G = AdjointDoubleLayerKernel(op, T)
