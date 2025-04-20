@@ -235,8 +235,23 @@ and `wᵢ` are the quadrature weights.
 Note that you must define `f(::QuadratureNode)`: use `q.coords` and `q.normal`
 if you need to access the coordinate or normal vector at que quadrature node.
 """
-function integrate(f, msh::Quadrature)
-    return sum(q -> f(q) * q.weight, msh.qnodes)
+function integrate(f, quad::Quadrature)
+    return sum(q -> f(q) * q.weight, quad.qnodes)
+end
+
+"""
+    integrate(vals::AbstractVector,quad::Quadrature)
+
+Similar to `integrate(f, quad)`, assume that `vals` is a vector of values at the quadrature
+nodes. Note that `length(vals)` must match the number of quadrature nodes in `quad`.
+"""
+function integrate(vals::AbstractVector, quad::Quadrature)
+    msg = "length of vals must match the number of quadrature nodes"
+    @assert length(vals) == length(quad) msg
+    iter = zip(vals, quad.qnodes)
+    return sum(iter) do (v, q)
+        return v * q.weight
+    end
 end
 
 """
