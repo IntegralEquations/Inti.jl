@@ -38,6 +38,15 @@ using LinearAlgebra
         @test Inti.range_dimension(t) == 3
         @test Inti.domain_dimension(t) == 2
     end
+    @testset "LagrangeTriangle" begin
+        # LagrangeTriangle of various orders
+        for N in [3, 6, 10, 15]
+            vals = @SVector rand(N)
+            el = Inti.LagrangeTriangle(vals)
+            nodes = Inti.reference_nodes(Inti.LagrangeTriangle{N})
+            @test all(i -> el(nodes[i]) ≈ vals[i], 1:length(vals))
+        end
+    end
     @testset "Tetrahedron" begin
         # TODO: add tests
     end

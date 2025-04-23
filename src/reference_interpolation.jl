@@ -334,7 +334,7 @@ Quadrangle2D(args...) = Quadrangle2D{Float64}(args...)
 Quadrangle3D(args...) = Quadrangle3D{Float64}(args...)
 
 """
-    const LagrangeSquare = LagrangeElement{ReferenceSquare}
+    const LagrangeCube = LagrangeElement{ReferenceSquare}
 """
 const LagrangeCube = LagrangeElement{ReferenceCube}
 
@@ -426,6 +426,16 @@ function (el::LagrangeLine{4})(u)
     return d + c * u[1] + b * u[1]^2 + a * u[1]^3
 end
 
+# P0 for ReferenceTriangle
+function reference_nodes(::Type{<:LagrangeTriangle{1}})
+    return SVector((SVector(1 / 3, 1 / 3),))
+end
+
+function (el::LagrangeTriangle{1})(u)
+    v = vals(el)
+    return v[1]
+end
+
 # P1 for ReferenceTriangle
 function reference_nodes(::Type{<:LagrangeTriangle{3}})
     return SVector(SVector(0.0, 0.0), SVector(1.0, 0.0), SVector(0.0, 1.0))
@@ -498,6 +508,74 @@ function (el::LagrangeTriangle{10})(u)
            v[8] * ϕ₈ +
            v[9] * ϕ₉ +
            v[10] * ϕ₁₀
+end
+
+# P4 for ReferenceTriangle
+# source: Silvester PP, Ferrari RL, Finite elements for electrical engineers (1990).
+function reference_nodes(::Type{<:LagrangeTriangle{15}})
+    #     3
+    #     | \
+    #    10   9
+    #     |     \
+    #    11 (15)  8
+    #     |         \
+    #    12 (13) (14) 7
+    #     |             \
+    #     1---4---5---6---2
+    return SVector(
+        SVector(0.0, 0.0),      # 1
+        SVector(1.0, 0.0),      # 2
+        SVector(0.0, 1.0),      # 3
+        SVector(1 / 4, 0.0),    # 4
+        SVector(1 / 2, 0.0),    # 5
+        SVector(3 / 4, 0.0),    # 6
+        SVector(3 / 4, 1 / 4),  # 7
+        SVector(1 / 2, 1 / 2),  # 8
+        SVector(1 / 4, 3 / 4),  # 9
+        SVector(0.0, 3 / 4),    # 10
+        SVector(0.0, 1 / 2),    # 11
+        SVector(0, 1 / 4),      # 12
+        SVector(1 / 4, 1 / 4),  # 13
+        SVector(1 / 2, 1 / 4),  # 14
+        SVector(1 / 4, 1 / 2),  # 15
+    )
+end
+
+function (el::LagrangeTriangle{15})(u)
+    # 11, 1, 15, 7, 4, 2, 3, 6, 10, 14, 13, 12, 8, 5, 9
+    x = u[1]
+    y = u[2]
+    ϕ₁ = 1 / 3 * (-1 + x + y) * (-1 + 2x + 2y) * (-3 + 4x + 4y) * (-1 + 4x + 4y)
+    ϕ₂ = 1 / 3 * x * (-1 + 2x) * (-3 + 4x) * (-1 + 4x)
+    ϕ₃ = 1 / 3 * y * (-1 + 2y) * (-3 + 4y) * (-1 + 4y)
+    ϕ₄ = -16 / 3 * x * (-1 + x + y) * (-1 + 2x + 2y) * (-3 + 4x + 4y)
+    ϕ₅ = 4x * (-1 + 4x) * (-1 + x + y) * (-3 + 4x + 4y)
+    ϕ₆ = -16 / 3 * x * (1 - 6x + 8x^2) * (-1 + x + y)
+    ϕ₇ = 8 / 3 * x * (-2 + 4x) * (-1 + 4x) * y
+    ϕ₈ = 4x * (-1 + 4x) * y * (-1 + 4y)
+    ϕ₉ = 8 / 3 * x * y * (-2 + 4y) * (-1 + 4y)
+    ϕ₁₀ = -16 / 3 * y * (-1 + x + y) * (1 - 6y + 8y^2)
+    ϕ₁₁ = 4y * (-1 + x + y) * (-1 + 4y) * (-3 + 4x + 4y)
+    ϕ₁₂ = -16 / 3 * y * (-1 + x + y) * (-1 + 2x + 2y) * (-3 + 4x + 4y)
+    ϕ₁₃ = 32x * y * (-1 + x + y) * (-3 + 4x + 4y)
+    ϕ₁₄ = -32x * (-1 + 4x) * y * (-1 + x + y)
+    ϕ₁₅ = -32x * y * (-1 + x + y) * (-1 + 4y)
+    v = vals(el)
+    return v[1] * ϕ₁ +
+           v[2] * ϕ₂ +
+           v[3] * ϕ₃ +
+           v[4] * ϕ₄ +
+           v[5] * ϕ₅ +
+           v[6] * ϕ₆ +
+           v[7] * ϕ₇ +
+           v[8] * ϕ₈ +
+           v[9] * ϕ₉ +
+           v[10] * ϕ₁₀ +
+           v[11] * ϕ₁₁ +
+           v[12] * ϕ₁₂ +
+           v[13] * ϕ₁₃ +
+           v[14] * ϕ₁₄ +
+           v[15] * ϕ₁₅
 end
 
 # P1 for ReferenceSquare
