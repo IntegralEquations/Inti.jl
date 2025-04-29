@@ -13,8 +13,8 @@ CurrentModule = Inti
 ## Problem definition
 
 In this example, we solve a disk crack problem in the context of linear elasticity using
-boundary integral equations. The problem involves determining the displacement field
-$\boldsymbol{u}$ in an infinite elastic domain containing a disk-shaped crack. It is
+boundary integral equations. The problem involves determining the displacement jump field
+$\boldsymbol{\phi}$ in an infinite elastic domain containing a disk-shaped crack. It is
 possible to show that the problem can be reduced to a boundary integral equation of the
 form:
 
@@ -96,8 +96,8 @@ The exact solution is known for this problem:
 
 ```@example crack_elasticity
 σ = 1
-uz(r) = 4*(1-ν)*σ / (π*μ) * sqrt(1-r^2)
-uexact(x) = SVector(0, 0, uz(norm(x)))
+φz(r) = 4*(1-ν)*σ / (π*μ) * sqrt(1-r^2)
+uexact(x) = SVector(0, 0, φz(norm(x)))
 ```
 
 To compute the approximate solution, we will need to solve the linear system:
@@ -107,7 +107,7 @@ T[\boldsymbol{\phi}] = \boldsymbol{f},
 ```
 
 where $\boldsymbol{u}$ is the unknown vector of displacements. One difficulty that arises is
-related to the fact that in our implementation, both `u` and `f` are represented as
+related to the fact that in our implementation, both `\phi` and `f` are represented as
 `Vector`s of `SVector`s. While convenient for some operations, this can lead to difficulties
 when trying to solve the linear system since most linear algebra libraries expect matrices
 of a scalar field (usually either ``\mathbb{R}`` or ``\mathbb{C}``). To address this, we
@@ -136,7 +136,7 @@ solve(T₀, δT, t) = solve!(zero(t), T₀, δT, t)
 We can now easily call `solve` to obtain our approximate solution:
 
 ```@example crack_elasticity
-u = solve(T₀, δT, t)
+φ = solve(T₀, δT, t)
 nothing # hide
 ```
 
@@ -146,13 +146,13 @@ nothing # hide
 using LinearAlgebra
 using GLMakie
 rr = []
-uu = []
+φφ = []
 for i in eachindex(Q)
     push!(rr, norm(Inti.coords(Q[i])))
-    push!(uu, u[i][3])
+    push!(φφ, φ[i][3])
 end
-scatter(rr, uu, label = "Numerical solution")
-lines!(0:0.01:1, uz, label = "Exact solution", color = :red, linewidth = 4)
+scatter(rr, φφ, label = "Numerical solution")
+lines!(0:0.01:1, φz, label = "Exact solution", color = :red, linewidth = 4)
 axislegend()
 current_figure()
 ```
@@ -172,8 +172,8 @@ Inti.singularity_order(::typeof(Kw)) = -3
 Tw_op = Inti.IntegralOperator(Kw, Q)
 Tw₀ = Inti.assemble_hmatrix(Tw_op)
 δTw = Inti.adaptive_correction(Tw_op; maxdist = 2*meshsize, atol = 1e-2)
-uw = solve(Tw₀, δTw, t)
-u = uw .* [weight(q.coords) for q in Q]
+φw = solve(Tw₀, δTw, t)
+φφ = φw .* [weight(q.coords) for q in Q]
 ```
 
 Check that it is indeed better:
@@ -182,14 +182,14 @@ Check that it is indeed better:
 using LinearAlgebra
 using GLMakie
 rr = []
-uu = []
+φφ = []
 for i in eachindex(Q)
     x = Inti.coords(Q[i])
     push!(rr, norm(x))
-    push!(uu, u[i][3])
+    push!(φφ, φ[i][3])
 end
-scatter(rr, uu, label = "Numerical solution")
-lines!(0:0.01:1, uz, label = "Exact solution", color = :red, linewidth = 4)
+scatter(rr, φφ, label = "Numerical solution")
+lines!(0:0.01:1, φz, label = "Exact solution", color = :red, linewidth = 4)
 axislegend()
 current_figure()
 ```
@@ -198,15 +198,15 @@ Plotting on the mesh
 
 ```@example crack_elasticity
 using Meshes
-u3w_nodes = Inti.quadrature_to_node_vals(Q, [u[3] for u in uw])
+φ3w_nodes = Inti.quadrature_to_node_vals(Q, [φ[3] for φ in φw])
 msh_nodes = Inti.nodes(Q.mesh)
 w_nodes = [weight(x) for x in msh_nodes]
-u3_nodes = u3w_nodes .* w_nodes
-colorrange = extrema(u3_nodes)
+φ3_nodes = φ3w_nodes .* w_nodes
+colorrange = extrema(φ3_nodes)
 fig = Figure(; size = (800, 600))
 ax = Axis3(fig[1, 1])
 n = length(Q.mesh.nodes)
-viz!(Q.mesh; color = u3_nodes, interpolate = false, showsegments=true)
-cb = Colorbar(fig[1, 2]; label = "uz", colorrange)
+viz!(Q.mesh; color = φ3_nodes, interpolate = false, showsegments=true)
+cb = Colorbar(fig[1, 2]; label = "φz", colorrange)
 fig
 ```
