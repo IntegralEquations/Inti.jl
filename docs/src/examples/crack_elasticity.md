@@ -173,7 +173,7 @@ Tw_op = Inti.IntegralOperator(Kw, Q)
 Tw₀ = Inti.assemble_hmatrix(Tw_op)
 δTw = Inti.adaptive_correction(Tw_op; maxdist = 2*meshsize, atol = 1e-2)
 φw = solve(Tw₀, δTw, t)
-φφ = φw .* [weight(q.coords) for q in Q]
+φ = φw .* [weight(q.coords) for q in Q]
 ```
 
 Check that it is indeed better:
