@@ -494,11 +494,11 @@ function _regular_integration_errors(el, K, qreg, qref, maxiter)
     x₀ = center(el) # center
     h = radius(el)  # reasonable scale
     f = (x, ŷ) -> begin
-        y   = el(ŷ)
-        jac = jacobian(el, ŷ)
-        ν   = _normal(jac)
-        νₓ  = (x - x₀) |> normalize
-        τ′  = _integration_measure(jac)
+        y     = el(ŷ)
+        jac   = jacobian(el, ŷ)
+        ν    = _normal(jac)
+        νₓ = (x - x₀) |> normalize
+        τ′ = _integration_measure(jac)
         return K((coords = x, normal = νₓ), (coords = y, normal = ν)) * τ′
     end
     N = length(x₀)
@@ -512,7 +512,7 @@ function _regular_integration_errors(el, K, qreg, qref, maxiter)
         # explore a few directions and pick the worst error
         rel_er = 0.0
         abs_er = 0.0
-        for dir in -N:N
+        for dir in (-N):N
             iszero(dir) && continue
             k = abs(dir)
             x = setindex(x₀, x₀[k] + sign(N) * cc * h, k)
