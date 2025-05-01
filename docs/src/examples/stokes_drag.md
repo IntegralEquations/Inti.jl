@@ -32,40 +32,27 @@ where:
 
 The boundary conditions are:
 
-- No-slip condition on the sphere's surface,
-- Velocity at infinity is constant.
-
-We compute the drag force on the sphere using integral quantities derived from the solution.
-For a sphere of radius ``R`` moving with velocity ``\mathbf{U}``, the [drag force](https://en.wikipedia.org/wiki/Stokes%27_law) is given by:
+- ``\mathbf{u} = \mathbf{U}`` on the sphere's surface, where ``\mathbf{U}`` is the velocity
+  of the sphere. This is a no-slip condition.
+- ``\mathbf{u} \to \mathbf{0}`` at infinity, which means that the fluid is at rest far away
+  from the sphere.
+The drag force experienced by the sphere is described by [Stokes' law](https://en.wikipedia.org/wiki/Stokes%27_law):
 
 ```math
-\mathbf{F}_d = 6\pi\mu R \mathbf{U}.
+\mathbf{F}_d = -6\pi\mu R \mathbf{U},
 ```
 
-which we will use to validate our numerical solution. We will employ Hebeker's formulation
-[hebeker1986efficient](@cite), where we seek the solution ``\mathbf{u}`` in the form of a
-combined single- and double-layer potential:
+where ``R`` is the sphere's radius. This drag force, ``\mathbf{F}_d``, is the primary quantity of interest in this example. We will compute it using Hebeker's formulation [hebeker1986efficient](@cite), which expresses the velocity field ``\mathbf{u}`` as a combination of single- and double-layer potentials:
 
 ```math
 \mathbf{u}(\mathbf{x}) = \mathcal{D}[\boldsymbol{\sigma}](\mathbf{x}) + \eta \mathcal{S}[\boldsymbol{\sigma}](\mathbf{x}),
 ```
 
-where ``\boldsymbol{\sigma}`` is the unknown density, ``\mathcal{S}`` and ``\mathcal{D}``
-are the single- and double-layer potentials, respectively, and ``\eta > 0`` is a (free)
-coupling parameter which we set to ``\eta = \mu`` throughout this example. 
-
-As pointed out in [hebeker1986efficient; Theorem 2.4](@cite), the drag force of the body
-``\Omega`` is given by:
-
-```math
-    \mathbf{F}_d = \eta \int_{\Gamma} \boldsymbol{\sigma} \, d\Gamma,
-```
-
-which is the formula we will later use to compute the drag force.
+Here, ``\boldsymbol{\sigma}`` is the unknown density, ``\mathcal{S}`` and ``\mathcal{D}`` denote the single- and double-layer potentials, respectively, and ``\eta > 0`` is a coupling parameter, which we set to ``\eta = \mu`` throughout this example.
 
 ## Discretization
 
-To numerically discretize the boundary ``\Gamma := \partial \Omega``, we employ a second-order triangular mesh created using Gmsh:
+To discretize the boundary ``\Gamma := \partial \Omega``, we employ a second-order triangular mesh created using Gmsh:
 
 ```@example stokes_drag
 using Inti, Gmsh
@@ -83,7 +70,11 @@ nothing # hide
 ```
 
 !!! tip "Second-order mesh"
-    Using `gmsh.model.mesh.setOrder(2)` creates a second-order mesh, which is crucial for accurately capturing the curved surface of the sphere and significantly enhances the numerical solution's precision. For simple geometries like spheres, an exact (isogeometric) representation can also be achieved using `Inti`'s parametric entities. Refer to the [Geometry and meshes]("Geometry and meshes") tutorial for further details.
+    Using `gmsh.model.mesh.setOrder(2)` creates a second-order mesh, which is crucial for
+    accurately capturing the curved surface of the sphere and significantly enhances the
+    numerical solution's precision. For simple geometries like spheres, an exact
+    (isogeometric) representation can also be achieved using `Inti`'s parametric entities.
+    See the [Geometry and meshes]("Geometry and meshes") section for more details.
 
 Next we extract the `Domain` ``\Gamma`` from the mesh, and create a `Quadrature` on it:
 
@@ -119,7 +110,7 @@ S, D = Inti.single_double_layer(;
 )
 ```
 
-## Solution and visualization
+## Solution and drag force computation
 
 We are now ready to set up and solve the problem. First, we define the boundary conditions
 (a constant velocity on the sphere):
@@ -127,14 +118,15 @@ We are now ready to set up and solve the problem. First, we define the boundary 
 ```@example stokes_drag
 using StaticArrays
 v = 2.0
-U = SVector(2.0,0,0)
+U = SVector(v,0,0)
 f = fill(U, length(Γ_quad))
 nothing # hide
 ```
 
 To solve the linear system, we will use the `gmres` function from `IterativeSolvers`. Since
 the function requires scalar types, we need to convert the vector-valued quantities into
-scalars and vice versa. We can achieve this by using `reinterpret` to convert the data types:
+scalars and vice versa. We can achieve this by using `reinterpret` to convert between the
+vector of `SVector`s and a vector of `Float64`s types.
 
 ```@example stokes_drag
 using IterativeSolvers, LinearAlgebra, LinearMaps
@@ -150,46 +142,87 @@ end
 σ_ = reinterpret(Float64, σ)
 f_ = reinterpret(Float64, f)
 _, hist = gmres!(σ_, L_, f_; reltol = 1e-8, maxiter = 200, restart = 200, log = true)
-nothing # hide
+@assert hist.iters < 10 # hide
+hist
 ```
+
+Note that `gmres` converges in very few iterations, highlighting the favorable spectral
+properties of the Hebeker formulation for this problem.
 
 ### Drag force computation
 
-The drag force is computed as:
+Now that we have the density `σ`, we can compute the drag force. As pointed out in
+[hebeker1986efficient; Theorem 2.4](@cite), the drag force of the body ``\Omega`` is given
+by:
+
+```math
+    \mathbf{F}_d = \eta \int_{\Gamma} \boldsymbol{\sigma} \, d\Gamma,
+```
+
+which can be approximated using our knowledge of `σ` and the quadrature `Γ_quad`:
 
 ```@example stokes_drag
 drag = μ * sum(eachindex(Γ_quad)) do i
     return σ[i] * Γ_quad[i].weight
 end
-exact = 6π * μ * R * v
-relative_error = (norm(drag) - exact) / exact
 ```
 
-### Solution
-
-The solution is given by
+A quick comparison with the analytical solution indicates a good agreement.
 
 ```@example stokes_drag
-𝒮 = Inti.SingleLayerPotential(op, )
-
+exact = 6π * μ * R * U
+relative_error = norm(drag - exact) / norm(exact)
+@assert relative_error < 1e-4 # hide
+println("Relative error: ", relative_error)
 ```
 
-### Visualization
+The relative error in this example is less than `1e-4`, indicating that the numerical
+solution is very close to the analytical solution.
+
+## Visualization
+
+Finally, to visualize the flow field, we need to evaluate our integral representation at
+points off the boundary. The easiest way to achieve this is to use
+[`IntegralPotential`](@ref)s, or the convenient [`SingleLayerPotential`](@ref) and
+[`DoubleLayerPotential`](@ref) wrappers:
+
+```@example stokes_drag
+𝒮 = Inti.SingleLayerPotential(op, Γ_quad)
+𝒟 = Inti.DoubleLayerPotential(op, Γ_quad)
+u(x) = 𝒟[σ](x) + η*𝒮[σ](x) - U # fluid velocity relative to the sphere
+```
+
+In the code above, we have created a function `u` that evaluates the velocity at any point
+`x`:
+
+```@example stokes_drag
+u(SVector(1,2,3))
+```
+
+With `u` defined, we can visualize the flow field around the sphere. For this example we
+will simply sample points on a grid in the `xz` plane, and plot the velocity vectors at those
+points:
 
 ```@example stokes_drag
 using Meshes
 using GLMakie
+L = 5
+targets     = [SVector(x, 0, z) for x in -L:meshsize:L, z in -L:meshsize:L] |> vec
+filter!(x -> norm(x) > 1.1 * R, targets) # remove points inside or close to the sphere
+directions  = u.(targets)
 fig = Figure()
-ax  = Axis3(fig[1, 1]; title = "Stokes drag", aspect = :equal)
+ax  = Axis3(fig[1, 1]; title = "Velocity field", aspect = :data, limits = ([-L, L], [-R, R], [-L, L]))
 viz!(msh[Γ], showsegments=true)
-xx = yy = zz = collect(-2:0.2:2)
-quiver!()
+arrows!(ax, Point3.(targets), Point3.(directions), arrowsize = 0.1, color = :blue)
 current_figure()
+fig
 ```
 
 ## Summary
 
-This tutorial demonstrates how to solve the Stokes drag problem using the Inti library. The approach combines boundary integral equations with numerical quadrature and iterative solvers to compute the drag force on a sphere in a viscous fluid.
+This tutorial demonstrates how to solve the Stokes drag problem using the Inti library. The
+approach combines boundary integral equations with numerical quadrature and iterative
+solvers to compute the drag force on a sphere in a viscous fluid.
 
 !!! tip "Extensions"
     - Experiment with different geometries or boundary conditions.

@@ -37,7 +37,6 @@ end
     return out
 end
 
-
 """
     SingleLayerPotential(op::AbstractDifferentialOperator, source::Quadrature)
 
