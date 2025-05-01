@@ -74,7 +74,7 @@ nothing # hide
     accurately capturing the curved surface of the sphere and significantly enhances the
     numerical solution's precision. For simple geometries like spheres, an exact
     (isogeometric) representation can also be achieved using `Inti`'s parametric entities.
-    See the [Geometry and meshes]("Geometry and meshes") section for more details.
+    See the [Geometry and meshes](@ref "Geometry and meshes") section for more details.
 
 Next we extract the `Domain` ``\Gamma`` from the mesh, and create a `Quadrature` on it:
 
