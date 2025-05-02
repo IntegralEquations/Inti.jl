@@ -75,8 +75,6 @@ circarea = 0.0
 #elind = 747
 els = []
 for elind = 1:nvol_els
-    #elind = 6
-    #elind = 749
     node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{2, Float64}}][:, elind]
     nodes = msh.nodes[node_indices]
 
@@ -150,7 +148,7 @@ for elind = 1:nvol_els
         F̃ₖ = (x) -> [(cₖ[1] - bₖ[1])*x[1] + (aₖ[1] - bₖ[1])*x[2] + bₖ[1], (cₖ[2] - bₖ[2])*x[1] + (aₖ[2] - bₖ[2])*x[2] + bₖ[2]]
 
         # Full transformation
-        Fₖ = (x) -> F̃ₖ(x) + Φₖ(x)
+        Fₖ = (x) -> F̃ₖ(x) + Φₖ_l3(x)
         JF̃ₖ = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
         D = Inti.ReferenceTriangle
         T = SVector{2,Float64}
@@ -172,7 +170,7 @@ for elind = 1:nvol_els
         Jₖ_l1 = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
         Jₖ_l2 = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
         Jₖ_l3 = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
-        Jₖ_Z = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
+        Jₖ_Z  = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
     end
 
     Q = Inti.VioreanuRokhlin(; domain=Inti.ReferenceTriangle(), order=qorder)()
