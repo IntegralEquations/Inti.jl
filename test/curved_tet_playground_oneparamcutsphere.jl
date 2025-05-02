@@ -61,7 +61,7 @@ for elind = 1:nbdry_els
         if node_indices[1] ∉ chart_1_bdry_node_idx
             if abs(msh.nodes[node_indices[1]][3]) ≈ 0.5
                 guess = SVector{2,Float64}((θ[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]))
-                α = Vector{Float64}(ψ⁻¹(guess, deepcopy(msh.nodes[node_indices[1]])))
+                α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[1]])))
                 push!(chart_1_bdry_node_param_loc, α)
             else
                 msh.nodes[node_indices[1]] = chart_1[idxs[1]]
@@ -72,7 +72,7 @@ for elind = 1:nbdry_els
         if node_indices[2] ∉ chart_1_bdry_node_idx
             if abs(msh.nodes[node_indices[2]][3]) ≈ 0.5
                 guess = SVector{2,Float64}((θ[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]))
-                α = Vector{Float64}(ψ⁻¹(guess, deepcopy(msh.nodes[node_indices[2]])))
+                α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[2]])))
                 push!(chart_1_bdry_node_param_loc, α)
             else
                 msh.nodes[node_indices[2]] = chart_1[idxs[2]]
@@ -83,7 +83,7 @@ for elind = 1:nbdry_els
         if node_indices[3] ∉ chart_1_bdry_node_idx
             if abs(msh.nodes[node_indices[3]][3]) ≈ 0.5
                 guess = SVector{2,Float64}((θ[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]))
-                α = Vector{Float64}(ψ⁻¹(guess, deepcopy(msh.nodes[node_indices[3]])))
+                α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[3]])))
                 push!(chart_1_bdry_node_param_loc, α)
             else
                 msh.nodes[node_indices[3]] = chart_1[idxs[3]]
@@ -111,18 +111,18 @@ for elind = 1:nvol_els
         j = nverts_in_chart
     end
     if j > 1
-        node_indices_on_bdry = deepcopy(node_indices[verts_on_bdry])
+        node_indices_on_bdry = copy(node_indices[verts_on_bdry])
         node_to_param = chart_1_node_to_param
         ψ = ψ₁
         ψ⁻¹ = ψ₁⁻¹
-        α₁ = deepcopy(node_to_param[node_indices_on_bdry[1]])
+        α₁ = copy(node_to_param[node_indices_on_bdry[1]])
         if nverts_in_chart >= 2
-            α₂ = deepcopy(node_to_param[node_indices_on_bdry[2]])
+            α₂ = copy(node_to_param[node_indices_on_bdry[2]])
         else
             @assert false
         end
         if nverts_in_chart >= 3
-            α₃ = deepcopy(node_to_param[node_indices_on_bdry[3]])
+            α₃ = copy(node_to_param[node_indices_on_bdry[3]])
         else
             # Find missing node α₃ that (non-uniquely) defines the curved face simplex containing α₁, α₂
             candidate_els = Inti.elements_containing_nodes(n2e, node_indices_on_bdry)
@@ -132,21 +132,21 @@ for elind = 1:nvol_els
             # if j=3 only one of the candidate face triangles will work, so
             # find that one
             if candidate_els[1][1] ∉ node_indices_on_bdry
-                p = deepcopy(msh.nodes[candidate_els[1][1]])
+                p = copy(msh.nodes[candidate_els[1][1]])
             elseif candidate_els[1][2] ∉ node_indices_on_bdry
-                p = deepcopy(msh.nodes[candidate_els[1][2]])
+                p = copy(msh.nodes[candidate_els[1][2]])
             elseif candidate_els[1][3] ∉ node_indices_on_bdry
-                p = deepcopy(msh.nodes[candidate_els[1][3]])
+                p = copy(msh.nodes[candidate_els[1][3]])
             else
                 @assert false
             end
             if j == 3 && p ∉ nodes
                 if candidate_els[2][1] ∉ node_indices_on_bdry
-                    p = deepcopy(msh.nodes[candidate_els[2][1]])
+                    p = copy(msh.nodes[candidate_els[2][1]])
                 elseif candidate_els[2][2] ∉ node_indices_on_bdry
-                    p = deepcopy(msh.nodes[candidate_els[2][2]])
+                    p = copy(msh.nodes[candidate_els[2][2]])
                 elseif candidate_els[2][3] ∉ node_indices_on_bdry
-                    p = deepcopy(msh.nodes[candidate_els[2][3]])
+                    p = copy(msh.nodes[candidate_els[2][3]])
                 else
                     @assert false
                 end
@@ -154,7 +154,7 @@ for elind = 1:nvol_els
             global nnewton += 1
             res = ψ⁻¹(α₂, p)
             if  res.retcode == ReturnCode.MaxIters
-                α₃ = deepcopy(α₂)
+                α₃ = copy(α₂)
                 @assert j == 2
             else
                 α₃ = Vector{Float64}(ψ⁻¹(α₂, p))
@@ -262,16 +262,16 @@ for elind = 1:nvol_els
         end
         if j == 2
             if all(norm.(Ref(nodes[1]) .- facenodes) .> atol)
-                (skipnode == 1) || (cₖ = deepcopy(nodes[1]))
+                (skipnode == 1) || (cₖ = copy(nodes[1]))
             end
             if all(norm.(Ref(nodes[2]) .- facenodes) .> atol)
-                (skipnode == 2) || (cₖ = deepcopy(nodes[2]))
+                (skipnode == 2) || (cₖ = copy(nodes[2]))
             end
             if all(norm.(Ref(nodes[3]) .- facenodes) .> atol)
-                (skipnode == 3) || (cₖ = deepcopy(nodes[3]))
+                (skipnode == 3) || (cₖ = copy(nodes[3]))
             end
             if all(norm.(Ref(nodes[4]) .- facenodes) .> atol)
-                (skipnode == 4) || (cₖ = deepcopy(nodes[4]))
+                (skipnode == 4) || (cₖ = copy(nodes[4]))
             end
             atol = 10^-12
             @assert abs(norm(cₖ) - 1.0) > atol
