@@ -49,8 +49,8 @@ function gmsh_cut_ball(; center, radius, meshsize)
         ymin = -1.1*radius
         xmax = 1.1*radius
         ymax = 1.1*radius
-        zmin = -0.5*radius
-        zmax = 0.5*radius
+        zmin = -0.999*radius
+        zmax = 0.999*radius
         gmsh.initialize()
         gmsh.option.setNumber("General.Verbosity", 2)
         gmsh.model.add("ball")
