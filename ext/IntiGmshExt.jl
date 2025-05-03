@@ -22,6 +22,7 @@ function Inti.import_mesh(filename = nothing; dim = 3)
             @assert E <: Union{Inti.LagrangeElement,SVector}
             msh.etype2els[E] = Inti.ElementIterator(msh, E)
         end
+        Inti.build_orientation!(msh)
     elseif filename isa String
         initialized = gmsh.isInitialized() == 1
         try
@@ -35,7 +36,6 @@ function Inti.import_mesh(filename = nothing; dim = 3)
     else
         error("filename must be a string or nothing to import current gmsh model")
     end
-    Inti.build_orientation!(msh)
     return msh
 end
 

@@ -38,6 +38,24 @@ end
 end
 
 """
+    SingleLayerPotential(op::AbstractDifferentialOperator, source::Quadrature)
+
+An [`IntegralPotential`](@ref) over `source` with kernel given by `SingleLayerKernel(op)`.
+"""
+function SingleLayerPotential(op::AbstractDifferentialOperator, source::Quadrature)
+    return IntegralPotential(SingleLayerKernel(op), source)
+end
+
+"""
+    DoubleLayerPotential(op::AbstractDifferentialOperator, source::Quadrature)
+
+An [`IntegralPotential`](@ref) over `source` with kernel given by `DoubleLayerKernel(op)`.
+"""
+function DoubleLayerPotential(op::AbstractDifferentialOperator, source::Quadrature)
+    return IntegralPotential(DoubleLayerKernel(op), source)
+end
+
+"""
     struct IntegralOperator{T} <: AbstractMatrix{T}
 
 A discrete linear integral operator given by
