@@ -210,10 +210,11 @@ L = 5
 targets     = [SVector(x, 0, z) for x in -L:meshsize:L, z in -L:meshsize:L] |> vec
 filter!(x -> norm(x) > 1.1 * R, targets) # remove points inside or close to the sphere
 directions  = u.(targets)
-fig = Figure()
+strength    = norm.(directions)
+fig = Figure(size = (1000, 800))
 ax  = Axis3(fig[1, 1]; title = "Velocity field", aspect = :data, limits = ([-L, L], [-R, R], [-L, L]))
 viz!(msh[Γ], showsegments=true)
-arrows!(ax, Point3.(targets), Point3.(directions), arrowsize = 0.1, color = :blue)
+arrows!(ax, Point3.(targets), Point3.(directions), arrowsize = 0.15, lengthscale = 0.4, arrowcolor = strength, linecolor = strength)
 current_figure()
 fig
 ```
