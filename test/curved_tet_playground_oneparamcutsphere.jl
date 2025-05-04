@@ -292,37 +292,45 @@ for elind = 1:nvol_els
         @assert bₖ ≈ a₂
 
         # l = 1
-        πₖ¹_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, 3, SVector{2,Float64}})
+        πₖ¹_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, binomial(2+1,2), SVector{2,Float64}})
         πₖ¹ψ_reference_nodes = Vector{SVector{3,Float64}}(undef, length(πₖ¹_nodes))
         for i in eachindex(πₖ¹_nodes)
             πₖ¹ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ¹_nodes[i]))
         end
-        πₖ¹ψ_reference_nodes = SVector{3}(πₖ¹ψ_reference_nodes)
+        πₖ¹ψ_reference_nodes = SVector{binomial(2+1,2)}(πₖ¹ψ_reference_nodes)
         πₖ¹ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ¹ψ_reference_nodes)(x)
         #l = 2
-        πₖ²_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, 6, SVector{2,Float64}})
+        πₖ²_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, binomial(2+2,2), SVector{2,Float64}})
         πₖ²ψ_reference_nodes = Vector{SVector{3,Float64}}(undef, length(πₖ²_nodes))
         for i in eachindex(πₖ²_nodes)
             πₖ²ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ²_nodes[i]))
         end
-        πₖ²ψ_reference_nodes = SVector{6}(πₖ²ψ_reference_nodes)
+        πₖ²ψ_reference_nodes = SVector{binomial(2+2,2)}(πₖ²ψ_reference_nodes)
         πₖ²ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ²ψ_reference_nodes)(x)
         #l = 3
-        πₖ³_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, 10, SVector{2,Float64}})
+        πₖ³_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, binomial(2+3,2), SVector{2,Float64}})
         πₖ³ψ_reference_nodes = Vector{SVector{3,Float64}}(undef, length(πₖ³_nodes))
         for i in eachindex(πₖ³_nodes)
             πₖ³ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ³_nodes[i]))
         end
-        πₖ³ψ_reference_nodes = SVector{10}(πₖ³ψ_reference_nodes)
+        πₖ³ψ_reference_nodes = SVector{binomial(2+3,2)}(πₖ³ψ_reference_nodes)
         πₖ³ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ³ψ_reference_nodes)(x)
         #l = 4
-        πₖ⁴_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, 15, SVector{2,Float64}})
+        πₖ⁴_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, binomial(2+4,2), SVector{2,Float64}})
         πₖ⁴ψ_reference_nodes = Vector{SVector{3,Float64}}(undef, length(πₖ⁴_nodes))
         for i in eachindex(πₖ⁴_nodes)
             πₖ⁴ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁴_nodes[i]))
         end
-        πₖ⁴ψ_reference_nodes = SVector{15}(πₖ⁴ψ_reference_nodes)
+        πₖ⁴ψ_reference_nodes = SVector{binomial(2+4,2)}(πₖ⁴ψ_reference_nodes)
         πₖ⁴ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ⁴ψ_reference_nodes)(x)
+        #l = 5
+        πₖ⁵_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, binomial(2+5,2), SVector{2,Float64}})
+        πₖ⁵ψ_reference_nodes = Vector{SVector{3,Float64}}(undef, length(πₖ⁵_nodes))
+        for i in eachindex(πₖ⁵_nodes)
+            πₖ⁵ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁵_nodes[i]))
+        end
+        πₖ⁵ψ_reference_nodes = SVector{binomial(2+5,2)}(πₖ⁵ψ_reference_nodes)
+        πₖ⁵ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ⁵ψ_reference_nodes)(x)
 
         # Nonlinear map
         if j == 3
@@ -331,14 +339,16 @@ for elind = 1:nvol_els
             Φₖ_θ2 = (x) -> ( (x[1] + x[2] + x[3])^4 * (ψ(f̂ₖ_comp(x)) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))))
             Φₖ_θ3 = (x) -> ( (x[1] + x[2] + x[3])^5 * (ψ(f̂ₖ_comp(x)) - πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^3 * (πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) )
             Φₖ_θ4 = (x) -> ( (x[1] + x[2] + x[3])^6 * (ψ(f̂ₖ_comp(x)) - πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^3 * (πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^4 * (πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) )
+            Φₖ_θ5 = (x) -> ( (x[1] + x[2] + x[3])^7 * (ψ(f̂ₖ_comp(x)) - πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^3 * (πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^4 * (πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^5 * (πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))))
         else
             f̂ₖ_comp = (x) -> f̂ₖ( (x[1] * α₁hat + x[2] * α₂hat)/(x[1] + x[2]) )
             Φₖ_θ1 = (x) -> ( (x[1] + x[2])^3 * (ψ(f̂ₖ_comp(x)) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))))
             Φₖ_θ2 = (x) -> ( (x[1] + x[2])^4 * (ψ(f̂ₖ_comp(x)) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))))
             Φₖ_θ3 = (x) -> ( (x[1] + x[2])^5 * (ψ(f̂ₖ_comp(x)) - πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^3 * (πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))))
             Φₖ_θ4 = (x) -> ( (x[1] + x[2])^6 * (ψ(f̂ₖ_comp(x)) - πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^3 * (πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^4 * (πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))))
+            Φₖ_θ5 = (x) -> ( (x[1] + x[2])^7 * (ψ(f̂ₖ_comp(x)) - πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^3 * (πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^4 * (πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^5 * (πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))))
         end
-        Φₖ = Φₖ_θ4
+        Φₖ = Φₖ_θ5
 
         # Full transformation
         atol = 10^(-12)
