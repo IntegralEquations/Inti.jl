@@ -15,13 +15,15 @@ include("test_utils.jl")
 meshsize = .1
 qorder = 5
 
+#Ω, msh = gmsh_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = meshsize)
 Ω, msh = gmsh_cut_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = meshsize)
 Γ = Inti.external_boundary(Ω)
 Γ_msh = view(msh, Γ)
 
 ang = π/2
 θ₁ = LinRange(0, π, 50*round(Int, 1/meshsize))
-θ₂ = LinRange(-ang, π-ang, 50*round(Int, 1/meshsize))
+#θ₂ = LinRange(-ang, π-ang, 50*round(Int, 1/meshsize))
+θ₂ = LinRange(0, π, 50*round(Int, 1/meshsize))
 ϕ = LinRange(0, 2*π, 50*round(Int, 1/meshsize))
 # v = (θ, ϕ)
 #ang = 0.0
@@ -29,12 +31,12 @@ ang = π/2
 M = [cos(ang) 0 sin(ang); 0 1 0; -1*sin(ang) 0 cos(ang)]
 #ψ₁ = (v) -> [0.0, 0.0, 0.0]
 ψ₁ = (v) -> [sin(v[1]) * cos(v[2]), sin(v[1]) * sin(v[2]), cos(v[1])]
-ψ₂ = (v) -> M * [sin(v[1]) * cos(v[2]), sin(v[1]) * sin(v[2]), cos(v[1])]
-ψ₂ = (v) -> [sin(v[1] + ang) * cos(v[2]), sin(v[1] + ang) * sin(v[2]), cos(v[1] + ang)]
+ψ₂ = (v) -> M * ψ₁(v)
+#ψ₂ = (v) -> [sin(v[1] + ang) * cos(v[2]), sin(v[1] + ang) * sin(v[2]), cos(v[1] + ang)]
 
 function chart_id(face_nodes)
     id = 1
-    if all([abs(q[3]) for q in face_nodes] .> 0.55)
+    if all([abs(q[3]) for q in face_nodes] .> 0.75)
         id = 2
     end
     return id
@@ -97,8 +99,10 @@ for elind = 1:nbdry_els
             ψ⁻¹ = ψ₁⁻¹
             if node_indices[1] ∉ chart_1_bdry_node_idx && node_indices[1] ∉ chart_2_bdry_node_idx
                 if abs(msh.nodes[node_indices[1]][3]) ≈ 0.8
+                #if false #abs(msh.nodes[node_indices[1]][3]) ≈ 0.8
                     guess = SVector{2,Float64}((θ₁[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]))
                     α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[1]])))
+                    @assert α[1] ≥ 0
                     push!(chart_1_bdry_node_idx, node_indices[1])
                     push!(chart_1_bdry_node_param_loc, α)
                 else
@@ -109,8 +113,10 @@ for elind = 1:nbdry_els
             end
             if node_indices[2] ∉ chart_1_bdry_node_idx && node_indices[2] ∉ chart_2_bdry_node_idx
                 if abs(msh.nodes[node_indices[2]][3]) ≈ 0.8
+                #if false #abs(msh.nodes[node_indices[2]][3]) ≈ 0.8
                     guess = SVector{2,Float64}((θ₁[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]))
                     α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[2]])))
+                    @assert α[1] ≥ 0
                     push!(chart_1_bdry_node_idx, node_indices[2])
                     push!(chart_1_bdry_node_param_loc, α)
                 else
@@ -121,8 +127,10 @@ for elind = 1:nbdry_els
             end
             if node_indices[3] ∉ chart_1_bdry_node_idx && node_indices[3] ∉ chart_2_bdry_node_idx
                 if abs(msh.nodes[node_indices[3]][3]) ≈ 0.8
+                #if false #abs(msh.nodes[node_indices[3]][3]) ≈ 0.8
                     guess = SVector{2,Float64}((θ₁[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]))
                     α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[3]])))
+                    @assert α[1] ≥ 0
                     push!(chart_1_bdry_node_idx, node_indices[3])
                     push!(chart_1_bdry_node_param_loc, α)
                 else
@@ -141,8 +149,10 @@ for elind = 1:nbdry_els
             end
             if node_indices[1] ∉ chart_1_bdry_node_idx && node_indices[1] ∉ chart_2_bdry_node_idx
                 if abs(msh.nodes[node_indices[1]][3]) ≈ 0.8
+                #if false #abs(msh.nodes[node_indices[1]][3]) ≈ 0.8
                     guess = SVector{2,Float64}((θ₂[chart_2_cart_idxs_θ[idxs[1]]], ϕ[chart_2_cart_idxs_ϕ[idxs[1]]]))
                     α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[1]])))
+                    @assert α[1] ≥ 0
                     push!(chart_2_bdry_node_idx, node_indices[1])
                     push!(chart_2_bdry_node_param_loc, α)
                 else
@@ -153,8 +163,10 @@ for elind = 1:nbdry_els
             end
             if node_indices[2] ∉ chart_1_bdry_node_idx && node_indices[2] ∉ chart_2_bdry_node_idx
                 if abs(msh.nodes[node_indices[2]][3]) ≈ 0.8
+                #if false #abs(msh.nodes[node_indices[2]][3]) ≈ 0.8
                     guess = SVector{2,Float64}((θ₂[chart_2_cart_idxs_θ[idxs[1]]], ϕ[chart_2_cart_idxs_ϕ[idxs[1]]]))
                     α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[2]])))
+                    @assert α[1] ≥ 0
                     push!(chart_2_bdry_node_idx, node_indices[2])
                     push!(chart_2_bdry_node_param_loc, α)
                 else
@@ -165,8 +177,10 @@ for elind = 1:nbdry_els
             end
             if node_indices[3] ∉ chart_1_bdry_node_idx && node_indices[3] ∉ chart_2_bdry_node_idx
                 if abs(msh.nodes[node_indices[3]][3]) ≈ 0.8
+                #if false #abs(msh.nodes[node_indices[3]][3]) ≈ 0.8
                     guess = SVector{2,Float64}((θ₂[chart_2_cart_idxs_θ[idxs[1]]], ϕ[chart_2_cart_idxs_ϕ[idxs[1]]]))
                     α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[3]])))
+                    @assert α[1] ≥ 0
                     push!(chart_2_bdry_node_idx, node_indices[3])
                     push!(chart_2_bdry_node_param_loc, α)
                 else
@@ -383,11 +397,17 @@ for elind = 1:nvol_els
             end
         end
         if j == 3
-            #println(elind)
             @assert true
-            #@assert ((abs(α₁[1] - α₂[1]) < π/8) && (abs(α₂[1] - α₃[1]) < π/8) && (abs(α₁[1] - α₃[1]) < π/8))
+            #if α₁[1] < 0 && α₂[1] > 0
+            #    α₁ = ψ⁻¹(α₂, ψ₂(α₁))
+            #end
+            #if α₂[1] < 0 && α₁[1] > 0
+            #    α₂ = ψ⁻¹(α₁, ψ₂(α₂))
+            #end
+            @assert ((abs(α₁[1] - α₂[1]) < π/8) && (abs(α₂[1] - α₃[1]) < π/8) && (abs(α₁[1] - α₃[1]) < π/8))
         end
         if !((abs(α₁[2] - α₂[2]) < π/8) && (abs(α₂[2] - α₃[2]) < π/8) && (abs(α₁[2] - α₃[2]) < π/8))
+            println(elind)
             @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", max(α₁[1], α₂[1], α₃[1])
             @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", min(α₁[1], α₂[1], α₃[1])
         end
@@ -550,7 +570,6 @@ for elind = 1:nvol_els
             @assert norm(Φₖ([0.3, 0.45, 0.25]) - (ψ(f̂ₖ_comp([0.3, 0.45, 0.25])) - 0.3*a₁ - 0.45*a₂ - 0.25*a₃)) < atol
             @assert norm(Φₖ([0.55, 0.45, 0.0]) - (ψ(f̂ₖ_comp([0.55, 0.45, 0.0])) - 0.55*a₁ - 0.45*a₂)) < atol
         end
-        println(elind)
         @assert abs(norm(Fₖ([0.6, 0.4, 0.0])) - 1.0) < atol
         @assert abs(norm(Fₖ([1.0, 0.0, 0.0])) - 1.0) < atol
         @assert abs(norm(Fₖ([0.0, 1.0, 0.0])) - 1.0) < atol
