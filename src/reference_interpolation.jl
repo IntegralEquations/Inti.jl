@@ -83,11 +83,22 @@ Calculate the [mean curvature](https://en.wikipedia.org/wiki/Mean_curvature) of
 the element `τ` at the parametric coordinate `x̂`.
 """
 function mean_curvature(el::ReferenceInterpolant, x̂)
-    E, F, G = first_fundamental_form(el, x̂)
-    L, M, N = second_fundamental_form(el, x̂)
-    # mean curvature
-    κ = (L * G - 2 * F * M + E * N) / (2 * (E * G - F^2))
-    return κ
+    N = geometric_dimension(el)
+    if N == 1
+        # divergence of the normal vector
+        χ′  = jacobian(el, x̂)
+        χ′′ = hessian(el, x̂)
+        κ   = det(hcat(vec(χ′), vec(χ′′))) / norm(χ′)^3
+        return κ
+    elseif N == 2
+        E, F, G = first_fundamental_form(el, x̂)
+        L, M, N = second_fundamental_form(el, x̂)
+        # mean curvature
+        κ = (L * G - 2 * F * M + E * N) / (2 * (E * G - F^2))
+        return κ
+    else
+        throw(ArgumentError("Mean curvature is not defined for $N dimensions"))
+    end
 end
 
 """

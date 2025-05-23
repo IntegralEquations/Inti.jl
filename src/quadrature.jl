@@ -1,13 +1,14 @@
 """
     QuadratureNode{N,T<:Real}
 
-A point in `ℝᴺ` with a `weight` for performing numerical integration. A
-`QuadratureNode` can optionally store a `normal` vector.
+A point in `ℝᴺ` with a `weight` for performing numerical integration. A `QuadratureNode` can
+optionally store a `normal` vector and a `curvature` value.
 """
 struct QuadratureNode{N,T<:Real}
     coords::SVector{N,T}
     weight::T
     normal::Union{Nothing,SVector{N,T}}
+    curvature::Union{Nothing,T}
 end
 
 """
@@ -41,9 +42,11 @@ end
 
 Return a new `QuadratureNode` with the normal vector flipped.
 """
-flip_normal(q::QuadratureNode) = QuadratureNode(q.coords, q.weight, -q.normal)
+flip_normal(q::QuadratureNode) = QuadratureNode(q.coords, q.weight, -q.normal, q.curvature)
 
 weight(q::QuadratureNode) = q.weight
+
+curvature(q::QuadratureNode) = q.curvature
 
 # useful for using either a quadrature node or a just a simple point in
 # `IntegralOperators`.
@@ -100,7 +103,7 @@ used for each element type usig [`_qrule_for_reference_shape`](@ref).
 For co-dimension one elements, the normal vector is also computed and stored in
 the [`QuadratureNode`](@ref)s.
 """
-function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
+function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict, curvature) where {N,T}
     # initialize mesh with empty fields
     quad = Quadrature{N,T}(
         msh,
@@ -114,20 +117,24 @@ function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
         ori = orientation(msh, E)
         qrule = etype2qrule[E]
         # dispatch to type-stable method
-        _build_quadrature!(quad, els, ori, qrule)
+        _build_quadrature!(quad, els, ori, qrule, curvature)
     end
     return quad
 end
 
-function Quadrature(msh::AbstractMesh{N,T}, qrule::ReferenceQuadrature) where {N,T}
+function Quadrature(
+    msh::AbstractMesh{N,T},
+    qrule::ReferenceQuadrature,
+    curvature = false,
+) where {N,T}
     etype2qrule = Dict(E => qrule for E in element_types(msh))
-    return Quadrature(msh, etype2qrule)
+    return Quadrature(msh, etype2qrule, curvature)
 end
 
-function Quadrature(msh::AbstractMesh; qorder)
+function Quadrature(msh::AbstractMesh; qorder, curvature = false)
     etype2qrule =
         Dict(E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(msh))
-    return Quadrature(msh, etype2qrule)
+    return Quadrature(msh, etype2qrule, curvature)
 end
 
 @noinline function _build_quadrature!(
@@ -135,6 +142,7 @@ end
     els::AbstractVector{E},
     orientation::Vector{Int},
     qrule::ReferenceQuadrature,
+    curvature::Bool = false,
 ) where {N,T,E}
     x̂ = map(x̂ -> T.(x̂), qcoords(qrule))
     ŵ = map(ŵ -> T.(ŵ), qweights(qrule))
@@ -151,7 +159,8 @@ end
             μ = _integration_measure(jac)
             w = μ * ŵi
             ν = codim == 1 ? T.(s * _normal(jac)) : nothing
-            qnode = QuadratureNode(T.(x), T.(w), ν)
+            κ = curvature ? mean_curvature(el, x̂i) : nothing
+            qnode = QuadratureNode(T.(x), T.(w), ν, κ)
             push!(quad.qnodes, qnode)
         end
     end
@@ -167,9 +176,9 @@ end
 Construct a `Quadrature` over the domain `Ω` with a mesh of size `meshsize` and
 quadrature order `qorder`.
 """
-function Quadrature(Ω::Domain; meshsize, qorder)
+function Quadrature(Ω::Domain; meshsize, qorder, curvature = false)
     msh = meshgen(Ω; meshsize)
-    Q = Quadrature(view(msh, Ω); qorder)
+    Q = Quadrature(view(msh, Ω); qorder, curvature)
     return Q
 end
 
