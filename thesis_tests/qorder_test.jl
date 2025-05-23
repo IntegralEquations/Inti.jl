@@ -11,7 +11,6 @@ using ForwardDiff
 using LinearMaps
 using IterativeSolvers
 
-SAVE = false
 TEST_TYPE = "QORDER"
 
 include("test_utils.jl")
@@ -38,15 +37,16 @@ Errg = Dict(qorder => Float64[] for qorder in Q)
 GEOMETRY = "geometries/8-like.jl"
 # k = 10      # number of neighbors for local correction
 ## suggested values are include in geometry files
-TESTFILE = "test_files/auto_converge_Integral_discontinuous.jl"
+TESTFILE = "test_files/auto_converge_Dirichlet_discontinuous.jl"
 
 Inti.clear_entities!()
 include(GEOMETRY)
 xt = χ((3a+b)/4)
 # xt = χ(0)
 k = 10
-α, β = 1, 0 # coefficients for single, double layer
+α, β = 0, 1 # coefficients for single, double layer
 onSurf = true
+SAVE = true
 include(TESTFILE)
 
 theme = Theme(;
@@ -78,9 +78,9 @@ for qorder in Q
     scatterlines!(ax, H, errg;colormap=Reverse(:viridis), colorrange=(1, 10), color=qorder+3, marker=:circle, markersize=15, label=L"\text{global }P=%$P")
 end
 # add reference slopes
-params = [(0, Errg[5], 2, 0.99, 0.6),
-          (1, Errl[3], 3, 0.99, 10),
-          (3, Errl[5], 5, 0.99, 0.6)]
+params = [#(0, Errg[5], 4, 0.99, 0.6),
+          (2, Errl[3], 4, 0.99, 0.6),
+          (4, Errl[5], 4, 0.99, 0.6)]
 for (slope, err, i, tx, ty) in params
     ref = 0.7 * err[i] / H[i]^slope
     lines!(ax, H, ref * H .^ slope;color=:black, linestyle = :dash, label =nothing)

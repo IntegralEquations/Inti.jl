@@ -3,6 +3,7 @@ G = Inti.SingleLayerKernel(pde)
 dG = Inti.DoubleLayerKernel(pde)
 # u = x -> SVector(cos(Inti.coords(x)[1]), Inti.coords(x)[2]*sin(Inti.coords(x)[1]))
 σ = x -> cos(Inti.coords(x)[1]) * exp(Inti.coords(x)[2])
+# σ = x -> SVector(-sin(x.coords[1])*exp(x.coords[2]), cos(x.coords[1])*exp(x.coords[2])) ⋅ x.normal
 
 qorder_ref, h_ref = 5, 1e-4
 msh = Inti.meshgen(Γ; meshsize = h_ref)

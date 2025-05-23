@@ -21,7 +21,7 @@ G = Inti.SingleLayerKernel(pde)
 dG = Inti.DoubleLayerKernel(pde)
 # pde = Inti.Helmholtz(; k = 2.1, dim = N)
 # pde = Inti.Stokes(; dim = N, μ = 1.2)
-α, β = 1, 0
+α, β = 0, 1
 
 ##
 ##
@@ -31,6 +31,7 @@ include(GEOMETRY)
 
 # calculate reference boundary value by quadgk
 σ = x -> cos(Inti.coords(x)[1]) * exp(Inti.coords(x)[2])
+# σ = x -> SVector(-sin(x.coords[1])*exp(x.coords[2]), cos(x.coords[1])*exp(x.coords[2])) ⋅ x.normal
 # u = x -> quadgk(a, b, atol=1e-15) do s
 #     y  = s -> (coords=χ(s), normal=normalize(χn(s)))
 #     (G(x, χ(s)) * σ_ref(χ(s))) * norm(χn(s))        
@@ -67,7 +68,7 @@ ubnd = (α*Sdim + β*Ddim) * σ_ref + β*μ*σ_vec
 
 ## calculate numeric values
 
-δS, δD = Inti.local_bdim_correction(
+δSl, δDl = Inti.local_bdim_correction(
     pde,
     quad,
     quad;
@@ -76,24 +77,24 @@ ubnd = (α*Sdim + β*Ddim) * σ_ref + β*μ*σ_vec
     maxdist = 10 * h,
     qorder_aux = 20 * ceil(Int, abs(log(h))),
 )
-Sdim = Smat + δS
-Ddim = Dmat + δD
-σl   = (α*Sdim + β*(Ddim + μ*I)) \ ubnd
-errl = abs.(σl - σ_vec)
+Sdiml = Smat + δSl
+Ddiml = Dmat + δDl
+σl   = (α*Sdiml + β*(Ddiml + μ*I)) \ ubnd
+errL = abs.(σl - σ_vec)
 # @show σ
 
-tdim = @elapsed δS, δD =
+tdim = @elapsed δSg, δDg =
     Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
-Sdim = Smat + δS
-Ddim = Dmat + δD
-σg   = (α*Sdim + β*(Ddim + μ*I)) \ ubnd
-errg = abs.(σg - σ_vec)
+Sdimg = Smat + δSg
+Ddimg = Dmat + δDg
+σg   = (α*Sdimg + β*(Ddimg + μ*I)) \ ubnd
+errG = abs.(σg - σ_vec)
 
 # normalize data
 q = map(Inti.coords, quad)
 # Merr = max(maximum(errl), maximum(errg))
-errl = log10.(errl)
-errg = log10.(errg)
+# errl, errg = errL, errG
+errl, errg = log10.(errL), log10.(errG)
 
 theme = Theme(;
     Axis = (     
@@ -120,4 +121,4 @@ Colorbar(fig[1, 3], colormap=cmap, colorrange=[m,M])
 
 display(fig)
 
-save("thesis_tests/density_plots/density_error.png", fig)
+save("thesis_tests/density_plots/density_error_double.png", fig)
