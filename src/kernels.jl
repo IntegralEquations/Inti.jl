@@ -619,3 +619,96 @@ function (HS::HyperSingularKernel{T,<:Elastostatic{N}})(target, source) where {N
         )
     end
 end
+
+################################################################################
+################################# LAPLACE PERIODIC #############################
+################################################################################
+
+struct LaplacePeriodic1D{N,T<:Real} <: AbstractDifferentialOperator{N}
+    period::T
+end
+
+"""
+    LaplacePeriodic(; dim, period = 2π)
+
+Laplace's differential operator `-Δu = 0` in `dim` dimension with periodic boundary
+conditions along the first dimension. The `period` is set to `2π` by default.
+
+The negative sign is used to match the convention of coercive operators.
+"""
+LaplacePeriodic1D(; dim, period = 2π) = LaplacePeriodic1D{dim,typeof(period)}(period)
+
+function Base.show(io::IO, op::LaplacePeriodic1D{N}) where {N}
+    return print(
+        io,
+        "Periodic Laplace operator -Δu in $N dimensions with periodic conditions along the first dimension",
+    )
+end
+
+default_kernel_eltype(::LaplacePeriodic1D) = Float64
+default_density_eltype(::LaplacePeriodic1D) = Float64
+
+function (SL::SingleLayerKernel{T,<:LaplacePeriodic1D{N}})(
+    target,
+    source,
+    r = coords(target) - coords(source),
+) where {N,T}
+    l = SL.op.period
+    if N == 2
+        d2 = sin(π / l * r[1])^2 + sinh(π / l * r[2])^2
+        out = -1 / 4π * log(d2)
+        return d2 ≤ SAME_POINT_TOLERANCE ? zero(T) : out
+    else
+        error("Single layer kernel for LaplacePeriodic1D not implemented in $N dimensions")
+    end
+end
+
+function (DL::DoubleLayerKernel{T,<:LaplacePeriodic1D{N}})(
+    target,
+    source,
+    r = coords(target) - coords(source),
+) where {N,T}
+    ny = normal(source)
+    if N == 2
+        l   = DL.op.period
+        s   = sin(π / l * r[1])
+        sh  = sinh(π / l * r[2])
+        d2  = s^2 + sh^2
+        out = 1 / (4π * d2) * (2 * π / l * s * cos(π / l * r[1]) * ny[1] + 2 * π / l * sh * cosh(π / l * r[2]) * ny[2])
+        return d2 ≤ SAME_POINT_TOLERANCE ? zero(T) : out
+    else
+        error("Double layer kernel for LaplacePeriodic1D not implemented in $N dimensions")
+    end
+end
+
+function (ADL::AdjointDoubleLayerKernel{T,<:LaplacePeriodic1D{N}})(
+    target,
+    source,
+    r = coords(target) - coords(source),
+) where {N,T}
+    nx = normal(target)
+    if N == 2
+        l   = ADL.op.period
+        s   = sin(π / l * r[1])
+        sh  = sinh(π / l * r[2])
+        d2  = s^2 + sh^2
+        out = -1 / (4π * d2) * (2 * π / l * s * cos(π / l * r[1]) * nx[1] + 2 * π / l * sh * cosh(π / l * r[2]) * nx[2])
+        return d2 ≤ SAME_POINT_TOLERANCE ? zero(T) : out
+    else
+        error(
+            "Adjoint double layer kernel for LaplacePeriodic1D not implemented in $N dimensions",
+        )
+    end
+end
+
+function (HS::HyperSingularKernel{T,<:LaplacePeriodic1D{N}})(
+    target,
+    source,
+    r = coords(target) - coords(source),
+) where {N,T}
+    nx = normal(target)
+    ny = normal(source)
+    return error(
+        "Hypersingular kernel for LaplacePeriodic1D not implemented in $N dimensions",
+    )
+end

@@ -46,6 +46,10 @@ for correction in corrections
                     Inti.Stokes(; μ = 1.2, dim = N),
                     Inti.Elastostatic(; λ = 1, μ = 1, dim = N),
                 )
+                # periodic Laplace only defined for 2d, so we add it conditionally
+                if N == 2
+                    ops = (Inti.LaplacePeriodic1D(; dim = N, period = 2π), ops...)
+                end
                 for op in ops
                     @testset "Greens identity ($t) $(N)d $op" begin
                         xs = t == :interior ? ntuple(i -> 3, N) : ntuple(i -> 0.1, N)
@@ -78,8 +82,10 @@ for correction in corrections
                             @test norm(e1, Inf) < rtol1
                         end
                         # adjoint double-layer and hypersingular.
-                        op isa Inti.Stokes && continue # TODO: implement hypersingular for Stokes?
-
+                        if op isa Inti.Stokes || op isa Inti.LaplacePeriodic1D
+                            # skip cases where hypersingular has not been implemented
+                            continue
+                        end
                         Kop = Inti.IntegralOperator(Inti.AdjointDoubleLayerKernel(op), quad)
                         Kmat = Inti.assemble_matrix(Kop)
                         Hop = Inti.IntegralOperator(Inti.HyperSingularKernel(op), quad)
