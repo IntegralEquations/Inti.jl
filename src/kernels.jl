@@ -722,3 +722,11 @@ function (HS::HyperSingularKernel{T,<:LaplacePeriodic1D{N}})(
         )
     end
 end
+
+################################################################################
+################################# HELMHOLTZ PERIODIC ###########################
+################################################################################
+
+function HelmholtzPeriodic1D(args...; kwargs...)
+    return error("HelmholtzPeriodic1D not found. Did you forget to import QPGreen?")
+end

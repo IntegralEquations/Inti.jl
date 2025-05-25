@@ -8,6 +8,7 @@ using LinearAlgebra
 using Inti
 using Random
 using StaticArrays
+using QPGreen
 
 include("test_utils.jl")
 
@@ -48,7 +49,11 @@ for correction in corrections
                 )
                 # periodic Laplace only defined for 2d, so we add it conditionally
                 if N == 2
-                    ops = (Inti.LaplacePeriodic1D(; dim = N, period = 2π), ops...)
+                    ops = (
+                        Inti.LaplacePeriodic1D(; dim = N, period = 2π),
+                        Inti.HelmholtzPeriodic1D(; alpha = 0.3, k = 1.2, dim = N),
+                        ops...,
+                    )
                 end
                 for op in ops
                     @testset "Greens identity ($t) $(N)d $op" begin
@@ -82,7 +87,7 @@ for correction in corrections
                             @test norm(e1, Inf) < rtol1
                         end
                         # adjoint double-layer and hypersingular.
-                        if op isa Inti.Stokes
+                        if op isa Inti.Stokes || op isa Inti.HelmholtzPeriodic1D
                             # skip cases where hypersingular has not been implemented
                             continue
                         end
