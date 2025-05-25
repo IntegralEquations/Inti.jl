@@ -1,5 +1,5 @@
 """
-    adaptive_correction(iop::IntegralOperator; [maxdist, rtol, threads = true, kwargs...])
+    adaptive_correction(iop::IntegralOperator; [maxdist, atol, rtol, threads = true, kwargs...])
     adaptive_correction(iop::IntegralOperator, maxdist, quads_dict::Dict, threads = true)
 
 This function computes a sparse correction for the integral operator `iop`, addressing its
@@ -9,18 +9,18 @@ The parameter `maxdist` specifies the maximum distance between target points  an
 elements to be considered for correction (only interactions within this distance are
 corrected).
 
-The parameter `rtol` defines the tolerance for the adaptive quadrature used to compute the
-corrections for singular or nearly singular entries.
+The parameters `atol` and `rtol` define the absolute and relative tolerances for the
+adaptive quadrature used to compute the corrections for singular or nearly singular entries.
 
 Additional `kwargs` arguments are passed to [`adaptive_quadrature`](@ref); see its
 documentation for more information.
 
-Selecting `maxdist` and `rtol` involves balancing accuracy and computational cost. A smaller
-`maxdist` reduces the number of corrections but may impact accuracy. Conversely, a smaller
-`rtol` improves correction accuracy but increases computational expense. The ideal values
-for `maxdist` and `rtol` depend on the kernel and the mesh/quadrature rule applied.
+Selecting `maxdist` and `(atol,rtol)` involves balancing accuracy and computational cost. A
+smaller `maxdist` reduces the number of corrections but may impact accuracy. Conversely, a
+smaller tolerance improves correction accuracy but increases computational expense. The
+ideal values depend on the kernel and the mesh/quadrature rule applied.
 
-By default, `maxdist` and `rtol` are estimated using the
+By default, `maxdist` and `(atol,rtol)` are estimated using the
 [`local_correction_dist_and_tol`](@ref), but it is often possible to improve performance by
 manually tunning these parameters.
 
@@ -494,11 +494,11 @@ function _regular_integration_errors(el, K, qreg, qref, maxiter)
     x₀ = center(el) # center
     h = radius(el)  # reasonable scale
     f = (x, ŷ) -> begin
-        y     = el(ŷ)
-        jac   = jacobian(el, ŷ)
-        ν    = _normal(jac)
-        νₓ = (x - x₀) |> normalize
-        τ′ = _integration_measure(jac)
+        y   = el(ŷ)
+        jac = jacobian(el, ŷ)
+        ν   = _normal(jac)
+        νₓ  = (x - x₀) |> normalize
+        τ′  = _integration_measure(jac)
         return K((coords = x, normal = νₓ), (coords = y, normal = ν)) * τ′
     end
     N = length(x₀)

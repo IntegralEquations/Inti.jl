@@ -127,6 +127,7 @@ end
 push!(notebook_examples, "Heat equation" => joinpath("examples", "heat_equation.md"))
 push!(notebook_examples, "Stokes drag" => joinpath("examples", "stokes_drag.md"))
 push!(notebook_examples, "Elastic crack" => joinpath("examples", "crack_elasticity.md"))
+push!(notebook_examples, "Plasmonic eigenvalues" => joinpath("examples", "pep.md"))
 size_threshold_ignore = last.(notebook_examples)
 
 makedocs(;
