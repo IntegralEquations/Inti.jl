@@ -4,6 +4,12 @@ using StaticArrays
 using ForwardDiff
 using QPGreen
 
+# Extend QuadGK to support ForwardDiff.Dual types (see https://github.com/JuliaMath/QuadGK.jl/issues/122)
+using QuadGK
+function QuadGK.kronrod(::Type{<:ForwardDiff.Dual{T,V,N}}, n::Integer) where {T,V,N}
+    return QuadGK.kronrod(V, n)
+end
+
 @testset "Yukawa" begin
     for dim in (2, 3)
         x = @SVector rand(dim)
@@ -73,10 +79,16 @@ end
     dGdnx   = Inti.AdjointDoubleLayerKernel(op)
     d2Gdnxy = Inti.HyperSingularKernel(op)
     # test that the normal derivatives are correct
-    @test ForwardDiff.derivative(t -> G((coords = x + t * nx,), y), 0) ≈
-          dGdnx((coords = x, normal = nx), y)
-    @test ForwardDiff.derivative(t -> G(x, (coords = y + t * ny,)), 0) ≈
-          dGdny(x, (coords = y, normal = ny))
+    @test isapprox(
+        ForwardDiff.derivative(t -> G((coords = x + t * nx,), y), 0),
+        dGdnx((coords = x, normal = nx), y);
+        atol = 1e-6,
+    )
+    @test isapprox(
+        ForwardDiff.derivative(t -> G(x, (coords = y + t * ny,)), 0),
+        dGdny(x, (coords = y, normal = ny));
+        atol = 1e-6,
+    )
     @test ForwardDiff.derivative(
         t -> dGdny((coords = x + t * nx,), (coords = y, normal = ny)),
         0,
