@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Plasmonic eigenvalues · Inti.jl</title><meta name="title" content="Plasmonic eigenvalues · Inti.jl"/><meta property="og:title" content="Plasmonic eigenvalues · Inti.jl"/><meta property="twitter:title" content="Plasmonic eigenvalues · Inti.jl"/><meta name="description" content="Documentation for Inti.jl."/><meta property="og:description" content="Documentation for Inti.jl."/><meta property="twitter:description" content="Documentation for Inti.jl."/><meta property="og:url" content="https://IntegralEquations.github.io/Inti.jl/examples/pep/"/><meta property="twitter:url" content="https://IntegralEquations.github.io/Inti.jl/examples/pep/"/><link rel="canonical" href="https://IntegralEquations.github.io/Inti.jl/examples/pep/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.png" alt="Inti.jl logo"/></a><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../../tutorials/getting_started/">Getting started</a></li><li><a class="tocitem" href="../../tutorials/geo_and_meshes/">Geometry and meshes</a></li><li><a class="tocitem" href="../../tutorials/integral_operators/">Integral operators</a></li><li><a class="tocitem" href="../../tutorials/layer_potentials/">Layer potentials</a></li><li><a class="tocitem" href="../../tutorials/compression_methods/">Compression methods</a></li><li><a class="tocitem" href="../../tutorials/correction_methods/">Correction methods</a></li><li><a class="tocitem" href="../../tutorials/solvers/">Linear solvers</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../../pluto-examples/toy_example/">Toy example</a></li><li><a class="tocitem" href="../../pluto-examples/helmholtz_scattering/">Helmholtz scattering</a></li><li><a class="tocitem" href="../../pluto-examples/poisson/">Poisson problem</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../stokes_drag/">Stokes drag</a></li><li><a class="tocitem" href="../crack_elasticity/">Elastic crack</a></li><li class="is-active"><a class="tocitem" href>Plasmonic eigenvalues</a><ul class="internal"><li><a class="tocitem" href="#Problem-definition"><span>Problem definition</span></a></li><li><a class="tocitem" href="#Implementation"><span>Implementation</span></a></li><li><a class="tocitem" href="#Validation"><span>Validation</span></a></li><li><a class="tocitem" href="#Extensions"><span>Extensions</span></a></li></ul></li></ul></li><li><a class="tocitem" href="../../references/">References</a></li><li><a class="tocitem" href="../../docstrings/">Docstrings</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Plasmonic eigenvalues</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Plasmonic eigenvalues</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl/blob/main/docs/src/examples/pep.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Plasmonic-eigenvalue-problem"><a class="docs-heading-anchor" href="#Plasmonic-eigenvalue-problem">Plasmonic eigenvalue problem</a><a id="Plasmonic-eigenvalue-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Plasmonic-eigenvalue-problem" title="Permalink"></a></h1><div class="admonition is-info" id="Important-points-covered-in-this-example-14a66147f06525c6"><header class="admonition-header">Important points covered in this example<a class="admonition-anchor" href="#Important-points-covered-in-this-example-14a66147f06525c6" title="Permalink"></a></header><div class="admonition-body"><ul><li>Reformulate a transmission eigenvalue problem using integral equations.</li><li>Use a periodic Green&#39;s function</li></ul></div></div><h2 id="Problem-definition"><a class="docs-heading-anchor" href="#Problem-definition">Problem definition</a><a id="Problem-definition-1"></a><a class="docs-heading-anchor-permalink" href="#Problem-definition" title="Permalink"></a></h2><p>Given a bounded domain <span>$\Omega \subset \mathbb{R}^2$</span> with boundary <span>$\Gamma := \partial \Omega$</span>, we focus in this tutorial on the solution of the so-called plasmonic eigenvalue problem, defined as follows:</p><div class="admonition is-info" id="Plasmonic-eigenvalue-problem-(PEP)-92114e2b842cb465"><header class="admonition-header">Plasmonic eigenvalue problem (PEP)<a class="admonition-anchor" href="#Plasmonic-eigenvalue-problem-(PEP)-92114e2b842cb465" title="Permalink"></a></header><div class="admonition-body"><p>Find <span>$(u,\kappa) \in \dot{H}^1(\mathbb{R}^2) \times (-\infty,0)$</span>, <span>$u\neq0$</span>, such that   ```math   \tag{PEP}   \begin{aligned}         \nabla \cdot [ a(\boldsymbol{x},\kappa) \nabla u(\boldsymbol{x})] = 0 \
+        u (\boldsymbol{x})\underset{|\boldsymbol{x}|\to \infty}{=} \mathcal{O}(|\boldsymbol{x}|^{-1})   \end{aligned}   <code>where</code>math   \begin{equation<em>} 	\dot{H}^1(\mathbb{R}^2)  \coloneqq \left{u \in L^{2}_{\textup{loc}}(\mathbb{R}^2) \, \left\vert \, \nabla u \in L^{2}(\mathbb{R}^2) \right.\right}, 	\; \quad 	a(\boldsymbol{x},\kappa) = 	\begin{cases} 		1      &amp; (\boldsymbol{x}\in\Omega)    \
+		\kappa &amp; (\boldsymbol{x}\in\Omega^c). 	\end{cases} \end{equation</em>}   ```</p></div></div><p>Since <span>$a$</span> is piece-wise constant, it is convenient to reformulate the problem in terms of the jump conditions across the boundary <span>$\Gamma$</span>. We denote the jump of a function <span>$u$</span> across <span>$\Gamma$</span> as</p><p class="math-container">\[\llbracket u \rrbracket := u|_{\Omega^+} - u|_{\Omega^-},\]</p><p>where <span>$\Omega^+$</span> and <span>$\Omega^-$</span> are the outside and inside of <span>$\Omega$</span>, respectively. The transmission conditions implicitly implied by the PEP problem are then</p><p class="math-container">\[\begin{aligned}
+\llbracket u \rrbracket = 0, \quad
+\llbracket a(\boldsymbol{x},\kappa) \nabla u \rrbracket = 0
+\end{aligned}\]</p><p>It is common to reformulate the PEP in terms of an integral equation by means of a single-layer ansatz, where one searches for a function <span>$u$</span> on the form of </p><p class="math-container">\[\begin{aligned}
+ u(\boldsymbol{x}) = \int_{\Gamma} G(\boldsymbol{x},\boldsymbol{y}) \sigma(\boldsymbol{y}) \, \textup{d} s({\boldsymbol{y}}),
+\end{aligned}\]</p><p>where <span>$G$</span> is the Green&#39;s function of the Laplace operator, and <span>$\sigma : \Gamma \to \mathbb{R}$</span> is an unknown density function. By construction, <span>$u$</span> satisfies Laplace&#39;s equation on <span>$\mathbb{R}^2 \setminus \Gamma$</span>, and the jump conditions across <span>$\Gamma$</span> yields the equivalent Neumann-Poincaré eigenvalue problem</p><div class="admonition is-info" id="Neumann-Poincaré-eigenvalue-problem-69ae11aaf5d687f3"><header class="admonition-header">Neumann-Poincaré eigenvalue problem<a class="admonition-anchor" href="#Neumann-Poincaré-eigenvalue-problem-69ae11aaf5d687f3" title="Permalink"></a></header><div class="admonition-body"><p>Find <span>$(\sigma,\lambda) \in H^{-1/2}(\Gamma) \times (-1/2,1/2)$</span>, <span>$\sigma\neq0$</span>, such that   <code>math   \tag{NPEP}   \begin{aligned}         K^{\star} \sigma = \lambda \sigma   \end{aligned}</code>   where <span>$K^{\star}$</span> is the adjoint double-layer operator (also known as the Neumann-Poincaré   operator), defined in terms of the Green&#39;s function <span>$G$</span> as   <code>math   \begin{aligned}         K^{\star} \sigma(\boldsymbol{x}) = \int_{\Gamma}         \partial_{\nu({\boldsymbol{y}})} G(\boldsymbol{x},\boldsymbol{y}) \sigma(\boldsymbol{y}) \, \textup{d} s({\boldsymbol{y}}),   \end{aligned}</code></p></div></div><p>Finally, the eigenvalues of the NPEP are related to the eigenvalues of the PEP by the relation</p><p class="math-container">\[\kappa = \frac{2 \lambda + 1}{2 \lambda - 1}\]</p><h2 id="Implementation"><a class="docs-heading-anchor" href="#Implementation">Implementation</a><a id="Implementation-1"></a><a class="docs-heading-anchor-permalink" href="#Implementation" title="Permalink"></a></h2><p>We now write a function that takes a curve <span>$\Gamma$</span>, as well as some discretization parameters, and returns a set of <span>$\left\{ \lambda_i, \sigma_i \right\}_{i=1}^{N}$</span> pairs that are the eigenvalues and eigenfunctions of the NPEP.</p><pre><code class="language-julia hljs">using Inti
+using StaticArrays
+using LinearAlgebra
+using GLMakie
+
+function npep(Γ; meshsize, qorder, period = Inf)
+    # discretize the curve Γ and create a quadrature rule
+    Q = Inti.Quadrature(Γ; meshsize, qorder)
+    # create the integral operator
+    op     = isfinite(period) ? Inti.LaplacePeriodic1D(; dim=2, period) : Inti.Laplace(; dim = 2)
+    kernel = Inti.AdjointDoubleLayerKernel(op)
+    Kop    = Inti.IntegralOperator(kernel, Q, Q)
+    # assemble a matrix representation of the operator (not handling possible singularities)
+    K₀ = Inti.assemble_matrix(Kop)
+    δK = Inti.adaptive_correction(Kop)
+    K  = K₀ + δK
+    F  = eigen(K)
+    λᵢ = F.values
+    uᵢ = map(eachcol(F.vectors)) do v
+        return Inti.SingleLayerPotential(op, Q)[real(v) / norm(v, Inf)]
+    end
+    return λᵢ, uᵢ
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">npep (generic function with 1 method)</code></pre><h2 id="Validation"><a class="docs-heading-anchor" href="#Validation">Validation</a><a id="Validation-1"></a><a class="docs-heading-anchor-permalink" href="#Validation" title="Permalink"></a></h2><pre><code class="language-julia hljs">χ = (s) -&gt; SVector(2.5 * cos(s), sin(s))
+Γ = Inti.parametric_curve(χ, 0, 2π) |&gt; Inti.Domain
+r = 1 / 2.5
+nmax = 10
+λ = [sign(n) / 2 * exp(-2 * abs(n) * atanh(r)) for n in -nmax:nmax]
+λᵢ, uᵢ = npep(Γ; meshsize = 0.1, qorder = 4)
+
+fig = Figure(size = (600, 250))
+ax = Axis(
+    fig[1, 1];
+    title = &quot;Ellipse eigenvalues of the NPEP&quot;,
+    xlabel = &quot;Re(λ)&quot;,
+    ylabel = &quot;Im(λ)&quot;,
+    limits = (-0.5, 0.5, -0.1, 0.1),
+)
+scatter!(
+    ax,
+    real(λ),
+    imag(λ);
+    label = &quot;exact&quot;,
+    color = :gray,
+    markersize = 20,
+    marker = :rect,
+    alpha = 0.6,
+)
+scatter!(
+    ax,
+    real(λᵢ),
+    imag(λᵢ);
+    label = &quot;computed&quot;,
+    color = :blue,
+    markersize = 14,
+    marker = :cross,
+)
+axislegend(ax)</code></pre><img src="5960da5c.png" alt="Example block output"/><p>We can also visualize the eigenfunction corresponding to a given eigenvalue:</p><pre><code class="language-julia hljs">fig  = Figure(size = (500, 400))
+n    = 8 # choose an eigenvalue to visualize
+ax = Axis(
+    fig[1, 1];
+    title = &quot;Eigenfunction with λ ≈ $(trunc(real(λᵢ[n]), sigdigits = 2))&quot;,
+    xlabel = &quot;x&quot;,
+    ylabel = &quot;y&quot;,
+    aspect = DataAspect(),
+)
+fun = (x, y) -&gt; real(uᵢ[n](SVector(x, y)))
+l = 4
+xx = yy = range(-l, l, 100)
+hm = heatmap!(ax, xx, yy, fun; colormap = :viridis, interpolate = true)
+s = range(0, 2π, 100)
+lines!(ax, getindex.(χ.(s), 1), getindex.(χ.(s), 2); color = :black, linewidth = 2, label = &quot;Γ&quot;)
+Colorbar(fig[1, 2], hm)
+
+fig</code></pre><img src="008c05bf.png" alt="Example block output"/><h2 id="Extensions"><a class="docs-heading-anchor" href="#Extensions">Extensions</a><a id="Extensions-1"></a><a class="docs-heading-anchor-permalink" href="#Extensions" title="Permalink"></a></h2><h3 id="Other-shapes"><a class="docs-heading-anchor" href="#Other-shapes">Other shapes</a><a id="Other-shapes-1"></a><a class="docs-heading-anchor-permalink" href="#Other-shapes" title="Permalink"></a></h3><p>Now that we have validated the implementation of the NPEP for an ellipse, we can extend it to other shapes. We can use for instance a kite-shaped curve defined as</p><pre><code class="language-julia hljs">χ = (s) -&gt; SVector(cos(s[1]) + 0.65 * cos(2 * s[1]) - 0.65, 1.5 * sin(s[1]))
+Γ = Inti.parametric_curve(χ, 0, 2π) |&gt; Inti.Domain</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Domain with 1 entity
+ EntityKey: (1, 7) =&gt; Inti.GeometricEntity with labels String[]</code></pre><p>Exactly the same code can then be used to obtain and visualize the eigenfunctions:</p><pre><code class="language-julia hljs">λᵢ, uᵢ = npep(Γ; meshsize = 0.1, qorder = 4)
+fig  = Figure(size = (500, 400))
+n    = 8 # choose an eigenvalue to visualize
+ax = Axis(
+    fig[1, 1];
+    title = &quot;Eigenfunction with λ ≈ $(trunc(real(λᵢ[n]), sigdigits = 2))&quot;,
+    xlabel = &quot;x&quot;,
+    ylabel = &quot;y&quot;,
+    aspect = DataAspect(),
+)
+fun = (x, y) -&gt; real(uᵢ[n](SVector(x, y)))
+l = 4
+xx = yy = range(-l, l, 100)
+hm = heatmap!(ax, xx, yy, fun; colormap = :viridis, interpolate = true)
+s = range(0, 2π, 100)
+lines!(ax, getindex.(χ.(s), 1), getindex.(χ.(s), 2); color = :black, linewidth = 2, label = &quot;Γ&quot;)
+Colorbar(fig[1, 2], hm)</code></pre><img src="f4ab746f.png" alt="Example block output"/><h3 id="Periodic-case"><a class="docs-heading-anchor" href="#Periodic-case">Periodic case</a><a id="Periodic-case-1"></a><a class="docs-heading-anchor-permalink" href="#Periodic-case" title="Permalink"></a></h3><p>Almost everything said above extends to the periodic case, where the PEP is posed on <span>$[-\ell / 2, \ell / 2] \times \mathbb{R}$</span> instead of <span>$\mathbb{R}^2$</span> with <span>$\ell$</span> being the period, provided that the Green&#39;s function is replaced by a periodic one.</p><div class="admonition is-info" id="Periodic-plasmonic-eigenvalue-problem-a2e9917e92978e9e"><header class="admonition-header">Periodic plasmonic eigenvalue problem<a class="admonition-anchor" href="#Periodic-plasmonic-eigenvalue-problem-a2e9917e92978e9e" title="Permalink"></a></header><div class="admonition-body"><p>Find <span>$(u,\kappa) \in \dot{H}^1([-\ell/2, \ell/2] \times \mathbb{R}) \times (-\infty,0)$</span>, <span>$u\neq0$</span>, such that   ```math   \tag{PEP}   \begin{aligned}         \nabla \cdot [ a(\boldsymbol{x},\kappa) \nabla u(\boldsymbol{x})] = 0 \
+        \nabla u (\boldsymbol{x})\underset{|x<em>2|\to \infty}{=} \mathcal{O}(|\boldsymbol{x}|^{-1})   \end{aligned}   <code>where</code>math   \begin{equation*} 	\dot{H}^1([-\ell/2, \ell/2] \times \mathbb{R})  \coloneqq \left{u \in L^{2}</em>{\textup{loc}}([-\ell/2, \ell/2] \times \mathbb{R}) \, \left\vert \, \nabla u \in L^{2}([-\ell/2, \ell/2] \times \mathbb{R}) \right.\right}, 	\; \quad 	a(\boldsymbol{x},\kappa) = 	\begin{cases} 		1      &amp; (\boldsymbol{x}\in\Omega)    \
+		\kappa &amp; (\boldsymbol{x}\in\Omega^c). 	\end{cases} \end{equation*}   ```</p></div></div><p>The code for the periodic case is very similar to the one above, with the only difference that we must pass a period to the <code>npep</code> function so that it uses the <code>LaplacePeriodic1D</code> kernel instead of the <code>Laplace</code> kernel. The rest of the code remains unchanged.</p><pre><code class="language-julia hljs">period = 4
+λᵢ, uᵢ = npep(Γ; meshsize = 0.1, qorder = 4, period)
+fig  = Figure(size = (500, 400))
+n    = length(λᵢ) - 2 # choose an eigenvalue to visualize
+ax = Axis(
+    fig[1, 1];
+    title = &quot;Eigenfunction with λ ≈ $(trunc(real(λᵢ[n]), sigdigits = 2))&quot;,
+    xlabel = &quot;x&quot;,
+    ylabel = &quot;y&quot;,
+    aspect = DataAspect(),
+)
+fun = (x, y) -&gt; real(uᵢ[n](SVector(x, y)))
+l = 1.5*period
+xx = yy = range(-l, l, 100)
+hm = heatmap!(ax, xx, yy, fun; colormap = :viridis, interpolate = true)
+s = range(0, 2π, 100)
+lines!(ax, getindex.(χ.(s), 1), getindex.(χ.(s), 2); color = :black, linewidth = 2)
+lines!(ax, getindex.(χ.(s), 1) .+ period, getindex.(χ.(s), 2); color = :black, linewidth = 2)
+lines!(ax, getindex.(χ.(s), 1) .- period, getindex.(χ.(s), 2); color = :black, linewidth = 2)
+vlines!(ax, [-period/2, period/2], color = :black, linewidth = 2, linestyle = :dash)
+Colorbar(fig[1, 2], hm)</code></pre><img src="4947067d.png" alt="Example block output"/><h3 id="Corners"><a class="docs-heading-anchor" href="#Corners">Corners</a><a id="Corners-1"></a><a class="docs-heading-anchor-permalink" href="#Corners" title="Permalink"></a></h3><p>TODO:</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../crack_elasticity/">« Elastic crack</a><a class="docs-footer-nextpage" href="../../references/">References »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.11.4 on <span class="colophon-date" title="Sunday 25 May 2025 15:36">Sunday 25 May 2025</span>. Using Julia version 1.11.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
