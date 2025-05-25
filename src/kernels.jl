@@ -629,10 +629,11 @@ struct LaplacePeriodic1D{N,T<:Real} <: AbstractDifferentialOperator{N}
 end
 
 """
-    LaplacePeriodic(; dim, period = 2π)
+    LaplacePeriodic1D(; dim, period = 2π)
 
-Laplace's differential operator `-Δu = 0` in `dim` dimension with periodic boundary
-conditions along the first dimension. The `period` is set to `2π` by default.
+Laplace's differential operator `-Δu` in `dim` dimension with periodic boundary
+conditions along the first dimension. The `period` is set to `2π` by default, and the
+periodic cell is defined as `[-period/2, period/2]`.
 
 The negative sign is used to match the convention of coercive operators.
 """
@@ -706,9 +707,18 @@ function (HS::HyperSingularKernel{T,<:LaplacePeriodic1D{N}})(
     source,
     r = coords(target) - coords(source),
 ) where {N,T}
+    x = coords(target)
     nx = normal(target)
     ny = normal(source)
-    return error(
-        "Hypersingular kernel for LaplacePeriodic1D not implemented in $N dimensions",
-    )
+    if N == 2
+        dGdny = DoubleLayerKernel(HS.op)
+        # TODO: in the case of the double- and a adjoint double-layer kernerls, I observed
+        # that ForwardDiff is slighly slower than the analytical forms. That may still be
+        # the case here, so we should consider implementing the analytical form.
+        ForwardDiff.derivative(t -> dGdny(x + t * nx, source), 0)
+    else
+        return error(
+            "Hypersingular kernel for LaplacePeriodic1D not implemented in $N dimensions",
+        )
+    end
 end
