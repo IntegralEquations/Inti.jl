@@ -50,8 +50,8 @@ function Base.show(io::IO, op::HelmholtzPeriodic1D{N}) where {N}
     )
 end
 
-Inti.default_kernel_eltype(::HelmholtzPeriodic1D) = Float64
-Inti.default_density_eltype(::HelmholtzPeriodic1D) = Float64
+Inti.default_kernel_eltype(::HelmholtzPeriodic1D) = ComplexF64
+Inti.default_density_eltype(::HelmholtzPeriodic1D) = ComplexF64
 
 function (SL::Inti.SingleLayerKernel{T,<:HelmholtzPeriodic1D{N}})(
     target,
