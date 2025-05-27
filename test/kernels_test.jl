@@ -6,8 +6,11 @@ using QPGreen
 
 # Extend QuadGK to support ForwardDiff.Dual types (see https://github.com/JuliaMath/QuadGK.jl/issues/122)
 using QuadGK
-function QuadGK.kronrod(::Type{<:ForwardDiff.Dual{T,V,N}}, n::Integer) where {T,V,N}
-    return QuadGK.kronrod(V, n)
+function QuadGK.cachedrule(
+    ::Type{<:ForwardDiff.Dual{<:Any,T}},
+    n::Integer,
+) where {T<:Number}
+    return QuadGK._cachedrule(typeof(float(real(one(T)))), Int(n))
 end
 
 @testset "Yukawa" begin

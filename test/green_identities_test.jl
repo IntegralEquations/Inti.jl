@@ -13,8 +13,11 @@ using ForwardDiff
 
 # Extend QuadGK to support ForwardDiff.Dual types (see https://github.com/JuliaMath/QuadGK.jl/issues/122)
 using QuadGK
-function QuadGK.kronrod(::Type{<:ForwardDiff.Dual{T,V,N}}, n::Integer) where {T,V,N}
-    return QuadGK.kronrod(V, n)
+function QuadGK.cachedrule(
+    ::Type{<:ForwardDiff.Dual{<:Any,T}},
+    n::Integer,
+) where {T<:Number}
+    return QuadGK._cachedrule(typeof(float(real(one(T)))), Int(n))
 end
 
 include("test_utils.jl")
@@ -64,6 +67,12 @@ for correction in corrections
                 end
                 for op in ops
                     @testset "Greens identity ($t) $(N)d $op" begin
+                        if op isa
+                           Base.get_extension(Inti, :IntiQPGreenExt).HelmholtzPeriodic1D &&
+                           correction ==
+                           (method = :adaptive, maxdist = 2 * meshsize, rtol = 1e-2)
+                            quad = Inti.Quadrature(Γ; meshsize = 0.2, qorder = 5)
+                        end
                         xs = t == :interior ? ntuple(i -> 3, N) : ntuple(i -> 0.1, N)
                         T = Inti.default_density_eltype(op)
                         c = rand(T)
@@ -81,12 +90,6 @@ for correction in corrections
                         Dop = Inti.IntegralOperator(dG, quad)
                         Dmat = Inti.assemble_matrix(Dop)
                         e0 = norm(Smat * γ₁u - Dmat * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
-                        if op isa
-                           Base.get_extension(Inti, :IntiQPGreenExt).HelmholtzPeriodic1D &&
-                           correction == (method = :adaptive, maxdist = 1.0, rtol = 0.01)
-                            # skip adaptive correction for periodic Helmholtz until I fix the issue
-                            continue
-                        end
                         S, D = Inti.single_double_layer(;
                             op,
                             target      = quad,
