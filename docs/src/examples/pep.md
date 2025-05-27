@@ -69,7 +69,7 @@ following boundary integral equation:
 
 ```math
 \begin{aligned}
-    \left( K^{\star} \sigma \right)(\boldsymbol{x}) = \kappa \sigma(\boldsymbol{x}) \quad &&\text{for } \boldsymbol{x} \in \Gamma
+    \left( K^{\star} \sigma \right)(\boldsymbol{x}) = \lambda \sigma(\boldsymbol{x}) \quad &&\text{for } \boldsymbol{x} \in \Gamma
 \end{aligned}
 ```
 
