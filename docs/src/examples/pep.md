@@ -62,7 +62,7 @@ where:
 - ``\sigma(\boldsymbol{y})`` is an unknown density function defined on ``\Gamma``
 
 Note that this ansatz automatically satisfies Laplace's equation ($\Delta u = 0$) in both
-$\Omega^+$ and $\Omega^-$ by construction, so we only need to enforce the jump conditiosn on
+$\Omega^+$ and $\Omega^-$ by construction, so we only need to enforce the jump conditions on
 the boundary $\Gamma$. Using some properties of the single-layer potential (in particular,
 its continuity across the boundary and the jump in the normal derivative), we can derive the
 following boundary integral equation:
@@ -211,7 +211,7 @@ fig # hide
 ```
 
 The excellent agreement between the analytical and numerical eigenvalues confirms the
-accuracy of our implementation. The eigenvalue at `\lambda = -1/2` corresponds to constant
+accuracy of our implementation. The eigenvalue at $\lambda = -1/2$ corresponds to constant
 functions, which are not plasmonic modes since they do not satisfy the decay condition at
 infinity, but are still part of the spectrum of the Neumann-Poincaré operator.
 
