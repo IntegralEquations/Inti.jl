@@ -111,10 +111,20 @@ function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
     # loop element types and generate quadrature for each
     for E in element_types(msh)
         els = elements(msh, E)
-        ori = orientation(msh, E)
         qrule = etype2qrule[E]
         # dispatch to type-stable method
-        _build_quadrature!(quad, els, ori, qrule)
+        _build_quadrature!(quad, els, qrule)
+    end
+    # check for entities with negative orientation and flip normal vectors if
+    # present
+    for ent in entities(msh)
+        if (sign(tag(ent)) < 0) && (N - geometric_dimension(ent) == 1)
+            @debug "Flipping normals of $ent"
+            tags = dom2qtags(quad, Domain(ent))
+            for i in tags
+                quad[i] = flip_normal(quad[i])
+            end
+        end
     end
     return quad
 end
@@ -131,27 +141,25 @@ function Quadrature(msh::AbstractMesh; qorder)
 end
 
 @noinline function _build_quadrature!(
-    quad::Quadrature{N,T},
+    quad,
     els::AbstractVector{E},
-    orientation::Vector{Int},
     qrule::ReferenceQuadrature,
-) where {N,T,E}
-    x̂ = map(x̂ -> T.(x̂), qcoords(qrule))
-    ŵ = map(ŵ -> T.(ŵ), qweights(qrule))
+) where {E}
+    N = ambient_dimension(quad)
+    x̂, ŵ = qrule() # nodes and weights on reference element
     num_nodes = length(ŵ)
     M = geometric_dimension(domain(E))
     codim = N - M
     istart = length(quad.qnodes) + 1
-    @assert length(els) == length(orientation)
-    for (s, el) in zip(orientation, els)
+    for el in els
         # and all qnodes for that element
         for (x̂i, ŵi) in zip(x̂, ŵ)
             x = el(x̂i)
             jac = jacobian(el, x̂i)
             μ = _integration_measure(jac)
             w = μ * ŵi
-            ν = codim == 1 ? T.(s * _normal(jac)) : nothing
-            qnode = QuadratureNode(T.(x), T.(w), ν)
+            ν = codim == 1 ? _normal(jac) : nothing
+            qnode = QuadratureNode(x, w, ν)
             push!(quad.qnodes, qnode)
         end
     end
@@ -207,8 +215,8 @@ an appropiate quadrature rule.
 """
 function _qrule_for_reference_shape(ref, order)
     if ref === ReferenceLine() || ref === :line
-        # return Fejer(; order)
         return GaussLegendre(; order)
+        # return Fejer(; order)
     elseif ref === ReferenceSquare() || ref === :square
         qx = _qrule_for_reference_shape(ReferenceLine(), order)
         qy = qx
@@ -298,16 +306,13 @@ function quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
     areas = zeros(length(inodes)) # area of neighboring triangles
     for (E, mat) in etype2mat(msh)
         qrule = Q.etype2qrule[E]
-        L = lagrange_basis(qrule)
-        coords = reference_nodes(E)
-        # precompute value of quadrature basis at the interpolation nodes
-        Q2I = mapreduce(L, hcat, coords) |> transpose
+        V = mapreduce(lagrange_basis(E), hcat, qcoords(qrule)) |> Matrix
         ni, nel = size(mat) # number of interpolation nodes by number of elements
         for n in 1:nel
             qtags = Q.etype2qtags[E][:, n]
             itags = mat[:, n]
             area = sum(q -> weight(q), view(Q.qnodes, qtags))
-            ivals[itags] .+= area .* (Q2I * qvals[qtags])
+            ivals[itags] .+= area .* (transpose(V) \ qvals[qtags])
             areas[itags] .+= area
         end
     end
@@ -345,4 +350,28 @@ function _curvature(f, Q)
         end
     end
     return curv
+end
+
+curvature_tensor(Q::Quadrature) = _curvature_mat(curvature_tensor, Q)
+# helper function for computing curvature
+function _curvature_mat(f, Q)
+    msh = mesh(Q)
+    curv_mat = zeros(length(Q), 6)
+    for (E, tags) in Q.etype2qtags
+        qrule = quadrature_rule(Q, E)
+        q̂, _ = qrule()
+        els = elements(msh, E)
+        for n in 1:size(tags, 2)
+            el = els[n]
+            for i in 1:size(tags, 1)
+                qtag = tags[i, n]
+                aux = reshape(f(el, q̂[i]), 9)
+                #  curv_mat[(1:9).+(qtag-1)*9] = reshape(mat,9)
+                # aux = reshape(mat,9)
+                curv_mat[qtag, :] = aux[[1; 2; 3; 5; 6; 9]]
+                #  curv_mat[qtag,:] = reshape(mat,9)
+            end
+        end
+    end
+    return curv_mat
 end

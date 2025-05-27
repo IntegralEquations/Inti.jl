@@ -76,6 +76,17 @@ function second_fundamental_form(el::ReferenceInterpolant, x̂)
     return L, M, N
 end
 
+function curvature_tensor(el::ReferenceInterpolant, x̂)
+    E, F, G = first_fundamental_form(el, x̂)
+    L, M, N = second_fundamental_form(el, x̂)
+    I_inv = 1 / (E * G - F^2) * [G -F; -F E]
+    II = [L M; M N]
+    jac = jacobian(el, x̂)
+    # curvature tensor
+    R = -jac * I_inv * II * I_inv * jac'
+    return R
+end
+
 """
     mean_curvature(τ, x̂)
 
@@ -86,7 +97,7 @@ function mean_curvature(el::ReferenceInterpolant, x̂)
     E, F, G = first_fundamental_form(el, x̂)
     L, M, N = second_fundamental_form(el, x̂)
     # mean curvature
-    κ = (L * G - 2 * F * M + E * N) / (2 * (E * G - F^2))
+    κ = -(L * G - 2 * F * M + E * N) / (2 * (E * G - F^2))
     return κ
 end
 
@@ -107,10 +118,6 @@ end
 
 domain(::ReferenceInterpolant{D,T}) where {D,T} = D()
 domain(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = D()
-
-# TODO: deprecate `domain` in favor of `reference_domain` for clarity
-reference_domain(el) = domain(el)
-
 return_type(::ReferenceInterpolant{D,T}) where {D,T} = T
 return_type(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = T
 domain_dimension(t::ReferenceInterpolant{D,T}) where {D,T} = domain(t) |> center |> length
@@ -379,15 +386,6 @@ Hardcode some basic elements.
 TODO: Eventually this could/should be automated.
 =#
 
-# P0 for ReferenceLine
-function reference_nodes(::Type{<:LagrangeLine{1}})
-    return SVector(SVector(0.5))
-end
-
-function (el::LagrangeLine{1})(u)
-    return vals(el)[1]
-end
-
 # P1 for ReferenceLine
 function reference_nodes(::Type{<:LagrangeLine{2}})
     return SVector(SVector(0.0), SVector(1.0))
@@ -408,22 +406,6 @@ function (el::LagrangeLine{3})(u)
     return v[1] +
            (4 * v[3] - 3 * v[1] - v[2]) * u[1] +
            2 * (v[2] + v[1] - 2 * v[3]) * u[1]^2
-end
-
-# P3 for ReferenceLine
-function reference_nodes(::Type{<:LagrangeLine{4}})
-    return SVector(SVector(0.0), SVector(1.0), SVector(1 / 3), SVector(2 / 3))
-end
-
-function (el::LagrangeLine{4})(u)
-    v1, v2, v3, v4 = vals(el)
-    # Calculate the coefficients based on the values
-    a = -9 * v1 / 2 + 9 * v2 / 2 + 27 * v3 / 2 - 27 * v4 / 2
-    b = 9 * v1 - 9 * v2 / 2 - 45 * v3 / 2 + 18 * v4
-    c = -11 * v1 / 2 + v2 + 9 * v3 - 9 * v4 / 2
-    d = v1
-    # Evaluate the cubic polynomial at u
-    return d + c * u[1] + b * u[1]^2 + a * u[1]^3
 end
 
 # P1 for ReferenceTriangle
@@ -458,7 +440,7 @@ end
 
 # P3 for ReferenceTriangle
 # source: https://www.math.uci.edu/~chenlong/iFEM/doc/html/dofP3doc.html
-function reference_nodes(::Type{<:LagrangeTriangle{10}})
+function reference_nodes(::LagrangeTriangle{10})
     return SVector(
         SVector(0.0, 0.0),
         SVector(1.0, 0.0),
@@ -500,6 +482,64 @@ function (el::LagrangeTriangle{10})(u)
            v[10] * ϕ₁₀
 end
 
+# P4 for ReferenceTriangle
+function reference_nodes(::Type{<:LagrangeTriangle{15}})
+    return SVector(
+        SVector(0.0, 0.0),
+        SVector(1.0, 0.0),
+        SVector(0.0, 1.0),
+        SVector(0.25, 0.0),
+        SVector(0.5, 0.0),
+        SVector(0.75, 0.0),
+        SVector(0.75, 0.25),
+        SVector(0.5, 0.5),
+        SVector(0.25, 0.75),
+        SVector(0.0, 0.75),
+        SVector(0.0, 0.5),
+        SVector(0.0, 0.25),
+        SVector(0.25, 0.25),
+        SVector(0.5, 0.25),
+        SVector(0.25, 0.5),
+    )
+end
+
+function (el::LagrangeTriangle{15})(u)
+    v = vals(el)
+    λ₁ = 1 - u[1] - u[2]
+    λ₂ = u[1]
+    λ₃ = u[2]
+    ϕ₁ = λ₁ * (4λ₁ - 1) * (4λ₁ - 2) * (4λ₁ - 3) / 6
+    ϕ₂ = λ₂ * (4λ₂ - 1) * (4λ₂ - 2) * (4λ₂ - 3) / 6
+    ϕ₃ = λ₃ * (4λ₃ - 1) * (4λ₃ - 2) * (4λ₃ - 3) / 6
+    ϕ₄ = 16 * λ₁ * λ₂ * (4λ₁ - 1) * (4λ₁ - 2) / 6
+    ϕ₅ = 32 * λ₁ * λ₂ * (4λ₁ - 1) * (4λ₂ - 1) / 8
+    ϕ₆ = 16 * λ₁ * λ₂ * (4λ₂ - 1) * (4λ₂ - 2) / 6
+    ϕ₇ = 16 * λ₂ * λ₃ * (4λ₂ - 1) * (4λ₂ - 2) / 6
+    ϕ₈ = 32 * λ₂ * λ₃ * (4λ₂ - 1) * (4λ₃ - 1) / 8
+    ϕ₉ = 16 * λ₂ * λ₃ * (4λ₃ - 1) * (4λ₃ - 2) / 6
+    ϕ₁₀ = 16 * λ₃ * λ₁ * (4λ₃ - 1) * (4λ₃ - 2) / 6
+    ϕ₁₁ = 32 * λ₃ * λ₁ * (4λ₃ - 1) * (4λ₁ - 1) / 8
+    ϕ₁₂ = 16 * λ₃ * λ₁ * (4λ₁ - 1) * (4λ₁ - 2) / 6
+    ϕ₁₃ = 128 * λ₁ * λ₂ * λ₃ * (4λ₁ - 1) / 4
+    ϕ₁₄ = 128 * λ₁ * λ₂ * λ₃ * (4λ₂ - 1) / 4
+    ϕ₁₅ = 128 * λ₁ * λ₂ * λ₃ * (4λ₃ - 1) / 4
+    return v[1] * ϕ₁ +
+           v[2] * ϕ₂ +
+           v[3] * ϕ₃ +
+           v[4] * ϕ₄ +
+           v[5] * ϕ₅ +
+           v[6] * ϕ₆ +
+           v[7] * ϕ₇ +
+           v[8] * ϕ₈ +
+           v[9] * ϕ₉ +
+           v[10] * ϕ₁₀ +
+           v[11] * ϕ₁₁ +
+           v[12] * ϕ₁₂ +
+           v[13] * ϕ₁₃ +
+           v[14] * ϕ₁₄ +
+           v[15] * ϕ₁₅
+end
+
 # P1 for ReferenceSquare
 function reference_nodes(::Type{<:LagrangeSquare{4}})
     return SVector(SVector(0, 0), SVector(1, 0), SVector(1, 1), SVector(0, 1))
@@ -514,7 +554,7 @@ function (el::LagrangeElement{ReferenceSquare,4})(u)
 end
 
 # P1 for ReferenceTetrahedron
-function reference_nodes(::Type{<:LagrangeTetrahedron{4}})
+function reference_nodes(::LagrangeTetrahedron{4})
     return SVector(SVector(0, 0, 0), SVector(1, 0, 0), SVector(0, 1, 0), SVector(0, 0, 1))
 end
 
