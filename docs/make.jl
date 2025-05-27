@@ -140,7 +140,21 @@ makedocs(;
         size_threshold = 2 * 2^20, # 2 MiB
         size_threshold_warn = 1 * 2^20, # 1 MiB
         sidebar_sitename = false,
-        mathengine = MathJax3(),
+        mathengine = Documenter.KaTeX(
+            Dict(
+                :delimiters => [
+                    Dict(:left => raw"$", :right => raw"$", display => false),
+                    Dict(:left => raw"$$", :right => raw"$$", display => true),
+                    Dict(:left => raw"\[", :right => raw"\]", display => true),
+                ],
+                :macros => Dict(
+                    "\\RR" => "\\mathbb{R}",
+                    "\\CC" => "\\mathbb{C}",
+                    "\\bx" => "\\boldsymbol{x}",
+                    "\\by" => "\\boldsymbol{y}",
+                ),
+            ),
+        ),
         size_threshold_ignore,
     ),
     pages = [
