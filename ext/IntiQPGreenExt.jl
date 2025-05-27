@@ -9,12 +9,17 @@ function __init__()
     @info "Loading Inti.jl QPGreen extension"
 end
 
-struct HelmholtzPeriodic1D{N,NT<:NamedTuple,F1,F2<:NamedTuple} <:
-       Inti.AbstractDifferentialOperator{N}
+struct HelmholtzPeriodic1D{
+    N,
+    NT<:NamedTuple,
+    F1,
+    F2<:NamedTuple,
+    C1<:QPGreen.AbstractIntegrationCache,
+} <: Inti.AbstractDifferentialOperator{N}
     params::NT
     val_interp::F1
     grad_interp::F2
-    Yε_cache::QPGreen.IntegrationCache
+    Yε_cache::C1
 end
 
 """
@@ -35,7 +40,13 @@ function Inti.HelmholtzPeriodic1D(; alpha, k, dim)
     grid_size = 1024
     val_interp, grad_interp, Yε_cache =
         QPGreen.init_qp_green_fft(params, grid_size; derivative = true)
-    return HelmholtzPeriodic1D{dim,typeof(params),typeof(val_interp),typeof(grad_interp)}(
+    return HelmholtzPeriodic1D{
+        dim,
+        typeof(params),
+        typeof(val_interp),
+        typeof(grad_interp),
+        typeof(Yε_cache),
+    }(
         params,
         val_interp,
         grad_interp,
