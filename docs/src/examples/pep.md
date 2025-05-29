@@ -12,24 +12,30 @@ CurrentModule = Inti
 
 ## Problem Definition  
 
-!!! details "Motivation"
-    Plasmonic resonances play a crucial role in nanophotonics, metamaterials, and sensing
-    applications. At these resonances, the electromagnetic field becomes highly concentrated
-    near material interfaces, leading to enhanced optical effects like extraordinary
-    transmission, surface-enhanced Raman scattering, and localized heating. This tutorial
-    demonstrates how to compute these resonances (in a much simplified context!) by solving the
-    plasmonic eigenvalue problem using boundary integral methods.
+Plasmonic resonances play a crucial role in nanophotonics, metamaterials, and sensing
+applications. At these resonances, the electromagnetic field becomes highly concentrated
+near material interfaces, leading to enhanced optical effects like extraordinary
+transmission, surface-enhanced Raman scattering, and localized heating. This tutorial
+demonstrates how to compute these resonances (in a much simplified context!) by solving the
+plasmonic eigenvalue problem using boundary integral methods. To keep things simple, we
+provide a brief and non-rigorous overview of the plasmonic eigenvalue problem; see e.g.
+[grieser2014plasmonic](@cite) for a more detailed mathematical discussion and
+e.g. [maier2007plasmonics](@cite) for a detailed discussion on plasmonic resonances and
+their physical relevance.
 
-Let ``\Omega \subset \RR^2`` be a bounded domain with boundary ``\Gamma := \partial\Omega``.
-In this tutorial we are interested in finding a non-zero function ``u : \RR^2 \to \RR`` and a
-scalar ``\kappa \in (-\infty, 0)`` solving the following eigenvalue problem:
+In what follows we let ``\Omega \subset \RR^2`` be a bounded domain with smooth (e.g.
+``C^2``) boundary
+``\Gamma := \partial\Omega``. We are interested in finding a non-zero
+function ``u : \RR^2 \to \RR`` and a scalar ``\kappa \in (-\infty, 0)`` solving the
+following eigenvalue problem:
 
 ```math
 \begin{aligned}
-    \nabla \cdot \left(a(\bx) \nabla u \right) &= 0 \quad, \quad a(\bx) = \begin{cases}
+    \nabla \cdot \left(a(\bx) \nabla u \right) &= 0, \quad a(\bx) = \begin{cases}
         1 & \text{if } \bx \in \Omega \\
         \kappa & \text{if } \bx \in \Omega^c
-    \end{cases}.
+    \end{cases}, \quad u(\bx) \underset{|\bx|\to \infty}{=} \mathcal{O}(|\bx|^{-1}).
+    
 \end{aligned}
 ```
 
@@ -41,8 +47,8 @@ the restriction of ``u`` to ``\Omega^\pm``, we can rewrite the problem as:
 ```math
 \begin{aligned}
 \Delta u^\pm &= 0 \quad &&\text{in } \Omega^\pm, \\
-u^+ &= u^- \quad &&\text{on } \Gamma \\
-\kappa \partial_\nu u^{+} &= \partial_\nu u^{-} \quad &&\text{on } \Gamma \\
+u^+ &= u^- \quad &&\text{on } \Gamma,\\
+\kappa \partial_\nu u^{+} &= \partial_\nu u^{-} \quad &&\text{on } \Gamma, \\
 \end{aligned}
 ```
 
@@ -58,14 +64,15 @@ single-layer potential ansatz:
 ```
 
 where:
+
 - ``G(\boldsymbol{x},\boldsymbol{y})`` is the Green's function for the Laplace equation
 - ``\sigma(\boldsymbol{y})`` is an unknown density function defined on ``\Gamma``
 
 Note that this ansatz automatically satisfies Laplace's equation ($\Delta u = 0$) in both
 $\Omega^+$ and $\Omega^-$ by construction, so we only need to enforce the jump conditions on
-the boundary $\Gamma$. Using some properties of the single-layer potential (in particular,
-its continuity across the boundary and the jump in the normal derivative), we can derive the
-following boundary integral equation:
+the boundary $\Gamma$ and possibly at ``\infty``. Using some properties of the single-layer
+potential (in particular, its continuity across the boundary and the jump in the normal
+derivative), we can derive the following boundary integral equation:
 
 ```math
 \begin{aligned}
@@ -81,19 +88,25 @@ where ``K^{\star}`` is the adjoint single-layer operator defined as:
 \end{aligned}
 ```
 
-The spectral parameter $\lambda$ is related to the original parameter $\kappa$ by the
-transformation:
+For the condition at infinity, it can be shown that the single-layer representation
+satisfies the decay condition at infinity if the density $\sigma$ has zero mean over the
+boundary $\Gamma$, which is the case if $\lambda \neq -1/2$ [faria2024complex; Lemma
+29](@cite). We thus have an equivalence between the original plasmonic eigenvalue problem
+and the Neumann-Poincaré eigenvalue problem (PEP), where $\lambda$ is related to the
+original parameter $\kappa$ by the transformation:
 
 ```math
 \kappa = \frac{2 \lambda + 1}{2 \lambda - 1}
 ```
 
-This is called the Neumann-Poincaré eigenvalue problem (NPEP), and is precisely the problem
-we will solve numerically in this tutorial.
+Next, we focus on the numerical discretization of the Neumann-Poincaré operator $K^{\star}$
+using `Inti`'s boundary integral methods.
 
-!!! note "Functional spaces and conditions at infinty"
-    To keep the discussion simple, we have chosen to avoid function spaces and the
-    appropriate decay conditions at infinity, but this can all be made rigorous.
+!!! note "Rigorous formulation"
+    To keep the discussion simple, we have chosen to avoid the details of the appropriate
+    function spaces and precise regularity conditions. A rigorous treatment is beyond the
+    scope of this tutorial, but details can be found in the literature. Note that the
+    two-dimensional case is somewhat special [grieser2014plasmonic; ``\S 2.4``](@cite).
 
 ## Numerical Implementation
 
@@ -105,7 +118,7 @@ Now, let's implement a numerical solution to this problem. We'll create a functi
 4. Returns the results as eigenvalue-eigenfunction pairs
 
 Because later we will also consider periodic structures, we will allow the user to specify a
-period for the Green's function. If no period is specified, we will use the standard Green's
+period for the Green's function. If no period is specified, we will use the free-space Green's
 function.
 
 ```@example NPEP
@@ -211,7 +224,7 @@ fig # hide
 ```
 
 The excellent agreement between the analytical and numerical eigenvalues confirms the
-accuracy of our implementation. The eigenvalue at $\lambda = -1/2$ corresponds to constant
+accuracy of our implementation. The eigenvalue at ``\lambda = -1/2`` corresponds to constant
 functions, which are not plasmonic modes since they do not satisfy the decay condition at
 infinity, but are still part of the spectrum of the Neumann-Poincaré operator.
 
@@ -310,7 +323,8 @@ Green's function. In the periodic case, the problem is posed on $[-\ell/2, \ell/
 periodic boundary conditions in the first coordinate.
 
 Almost everything we have done so far can be adapted to this case, provided a periodic
-Green's function is used. The periodic Green's function for the Laplace equation in 2D is given by:
+Green's function is used. The periodic Green's function for the Laplace equation in 2D is
+given by (see [these lecture notes](https://people.math.ethz.ch/~grsam/HS17/MaCMiPaP/Lecture%20Notes/Lecture%204.pdf)):
 
 ```math
 G_p(\bx, \by) = \frac{-1}{4\pi} \log\left(\sin^2\left( \frac{\pi(x_1 - y_1)}{\ell}\right) + \sinh^2\left( \frac{\pi(x_2 - y_2)}{\ell}\right)\right)
@@ -329,7 +343,7 @@ period = 4
 
 # Visualize an eigenfunction
 fig = Figure(size = (500, 400))
-n = length(λᵢ) - 2 # Choose an eigenvalue to visualize
+n = 7 # Choose an eigenvalue to visualize
 ax = Axis(
     fig[1, 1];
     title = "Periodic Eigenfunction with λ ≈ $(trunc(real(λᵢ[n]), sigdigits = 2))",
@@ -363,33 +377,49 @@ Colorbar(fig[1, 2], hm)
 fig
 ```
 
-This plot shows the eigenfunction for a periodic array of kite-shaped inclusions. Notice how
-the solution repeats with period $\ell$ in the x-direction. The dashed lines indicate the
-boundaries of the unit cell.
+This plot shows the eigenfunction for a periodic array of kite-shaped inclusions (only three
+cells are shown). Notice how the solution repeats with period $\ell$ in the x-direction. The
+dashed lines indicate the boundaries of the unit cell.
 
-## Advanced Topics
+## Further generalizations
+
+Some interesting generalizations are described next. If you are interested in any of these,
+feel free to open a draft PR to discuss the implementation details!
+
+### Multiple inclusions
+
+The approach can be extended to handle multiple inclusions (disconnected domains). In this
+case, the boundary $\Gamma$ would consist of multiple closed curves, and the quadrature
+would need to be defined on each component. This presents no fundamental challenges, and is
+simply a matter of defining a more complex domain. As long as the inclusions are smooth,
+everything should work as expected. 
+
+### Helmholtz equation
+
+The eigenvalue problem can be stated for the Helmholtz equation as well, where a different
+wavenumber is used in the exterior and interior domains (and their dependency on the
+spectral parameter must be specified through a model). Reformulating the problem in terms of
+boundary integral equations is still possible, but becomes more involved. 
+
+Furthermore, when the domain is composed of periodic structures, the solution ``u`` is
+usually quasi-periodic, and the computation of quasi-periodic Green's functions requires
+more involved techniques.
+
+### Three-dimensional problems
+
+In three dimensions, the approach is similar, but we need to use the three-dimensional
+Green's functions. Since everything becomes more expensive, one should probably use
+acceleration techniques such as the Fast Multipole Method (FMM), and compute only parts of
+the spectrum.
 
 ### Domains with Corners
 
-For domains with corners, the eigenfunctions can exhibit singular behavior near the corners.
-To accurately capture this behavior, one would typically need to:
-
-1. Use adaptive mesh refinement near corners
-2. Employ special quadrature methods that can handle the singularities
-3. Consider using a graded mesh that places more points near corners
-
-Inti provides tools for handling these situations, though they require more careful setup than the smooth domains we've considered so far.
-
-### Multiple Inclusions
-
-The approach can be extended to handle multiple inclusions (disconnected domains). In this case, the boundary $\Gamma$ would consist of multiple closed curves, and the quadrature would need to be defined on each component.
-
-### Quasi-periodic and Helmholtz problems
-
-For quasi-periodic problems or those involving Helmholtz equations, the approach remains
-similar, but the Green's function and boundary conditions may change. Integral operators
-operator can still be used, but care must be taken to ensure the correct form of the Green's
-function is employed, and the boundary conditions are properly defined.
+For domains with corners, the solutions can exhibit singular behavior near the corners, and
+the Neumann-Poincaré operator loses its compactness, introducing a continuous spectrum.
+Although there are ways to handle this situation, they all require a somewhat intricate
+analysis of the corners. See [this
+repository](https://github.com/fmonteghetti/neumann-poincare-complex-scaling) for one
+possible method, based on complex scaling, implemented using `Inti`.
 
 ## Conclusion
 
