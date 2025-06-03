@@ -14,8 +14,9 @@ include("test_utils.jl")
 # create a boundary and area meshes and quadrature only once
 meshsize = .1
 qorder = 5
+cutelevation = 0.2
 
-Ω, msh = gmsh_cut_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = meshsize)
+Ω, msh = gmsh_cut_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = meshsize, cutelevation = cutelevation)
 Γ = Inti.external_boundary(Ω)
 Γ_msh = view(msh, Γ)
 
@@ -59,7 +60,7 @@ for elind = 1:nbdry_els
         idxs, dists = nn(chart_1_kdt, nodes)
         ψ⁻¹ = ψ₁⁻¹
         if node_indices[1] ∉ chart_1_bdry_node_idx
-            if abs(msh.nodes[node_indices[1]][3]) ≈ 0.999
+            if abs(msh.nodes[node_indices[1]][3]) ≈ (1 - cutelevation)
                 guess = SVector{2,Float64}((θ[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]))
                 α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[1]])))
                 push!(chart_1_bdry_node_param_loc, α)
@@ -70,7 +71,7 @@ for elind = 1:nbdry_els
             push!(chart_1_bdry_node_idx, node_indices[1])
         end
         if node_indices[2] ∉ chart_1_bdry_node_idx
-            if abs(msh.nodes[node_indices[2]][3]) ≈ 0.999
+            if abs(msh.nodes[node_indices[2]][3]) ≈ (1 - cutelevation)
                 guess = SVector{2,Float64}((θ[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]))
                 α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[2]])))
                 push!(chart_1_bdry_node_param_loc, α)
@@ -81,7 +82,7 @@ for elind = 1:nbdry_els
             push!(chart_1_bdry_node_idx, node_indices[2])
         end
         if node_indices[3] ∉ chart_1_bdry_node_idx
-            if abs(msh.nodes[node_indices[3]][3]) ≈ 0.999
+            if abs(msh.nodes[node_indices[3]][3]) ≈ (1 - cutelevation)
                 guess = SVector{2,Float64}((θ[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]))
                 α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[3]])))
                 push!(chart_1_bdry_node_param_loc, α)
@@ -403,5 +404,4 @@ for elind = 1:nvol_els
     global spharea += elarea
 end
 
-h = 0.001
-truearea = 4 * π / 3 - 2 * 1/3 * π * h^2 * (3 - h)
+truearea = 4 * π / 3 - 2 * 1/3 * π * cutelevation^2 * (3 - cutelevation)

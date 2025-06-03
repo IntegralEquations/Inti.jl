@@ -85,7 +85,6 @@ nnewton = 0
 elcount = 0
 els = []
 for elind = 1:nvol_els
-    #elind = 2017
     node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}][:, elind]
     nodes = msh.nodes[node_indices]
     
@@ -301,14 +300,12 @@ for elind = 1:nvol_els
                 (skipnode == 4) || (cₖ = copy(nodes[4]))
             end
             atol = 10^-12
-            @assert abs(norm(cₖ) - 1.0) > atol
             @assert norm(cₖ - a₃) > atol
             @assert norm(cₖ - dₖ) > atol
             @assert norm(dₖ - a₁) > atol
             @assert norm(dₖ - a₂) > atol
         end
         atol = 10^-12
-        @assert abs(norm(dₖ) - 1) > atol
         @assert !all(norm.(Ref(a₁) .- nodes) .> atol)
         @assert !all(norm.(Ref(a₂) .- nodes) .> atol)
         if j == 3
@@ -390,17 +387,12 @@ for elind = 1:nvol_els
             @assert norm(a₃ - cₖ) < atol
             @assert norm(Fₖ([0.0, 0.0, 1.0]) - cₖ) < atol
             @assert norm(Fₖ([0.0, 0.0, 1.0]) - a₃) < atol
-            #@assert abs(norm(Fₖ([0.2, 0.3, 0.5])) - 1.0) < atol
-            #@assert abs(norm(Fₖ([0.0, 0.0, 1.0])) - 1.0) < atol
             @assert norm(Φₖ([0.0, 0.0, 0.3])) < atol
             @assert norm(Φₖ([0.0, 0.3, 0.0])) < atol
             @assert norm(Φₖ([0.3, 0.0, 0.0])) < atol
             @assert norm(Φₖ([0.3, 0.45, 0.25]) - (ψ(f̂ₖ_comp([0.3, 0.45, 0.25])) - 0.3*a₁ - 0.45*a₂ - 0.25*a₃)) < atol
             @assert norm(Φₖ([0.55, 0.45, 0.0]) - (ψ(f̂ₖ_comp([0.55, 0.45, 0.0])) - 0.55*a₁ - 0.45*a₂)) < atol
         end
-        #@assert abs(norm(Fₖ([0.6, 0.4, 0.0])) - 1.0) < atol
-        #@assert abs(norm(Fₖ([1.0, 0.0, 0.0])) - 1.0) < atol
-        #@assert abs(norm(Fₖ([0.0, 1.0, 0.0])) - 1.0) < atol
         @assert norm(Φₖ([0.0, 0.0000000000000001, 0.3])) < atol
         @assert norm(Φₖ([0.0, 0.3, 0.0])) < atol
         @assert norm(Φₖ([0.3, 0.0, 0.0])) < atol
@@ -427,7 +419,6 @@ for elind = 1:nvol_els
     for q in 1:nq
         tmp = Q[2][q] * abs(det(Jₖ(Q[1][q])))
         elarea += tmp
-        #global elarea += tmp
     end
     global spharea += elarea
 end
