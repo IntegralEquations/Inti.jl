@@ -38,6 +38,24 @@ end
 end
 
 """
+    SingleLayerPotential(op::AbstractDifferentialOperator, source::Quadrature)
+
+An [`IntegralPotential`](@ref) over `source` with kernel given by `SingleLayerKernel(op)`.
+"""
+function SingleLayerPotential(op::AbstractDifferentialOperator, source::Quadrature)
+    return IntegralPotential(SingleLayerKernel(op), source)
+end
+
+"""
+    DoubleLayerPotential(op::AbstractDifferentialOperator, source::Quadrature)
+
+An [`IntegralPotential`](@ref) over `source` with kernel given by `DoubleLayerKernel(op)`.
+"""
+function DoubleLayerPotential(op::AbstractDifferentialOperator, source::Quadrature)
+    return IntegralPotential(DoubleLayerKernel(op), source)
+end
+
+"""
     struct IntegralOperator{T} <: AbstractMatrix{T}
 
 A discrete linear integral operator given by
@@ -106,23 +124,23 @@ end
 end
 
 """
-    assemble_fmm(iop; atol)
+    assemble_fmm(iop; rtol)
 
-Set up a 2D or 3D FMM for evaluating the discretized integral operator `iop`
-associated with the `op`. In 2D the `FMM2D` or `FMMLIB2D` library is used
-(whichever was most recently loaded) while in 3D `FMM3D` is used.
+Set up a 2D or 3D FMM for evaluating the discretized integral operator `iop` associated with
+the `op`. In 2D the `FMM2D` or `FMMLIB2D` library is used (whichever was most recently
+loaded) while in 3D `FMM3D` is used.
 
 !!! warning "FMMLIB2D"
     FMMLIB2D does *no* checking for if the targets and sources coincide, and
     will return `Inf` values if `iop.target !== iop.source`, but there is a
     point `x ∈ iop.target` such that `x ∈ iop.source`.
 """
-function assemble_fmm(iop::IntegralOperator, args...; kwargs...)
+function assemble_fmm(iop::IntegralOperator; rtol)
     N = ambient_dimension(iop.source)
     if N == 2
-        return _assemble_fmm2d(iop, args...; kwargs...)
+        return _assemble_fmm2d(iop; rtol)
     elseif N == 3
-        return _assemble_fmm3d(iop, args...; kwargs...)
+        return _assemble_fmm3d(iop; rtol)
     else
         return error("Only 2D and 3D FMMs are supported")
     end
@@ -197,84 +215,3 @@ function isinside(x::SVector, quad::Quadrature, s = 1)
     # u < 0
 end
 isinside(x::Tuple, quad::Quadrature) = isinside(SVector(x), quad)
-
-"""
-    farfield_distance(iop::IntegralOperator; tol, maxiter = 10)
-    farfield_distance(K, Q::Quadrature; tol, maxiter = 10)
-
-Return an estimate of the distance `d` such that the (absolute) quadrature error
-of the integrand `y -> K(x,y)` is below `tol` for `x` at a distance `d` from the
-center of the largest element in `Q`; when an integral operator is passed, we
-have `Q::Quadrature = source(iop)` and `K = kernel(iop)`.
-
-The estimate is computed by finding the first integer `n` such that the
-quadrature error on the largest element `τ` lies below `tol` for points `x`
-satisfying `dist(x,center(τ)) = n*radius(τ)`.
-
-Note that the desired tolerance may not be achievable if the quadrature rule is
-not accurate enough, or if `τ` is not sufficiently small, and therefore a
-maximum number of iterations `maxiter` is provided to avoid an infinite loops.
-In such cases, it is recommended that you either increase the quadrature order,
-or decrease the mesh size.
-
-**Note**: this is obviously a heuristic, and may not be accurate in all cases.
-"""
-function farfield_distance(iop::IntegralOperator; tol, maxiter = 10)
-    return farfield_distance(kernel(iop), source(iop); tol, maxiter)
-end
-
-function farfield_distance(K, Q::Quadrature; tol, maxiter = 10)
-    msh = mesh(Q)
-    dict = Dict{DataType,Float64}()
-    for E in element_types(msh)
-        els = elements(msh, E)
-        qrule = quadrature_rule(Q, E)
-        # pick the biggest element as a reference
-        qtags = etype2qtags(Q, E)
-        a, i = @views findmax(j -> sum(weight, Q[qtags[:, j]]), 1:size(qtags, 2))
-        dict[E] = _farfield_distance(els[i], K, qrule, tol, maxiter)
-    end
-    # TODO: it may be useful to return a maxdist per element type so that we can
-    # be more efficient in cases where different elements of different orders
-    # and sizes are used. That is why a dictionary is created here. For the time
-    # being, however, we just return the maximum distance.
-    return maximum(values(dict))
-end
-
-function _farfield_distance(el, K, qrule, tol, maxiter)
-    x₀ = center(el) # center
-    h = radius(el)  # reasonable scale
-    f = (x, ŷ) -> begin
-        y   = el(ŷ)
-        jac = jacobian(el, ŷ)
-        ν   = _normal(jac)
-        νₓ  = (x - x₀) |> normalize
-        τ′  = _integration_measure(jac)
-        return K((coords = x, normal = νₓ), (coords = y, normal = ν)) * τ′
-    end
-    τ̂ = domain(el)
-    N = length(x₀)
-    er = 0.0
-    n = 0
-    while n < maxiter
-        n += 1
-        # explore a few directions and pick a maximum distance
-        er = 0.0
-        for dir in -N:N
-            iszero(dir) && continue
-            k    = abs(dir)
-            x    = setindex(x₀, x₀[k] + sign(N) * n * h, k)
-            I, E = adaptive_integration(ŷ -> f(x, ŷ), τ̂; atol = tol / 2)
-            @assert E < tol / 2 "hcubature did not converge"
-            Ia = integrate(ŷ -> f(x, ŷ), qrule)
-            er = max(er, norm(Ia - I))
-        end
-        @debug n, er
-        (er < tol / 2) && break # attained desired tolerance
-    end
-    msg = """failed to attain desired tolerance when computing maxdist. Your
-    quadrature may not be accurate enough, or your meshsize not small enough, to
-    achieve the requested tolerance on the far field."""
-    er > tol / 2 && @warn msg
-    return n * h
-end

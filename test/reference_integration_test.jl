@@ -8,7 +8,7 @@ using Inti
     x, w = q()
     D = Inti.domain(q)
     @test D == Inti.ReferenceLine()
-    @test all(qnode ∈ D for qnode in x)
+    @test all(qnode in D for qnode in x)
     @test sum(w) ≈ 1
     @test Inti.order(q) == N - 1
     # integrate all polynomial of degree N-1 exactly
@@ -29,7 +29,7 @@ end
         q = Inti.Gauss(; domain = d, order = p)
         x, w = q()
         @test Inti.domain(q) == d
-        @test all(qnode ∈ d for qnode in x)
+        @test all(qnode in d for qnode in x)
         @test Inti.order(q) == p
         for i in 0:p, j in 0:p
             i + j > p && continue
@@ -56,7 +56,7 @@ end
         q = Inti.Gauss(; domain = d, order = p)
         x, w = q()
         @test Inti.domain(q) == d
-        @test all(qnode ∈ d for qnode in x)
+        @test all(qnode in d for qnode in x)
         @test Inti.order(q) == p
         for i in 0:p, j in 0:p, k in 0:p
             i + j + k > p && continue
@@ -83,7 +83,7 @@ end
         q = Inti.VioreanuRokhlin(; domain = d, order = p)
         x, w = q()
         @test Inti.domain(q) == d
-        @test all(qnode ∈ d for qnode in x)
+        @test all(qnode in d for qnode in x)
         @test Inti.order(q) == p
         for i in 0:p, j in 0:p
             i + j > p && continue
@@ -110,7 +110,7 @@ end
         q = Inti.VioreanuRokhlin(; domain = d, order = p)
         x, w = q()
         @test Inti.domain(q) == d
-        @test all(qnode ∈ d for qnode in x)
+        @test all(qnode in d for qnode in x)
         @test Inti.order(q) == p
         for i in 0:p, j in 0:p, k in 0:p
             i + j + k > p && continue
@@ -136,7 +136,7 @@ end
     x, w = q()
     D = Inti.domain(q)
     @test D == Inti.ReferenceSquare()
-    @test all(qnode ∈ D for qnode in x)
+    @test all(qnode in D for qnode in x)
     # TODO write an order() for TensorProductQuadrature
     for i in 0:px, j in 0:py
         @test Inti.integrate(x -> x[1]^i * x[2]^j, q) ≈ 1 / (i + 1) * 1 / (j + 1)

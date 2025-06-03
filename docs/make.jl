@@ -124,6 +124,9 @@ for notebook in notebooks
     file_out = generate_md(file_in)
     push!(notebook_examples, title => joinpath("pluto-examples", basename(file_out)))
 end
+push!(notebook_examples, "Heat equation" => joinpath("examples", "heat_equation.md"))
+push!(notebook_examples, "Stokes drag" => joinpath("examples", "stokes_drag.md"))
+push!(notebook_examples, "Elastic crack" => joinpath("examples", "crack_elasticity.md"))
 size_threshold_ignore = last.(notebook_examples)
 
 makedocs(;
@@ -150,7 +153,7 @@ makedocs(;
             "tutorials/correction_methods.md",
             "tutorials/solvers.md",
         ],
-        "Notebooks" => notebook_examples,
+        "Examples" => notebook_examples,
         "References" => "references.md",
         "Docstrings" => "docstrings.md",
     ],

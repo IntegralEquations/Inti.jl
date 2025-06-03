@@ -12,7 +12,7 @@ end
 """
     bdim_correction(op,X,Y,S,D; green_multiplier, kwargs...)
 
-Given a `op` and a (possibly innacurate) discretizations of its single and
+Given a `op` and a (possibly inaccurate) discretizations of its single and
 double-layer operators `S` and `D` (taking a vector of values on `Y` and
 returning a vector on of values on `X`), compute corrections `δS` and `δD` such
 that `S + δS` and `D + δD` are more accurate approximations of the underlying
@@ -91,7 +91,7 @@ function bdim_correction(
         error("only 2D and 3D supported")
     end
     # compute traces of monopoles on the source mesh
-    G   = SingleLayerKernel(op, T)
+    G = SingleLayerKernel(op, T)
     γ₁G = AdjointDoubleLayerKernel(op, T)
     γ₀B = Dense{T}(undef, length(source), ns)
     γ₁B = Dense{T}(undef, length(source), ns)
@@ -113,8 +113,25 @@ function bdim_correction(
             Θ[i, k] = μ * v
         end
     end
-    @views mul!(Θ, Sop, γ₁B, 1, 1)
-    @views mul!(Θ, Dop, γ₀B, -1, 1)
+    if Dense <: Array || (Sop isa BlockArray && Dop isa BlockArray)
+        mul!(Θ, Sop, γ₁B, 1, 1)
+        mul!(Θ, Dop, γ₀B, -1, 1)
+    else
+        # for vector value problems, we only assume that Sop and Dop can be multiplied by
+        # Vectors of SVectors, and so we need to perform multiplication column by column
+        P, Q = size(T)
+        S = eltype(T)
+        Θ_data = parent(Θ)
+        γ₀B_data = parent(γ₀B)
+        γ₁B_data = parent(γ₁B)
+        for k in 1:size(Θ_data, 2)
+            y = reinterpret(SVector{P,S}, @view Θ_data[:, k])
+            x = reinterpret(SVector{Q,S}, @view γ₁B_data[:, k])
+            mul!(y, Sop, x, 1, 1)
+            x = reinterpret(SVector{Q,S}, @view γ₀B_data[:, k])
+            mul!(y, Dop, x, -1, 1)
+        end
+    end
 
     # finally compute the corrected weights as sparse matrices
     Is, Js, Ss, Ds = Int[], Int[], T[], T[]
@@ -140,7 +157,7 @@ function bdim_correction(
             # copy the monopoles/dipoles for the current element
             jglob = @view qtags[:, n]
             M[1:nq, :] .= γ₀B[jglob, :]
-            M[nq+1:2nq, :] .= γ₁B[jglob, :]
+            M[(nq+1):2nq, :] .= γ₁B[jglob, :]
             # TODO: get ride of all this transposing mumble jumble by assembling
             # the matrix in the correct orientation in the first place
             F = qr!(transpose(Mdata))

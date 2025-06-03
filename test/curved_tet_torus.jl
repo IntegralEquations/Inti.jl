@@ -80,7 +80,7 @@ end
 chart_1_node_to_param = Dict(zip(chart_1_bdry_node_idx, chart_1_bdry_node_param_loc))
 
 nvol_els = size(msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}])[2]
-spharea = 0.0
+area = 0.0
 nnewton = 0
 elcount = 0
 els = []
@@ -232,7 +232,6 @@ for elind = 1:nvol_els
                 α₂[1] += 2*π
             end
         end
-        println(elind)
         @assert ((abs(α₁[1] - α₂[1]) < π/8) && (abs(α₂[1] - α₃[1]) < π/8) && (abs(α₁[1] - α₃[1]) < π/8))
         if !((abs(α₁[2] - α₂[2]) < π/8) && (abs(α₂[2] - α₃[2]) < π/8) && (abs(α₁[2] - α₃[2]) < π/8))
             @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", max(α₁[1], α₂[1], α₃[1])
@@ -420,7 +419,7 @@ for elind = 1:nvol_els
         tmp = Q[2][q] * abs(det(Jₖ(Q[1][q])))
         elarea += tmp
     end
-    global spharea += elarea
+    global area += elarea
 end
 
 truearea = 2 * π^2 * r2^2 * r1

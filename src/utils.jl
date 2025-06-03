@@ -106,27 +106,29 @@ Return the normal vector of `el` at the parametric coordinate `x̂`.
 """
 function normal(el, x)
     jac = jacobian(el, x)
+    N, M = size(jac)
+    msg = "computing the normal vector requires the element to be of co-dimension one."
+    @assert (N - M == 1) msg
     return _normal(jac)
 end
 
 """
-    _normal(jac::SMatrix{M,N})
+    _normal(jac::SMatrix{M,N}, s = 1)
 
-Given a an `M` by `N` matrix representing the jacobian of a codimension one
-object, compute the normal vector.
+Given a an `M` by `N` matrix representing the jacobian of a codimension one object, compute
+the normal vector. If `s=-1`, the normal vector is flipped.
 """
-function _normal(jac::SMatrix{N,M}) where {N,M}
-    msg = "computing the normal vector requires the element to be of co-dimension one."
-    @assert (N - M == 1) msg
+function _normal(jac::SMatrix{N,M}, s = 1) where {N,M}
+    (N - M == 1) || (return nothing) # not a codimension one object
     if M == 1 # a line in 2d
         t = jac[:, 1] # tangent vector
         n = SVector(t[2], -t[1]) |> normalize
-        return n
+        return s * n
     elseif M == 2 # a surface in 3d
         t₁ = jac[:, 1]
         t₂ = jac[:, 2]
         n = cross(t₁, t₂) |> normalize
-        return n
+        return s * n
     else
         notimplemented()
     end
@@ -166,45 +168,6 @@ function fibonnaci_points_sphere(N, r, center)
         pts[i] = SVector(x, y, z)
     end
     return pts
-end
-
-"""
-    _copyto!(target,source)
-
-Defaults to `Base.copyto!`, but includes some specialized methods to copy from a
-`Matrix` of `SMatrix` to a `Matrix` of `Number`s and viceversa.
-"""
-function _copyto!(dest::AbstractMatrix{<:Number}, src::AbstractMatrix{<:SMatrix})
-    S = eltype(src)
-    sblock = size(S)
-    ss = size(src) .* sblock # matrix size when viewed as matrix over T
-    @assert size(dest) == ss
-    for i in 1:ss[1], j in 1:ss[2]
-        bi, ind_i = divrem(i - 1, sblock[1]) .+ (1, 1)
-        bj, ind_j = divrem(j - 1, sblock[2]) .+ (1, 1)
-        dest[i, j] = src[bi, bj][ind_i, ind_j]
-    end
-    return dest
-end
-function _copyto!(dest::AbstractMatrix{<:SMatrix}, src::AbstractMatrix{<:Number})
-    T = eltype(dest)
-    sblock = size(T)
-    nblock = div.(size(src), sblock)
-    for i in 1:nblock[1]
-        istart = (i - 1) * sblock[1] + 1
-        iend = i * sblock[1]
-        for j in 1:nblock[2]
-            jstart = (j - 1) * sblock[2] + 1
-            jend = j * sblock[2]
-            dest[i, j] = T(view(src, istart:iend, jstart:jend))
-        end
-    end
-    return dest
-end
-
-# defaults to Base.copyto!
-function _copyto!(dest, src)
-    return copyto!(dest, src)
 end
 
 # https://discourse.julialang.org/t/putting-threads-threads-or-any-macro-in-an-if-statement/41406/7
@@ -256,9 +219,6 @@ function _normalize_correction(correction, target, source)
             (maxdist = Inf, interpolation_order = nothing, center = nothing),
             correction,
         )
-    elseif correction.method == :adaptive
-        haskey(correction, :tol) || error("missing tol field in correction")
-        correction = merge((maxsplit = 10_000, maxdist = nothing), correction)
     end
     return correction
 end
@@ -434,4 +394,14 @@ at both endpoints.
 function kress_change_of_variables_periodic(P)
     v = (x) -> (1 / P - 1 / 2) * ((1 - 2x))^3 + 1 / P * ((2x - 1)) + 1 / 2
     return x -> v(x)^P / (v(x)^P + v(1 - x)^P)
+end
+
+macro maybe_threads(bool, expr)
+    return quote
+        if $(bool)
+            Threads.@threads $expr
+        else
+            $expr
+        end
+    end |> esc
 end

@@ -11,7 +11,15 @@ See also: [`SingleLayerKernel`](@ref),
 """
 abstract type AbstractKernel{T} end
 
-return_type(::AbstractKernel{T}) where {T} = T
+return_type(::AbstractKernel{T}, args...) where {T} = T
+
+"""
+    singularity_order(K)
+
+Given a kernel `K` with signature `K(target,source)::T`, return the order of the singularity
+of `K` at `target = source`. Order `n` means that `K(x,y) ∼ (x - y)^n` as `x -> y`.
+"""
+singularity_order(K) = nothing
 
 """
     abstract type AbstractDifferentialOperator{N}
@@ -33,6 +41,8 @@ function (::Type{K})(
     return K{T,Op}(op)
 end
 
+operator(K::AbstractKernel) = K.op
+
 """
     struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
 
@@ -41,6 +51,11 @@ AbstractDifferentialOperator`.
 """
 struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
+end
+
+function singularity_order(K::SingleLayerKernel)
+    N = ambient_dimension(K.op)
+    return 2 - N
 end
 
 """
@@ -53,6 +68,11 @@ derivative of the fundamental solution respect to the source variable.
 """
 struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
+end
+
+function singularity_order(K::DoubleLayerKernel)
+    N = ambient_dimension(K.op)
+    return 1 - N
 end
 
 """
@@ -68,6 +88,11 @@ struct AdjointDoubleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
 end
 
+function singularity_order(K::AdjointDoubleLayerKernel)
+    N = ambient_dimension(K.op)
+    return 1 - N
+end
+
 """
     struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
 
@@ -79,6 +104,11 @@ variable of the `DoubleLayerKernel`.
 """
 struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
     op::Op
+end
+
+function singularity_order(K::HyperSingularKernel)
+    N = ambient_dimension(K.op)
+    return -N
 end
 
 ################################################################################
@@ -156,7 +186,7 @@ function (HS::HyperSingularKernel{T,Laplace{N}})(
     target,
     source,
     r = coords(target) - coords(source),
-)::T where {N,T}
+) where {N,T}
     nx = normal(target)
     ny = normal(source)
     d = norm(r)
@@ -224,7 +254,6 @@ function (DL::DoubleLayerKernel{T,Yukawa{N,K}})(target, source)::T where {N,T,K}
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        k = im * λ
         return λ / (2 * π * d) * Bessels.besselk(1, λ * d) .* dot(r, ny)
     elseif N == 3
         return 1 / (4π) / d^2 * exp(-λ * d) * (λ + 1 / d) * dot(r, ny)
@@ -550,7 +579,7 @@ function (ADL::AdjointDoubleLayerKernel{T,<:Elastostatic{N}})(target, source)::T
     end
 end
 
-function (HS::HyperSingularKernel{T,<:Elastostatic{N}})(target, source)::T where {N,T}
+function (HS::HyperSingularKernel{T,<:Elastostatic{N}})(target, source) where {N,T}
     μ, λ = HS.op.μ, HS.op.λ
     ν = λ / (2 * (μ + λ))
     x = coords(target)
