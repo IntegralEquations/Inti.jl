@@ -12,8 +12,8 @@ using NonlinearSolve
 include("test_utils.jl")
 
 # create a boundary and area meshes and quadrature only once
-meshsize = 0.1
-qorder = 8
+meshsize = .1
+qorder = 5
 
 #Ω, msh = gmsh_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = meshsize)
 Ω, msh = gmsh_cut_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = meshsize)
@@ -21,54 +21,66 @@ qorder = 8
 Γ_msh = view(msh, Γ)
 
 ang = π/2
-θ₁ = LinRange(0, π, 50*round(Int, 1/meshsize))
-θ₂ = LinRange(0, π, 50*round(Int, 1/meshsize))
-ϕ = LinRange(0, 2*π, 50*round(Int, 1/meshsize))
+X = LinRange(-1.1, 1.1, 100*round(Int, 1/meshsize))
+Y = LinRange(-1.1, 1.1, 100*round(Int, 1/meshsize))
+#θ₂ = LinRange(-ang, π-ang, 50*round(Int, 1/meshsize))
+#θ₂ = LinRange(0, π, 50*round(Int, 1/meshsize))
 # v = (θ, ϕ)
-M = [cos(ang) 0 sin(ang); 0 1 0; -1*sin(ang) 0 cos(ang)]
-ψ₁ = (v) -> [sin(v[1]) * cos(v[2]), sin(v[1]) * sin(v[2]), cos(v[1])]
-ψ₂ = (v) -> M * ψ₁(v)
+#ang = 0.0
+#M = [cos(ang); 0; sin(ang);; 0; 1; 0;; -1*sin(ang); 0; cos(ang)]
+#M = [cos(ang) 0 sin(ang); 0 1 0; -1*sin(ang) 0 cos(ang)]
+#ψ₁ = (v) -> [0.0, 0.0, 0.0]
+#ψ₁ = (v) -> [sin(v[1]) * cos(v[2]), sin(v[1]) * sin(v[2]), cos(v[1])]
+#ψ₂ = (v) -> M * ψ₁(v)
+ψ₁ = (v) -> [-2*v[1]/(1 + v[1]^2 + v[2]^2), 2*v[2]/(1 + v[1]^2 + v[2]^2), (-1 + v[1]^2 + v[2]^2)/(1 + v[1]^2 + v[2]^2)]
+ψ₂ = (v) -> [2*v[1]/(1 + v[1]^2 + v[2]^2), 2*v[2]/(1 + v[1]^2 + v[2]^2), (1 - v[1]^2 - v[2]^2)/(1 + v[1]^2 + v[2]^2)]
+ψ₁⁻¹ =  (x) -> [-x[1]/(1 - x[3]), x[2]/(1 - x[3])]
+ψ₂⁻¹ =  (x) -> [x[1]/(1 + x[3]), x[2]/(1 + x[3])]
+#ψ₂ = (v) -> [sin(v[1] + ang) * cos(v[2]), sin(v[1] + ang) * sin(v[2]), cos(v[1] + ang)]
 
 function chart_id(face_nodes)
     id = 1
     #if all([abs(q[3]) for q in face_nodes] .> 0.75)
     #    id = 2
     #end
+    if all([q[3] for q in face_nodes] .> 0.0)
+        id = 2
+    end
     return id
 end
 
-function ψ₁⁻¹(v0, p)
-    F₁ = (v, p) -> ψ₁(v) - p
-    prob₁= NonlinearProblem(F₁, v0, p)
-    ψ₁⁻¹ = NonlinearSolve.solve(prob₁, SimpleNewtonRaphson())
-end
+#function ψ₁⁻¹(v0, p)
+#    F₁ = (v, p) -> ψ₁(v) - p
+#    prob₁= NonlinearProblem(F₁, v0, p)
+#    ψ₁⁻¹ = NonlinearSolve.solve(prob₁, SimpleNewtonRaphson())
+#end
+#
+#function ψ₂⁻¹(v0, p)
+#    F₂ = (v, p) -> ψ₂(v) - p
+#    prob₂= NonlinearProblem(F₂, v0, p)
+#    ψ₂⁻¹ = NonlinearSolve.solve(prob₂, SimpleNewtonRaphson())
+#end
 
-function ψ₂⁻¹(v0, p)
-    F₂ = (v, p) -> ψ₂(v) - p
-    prob₂= NonlinearProblem(F₂, v0, p)
-    ψ₂⁻¹ = NonlinearSolve.solve(prob₂, SimpleNewtonRaphson())
-end
-
-chart_1 = Array{SVector{3,Float64}}(undef, length(θ₁)*length(ϕ))
-chart_1_cart_idxs_θ = []
-chart_1_cart_idxs_ϕ = []
-for i in eachindex(θ₁)
-    for j in eachindex(ϕ)
-        chart_1[(i-1)*length(ϕ) + j] = [k for k in ψ₁((θ₁[i], ϕ[j]))]
-        push!(chart_1_cart_idxs_θ, i)
-        push!(chart_1_cart_idxs_ϕ, j)
+chart_1 = Array{SVector{3,Float64}}(undef, length(X)*length(Y))
+chart_1_cart_idxs_X = []
+chart_1_cart_idxs_Y = []
+for i in eachindex(X)
+    for j in eachindex(Y)
+        chart_1[(i-1)*length(Y) + j] = [k for k in ψ₁((X[i], Y[j]))]
+        push!(chart_1_cart_idxs_X, i)
+        push!(chart_1_cart_idxs_Y, j)
     end
 end
 chart_1_kdt = KDTree(chart_1; reorder = false)
 # chart 2
-chart_2 = Array{SVector{3,Float64}}(undef, length(θ₂)*length(ϕ))
-chart_2_cart_idxs_θ = []
-chart_2_cart_idxs_ϕ = []
-for i in eachindex(θ₂)
-    for j in eachindex(ϕ)
-        chart_2[(i-1)*length(ϕ) + j] = [k for k in ψ₂((θ₂[i], ϕ[j]))]
-        push!(chart_2_cart_idxs_θ, i)
-        push!(chart_2_cart_idxs_ϕ, j)
+chart_2 = Array{SVector{3,Float64}}(undef, length(X)*length(Y))
+chart_2_cart_idxs_X = []
+chart_2_cart_idxs_Y = []
+for i in eachindex(X)
+    for j in eachindex(Y)
+        chart_2[(i-1)*length(Y) + j] = [k for k in ψ₂((X[i], Y[j]))]
+        push!(chart_2_cart_idxs_X, i)
+        push!(chart_2_cart_idxs_Y, j)
     end
 end
 chart_2_kdt = KDTree(chart_2; reorder = false)
@@ -95,43 +107,37 @@ for elind = 1:nbdry_els
             if node_indices[1] ∉ chart_1_bdry_node_idx && node_indices[1] ∉ chart_2_bdry_node_idx
                 if abs(msh.nodes[node_indices[1]][3]) ≈ 0.8
                 #if false #abs(msh.nodes[node_indices[1]][3]) ≈ 0.8
-                    guess = SVector{2,Float64}((θ₁[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]))
-                    α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[1]])))
-                    @assert α[1] ≥ 0
+                    α = Vector{Float64}(ψ⁻¹(copy(msh.nodes[node_indices[1]])))
                     push!(chart_1_bdry_node_idx, node_indices[1])
                     push!(chart_1_bdry_node_param_loc, α)
                 else
                     msh.nodes[node_indices[1]] = chart_1[idxs[1]]
-                    push!(chart_1_bdry_node_param_loc, Vector{Float64}([θ₁[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]]))
+                    push!(chart_1_bdry_node_param_loc, Vector{Float64}([X[chart_1_cart_idxs_X[idxs[1]]], Y[chart_1_cart_idxs_Y[idxs[1]]]]))
                     push!(chart_1_bdry_node_idx, node_indices[1])
                 end
             end
             if node_indices[2] ∉ chart_1_bdry_node_idx && node_indices[2] ∉ chart_2_bdry_node_idx
                 if abs(msh.nodes[node_indices[2]][3]) ≈ 0.8
                 #if false #abs(msh.nodes[node_indices[2]][3]) ≈ 0.8
-                    guess = SVector{2,Float64}((θ₁[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]))
-                    α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[2]])))
-                    @assert α[1] ≥ 0
+                    α = Vector{Float64}(ψ⁻¹(copy(msh.nodes[node_indices[2]])))
                     push!(chart_1_bdry_node_idx, node_indices[2])
                     push!(chart_1_bdry_node_param_loc, α)
                 else
                     msh.nodes[node_indices[2]] = chart_1[idxs[2]]
                     push!(chart_1_bdry_node_idx, node_indices[2])
-                    push!(chart_1_bdry_node_param_loc, Vector{Float64}([θ₁[chart_1_cart_idxs_θ[idxs[2]]], ϕ[chart_1_cart_idxs_ϕ[idxs[2]]]]))
+                    push!(chart_1_bdry_node_param_loc, Vector{Float64}([X[chart_1_cart_idxs_X[idxs[2]]], Y[chart_1_cart_idxs_Y[idxs[2]]]]))
                 end
             end
             if node_indices[3] ∉ chart_1_bdry_node_idx && node_indices[3] ∉ chart_2_bdry_node_idx
                 if abs(msh.nodes[node_indices[3]][3]) ≈ 0.8
                 #if false #abs(msh.nodes[node_indices[3]][3]) ≈ 0.8
-                    guess = SVector{2,Float64}((θ₁[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]))
-                    α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[3]])))
-                    @assert α[1] ≥ 0
+                    α = Vector{Float64}(ψ⁻¹(copy(msh.nodes[node_indices[3]])))
                     push!(chart_1_bdry_node_idx, node_indices[3])
                     push!(chart_1_bdry_node_param_loc, α)
                 else
                     msh.nodes[node_indices[3]] = chart_1[idxs[3]]
                     push!(chart_1_bdry_node_idx, node_indices[3])
-                    push!(chart_1_bdry_node_param_loc, Vector{Float64}([θ₁[chart_1_cart_idxs_θ[idxs[3]]], ϕ[chart_1_cart_idxs_ϕ[idxs[3]]]]))
+                    push!(chart_1_bdry_node_param_loc, Vector{Float64}([X[chart_1_cart_idxs_X[idxs[3]]], Y[chart_1_cart_idxs_Y[idxs[3]]]]))
                 end
             end
         end
@@ -145,43 +151,37 @@ for elind = 1:nbdry_els
             if node_indices[1] ∉ chart_1_bdry_node_idx && node_indices[1] ∉ chart_2_bdry_node_idx
                 if abs(msh.nodes[node_indices[1]][3]) ≈ 0.8
                 #if false #abs(msh.nodes[node_indices[1]][3]) ≈ 0.8
-                    guess = SVector{2,Float64}((θ₂[chart_2_cart_idxs_θ[idxs[1]]], ϕ[chart_2_cart_idxs_ϕ[idxs[1]]]))
-                    α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[1]])))
-                    @assert α[1] ≥ 0
+                    α = Vector{Float64}(ψ⁻¹(copy(msh.nodes[node_indices[1]])))
                     push!(chart_2_bdry_node_idx, node_indices[1])
                     push!(chart_2_bdry_node_param_loc, α)
                 else
                     msh.nodes[node_indices[1]] = chart_2[idxs[1]]
-                    push!(chart_2_bdry_node_param_loc, Vector{Float64}([θ₂[chart_2_cart_idxs_θ[idxs[1]]], ϕ[chart_2_cart_idxs_ϕ[idxs[1]]]]))
+                    push!(chart_2_bdry_node_param_loc, Vector{Float64}([X[chart_2_cart_idxs_X[idxs[1]]], Y[chart_2_cart_idxs_Y[idxs[1]]]]))
                     push!(chart_2_bdry_node_idx, node_indices[1])
                 end
             end
             if node_indices[2] ∉ chart_1_bdry_node_idx && node_indices[2] ∉ chart_2_bdry_node_idx
                 if abs(msh.nodes[node_indices[2]][3]) ≈ 0.8
                 #if false #abs(msh.nodes[node_indices[2]][3]) ≈ 0.8
-                    guess = SVector{2,Float64}((θ₂[chart_2_cart_idxs_θ[idxs[1]]], ϕ[chart_2_cart_idxs_ϕ[idxs[1]]]))
-                    α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[2]])))
-                    @assert α[1] ≥ 0
+                    α = Vector{Float64}(ψ⁻¹(copy(msh.nodes[node_indices[2]])))
                     push!(chart_2_bdry_node_idx, node_indices[2])
                     push!(chart_2_bdry_node_param_loc, α)
                 else
                     msh.nodes[node_indices[2]] = chart_2[idxs[2]]
                     push!(chart_2_bdry_node_idx, node_indices[2])
-                    push!(chart_2_bdry_node_param_loc, Vector{Float64}([θ₂[chart_2_cart_idxs_θ[idxs[2]]], ϕ[chart_2_cart_idxs_ϕ[idxs[2]]]]))
+                    push!(chart_2_bdry_node_param_loc, Vector{Float64}([X[chart_2_cart_idxs_X[idxs[2]]], Y[chart_2_cart_idxs_Y[idxs[2]]]]))
                 end
             end
             if node_indices[3] ∉ chart_1_bdry_node_idx && node_indices[3] ∉ chart_2_bdry_node_idx
                 if abs(msh.nodes[node_indices[3]][3]) ≈ 0.8
                 #if false #abs(msh.nodes[node_indices[3]][3]) ≈ 0.8
-                    guess = SVector{2,Float64}((θ₂[chart_2_cart_idxs_θ[idxs[1]]], ϕ[chart_2_cart_idxs_ϕ[idxs[1]]]))
-                    α = Vector{Float64}(ψ⁻¹(guess, copy(msh.nodes[node_indices[3]])))
-                    @assert α[1] ≥ 0
+                    α = Vector{Float64}(ψ⁻¹(copy(msh.nodes[node_indices[3]])))
                     push!(chart_2_bdry_node_idx, node_indices[3])
                     push!(chart_2_bdry_node_param_loc, α)
                 else
                     msh.nodes[node_indices[3]] = chart_2[idxs[3]]
                     push!(chart_2_bdry_node_idx, node_indices[3])
-                    push!(chart_2_bdry_node_param_loc, Vector{Float64}([θ₂[chart_2_cart_idxs_θ[idxs[3]]], ϕ[chart_2_cart_idxs_ϕ[idxs[3]]]]))
+                    push!(chart_2_bdry_node_param_loc, Vector{Float64}([X[chart_2_cart_idxs_X[idxs[3]]], Y[chart_2_cart_idxs_Y[idxs[3]]]]))
                 end
             end
         end
@@ -201,21 +201,13 @@ for elind = 1:nvol_els
     # j = 2
     #elind = 18819
 
-    #elind = 5212
-
-    # elements where the two charts produce same result
-    # j = 2 and charts match to machine precision
-    #elind = 627
-    #elind = 3523
-    #elind = 15458
-    #elind = 16698
-    #elind = 17282
-
-    #elind = 17818
-    #elind = 17822
     # j = 3
     #elind = 18818
     #elind = 17793
+
+    #elind = 5319
+    #elind = 15315
+    #elind = 17778
     node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}][:, elind]
     nodes = msh.nodes[node_indices]
     
@@ -252,12 +244,7 @@ for elind = 1:nvol_els
                 push!(node_indices_on_bdry, node_indices[verts_on_bdry_chart_2[1]])
                 p = deepcopy(msh.nodes[node_indices[verts_on_bdry_chart_2[1]]])
                 global nnewton += 1
-                res = ψ⁻¹(α₁, p)
-                if res.retcode == ReturnCode.MaxIters
-                    @assert false
-                else
-                    α₂ = Vector{Float64}(res.u)
-                end
+                α₂ = ψ⁻¹(p)
                 @assert norm(ψ(α₂) - p) < 10^(-14)
             end
             if nverts_in_major_chart >= 3
@@ -292,15 +279,7 @@ for elind = 1:nvol_els
                     end
                 end
                 global nnewton += 1
-                res = ψ⁻¹(α₂, p)
-                if res.retcode == ReturnCode.MaxIters
-                    #@assert false
-                    α₃ = copy(α₂)
-                    @assert j == 2
-                else
-                    α₃ = Vector{Float64}(res.u)
-                    @assert norm(ψ(α₃) - p) < 10^(-14)
-                end
+                α₃ = ψ⁻¹(p)
             end
         else
             node_to_param = chart_2_node_to_param
@@ -315,13 +294,7 @@ for elind = 1:nvol_els
                 push!(node_indices_on_bdry, node_indices[verts_on_bdry_chart_1[1]])
                 p = deepcopy(msh.nodes[node_indices[verts_on_bdry_chart_1[1]]])
                 global nnewton += 1
-                res = ψ⁻¹(α₁, p)
-                if res.retcode == ReturnCode.MaxIters
-                    @assert false
-                else
-                    α₂ = Vector{Float64}(res.u)
-                    @assert norm(ψ(α₂) - p) < 10^(-14)
-                end
+                α₂ = ψ⁻¹(p)
             end
             if nverts_in_major_chart >= 3
                 α₃ = deepcopy(node_to_param[node_indices_on_bdry[3]])
@@ -354,76 +327,10 @@ for elind = 1:nvol_els
                     end
                 end
                 global nnewton += 1
-                res = ψ⁻¹(α₂, p)
-                if res.retcode == ReturnCode.MaxIters
-                    #@assert false
-                    α₃ = copy(α₂)
-                    @assert j == 2
-                else
-                    α₃ = Vector{Float64}(res.u)
-                    @assert norm(ψ(α₃) - p) < 10^(-14)
-                end
+                α₃ = ψ⁻¹(p)
             end
         end
         atol = 10^(-4)
-        # Try to handle periodicity in ϕ
-        if (abs(α₂[2]) < atol) && (abs(α₂[2] - α₁[2]) > π || abs(α₂[2] - α₃[2]) > π)
-            α₂[2] = 2*π
-        end
-        if (abs(α₃[2]) < atol) && (abs(α₃[2] - α₁[2]) > π || abs(α₃[2] - α₂[2]) > π)
-            α₃[2] = 2*π
-        end
-        if (abs(α₁[2]) < atol) && (abs(α₁[2] - α₂[2]) > π || abs(α₁[2] - α₃[2]) > π)
-            α₁[2] = 2*π
-        end
-        if (α₂[2] ≈ 2*π) && (abs(α₂[2] - α₁[2]) > π || abs(α₂[2] - α₃[2]) > π)
-            α₂[2] = 0.0
-        end
-        if (α₃[2] ≈ 2*π) && (abs(α₃[2] - α₁[2]) > π || abs(α₃[2] - α₂[2]) > π)
-            α₃[2] = 0.0
-        end
-        if (α₁[2] ≈ 2*π) && (abs(α₁[2] - α₂[2]) > π || abs(α₁[2] - α₃[2]) > π)
-            α₁[2] = 0.0
-        end
-
-        # Try to handle periodicity in ϕ -- case of α straddling 2π
-        if (abs(α₁[2] - α₂[2]) > π) || (abs(α₂[2] - α₃[2]) > π) || (abs(α₁[2] - α₃[2]) > π)
-            if α₁[2] < π && α₂[2] < π && α₃[2] > 2*(2*π)/3
-                α₃[2] -= 2*π
-            end
-            if α₂[2] < π && α₃[2] < π && α₁[2] > 2*(2*π)/3
-                α₁[2] -= 2*π
-            end
-            if α₁[2] < π && α₃[2] < π && α₂[2] > 2*(2*π)/3
-                α₂[2] -= 2*π
-            end
-        end
-        if (abs(α₁[2] - α₂[2]) > π) || (abs(α₂[2] - α₃[2]) > π) || (abs(α₁[2] - α₃[2]) > π)
-            if α₁[2] > 2*(2*π)/3 && α₂[2] > 2*(2*π)/3 && α₃[2] < π
-                α₃[2] += 2*π
-            end
-            if α₂[2] > 2*(2*π)/3 && α₃[2] > 2*(2*π)/3 && α₁[2] < π
-                α₁[2] += 2*π
-            end
-            if α₁[2] > 2*(2*π)/3 && α₃[2] > 2*(2*π)/3 && α₂[2] < π
-                α₂[2] += 2*π
-            end
-        end
-        if j == 3
-            @assert true
-            #if α₁[1] < 0 && α₂[1] > 0
-            #    α₁ = ψ⁻¹(α₂, ψ₂(α₁))
-            #end
-            #if α₂[1] < 0 && α₁[1] > 0
-            #    α₂ = ψ⁻¹(α₁, ψ₂(α₂))
-            #end
-            @assert ((abs(α₁[1] - α₂[1]) < π/8) && (abs(α₂[1] - α₃[1]) < π/8) && (abs(α₁[1] - α₃[1]) < π/8))
-        end
-        if !((abs(α₁[2] - α₂[2]) < π/8) && (abs(α₂[2] - α₃[2]) < π/8) && (abs(α₁[2] - α₃[2]) < π/8))
-            println(elind)
-            @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", max(α₁[1], α₂[1], α₃[1])
-            @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", min(α₁[1], α₂[1], α₃[1])
-        end
         a₁ = SVector{3,Float64}(ψ(α₁))
         a₂ = SVector{3,Float64}(ψ(α₂))
         a₃ = SVector{3,Float64}(ψ(α₃))
@@ -617,7 +524,7 @@ for elind = 1:nvol_els
     global spharea += elarea
 
     ### Comparison below with using single parametrization 
-    if j > 1
+    if j > 1 && chart_num == 2
         node_indices_on_bdry = deepcopy(node_indices[verts_on_bdry])
         #chart_num = chart_id(msh.nodes[node_indices_on_bdry])
         node_to_param = chart_1_node_to_param
@@ -628,25 +535,9 @@ for elind = 1:nvol_els
             ψ_alt = ψ₂
             ψ⁻¹_alt = ψ₂⁻¹
         end
-        guess = SVector{2,Float64}((π/4, π/4))
-        res = ψ⁻¹_alt(guess, a₁)
-        α₁_alt = Vector{Float64}(res.u)
-        α₁_alt = rem2pi.(α₁_alt, RoundDown)
-        res = ψ⁻¹_alt(α₁_alt, a₂)
-        α₂_alt = Vector{Float64}(res.u)
-        res = ψ⁻¹_alt(α₂_alt, a₃)
-        α₃_alt = Vector{Float64}(res.u)
-        #@assert abs(α₁_alt[1] - α₂_alt[1]) < π/8
-        #@assert abs(α₁_alt[1] - α₃_alt[1]) < π/8
-        #@assert abs(α₂_alt[1] - α₃_alt[1]) < π/8
-        #@assert abs(α₁_alt[2] - α₂_alt[2]) < π/8
-        #@assert abs(α₁_alt[2] - α₃_alt[2]) < π/8
-        #@assert abs(α₂_alt[2] - α₃_alt[2]) < π/8
-        
-        # FIXME: Fails with choice of chart #2 (ψ = ψ₂) above!
-        #println(α₁_alt[1])
-        #println(α₁[1])
-        #@assert α₁_alt[1] ≈ α₁[1]
+        α₁_alt = ψ⁻¹_alt(a₁)
+        α₂_alt = ψ⁻¹_alt(a₂)
+        α₃_alt = ψ⁻¹_alt(a₃)
         a₁_alt = SVector{3,Float64}(ψ_alt(α₁_alt))
         a₂_alt = SVector{3,Float64}(ψ_alt(α₂_alt))
         a₃_alt = SVector{3,Float64}(ψ_alt(α₃_alt))
@@ -805,7 +696,7 @@ for elind = 1:nvol_els
         #    println(elvol[elind])
         #    println(elind)
         #end
-        if j > 1 && abs(elarea - elvol[elind]) < 10^(-10)
+        if j > 1 && abs(elarea - elvol[elind]) < 10^(-9)
             println(elind)
         end
         #global elvol[elind] = elarea

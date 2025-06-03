@@ -85,7 +85,6 @@ uniqueidx(v) = unique(i -> v[i], eachindex(v))
 
 # Set up chart 1
 for elind = 1:nbdry_els
-    #elind = 498
     node_indices = deepcopy(msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{3, Float64}}][:, elind])
     nodes = deepcopy(msh.nodes[node_indices])
 
@@ -146,7 +145,7 @@ ncurv_vols = 0
 for elind = 1:nvol_els
     node_indices = deepcopy(msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}][:, elind])
     nodes = deepcopy(msh.nodes[node_indices])
-    
+
     verts_on_bdry_chart_1 = findall(x -> x ∈ chart_1_bdry_node_idx, node_indices)
     verts_on_bdry_chart_2 = findall(x -> x ∈ chart_2_bdry_node_idx, node_indices)
     j = 0
@@ -180,7 +179,12 @@ for elind = 1:nvol_els
                 push!(node_indices_on_bdry, node_indices[verts_on_bdry_chart_2[1]])
                 p = deepcopy(msh.nodes[node_indices[verts_on_bdry_chart_2[1]]])
                 global nnewton += 1
-                α₂ = Vector{Float64}(ψ⁻¹(α₁, p))
+                res = ψ⁻¹(α₁, p)
+                if res.retcode == ReturnCode.MaxIters
+                    @assert false
+                else
+                    α₂ = Vector{Float64}(res.u)
+                end
                 @assert norm(ψ(α₂) - p) < 10^(-14)
             end
             if nverts_in_major_chart >= 3
@@ -235,7 +239,12 @@ for elind = 1:nvol_els
                 push!(node_indices_on_bdry, node_indices[verts_on_bdry_chart_1[1]])
                 p = deepcopy(msh.nodes[node_indices[verts_on_bdry_chart_1[1]]])
                 global nnewton += 1
-                α₂ = Vector{Float64}(ψ⁻¹(α₁, p))
+                res = ψ⁻¹(α₁, p)
+                if res.retcode == ReturnCode.MaxIters
+                    @assert false
+                else
+                    α₂ = Vector{Float64}(res.u)
+                end
                 @assert norm(ψ(α₂) - p) < 10^(-14)
             end
             if nverts_in_major_chart >= 3
@@ -527,21 +536,4 @@ for elind = 1:nvol_els
             global sfcint += sfcint2
         end
     end
-
-    #A = faceel1([0.000000000001, 0.0])
-    #B = faceel1([1.0, 0.0])
-    #C = faceel1([0.000000000000000001, 1.0])
-    #norm(cross(B - A, C - A))/2 - (quad[1].weight + quad[2].weight + quad[3].weight)
-    #A = faceel2([0.000000000001, 0.0])
-    #B = faceel2([1.0, 0.0])
-    #C = faceel2([0.000000000000000001, 1.0])
-    #norm(cross(B - A, C - A))/2 - (quad[4].weight + quad[5].weight + quad[6].weight)
-    #A = faceel3([0.000000000001, 0.0])
-    #B = faceel3([1.0, 0.0])
-    #C = faceel3([0.000000000000000001, 1.0])
-    #norm(cross(B - A, C - A))/2 - (quad[7].weight + quad[8].weight + quad[9].weight)
-    #A = faceel4([0.000000000001, 0.0])
-    #B = faceel4([1.0, 0.0])
-    #C = faceel4([0.000000000000000001, 1.0])
-    #norm(cross(B - A, C - A))/2 - (quad[10].weight + quad[11].weight + quad[12].weight)
 end

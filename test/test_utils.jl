@@ -43,14 +43,35 @@ function gmsh_ball(; center, radius, meshsize)
     return Ω, msh
 end
 
+function gmsh_torus(; center, r1, r2, meshsize)
+    msh = try
+        gmsh.initialize()
+        gmsh.option.setNumber("General.Verbosity", 2)
+        gmsh.model.add("ball")
+        # set max and min meshsize to meshsize
+        gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+        gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+        gmsh.model.occ.addTorus(center[1], center[2], center[3], r1, r2)
+        gmsh.model.occ.synchronize()
+        gmsh.model.mesh.generate(3)
+        Inti.import_mesh(; dim = 3)
+    finally
+        gmsh.finalize()
+    end
+    Ω = Inti.Domain(Inti.entities(msh)) do e
+        return Inti.geometric_dimension(e) == 3
+    end
+    return Ω, msh
+end
+
 function gmsh_cut_ball(; center, radius, meshsize)
     msh = try
         xmin = -1.1*radius
         ymin = -1.1*radius
         xmax = 1.1*radius
         ymax = 1.1*radius
-        zmin = -0.8*radius
-        zmax = 0.8*radius
+        zmin = -0.999*radius
+        zmax = 0.999*radius
         gmsh.initialize()
         gmsh.option.setNumber("General.Verbosity", 2)
         gmsh.model.add("ball")
