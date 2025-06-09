@@ -203,26 +203,25 @@ end
 
 nv = 3 # Number of vertices for connectivity information in the volume
 nv_bdry = 2 # Number of vertices for connectivity information on the boundary
-newmsh = Inti.Mesh{2,Float64}()
 Ecurve = typeof(first(els_curve))
 Ebdry = typeof(first(bdry_els))
 Estraight = Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{2, Float64}} # TODO fix this to auto be a P1 element type
 
-newmsh.etype2mat[Ecurve] = reshape(connect_curve, nv, :)
-newmsh.etype2els[Ecurve] = convert(Vector{Ecurve}, els_curve)
-newmsh.etype2orientation[Ecurve] = ones(length(els_curve))
+crvmsh.etype2mat[Ecurve] = reshape(connect_curve, nv, :)
+crvmsh.etype2els[Ecurve] = convert(Vector{Ecurve}, els_curve)
+crvmsh.etype2orientation[Ecurve] = ones(length(els_curve))
 
-newmsh.etype2mat[Estraight] = reshape(connect_straight, nv, :)
-newmsh.etype2els[Estraight] = convert(Vector{Estraight}, els_straight)
-newmsh.etype2orientation[Estraight] = ones(length(els_straight))
+crvmsh.etype2mat[Estraight] = reshape(connect_straight, nv, :)
+crvmsh.etype2els[Estraight] = convert(Vector{Estraight}, els_straight)
+crvmsh.etype2orientation[Estraight] = ones(length(els_straight))
 
 # Uncomment this to add boundary elements to mesh; breaks Quadrature() call
 # below since we cannot yet loop over entities or do a view()
-#newmsh.etype2mat[Ebdry] = reshape(connect_bdry, nv_bdry, :)
-#newmsh.etype2els[Ebdry] = convert(Vector{Ebdry}, bdry_els)
-#newmsh.etype2orientation[Ebdry] = ones(length(bdry_els))
+crvmsh.etype2mat[Ebdry] = reshape(connect_bdry, nv_bdry, :)
+crvmsh.etype2els[Ebdry] = convert(Vector{Ebdry}, bdry_els)
+crvmsh.etype2orientation[Ebdry] = ones(length(bdry_els))
 
-Quad = Inti.Quadrature(newmsh, qorder = 2)
+Quad = Inti.Quadrature(crvmsh, qorder = 2)
 accum = 0.0
 f = (x) -> x[1]^4
 for q in Quad
