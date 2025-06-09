@@ -31,6 +31,9 @@ function ψ₁⁻¹(v0, p)
     ψ₁⁻¹ = NonlinearSolve.solve(prob₁, SimpleNewtonRaphson())
 end
 
+face_element_on_sphere(nodelist) = all(norm.(nodelist) .≈ 1)
+face_element_on_surface = (nodelist) -> face_element_on_sphere(nodelist)
+
 chart_1 = Array{SVector{3,Float64}}(undef, length(θ)*length(ϕ))
 chart_1_cart_idxs_θ = []
 chart_1_cart_idxs_ϕ = []
@@ -56,7 +59,7 @@ for elind = 1:nbdry_els
     node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{3, Float64}}][:, elind]
     nodes = msh.nodes[node_indices]
 
-    if all(norm.(nodes) .≈ 1)
+    if face_element_on_surface(nodes)
         idxs, dists = nn(chart_1_kdt, nodes)
         ψ⁻¹ = ψ₁⁻¹
         if node_indices[1] ∉ chart_1_bdry_node_idx

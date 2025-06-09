@@ -32,6 +32,10 @@ function ψ₁⁻¹(v0, p)
     ψ₁⁻¹ = NonlinearSolve.solve(prob₁, SimpleNewtonRaphson())
 end
 
+face_element_on_torus(nodelist, R, r) = all([(sqrt(node[1]^2 + node[2]^2) - R^2)^2 + node[3]^2 ≈ r^2 for node in nodelist])
+
+face_element_on_surface = (nodelist) -> face_element_on_torus(nodelist, r1, r2)
+
 chart_1 = Array{SVector{3,Float64}}(undef, length(θ)*length(ϕ))
 chart_1_cart_idxs_θ = []
 chart_1_cart_idxs_ϕ = []
@@ -57,7 +61,7 @@ for elind = 1:nbdry_els
     node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{3, Float64}}][:, elind]
     nodes = msh.nodes[node_indices]
 
-    if all([(sqrt(node[1]^2 + node[2]^2) - r1^2)^2 + node[3]^2 ≈ r2^2 for node in nodes])
+    if face_element_on_surface(nodes)
         idxs, dists = nn(chart_1_kdt, nodes)
         ψ⁻¹ = ψ₁⁻¹
         if node_indices[1] ∉ chart_1_bdry_node_idx
