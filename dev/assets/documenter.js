@@ -4,8 +4,10 @@ requirejs.config({
     'highlight-julia': 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/julia.min',
     'headroom': 'https://cdnjs.cloudflare.com/ajax/libs/headroom/0.12.0/headroom.min',
     'jqueryui': 'https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min',
+    'katex-auto-render': 'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/contrib/auto-render.min',
     'jquery': 'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min',
     'headroom-jquery': 'https://cdnjs.cloudflare.com/ajax/libs/headroom/0.12.0/jQuery.headroom.min',
+    'katex': 'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min',
     'highlight': 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min',
     'highlight-julia-repl': 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/julia-repl.min',
   },
@@ -13,6 +15,11 @@ requirejs.config({
   "highlight-julia": {
     "deps": [
       "highlight"
+    ]
+  },
+  "katex-auto-render": {
+    "deps": [
+      "katex"
     ]
   },
   "headroom-jquery": {
@@ -29,40 +36,38 @@ requirejs.config({
 }
 });
 ////////////////////////////////////////////////////////////////////////////////
-require([], function() {
-window.MathJax = {
-  "tex": {
-    "packages": [
-      "base",
-      "ams",
-      "autoload",
-      "mhchem"
-    ],
-    "inlineMath": [
-      [
-        "$",
-        "$"
-      ],
-      [
-        "\\(",
-        "\\)"
-      ]
-    ],
-    "tags": "ams"
-  },
-  "options": {
-    "ignoreHtmlClass": "tex2jax_ignore",
-    "processHtmlClass": "tex2jax_process"
+require(['jquery', 'katex', 'katex-auto-render'], function($, katex, renderMathInElement) {
+$(document).ready(function() {
+  renderMathInElement(
+    document.body,
+    {
+  "delimiters": [
+    {
+      "left": "$",
+      "right": "$",
+      "display": false
+    },
+    {
+      "left": "$$",
+      "right": "$$",
+      "display": true
+    },
+    {
+      "left": "\\[",
+      "right": "\\]",
+      "display": true
+    }
+  ],
+  "macros": {
+    "\\CC": "\\mathbb{C}",
+    "\\bx": "\\boldsymbol{x}",
+    "\\RR": "\\mathbb{R}",
+    "\\by": "\\boldsymbol{y}"
   }
 }
-;
 
-(function () {
-    var script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg-full.js';
-    script.async = true;
-    document.head.appendChild(script);
-})();
+  );
+})
 
 })
 ////////////////////////////////////////////////////////////////////////////////
