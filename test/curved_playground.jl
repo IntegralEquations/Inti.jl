@@ -36,6 +36,13 @@ end
 Ωₕ = view(msh, Ω)
 Γₕ = view(msh, Γ)
 
+crvmsh = Inti.Mesh{2,Float64}()
+append!(crvmsh.nodes, msh.nodes)
+
+connect_straight = Int[]
+connect_curve = Int[]
+connect_bdry = Int[]
+
 ψ = (t) -> [cos(2*π*t), sin(2*π*t)]
 ψ_der = (t) -> [-2*π*sin(2*π*t), 2*π*cos(2*π*t)]
 
@@ -72,8 +79,10 @@ nvol_els = size(msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, 
 
 # generate volume parametrizations
 circarea = 0.0
-#elind = 747
-els = []
+els_curve = []
+# TODO This could be an ElementIterator
+els_straight = []
+bdry_els = []
 for elind = 1:nvol_els
     node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{2, Float64}}][:, elind]
     nodes = msh.nodes[node_indices]
@@ -81,7 +90,9 @@ for elind = 1:nvol_els
     # First determine if straight or curved
     verts_on_bdry = findall(x -> x ∈ bdry_node_idx, node_indices)
     if length(verts_on_bdry) > 1
+        append!(connect_curve, node_indices)
         node_indices_on_bdry = node_indices[verts_on_bdry]
+        append!(connect_bdry, node_indices_on_bdry)
 
         # Need parametric coordinates of curved mapping to be consistent with straight simplex nodes
         α₁ = min(node_to_param[node_indices_on_bdry[1]], node_to_param[node_indices_on_bdry[2]])
@@ -153,7 +164,12 @@ for elind = 1:nvol_els
         D = Inti.ReferenceTriangle
         T = SVector{2,Float64}
         el = Inti.ParametricElement{D,T}(x -> Fₖ(x))
-        push!(els, el)
+        push!(els_curve, el)
+        ψₖ = (s) -> Fₖ([s, 1.0 - s])
+        L = Inti.ReferenceHyperCube{1}
+        bdry_el = Inti.ParametricElement{L,T}(s -> ψₖ(s))
+        push!(bdry_els, bdry_el)
+
         Jₖ_l1 = (x) ->  JF̃ₖ(x) + transpose(ForwardDiff.jacobian(Φₖ_l1, x))
         Jₖ_l2 = (x) ->  JF̃ₖ(x) + transpose(ForwardDiff.jacobian(Φₖ_l2, x))
         Jₖ_l3 = (x) ->  JF̃ₖ(x) + transpose(ForwardDiff.jacobian(Φₖ_l3, x))
@@ -171,6 +187,10 @@ for elind = 1:nvol_els
         Jₖ_l2 = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
         Jₖ_l3 = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
         Jₖ_Z  = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
+
+        append!(connect_straight, node_indices)
+        el = Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{2, Float64}}(nodes)
+        push!(els_straight, el)
     end
 
     Q = Inti.VioreanuRokhlin(; domain=Inti.ReferenceTriangle(), order=qorder)()
@@ -179,4 +199,33 @@ for elind = 1:nvol_els
         global circarea
         circarea += Q[2][q] * abs(det(Jₖ_l3(Q[1][q])))
     end
+end
+
+nv = 3 # Number of vertices for connectivity information in the volume
+nv_bdry = 2 # Number of vertices for connectivity information on the boundary
+newmsh = Inti.Mesh{2,Float64}()
+Ecurve = typeof(first(els_curve))
+Ebdry = typeof(first(bdry_els))
+Estraight = Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{2, Float64}} # TODO fix this to auto be a P1 element type
+
+newmsh.etype2mat[Ecurve] = reshape(connect_curve, nv, :)
+newmsh.etype2els[Ecurve] = convert(Vector{Ecurve}, els_curve)
+newmsh.etype2orientation[Ecurve] = ones(length(els_curve))
+
+newmsh.etype2mat[Estraight] = reshape(connect_straight, nv, :)
+newmsh.etype2els[Estraight] = convert(Vector{Estraight}, els_straight)
+newmsh.etype2orientation[Estraight] = ones(length(els_straight))
+
+# Uncomment this to add boundary elements to mesh; breaks Quadrature() call
+# below since we cannot yet loop over entities or do a view()
+#newmsh.etype2mat[Ebdry] = reshape(connect_bdry, nv_bdry, :)
+#newmsh.etype2els[Ebdry] = convert(Vector{Ebdry}, bdry_els)
+#newmsh.etype2orientation[Ebdry] = ones(length(bdry_els))
+
+Quad = Inti.Quadrature(newmsh, qorder = 2)
+accum = 0.0
+f = (x) -> x[1]^4
+for q in Quad
+    global accum
+    accum += f(q.coords) * q.weight
 end
