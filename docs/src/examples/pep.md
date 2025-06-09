@@ -40,7 +40,7 @@ following eigenvalue problem:
 ```
 
 Since the coefficient $a(\boldsymbol{x})$ is piecewise constant, we can reformulate the
-problem in terms of the jump conditions across the boundary $\Gamma$. More precisely,
+problem in terms of the jump conditions across the boundary ``\Gamma``. More precisely,
 denoting by $\Omega^\pm$ the exterior and interior of $\Omega$, respectively, and ``u^\pm``
 the restriction of ``u`` to ``\Omega^\pm``, we can rewrite the problem as:
 
@@ -93,7 +93,7 @@ satisfies the decay condition at infinity if the density $\sigma$ has zero mean 
 boundary $\Gamma$, which is the case if $\lambda \neq -1/2$ [faria2024complex; Lemma
 29](@cite). We thus have an equivalence between the original plasmonic eigenvalue problem
 and the Neumann-Poincaré eigenvalue problem (PEP), where $\lambda$ is related to the
-original parameter $\kappa$ by the transformation:
+original parameter ``\kappa`` by the transformation:
 
 ```math
 \kappa = \frac{2 \lambda + 1}{2 \lambda - 1}
@@ -383,40 +383,78 @@ dashed lines indicate the boundaries of the unit cell.
 
 ## Three-dimensional Problems
 
+Plasmonic eigenvalue problems are not limited to two dimensions. In three dimensions, many
+of the physical and mathematical principles are similar, but the computational complexity
+increase. The boundary integral approach remains highly effective, as it avoids volumetric
+meshing and naturally incorporates the radiation condition at infinity.
+
+The following example demonstrates how to compute and visualize plasmonic eigenmodes for a
+toroidal inclusion. Unlike the two-dimensional case, we avoid assembling the full (dense)
+matrix, and use instead a fast multipole method (FMM) to compute the action of the operator
+on a vector. We then use a Krylov based eigensolver to compute a few of the eigenvalues,
+instead of the full eigendecomposition. This is particularly important as the size of the
+problem grows.
+
 ```@example NPEP
-using FMM3D, KrylovKit, Meshes
+using FMM3D, KrylovKit
 Ω = Inti.torus() |> Inti.Domain
 Γ = Inti.boundary(Ω)
-Q = Inti.Quadrature(Γ; meshsize = 0.05, qorder = 3)
+Q = Inti.Quadrature(Γ; meshsize = 0.1, qorder = 4)
 op = Inti.Laplace(; dim = 3)
-Kop = Inti.IntegralOperator(Inti.AdjointDoubleLayerKernel(op), Q, Q)
-K₀ = Inti.assemble_fmm(Kop; rtol = 1e-8)
-δK = Inti.adaptive_correction(Kop)
-K = K₀ + δK
-λᵢ, vᵢ, info = eigsolve(K, rand(size(K,1)), 5)
+kernel = Inti.AdjointDoubleLayerKernel(op)
+Kop = Inti.IntegralOperator(kernel, Q, Q)
+K₀ = Inti.assemble_fmm(Kop; rtol = 1e-4)
+δK = Inti.adaptive_correction(Kop) # Correction for singular integrals
+K = K₀ + δK # Final operator matrix
+λᵢ, vᵢ, info = eigsolve(K, rand(size(K, 1)), 10)
+@assert norm(imag(λᵢ), Inf) < 1e-6 # hide
+@assert all(real(λᵢ) .> -0.6) # hide
 info
 ```
 
+Notice that only the matrix-vector product is required by `eigsolve`, and the `info` object
+above displays the convergence information. Here is what the few computed eigenvalues look
+like:
+
 ```@example NPEP
-n = length(λᵢ) # Choose an eigenfunction to visualize
-vₙ = vᵢ[n]
-xx = yy = zz = range(-2,2,100)
+scatter(
+    real(λᵢ),
+    imag(λᵢ);
+    markersize = 10,
+    marker = :cross,
+    color = :blue,
+    label = "Eigenvalues",
+)
+```
+
+Finally, we can visualize one of the eigenfunctions by evaluating our single-layer ansatz on
+a points inside the volume. Since there are many target points, we will again use the fast
+multipole method to compute the action of the operator on the eigenfunction.
+The visualization will be done on a 3D volume slices using `Makie`.
+
+```@example NPEP
+using Meshes # to visualize the mesh using `viz!`
+vₙ = vᵢ[8]
+pts_per_dim = 100
+xx = yy = zz = range(-2,2,pts_per_dim)
 targets = [SVector(x, y, z) for x in xx, y in yy, z in zz] |> vec
 Kpot = Inti.IntegralOperator(Inti.SingleLayerKernel(op), targets, Q)
 Kpot_fmm = Inti.assemble_fmm(Kpot; rtol = 1e-4)
 uₙ = Kpot_fmm * real(vₙ)
-uₙ = reshape(uₙ, length(xx), length(yy), length(zz))
 fig = Figure()
 ax = Axis3(fig[1, 1]; aspect = :data, elevation = π/6, azimuth = π/3,
            title = "Eigenfunction with λ ≈ $(trunc(real(λᵢ[n]), sigdigits = 2))")
 hidedecorations!(ax)
-plt = volumeslices!(ax, xx, yy, zz, uₙ; interpolate = true)
-plt[:update_yz][](1)
-plt[:update_xz][](1)
+plt = volumeslices!(ax, xx, yy, zz, reshape(uₙ,pts_per_dim,pts_per_dim,pts_per_dim); interpolate = true)
+plt[:update_yz][](pts_per_dim ÷ 2)
+plt[:update_xz][](pts_per_dim ÷ 2)
 plt[:update_xy][](length(zz) ÷ 2)
-viz!(Inti.mesh(Q); showsegments = true, color = :white, alpha = 0.5)
-fig # hide
+viz!(Inti.mesh(Q); showsegments = true, color = :lightgray, alpha = 0.5)
+current_figure() # hide
 ```
+
+As before, the eigenfunction is localized near the boundary of the toroidal inclusion, which
+is a characteristic feature of plasmonic modes.
 
 ## Further generalizations
 
@@ -429,7 +467,7 @@ The approach can be extended to handle multiple inclusions (disconnected domains
 case, the boundary $\Gamma$ would consist of multiple closed curves, and the quadrature
 would need to be defined on each component. This presents no fundamental challenges, and is
 simply a matter of defining a more complex domain. As long as the inclusions are smooth,
-everything should work as expected. 
+everything should work as expected.
 
 ### Helmholtz equation
 
