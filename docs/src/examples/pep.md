@@ -381,6 +381,43 @@ This plot shows the eigenfunction for a periodic array of kite-shaped inclusions
 cells are shown). Notice how the solution repeats with period $\ell$ in the x-direction. The
 dashed lines indicate the boundaries of the unit cell.
 
+## Three-dimensional Problems
+
+```@example NPEP
+using FMM3D, KrylovKit, Meshes
+Ω = Inti.torus() |> Inti.Domain
+Γ = Inti.boundary(Ω)
+Q = Inti.Quadrature(Γ; meshsize = 0.05, qorder = 3)
+op = Inti.Laplace(; dim = 3)
+Kop = Inti.IntegralOperator(Inti.AdjointDoubleLayerKernel(op), Q, Q)
+K₀ = Inti.assemble_fmm(Kop; rtol = 1e-8)
+δK = Inti.adaptive_correction(Kop)
+K = K₀ + δK
+λᵢ, vᵢ, info = eigsolve(K, rand(size(K,1)), 5)
+info
+```
+
+```@example NPEP
+n = length(λᵢ) # Choose an eigenfunction to visualize
+vₙ = vᵢ[n]
+xx = yy = zz = range(-2,2,100)
+targets = [SVector(x, y, z) for x in xx, y in yy, z in zz] |> vec
+Kpot = Inti.IntegralOperator(Inti.SingleLayerKernel(op), targets, Q)
+Kpot_fmm = Inti.assemble_fmm(Kpot; rtol = 1e-4)
+uₙ = Kpot_fmm * real(vₙ)
+uₙ = reshape(uₙ, length(xx), length(yy), length(zz))
+fig = Figure()
+ax = Axis3(fig[1, 1]; aspect = :data, elevation = π/6, azimuth = π/3,
+           title = "Eigenfunction with λ ≈ $(trunc(real(λᵢ[n]), sigdigits = 2))")
+hidedecorations!(ax)
+plt = volumeslices!(ax, xx, yy, zz, uₙ; interpolate = true)
+plt[:update_yz][](1)
+plt[:update_xz][](1)
+plt[:update_xy][](length(zz) ÷ 2)
+viz!(Inti.mesh(Q); showsegments = true, color = :white, alpha = 0.5)
+fig # hide
+```
+
 ## Further generalizations
 
 Some interesting generalizations are described next. If you are interested in any of these,
@@ -404,13 +441,6 @@ boundary integral equations is still possible, but becomes more involved.
 Furthermore, when the domain is composed of periodic structures, the solution ``u`` is
 usually quasi-periodic, and the computation of quasi-periodic Green's functions requires
 more involved techniques.
-
-### Three-dimensional problems
-
-In three dimensions, the approach is similar, but we need to use the three-dimensional
-Green's functions. Since everything becomes more expensive, one should probably use
-acceleration techniques such as the Fast Multipole Method (FMM), and compute only parts of
-the spectrum.
 
 ### Domains with Corners
 
