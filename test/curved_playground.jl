@@ -25,7 +25,6 @@ function domain_and_mesh(; meshsize, meshorder = 1)
 end
 
 meshsize = 0.1
-qorder = 2
 
 tmesh = @elapsed begin
     Ω, msh = domain_and_mesh(; meshsize)
@@ -35,13 +34,6 @@ end
 Γ = Inti.external_boundary(Ω)
 Ωₕ = view(msh, Ω)
 Γₕ = view(msh, Γ)
-
-crvmsh = Inti.Mesh{2,Float64}()
-append!(crvmsh.nodes, msh.nodes)
-
-connect_straight = Int[]
-connect_curve = Int[]
-connect_bdry = Int[]
 
 ψ = (t) -> [cos(2*π*t), sin(2*π*t)]
 ψ_der = (t) -> [-2*π*sin(2*π*t), 2*π*cos(2*π*t)]
@@ -75,136 +67,193 @@ bdry_node_idx = bdry_node_idx[I]
 bdry_node_param_loc = bdry_node_param_loc[I]
 node_to_param = Dict(zip(bdry_node_idx, bdry_node_param_loc))
 
-nvol_els = size(msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{2, Float64}}])[2]
-
 # generate volume parametrizations
 circarea = 0.0
-els_curve = []
-# TODO This could be an ElementIterator
+
+crvmsh = Inti.Mesh{2,Float64}()
+(; nodes, etype2mat, etype2els, ent2etags) = crvmsh
+foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), Inti.entities(msh))
+append!(nodes, msh.nodes)
+
+connect_straight = Int[]
+connect_curve = Int[]
+connect_curve_bdry = Int[]
+# TODO Could use an ElementIterator for straight elements
 els_straight = []
-bdry_els = []
-for elind = 1:nvol_els
-    node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{2, Float64}}][:, elind]
-    nodes = msh.nodes[node_indices]
+els_curve = []
+els_curve_bdry = []
 
-    # First determine if straight or curved
-    verts_on_bdry = findall(x -> x ∈ bdry_node_idx, node_indices)
-    if length(verts_on_bdry) > 1
-        append!(connect_curve, node_indices)
-        node_indices_on_bdry = node_indices[verts_on_bdry]
-        append!(connect_bdry, node_indices_on_bdry)
+for E in Inti.element_types(msh)
+    # The purpose of this check is to see if other element types are present in
+    # the mesh, such as e.g. quads; This code errors when encountering a quad,
+    # but the method can be extended to transfer straight quads to the new mesh,
+    # similar to how straight simplices are transferred below.
+    E <: Union{Inti.LagrangeElement{Inti.ReferenceSimplex{2}},
+    Inti.LagrangeElement{Inti.ReferenceHyperCube{1}}, SVector} || error()
+    E <: SVector && continue
+    E <: Inti.LagrangeElement{Inti.ReferenceHyperCube{1}} && continue
+    E_straight_bdry = Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 2, SVector{2, Float64}}
+    els = Inti.elements(msh, E)
+    for elind in eachindex(els)
+        node_indices = msh.etype2mat[E][:, elind]
+        straight_nodes = msh.nodes[node_indices]
 
-        # Need parametric coordinates of curved mapping to be consistent with straight simplex nodes
-        α₁ = min(node_to_param[node_indices_on_bdry[1]], node_to_param[node_indices_on_bdry[2]])
-        α₂ = max(node_to_param[node_indices_on_bdry[1]], node_to_param[node_indices_on_bdry[2]])
-        # HACK: handle wrap-around in parameter space when using a global parametrization
-        if abs(α₁ - α₂) > 0.5
-            α₁ = α₂
-            α₂ = 1.0
+        # First determine if straight or curved
+        verts_on_bdry = findall(x -> x ∈ bdry_node_idx, node_indices)
+        if length(verts_on_bdry) > 1
+            append!(connect_curve, node_indices)
+            node_indices_on_bdry = node_indices[verts_on_bdry]
+            append!(connect_curve_bdry, node_indices_on_bdry)
+
+            # Need parametric coordinates of curved mapping to be consistent with straight simplex nodes
+            α₁ = min(node_to_param[node_indices_on_bdry[1]], node_to_param[node_indices_on_bdry[2]])
+            α₂ = max(node_to_param[node_indices_on_bdry[1]], node_to_param[node_indices_on_bdry[2]])
+            # HACK: handle wrap-around in parameter space when using a global parametrization
+            if abs(α₁ - α₂) > 0.5
+                α₁ = α₂
+                α₂ = 1.0
+            end
+            a₁ = ψ(α₁)
+            a₂ = ψ(α₂)
+
+            ## Interpolant πₖʲ construction from Inti
+            α₁hat = 0.0
+            α₂hat = 1.0
+            f̂ₖ = (t) -> α₁ .+ (α₂ - α₁)*t
+            f̂ₖ_comp = (x) -> f̂ₖ( (x[1] * α₁hat + x[2] * α₂hat)/(x[1] + x[2]) )
+
+            # l = 1 projection onto linear FE space
+            πₖ¹_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceLine, 2, SVector{2,Float64}})
+            πₖ¹ψ_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ¹_nodes))
+            for i in eachindex(πₖ¹_nodes)
+                πₖ¹ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ¹_nodes[i][1]))
+            end
+            πₖ¹ψ_reference_nodes = SVector{2}(πₖ¹ψ_reference_nodes)
+            πₖ¹ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceLine}(πₖ¹ψ_reference_nodes)(x)
+
+            # l = 2 projection onto quadratic FE space
+            πₖ²_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceLine, 3, SVector{3,Float64}})
+            πₖ²ψ_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ²_nodes))
+            for i in eachindex(πₖ²_nodes)
+                πₖ²ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ²_nodes[i][1]))
+            end
+            πₖ²ψ_reference_nodes = SVector{3}(πₖ²ψ_reference_nodes)
+            πₖ²ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceLine}(πₖ²ψ_reference_nodes)(x)
+
+            # l = 3 projection onto cubic FE space
+            πₖ³_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceLine, 4, SVector{4,Float64}})
+            πₖ³ψ_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ³_nodes))
+            for i in eachindex(πₖ³_nodes)
+                πₖ³ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ³_nodes[i][1]))
+            end
+            πₖ³ψ_reference_nodes = SVector{4}(πₖ³ψ_reference_nodes)
+            πₖ³ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceLine}(πₖ³ψ_reference_nodes)(x)
+
+            # Nonlinear map
+
+            # l = 1
+            Φₖ_l1 = (x) -> (x[1] + x[2])^3 * (ψ(f̂ₖ_comp(x)) - πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])))
+
+            # l = 2
+            Φₖ_l2 = (x) -> (x[1] + x[2])^4 * (ψ(f̂ₖ_comp(x)) - πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^2*(πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])))
+
+            # l = 3
+            Φₖ_l3 = (x) -> (x[1] + x[2])^5 * (ψ(f̂ₖ_comp(x)) - πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^2*(πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^3*(πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])))
+
+            # Zlamal nonlinear map
+            Φₖ_Z = (x) -> x[2]/(1 - x[1]) * (ψ(x[1] * α₁ + (1 - x[1]) * α₂) - x[1] * a₁ - (1 - x[1])*a₂)
+
+            # Affine map
+            aₖ = msh.nodes[node_indices_on_bdry[1]]
+            bₖ = msh.nodes[setdiff(node_indices, node_indices[verts_on_bdry])[1]]
+            cₖ = msh.nodes[node_indices_on_bdry[2]]
+            F̃ₖ = (x) -> [(cₖ[1] - bₖ[1])*x[1] + (aₖ[1] - bₖ[1])*x[2] + bₖ[1], (cₖ[2] - bₖ[2])*x[1] + (aₖ[2] - bₖ[2])*x[2] + bₖ[2]]
+
+            # Full transformation
+            Fₖ = (x) -> F̃ₖ(x) + Φₖ_l3(x)
+            JF̃ₖ = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
+            D = Inti.ReferenceTriangle
+            T = SVector{2,Float64}
+            el = Inti.ParametricElement{D,T}(x -> Fₖ(x))
+            push!(els_curve, el)
+            ψₖ = (s) -> Fₖ([s[1], 1.0 - s[1]])
+            L = Inti.ReferenceHyperCube{1}
+            bdry_el = Inti.ParametricElement{L,T}(s -> ψₖ(s))
+            push!(els_curve_bdry, bdry_el)
+
+            Jₖ_l1 = (x) ->  JF̃ₖ(x) + transpose(ForwardDiff.jacobian(Φₖ_l1, x))
+            Jₖ_l2 = (x) ->  JF̃ₖ(x) + transpose(ForwardDiff.jacobian(Φₖ_l2, x))
+            Jₖ_l3 = (x) ->  JF̃ₖ(x) + transpose(ForwardDiff.jacobian(Φₖ_l3, x))
+
+            Fₖ_Z = (x) -> F̃ₖ(x) + Φₖ_Z(x)
+            Jₖ_Z = (x) -> [cₖ[1]-bₖ[1] + Φₖ_Z_der_x1(x)[1]; aₖ[1]-bₖ[1] + Φₖ_Z_der_x2(x)[1];; cₖ[2]-bₖ[2] + Φₖ_Z_der_x1(x)[2]; aₖ[2]-bₖ[2] + Φₖ_Z_der_x2(x)[2]]
+            # loop over entities
+            Ecurve = typeof(first(els_curve))
+            Ecurvebdry = typeof(first(els_curve_bdry))
+            for k in Inti.entities(msh)
+                # determine if the straight (LagrangeElement) mesh element
+                # belongs to the entity and, if so, add the curved
+                # (ParametricElement) element.
+                if haskey(msh.ent2etags[k], E)
+                    n_straight_vol_els = size(msh.etype2mat[E])[2]
+                    if any((i) -> node_indices == msh.etype2mat[E][:, i], range(1,n_straight_vol_els))
+                        haskey(ent2etags[k], Ecurve) || (ent2etags[k][Ecurve] = Vector{Int64}())
+                        append!(ent2etags[k][Ecurve], length(els_curve))
+                    end
+
+                end
+                # find entity that contains straight (LagrangeElement) face
+                # element which is now being replaced by a curved
+                # (ParametricElement) face element
+                if haskey(msh.ent2etags[k], E_straight_bdry)
+                    k.dim == 1 || continue
+                    n_straight_bdry_els = size(msh.etype2mat[E_straight_bdry])[2]
+                    straight_entity_elementind = findall((i) -> sort(node_indices_on_bdry) == sort(msh.etype2mat[E_straight_bdry][:, i]), range(1, n_straight_bdry_els))
+                    if !isempty(straight_entity_elementind)
+                        haskey(ent2etags[k], Ecurvebdry) || (ent2etags[k][Ecurvebdry] = Vector{Int64}())
+                        append!(ent2etags[k][Ecurvebdry], length(els_curve_bdry))
+                    end
+                end
+            end
+
+        else
+            # Full transformation: Affine map
+            aₖ = straight_nodes[1]
+            bₖ = straight_nodes[2]
+            cₖ = straight_nodes[3]
+            Fₖ = (x) -> [(cₖ[1] - bₖ[1])*x[1] + (aₖ[1] - bₖ[1])*x[2] + bₖ[1], (cₖ[2] - bₖ[2])*x[1] + (aₖ[2] - bₖ[2])*x[2] + bₖ[2]]
+            Jₖ = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
+            Jₖ_l1 = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
+            Jₖ_l2 = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
+            Jₖ_l3 = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
+            Jₖ_Z  = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
+
+            append!(connect_straight, node_indices)
+            el = Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{2, Float64}}(straight_nodes)
+            push!(els_straight, el)
+
+            for k in Inti.entities(msh)
+                # determine if the straight mesh element belongs to the entity and, if so, add.
+                if haskey(msh.ent2etags[k], E)
+                    n_straight_vol_els = size(msh.etype2mat[E])[2]
+                    if any((i) -> node_indices == msh.etype2mat[E][:, i], range(1,n_straight_vol_els))
+                        haskey(ent2etags[k], E) || (ent2etags[k][E] = Vector{Int64}())
+                        append!(ent2etags[k][E], length(els_straight))
+                    end
+                end
+                # Note: This code does not consider the possibility of boundary
+                # entities that are the boundary of straight simplices.  This is
+                # because of the assumption above that if j > 1 the triangle is
+                # curved.
+            end
         end
-        a₁ = ψ(α₁)
-        a₂ = ψ(α₂)
-        
-        ## Interpolant πₖʲ construction from Inti
-        α₁hat = 0.0
-        α₂hat = 1.0
-        f̂ₖ = (t) -> α₁ .+ (α₂ - α₁)*t
-        f̂ₖ_comp = (x) -> f̂ₖ( (x[1] * α₁hat + x[2] * α₂hat)/(x[1] + x[2]) )
-
-        # l = 1 projection onto linear FE space
-        πₖ¹_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceLine, 2, SVector{2,Float64}})
-        πₖ¹ψ_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ¹_nodes))
-        for i in eachindex(πₖ¹_nodes)
-            πₖ¹ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ¹_nodes[i][1]))
-        end
-        πₖ¹ψ_reference_nodes = SVector{2}(πₖ¹ψ_reference_nodes)
-        πₖ¹ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceLine}(πₖ¹ψ_reference_nodes)(x)
-
-        # l = 2 projection onto quadratic FE space
-        πₖ²_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceLine, 3, SVector{3,Float64}})
-        πₖ²ψ_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ²_nodes))
-        for i in eachindex(πₖ²_nodes)
-            πₖ²ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ²_nodes[i][1]))
-        end
-        πₖ²ψ_reference_nodes = SVector{3}(πₖ²ψ_reference_nodes)
-        πₖ²ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceLine}(πₖ²ψ_reference_nodes)(x)
-
-        # l = 3 projection onto cubic FE space
-        πₖ³_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceLine, 4, SVector{4,Float64}})
-        πₖ³ψ_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ³_nodes))
-        for i in eachindex(πₖ³_nodes)
-            πₖ³ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ³_nodes[i][1]))
-        end
-        πₖ³ψ_reference_nodes = SVector{4}(πₖ³ψ_reference_nodes)
-        πₖ³ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceLine}(πₖ³ψ_reference_nodes)(x)
-
-        # Nonlinear map
-
-        # l = 1
-        Φₖ_l1 = (x) -> (x[1] + x[2])^3 * (ψ(f̂ₖ_comp(x)) - πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])))
-
-        # l = 2
-        Φₖ_l2 = (x) -> (x[1] + x[2])^4 * (ψ(f̂ₖ_comp(x)) - πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^2*(πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])))
-
-        # l = 3
-        Φₖ_l3 = (x) -> (x[1] + x[2])^5 * (ψ(f̂ₖ_comp(x)) - πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^2*(πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^3*(πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])))
-
-        # Zlamal nonlinear map
-        Φₖ_Z = (x) -> x[2]/(1 - x[1]) * (ψ(x[1] * α₁ + (1 - x[1]) * α₂) - x[1] * a₁ - (1 - x[1])*a₂)
-
-        # Affine map
-        aₖ = msh.nodes[node_indices_on_bdry[1]]
-        bₖ = msh.nodes[setdiff(node_indices, node_indices[verts_on_bdry])[1]]
-        cₖ = msh.nodes[node_indices_on_bdry[2]]
-        F̃ₖ = (x) -> [(cₖ[1] - bₖ[1])*x[1] + (aₖ[1] - bₖ[1])*x[2] + bₖ[1], (cₖ[2] - bₖ[2])*x[1] + (aₖ[2] - bₖ[2])*x[2] + bₖ[2]]
-
-        # Full transformation
-        Fₖ = (x) -> F̃ₖ(x) + Φₖ_l3(x)
-        JF̃ₖ = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
-        D = Inti.ReferenceTriangle
-        T = SVector{2,Float64}
-        el = Inti.ParametricElement{D,T}(x -> Fₖ(x))
-        push!(els_curve, el)
-        ψₖ = (s) -> Fₖ([s, 1.0 - s])
-        L = Inti.ReferenceHyperCube{1}
-        bdry_el = Inti.ParametricElement{L,T}(s -> ψₖ(s))
-        push!(bdry_els, bdry_el)
-
-        Jₖ_l1 = (x) ->  JF̃ₖ(x) + transpose(ForwardDiff.jacobian(Φₖ_l1, x))
-        Jₖ_l2 = (x) ->  JF̃ₖ(x) + transpose(ForwardDiff.jacobian(Φₖ_l2, x))
-        Jₖ_l3 = (x) ->  JF̃ₖ(x) + transpose(ForwardDiff.jacobian(Φₖ_l3, x))
-
-        Fₖ_Z = (x) -> F̃ₖ(x) + Φₖ_Z(x)
-        Jₖ_Z = (x) -> [cₖ[1]-bₖ[1] + Φₖ_Z_der_x1(x)[1]; aₖ[1]-bₖ[1] + Φₖ_Z_der_x2(x)[1];; cₖ[2]-bₖ[2] + Φₖ_Z_der_x1(x)[2]; aₖ[2]-bₖ[2] + Φₖ_Z_der_x2(x)[2]]
-    else
-        # Full transformation: Affine map
-        aₖ = nodes[1]
-        bₖ = nodes[2]
-        cₖ = nodes[3]
-        Fₖ = (x) -> [(cₖ[1] - bₖ[1])*x[1] + (aₖ[1] - bₖ[1])*x[2] + bₖ[1], (cₖ[2] - bₖ[2])*x[1] + (aₖ[2] - bₖ[2])*x[2] + bₖ[2]]
-        Jₖ = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
-        Jₖ_l1 = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
-        Jₖ_l2 = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
-        Jₖ_l3 = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
-        Jₖ_Z  = (x) -> [cₖ[1]-bₖ[1]; aₖ[1]-bₖ[1];; cₖ[2]-bₖ[2]; aₖ[2]-bₖ[2]]
-
-        append!(connect_straight, node_indices)
-        el = Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{2, Float64}}(nodes)
-        push!(els_straight, el)
-    end
-
-    Q = Inti.VioreanuRokhlin(; domain=Inti.ReferenceTriangle(), order=qorder)()
-    nq = length(Q[2])
-    for q in 1:nq
-        global circarea
-        circarea += Q[2][q] * abs(det(Jₖ_l3(Q[1][q])))
     end
 end
 
 nv = 3 # Number of vertices for connectivity information in the volume
 nv_bdry = 2 # Number of vertices for connectivity information on the boundary
 Ecurve = typeof(first(els_curve))
-Ebdry = typeof(first(bdry_els))
+Ecurvebdry = typeof(first(els_curve_bdry))
 Estraight = Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{2, Float64}} # TODO fix this to auto be a P1 element type
 
 crvmsh.etype2mat[Ecurve] = reshape(connect_curve, nv, :)
@@ -215,16 +264,27 @@ crvmsh.etype2mat[Estraight] = reshape(connect_straight, nv, :)
 crvmsh.etype2els[Estraight] = convert(Vector{Estraight}, els_straight)
 crvmsh.etype2orientation[Estraight] = ones(length(els_straight))
 
-# Uncomment this to add boundary elements to mesh; breaks Quadrature() call
-# below since we cannot yet loop over entities or do a view()
-crvmsh.etype2mat[Ebdry] = reshape(connect_bdry, nv_bdry, :)
-crvmsh.etype2els[Ebdry] = convert(Vector{Ebdry}, bdry_els)
-crvmsh.etype2orientation[Ebdry] = ones(length(bdry_els))
+crvmsh.etype2mat[Ecurvebdry] = reshape(connect_curve_bdry, nv_bdry, :)
+crvmsh.etype2els[Ecurvebdry] = convert(Vector{Ecurvebdry}, els_curve_bdry)
+crvmsh.etype2orientation[Ecurvebdry] = ones(length(els_curve_bdry))
 
-Quad = Inti.Quadrature(crvmsh, qorder = 2)
-accum = 0.0
-f = (x) -> x[1]^4
-for q in Quad
-    global accum
-    accum += f(q.coords) * q.weight
-end
+Γₕ = crvmsh[Γ]
+Ωₕ = crvmsh[Ω]
+
+qorder = 2
+Ωₕ_quad = Inti.Quadrature(Ωₕ, qorder = qorder)
+Γₕ_quad = Inti.Quadrature(Γₕ, qorder = qorder)
+@assert isapprox(Inti.integrate(x -> 1, Ωₕ_quad), π, rtol = 1e-7)
+@assert isapprox(Inti.integrate(q -> q.coords[1]^4, Ωₕ_quad), π/8, rtol = 1e-5)
+
+qorder = 5
+Ωₕ_quad = Inti.Quadrature(Ωₕ, qorder = qorder)
+Γₕ_quad = Inti.Quadrature(Γₕ, qorder = qorder)
+@assert isapprox(Inti.integrate(x -> 1, Ωₕ_quad), π, rtol = 1e-11)
+@assert isapprox(Inti.integrate(q -> q.coords[1]^4, Ωₕ_quad), π/8, rtol = 1e-10)
+
+qorder = 8
+Ωₕ_quad = Inti.Quadrature(Ωₕ, qorder = qorder)
+Γₕ_quad = Inti.Quadrature(Γₕ, qorder = qorder)
+@assert isapprox(Inti.integrate(x -> 1, Ωₕ_quad), π, rtol = 1e-14)
+@assert isapprox(Inti.integrate(q -> q.coords[1]^4, Ωₕ_quad), π/8, rtol = 1e-14)
