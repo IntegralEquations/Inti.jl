@@ -273,29 +273,8 @@ E = Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}
             a₁ = SVector{3,Float64}(ψ(α₁))
             a₂ = SVector{3,Float64}(ψ(α₂))
             a₃ = SVector{3,Float64}(ψ(α₃))
-            α₁hat = SVector{2,Float64}(1.0, 0.0)
-            α₂hat = SVector{2,Float64}(0.0, 1.0)
-            α₃hat = SVector{2,Float64}(0.0, 0.0)
 
-            πₖ¹_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, 3, SVector{2,Float64}})
-            α_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ¹_nodes))
-            α_reference_nodes[1] = SVector{2}(α₃)
-            α_reference_nodes[2] = SVector{2}(α₁)
-            α_reference_nodes[3] = SVector{2}(α₂)
-            α_reference_nodes = SVector{3}(α_reference_nodes)
-            f̂ₖ = (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(α_reference_nodes)(x)
-
-            @assert (f̂ₖ(α₁hat) ≈ α₁) && (f̂ₖ(α₂hat) ≈ α₂) && (f̂ₖ(α₃hat) ≈ α₃)
-            @assert a₁ ≈ ψ(f̂ₖ(α₁hat))
-            @assert a₂ ≈ ψ(f̂ₖ(α₂hat))
-            @assert a₃ ≈ ψ(f̂ₖ(α₃hat))
-            @assert a₁ ≈ straight_nodes[1] || a₁ ≈ straight_nodes[2] || a₁ ≈ straight_nodes[3] || a₁ ≈ straight_nodes[4]
-            @assert a₂ ≈ straight_nodes[1] || a₂ ≈ straight_nodes[2] || a₂ ≈ straight_nodes[3] || a₂ ≈ straight_nodes[4]
-            if j == 3
-                @assert a₃ ≈ straight_nodes[1] || a₃ ≈ straight_nodes[2] || a₃ ≈ straight_nodes[3] || a₃ ≈ straight_nodes[4]
-            end
-
-            # Affine map
+            # Construction of the affine map with vertices (aₖ, bₖ, cₖ, dₖ).
             # Vertices aₖ and bₖ always lay on surface. Vertex dₖ always lays in volume.
             aₖ = a₁
             bₖ = a₂
@@ -342,6 +321,41 @@ E = Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}
             @assert !all(norm.(Ref(a₂) .- straight_nodes) .> atol)
             if j == 3
                 @assert !all(norm.(Ref(a₃) .- straight_nodes) .> atol)
+            end
+
+            # The following ensures an ordering of the face nodes so that
+            # the resulting normal vector is properly oriented.
+            if det([aₖ-dₖ bₖ-dₖ cₖ-dₖ]) < 0
+                tmp = deepcopy(α₁)
+                α₁ = deepcopy(α₂)
+                α₂ = tmp
+                a₁ = SVector{3,Float64}(ψ(α₁))
+                a₂ = SVector{3,Float64}(ψ(α₂))
+                a₃ = SVector{3,Float64}(ψ(α₃))
+                aₖ = a₁
+                bₖ = a₂
+            end
+
+            α₁hat = SVector{2,Float64}(1.0, 0.0)
+            α₂hat = SVector{2,Float64}(0.0, 1.0)
+            α₃hat = SVector{2,Float64}(0.0, 0.0)
+
+            πₖ¹_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, 3, SVector{2,Float64}})
+            α_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ¹_nodes))
+            α_reference_nodes[1] = SVector{2}(α₃)
+            α_reference_nodes[2] = SVector{2}(α₁)
+            α_reference_nodes[3] = SVector{2}(α₂)
+            α_reference_nodes = SVector{3}(α_reference_nodes)
+            f̂ₖ = (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(α_reference_nodes)(x)
+
+            @assert (f̂ₖ(α₁hat) ≈ α₁) && (f̂ₖ(α₂hat) ≈ α₂) && (f̂ₖ(α₃hat) ≈ α₃)
+            @assert a₁ ≈ ψ(f̂ₖ(α₁hat))
+            @assert a₂ ≈ ψ(f̂ₖ(α₂hat))
+            @assert a₃ ≈ ψ(f̂ₖ(α₃hat))
+            @assert a₁ ≈ straight_nodes[1] || a₁ ≈ straight_nodes[2] || a₁ ≈ straight_nodes[3] || a₁ ≈ straight_nodes[4]
+            @assert a₂ ≈ straight_nodes[1] || a₂ ≈ straight_nodes[2] || a₂ ≈ straight_nodes[3] || a₂ ≈ straight_nodes[4]
+            if j == 3
+                @assert a₃ ≈ straight_nodes[1] || a₃ ≈ straight_nodes[2] || a₃ ≈ straight_nodes[3] || a₃ ≈ straight_nodes[4]
             end
             F̃ₖ = (x) -> [(aₖ[1] - dₖ[1])*x[1] + (bₖ[1] - dₖ[1])*x[2] + (cₖ[1] - dₖ[1])*x[3] + dₖ[1], (aₖ[2] - dₖ[2])*x[1] + (bₖ[2] - dₖ[2])*x[2] + (cₖ[2] - dₖ[2])*x[3] + dₖ[2], (aₖ[3] - dₖ[3])*x[1] + (bₖ[3] - dₖ[3])*x[2] + (cₖ[3] - dₖ[3])*x[3] + dₖ[3]]
             @assert aₖ ≈ a₁
@@ -542,3 +556,10 @@ qorder = 8
 Γₕ_quad = Inti.Quadrature(Γₕ, qorder = qorder)
 @assert isapprox(Inti.integrate(x -> 1, Ωₕ_quad), truevol, rtol = 1e-12)
 @assert isapprox(Inti.integrate(x -> 1, Γₕ_quad), truesfcarea, rtol = 1e-14)
+
+divF = (x) -> x[3] + x[3]^2 + x[2]^3
+F = (x) -> [x[1]*x[3], x[2]*x[3]^2, x[2]^3*x[3]]
+#divF = (x) -> 1.0
+#F = (x) -> 1/3*[x[1], x[2], x[3]]
+Inti.integrate(q -> divF(q.coords), Ωₕ_quad)
+Inti.integrate(q -> dot(F(q.coords), q.normal), Γₕ_quad)

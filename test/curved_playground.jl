@@ -176,7 +176,7 @@ for E in Inti.element_types(msh)
             T = SVector{2,Float64}
             el = Inti.ParametricElement{D,T}(x -> Fₖ(x))
             push!(els_curve, el)
-            ψₖ = (s) -> Fₖ([s[1], 1.0 - s[1]])
+            ψₖ = (s) -> Fₖ([1.0 - s[1], s[1]])
             L = Inti.ReferenceHyperCube{1}
             bdry_el = Inti.ParametricElement{L,T}(s -> ψₖ(s))
             push!(els_curve_bdry, bdry_el)
@@ -288,3 +288,11 @@ qorder = 8
 Γₕ_quad = Inti.Quadrature(Γₕ, qorder = qorder)
 @assert isapprox(Inti.integrate(x -> 1, Ωₕ_quad), π, rtol = 1e-14)
 @assert isapprox(Inti.integrate(q -> q.coords[1]^4, Ωₕ_quad), π/8, rtol = 1e-14)
+
+Fvol = (x) -> x[2]^2 - 2*x[2]*x[1]^3
+F = (x) -> [x[1]*x[2]^2, x[1]^3*x[2]^2]
+#Fvol = (x) -> 1.0
+#F = (x) -> [1/2*x[1], 1/2*x[2]]
+greenvol = Inti.integrate(q -> Fvol(q.coords), Ωₕ_quad)
+greenline = Inti.integrate(q -> dot(F(q.coords), q.normal), Γₕ_quad)
+@assert isapprox(greenline, greenvol, rtol = 1e-13)
