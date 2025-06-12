@@ -50,13 +50,18 @@ bdry_node_param_loc = Vector{Float64}()
 
 uniqueidx(v) = unique(i -> v[i], eachindex(v))
 
+crvmsh = Inti.Mesh{2,Float64}()
+(; nodes, etype2mat, etype2els, ent2etags) = crvmsh
+foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), Inti.entities(msh))
+append!(nodes, msh.nodes)
+
 # Re-write nodes to lay on exact boundary
 for elind = 1:nbdry_els
     local node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 2, SVector{2, Float64}}][:, elind]
-    local nodes = msh.nodes[node_indices]
+    local nodes = crvmsh.nodes[node_indices]
     idxs, dists = nn(kdt, nodes)
-    msh.nodes[node_indices[1]] = param_disc[idxs[1]]
-    msh.nodes[node_indices[2]] = param_disc[idxs[2]]
+    crvmsh.nodes[node_indices[1]] = param_disc[idxs[1]]
+    crvmsh.nodes[node_indices[2]] = param_disc[idxs[2]]
     push!(bdry_node_idx, node_indices[1])
     push!(bdry_node_idx, node_indices[2])
     push!(bdry_node_param_loc, t[idxs[1]])
@@ -69,11 +74,6 @@ node_to_param = Dict(zip(bdry_node_idx, bdry_node_param_loc))
 
 # generate volume parametrizations
 circarea = 0.0
-
-crvmsh = Inti.Mesh{2,Float64}()
-(; nodes, etype2mat, etype2els, ent2etags) = crvmsh
-foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), Inti.entities(msh))
-append!(nodes, msh.nodes)
 
 connect_straight = Int[]
 connect_curve = Int[]
@@ -96,11 +96,12 @@ for E in Inti.element_types(msh)
     els = Inti.elements(msh, E)
     for elind in eachindex(els)
         node_indices = msh.etype2mat[E][:, elind]
-        straight_nodes = msh.nodes[node_indices]
+        straight_nodes = crvmsh.nodes[node_indices]
 
         # First determine if straight or curved
         verts_on_bdry = findall(x -> x ∈ bdry_node_idx, node_indices)
-        if length(verts_on_bdry) > 1
+        j = length(verts_on_bdry) # j in C. Bernardi SINUM Sec. 6
+        if j > 1
             append!(connect_curve, node_indices)
             node_indices_on_bdry = node_indices[verts_on_bdry]
             append!(connect_curve_bdry, node_indices_on_bdry)
@@ -164,9 +165,9 @@ for E in Inti.element_types(msh)
             Φₖ_Z = (x) -> x[2]/(1 - x[1]) * (ψ(x[1] * α₁ + (1 - x[1]) * α₂) - x[1] * a₁ - (1 - x[1])*a₂)
 
             # Affine map
-            aₖ = msh.nodes[node_indices_on_bdry[1]]
-            bₖ = msh.nodes[setdiff(node_indices, node_indices[verts_on_bdry])[1]]
-            cₖ = msh.nodes[node_indices_on_bdry[2]]
+            aₖ = crvmsh.nodes[node_indices_on_bdry[1]]
+            bₖ = crvmsh.nodes[setdiff(node_indices, node_indices[verts_on_bdry])[1]]
+            cₖ = crvmsh.nodes[node_indices_on_bdry[2]]
             F̃ₖ = (x) -> [(cₖ[1] - bₖ[1])*x[1] + (aₖ[1] - bₖ[1])*x[2] + bₖ[1], (cₖ[2] - bₖ[2])*x[1] + (aₖ[2] - bₖ[2])*x[2] + bₖ[2]]
 
             # Full transformation

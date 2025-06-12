@@ -56,37 +56,37 @@ chart_1_bdry_node_param_loc = Vector{Vector{Float64}}()
 
 uniqueidx(v) = unique(i -> v[i], eachindex(v))
 
+crvmsh = Inti.Mesh{3,Float64}()
+(; nodes, etype2mat, etype2els, ent2etags) = crvmsh
+foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), Inti.entities(msh))
+append!(nodes, msh.nodes)
+
 # Set up chart <-> node Dict
 for elind = 1:nbdry_els
     node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{3, Float64}}][:, elind]
-    straight_nodes = msh.nodes[node_indices]
+    straight_nodes = crvmsh.nodes[node_indices]
 
     if face_element_on_surface(straight_nodes)
         idxs, dists = nn(chart_1_kdt, straight_nodes)
         ψ⁻¹ = ψ₁⁻¹
         if node_indices[1] ∉ chart_1_bdry_node_idx
-            msh.nodes[node_indices[1]] = chart_1[idxs[1]]
+            crvmsh.nodes[node_indices[1]] = chart_1[idxs[1]]
             push!(chart_1_bdry_node_param_loc, Vector{Float64}([θ[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]]))
             push!(chart_1_bdry_node_idx, node_indices[1])
         end
         if node_indices[2] ∉ chart_1_bdry_node_idx
-            msh.nodes[node_indices[2]] = chart_1[idxs[2]]
+            crvmsh.nodes[node_indices[2]] = chart_1[idxs[2]]
             push!(chart_1_bdry_node_param_loc, Vector{Float64}([θ[chart_1_cart_idxs_θ[idxs[2]]], ϕ[chart_1_cart_idxs_ϕ[idxs[2]]]]))
             push!(chart_1_bdry_node_idx, node_indices[2])
         end
         if node_indices[3] ∉ chart_1_bdry_node_idx
-            msh.nodes[node_indices[3]] = chart_1[idxs[3]]
+            crvmsh.nodes[node_indices[3]] = chart_1[idxs[3]]
             push!(chart_1_bdry_node_param_loc, Vector{Float64}([θ[chart_1_cart_idxs_θ[idxs[3]]], ϕ[chart_1_cart_idxs_ϕ[idxs[3]]]]))
             push!(chart_1_bdry_node_idx, node_indices[3])
         end
     end
 end
 chart_1_node_to_param = Dict(zip(chart_1_bdry_node_idx, chart_1_bdry_node_param_loc))
-
-crvmsh = Inti.Mesh{3,Float64}()
-(; nodes, etype2mat, etype2els, ent2etags) = crvmsh
-foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), Inti.entities(msh))
-append!(nodes, msh.nodes)
 
 connect_straight = Int[]
 connect_curve = Int[]
@@ -96,36 +96,32 @@ els_straight = []
 els_curve = []
 els_curve_bdry = []
 
-#nvol_els = size(msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}])[2]
-nnewton = 0
-elcount = 0
-els = []
-nvol_curved = 0
-#for E in Inti.element_types(msh)
-E = Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}
+for E in Inti.element_types(msh)
     # The purpose of this check is to see if other element types are present in
     # the mesh, such as e.g. cubes; This code errors when encountering a cube,
     # but the method can be extended to transfer straight cubes to the new mesh,
     # similar to how straight simplices are transferred below.
     E <: Union{Inti.LagrangeElement{Inti.ReferenceSimplex{3}},Inti.LagrangeElement{Inti.ReferenceSimplex{2}},
     Inti.LagrangeElement{Inti.ReferenceHyperCube{1}}, SVector} || error()
-    #E <: SVector && continue
-    #E <: Inti.LagrangeElement{Inti.ReferenceHyperCube{1}} && continue
-    #E <: Inti.LagrangeElement{Inti.ReferenceHyperCube{2}} && continue
+    E <: SVector && continue
+    E <: Inti.LagrangeElement{Inti.ReferenceHyperCube{1}} && continue
+    E <: Inti.LagrangeElement{Inti.ReferenceHyperCube{2}} && continue
+    E <: Inti.LagrangeElement{Inti.ReferenceSimplex{2}} && continue
+    E <: Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}} || (println(E); error())
     E_straight_bdry = Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{3, Float64}}
     els = Inti.elements(msh, E)
     for elind in eachindex(els)
         node_indices = msh.etype2mat[E][:, elind]
-        straight_nodes = msh.nodes[node_indices]
+        straight_nodes = crvmsh.nodes[node_indices]
     
         verts_on_bdry = findall(x -> x ∈ chart_1_bdry_node_idx, node_indices)
+        # j in C. Bernardi SINUM Sec. 6
         j = 0
         if !isempty(verts_on_bdry)
             nverts_in_chart = length(verts_on_bdry)
             j = nverts_in_chart
         end
         if j > 1
-            global nvol_curved += 1
             append!(connect_curve, node_indices)
             node_indices_on_bdry = copy(node_indices[verts_on_bdry])
             append!(connect_curve_bdry, node_indices_on_bdry)
@@ -149,26 +145,25 @@ E = Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}
                 # if j=3 only one of the candidate face triangles will work, so
                 # find that one
                 if candidate_els[1][1] ∉ node_indices_on_bdry
-                    p = copy(msh.nodes[candidate_els[1][1]])
+                    p = copy(crvmsh.nodes[candidate_els[1][1]])
                 elseif candidate_els[1][2] ∉ node_indices_on_bdry
-                    p = copy(msh.nodes[candidate_els[1][2]])
+                    p = copy(crvmsh.nodes[candidate_els[1][2]])
                 elseif candidate_els[1][3] ∉ node_indices_on_bdry
-                    p = copy(msh.nodes[candidate_els[1][3]])
+                    p = copy(crvmsh.nodes[candidate_els[1][3]])
                 else
                     @assert false
                 end
                 if j == 3 && p ∉ straight_nodes
                     if candidate_els[2][1] ∉ node_indices_on_bdry
-                        p = copy(msh.nodes[candidate_els[2][1]])
+                        p = copy(crvmsh.nodes[candidate_els[2][1]])
                     elseif candidate_els[2][2] ∉ node_indices_on_bdry
-                        p = copy(msh.nodes[candidate_els[2][2]])
+                        p = copy(crvmsh.nodes[candidate_els[2][2]])
                     elseif candidate_els[2][3] ∉ node_indices_on_bdry
-                        p = copy(msh.nodes[candidate_els[2][3]])
+                        p = copy(crvmsh.nodes[candidate_els[2][3]])
                     else
                         @assert false
                     end
                 end
-                global nnewton += 1
                 res = ψ⁻¹(α₂, p)
                 if  res.retcode == ReturnCode.MaxIters
                     α₃ = copy(α₂)
@@ -268,7 +263,6 @@ E = Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}
             @assert ((abs(α₁[1] - α₂[1]) < π/8) && (abs(α₂[1] - α₃[1]) < π/8) && (abs(α₁[1] - α₃[1]) < π/8))
             if !((abs(α₁[2] - α₂[2]) < π/8) && (abs(α₂[2] - α₃[2]) < π/8) && (abs(α₁[2] - α₃[2]) < π/8))
                 @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", max(α₁[1], α₂[1], α₃[1])
-                @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", min(α₁[1], α₂[1], α₃[1])
             end
             a₁ = SVector{3,Float64}(ψ(α₁))
             a₂ = SVector{3,Float64}(ψ(α₂))
@@ -279,7 +273,7 @@ E = Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}
             aₖ = a₁
             bₖ = a₂
             cₖ = a₃
-            atol = 10^-8
+            atol = 10^-12
             facenodes = [a₁, a₂, a₃]
             skipnode = 0
             if all(norm.(Ref(straight_nodes[1]) .- facenodes) .> atol)
@@ -310,13 +304,11 @@ E = Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}
                 if all(norm.(Ref(straight_nodes[4]) .- facenodes) .> atol)
                     (skipnode == 4) || (cₖ = copy(straight_nodes[4]))
                 end
-                atol = 10^-12
                 @assert norm(cₖ - a₃) > atol
                 @assert norm(cₖ - dₖ) > atol
                 @assert norm(dₖ - a₁) > atol
                 @assert norm(dₖ - a₂) > atol
             end
-            atol = 10^-12
             @assert !all(norm.(Ref(a₁) .- straight_nodes) .> atol)
             @assert !all(norm.(Ref(a₂) .- straight_nodes) .> atol)
             if j == 3
@@ -357,9 +349,9 @@ E = Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}
             if j == 3
                 @assert a₃ ≈ straight_nodes[1] || a₃ ≈ straight_nodes[2] || a₃ ≈ straight_nodes[3] || a₃ ≈ straight_nodes[4]
             end
-            F̃ₖ = (x) -> [(aₖ[1] - dₖ[1])*x[1] + (bₖ[1] - dₖ[1])*x[2] + (cₖ[1] - dₖ[1])*x[3] + dₖ[1], (aₖ[2] - dₖ[2])*x[1] + (bₖ[2] - dₖ[2])*x[2] + (cₖ[2] - dₖ[2])*x[3] + dₖ[2], (aₖ[3] - dₖ[3])*x[1] + (bₖ[3] - dₖ[3])*x[2] + (cₖ[3] - dₖ[3])*x[3] + dₖ[3]]
             @assert aₖ ≈ a₁
             @assert bₖ ≈ a₂
+            F̃ₖ = (x) -> [(aₖ[1] - dₖ[1])*x[1] + (bₖ[1] - dₖ[1])*x[2] + (cₖ[1] - dₖ[1])*x[3] + dₖ[1], (aₖ[2] - dₖ[2])*x[1] + (bₖ[2] - dₖ[2])*x[2] + (cₖ[2] - dₖ[2])*x[3] + dₖ[2], (aₖ[3] - dₖ[3])*x[1] + (bₖ[3] - dₖ[3])*x[2] + (cₖ[3] - dₖ[3])*x[3] + dₖ[3]]
 
             # l = 1
             πₖ¹_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, binomial(2+1,2), SVector{2,Float64}})
@@ -421,7 +413,6 @@ E = Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}
             Φₖ = Φₖ_θ5
 
             # Full transformation
-            atol = 10^(-12)
             Fₖ = (x) -> F̃ₖ(x) + Φₖ(x)
             @assert norm(Fₖ([1.0, 0.0, 0.0]) - a₁) < atol
             @assert norm(Fₖ([0.0, 1.0, 0.0]) - a₂) < atol
@@ -513,7 +504,7 @@ E = Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}
             end
         end
     end
-#end
+end
 
 nv = 4 # Number of vertices for connectivity information in the volume
 nv_bdry = 3 # Number of vertices for connectivity information on the boundary
