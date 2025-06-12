@@ -8,6 +8,17 @@ using LinearAlgebra
 using Inti
 using Random
 using StaticArrays
+using QPGreen
+using ForwardDiff
+
+# Extend QuadGK to support ForwardDiff.Dual types (see https://github.com/JuliaMath/QuadGK.jl/issues/122)
+using QuadGK
+function QuadGK.cachedrule(
+    ::Type{<:ForwardDiff.Dual{<:Any,T}},
+    n::Integer,
+) where {T<:Number}
+    return QuadGK._cachedrule(typeof(float(real(one(T)))), Int(n))
+end
 
 include("test_utils.jl")
 
@@ -46,8 +57,22 @@ for correction in corrections
                     Inti.Stokes(; μ = 1.2, dim = N),
                     Inti.Elastostatic(; λ = 1, μ = 1, dim = N),
                 )
+                # periodic Laplace only defined for 2d, so we add it conditionally
+                if N == 2
+                    ops = (
+                        Inti.LaplacePeriodic1D(; dim = N, period = 2π),
+                        Inti.HelmholtzPeriodic1D(; alpha = 0.3, k = 1.2, dim = N),
+                        ops...,
+                    )
+                end
                 for op in ops
                     @testset "Greens identity ($t) $(N)d $op" begin
+                        if op isa
+                           Base.get_extension(Inti, :IntiQPGreenExt).HelmholtzPeriodic1D &&
+                           correction ==
+                           (method = :adaptive, maxdist = 2 * meshsize, rtol = 1e-2)
+                            quad = Inti.Quadrature(Γ; meshsize = 0.2, qorder = 5)
+                        end
                         xs = t == :interior ? ntuple(i -> 3, N) : ntuple(i -> 0.1, N)
                         T = Inti.default_density_eltype(op)
                         c = rand(T)
@@ -78,8 +103,10 @@ for correction in corrections
                             @test norm(e1, Inf) < rtol1
                         end
                         # adjoint double-layer and hypersingular.
-                        op isa Inti.Stokes && continue # TODO: implement hypersingular for Stokes?
-
+                        if op isa Inti.Stokes
+                            # skip cases where hypersingular has not been implemented
+                            continue
+                        end
                         Kop = Inti.IntegralOperator(Inti.AdjointDoubleLayerKernel(op), quad)
                         Kmat = Inti.assemble_matrix(Kop)
                         Hop = Inti.IntegralOperator(Inti.HyperSingularKernel(op), quad)
