@@ -43,20 +43,20 @@ crvmsh = Inti.curve_mesh(msh, ψ, θ, 500*Int(1/meshsize))
 Ωₕ = crvmsh[Ω]
 
 qorder = 2
-Ωₕ_quad = Inti.Quadrature(Ωₕ, qorder = qorder)
-Γₕ_quad = Inti.Quadrature(Γₕ, qorder = qorder)
+Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder)
+Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder)
 @assert isapprox(Inti.integrate(x -> 1, Ωₕ_quad), π, rtol = 1e-7)
 @assert isapprox(Inti.integrate(q -> q.coords[1]^4, Ωₕ_quad), π/8, rtol = 1e-5)
 
 qorder = 5
-Ωₕ_quad = Inti.Quadrature(Ωₕ, qorder = qorder)
-Γₕ_quad = Inti.Quadrature(Γₕ, qorder = qorder)
+Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder)
+Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder)
 @assert isapprox(Inti.integrate(x -> 1, Ωₕ_quad), π, rtol = 1e-11)
 @assert isapprox(Inti.integrate(q -> q.coords[1]^4, Ωₕ_quad), π/8, rtol = 1e-10)
 
 qorder = 8
-Ωₕ_quad = Inti.Quadrature(Ωₕ, qorder = qorder)
-Γₕ_quad = Inti.Quadrature(Γₕ, qorder = qorder)
+Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder)
+Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder)
 @assert isapprox(Inti.integrate(x -> 1, Ωₕ_quad), π, rtol = 1e-14)
 @assert isapprox(Inti.integrate(q -> q.coords[1]^4, Ωₕ_quad), π/8, rtol = 1e-14)
 

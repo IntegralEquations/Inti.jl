@@ -12,19 +12,29 @@ using NonlinearSolve
 include("test_utils.jl")
 
 # create a boundary and area meshes and quadrature only once
-meshsize = .1
+meshsize = 0.1
 r1 = 1.0
 r2 = 0.5
 Ω, msh = gmsh_torus(; center = [0.0, 0.0, 0.0], r1 = r1, r2 = r2, meshsize = meshsize)
 Γ = Inti.external_boundary(Ω)
 Γ_msh = view(msh, Γ)
-    
-face_element_on_torus(nodelist, R, r) = all([(sqrt(node[1]^2 + node[2]^2) - R^2)^2 + node[3]^2 ≈ r^2 for node in nodelist])
+
+function face_element_on_torus(nodelist, R, r)
+    return all([
+        (sqrt(node[1]^2 + node[2]^2) - R^2)^2 + node[3]^2 ≈ r^2 for node in nodelist
+    ])
+end
 face_element_on_curved_surface = (nodelist) -> face_element_on_torus(nodelist, r1, r2)
 
 ψ = (v) -> [(r1 + r2*sin(v[1]))*cos(v[2]), (r1 + r2*sin(v[1]))*sin(v[2]), r2*cos(v[1])]
 θ = 5 # smoothness order of curved elements
-crvmsh = Inti.curve_mesh(msh, ψ, θ, 50*Int(1/meshsize); face_element_on_curved_surface = face_element_on_curved_surface)
+crvmsh = Inti.curve_mesh(
+    msh,
+    ψ,
+    θ,
+    50*Int(1/meshsize);
+    face_element_on_curved_surface = face_element_on_curved_surface,
+)
 
 Γₕ = crvmsh[Γ]
 Ωₕ = crvmsh[Ω]
@@ -33,20 +43,20 @@ truevol = 2 * π^2 * r2^2 * r1
 truesfcarea = 4 * π^2 * r1 * r2
 
 qorder = 2
-Ωₕ_quad = Inti.Quadrature(Ωₕ, qorder = qorder)
-Γₕ_quad = Inti.Quadrature(Γₕ, qorder = qorder)
+Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder)
+Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder)
 @assert isapprox(Inti.integrate(x -> 1, Ωₕ_quad), truevol, rtol = 1e-6)
 @assert isapprox(Inti.integrate(x -> 1, Γₕ_quad), truesfcarea, rtol = 1e-6)
 
 qorder = 5
-Ωₕ_quad = Inti.Quadrature(Ωₕ, qorder = qorder)
-Γₕ_quad = Inti.Quadrature(Γₕ, qorder = qorder)
+Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder)
+Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder)
 @assert isapprox(Inti.integrate(x -> 1, Ωₕ_quad), truevol, rtol = 1e-11)
 @assert isapprox(Inti.integrate(x -> 1, Γₕ_quad), truesfcarea, rtol = 1e-11)
 
 qorder = 8
-Ωₕ_quad = Inti.Quadrature(Ωₕ, qorder = qorder)
-Γₕ_quad = Inti.Quadrature(Γₕ, qorder = qorder)
+Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder)
+Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder)
 @assert isapprox(Inti.integrate(x -> 1, Ωₕ_quad), truevol, rtol = 1e-12)
 @assert isapprox(Inti.integrate(x -> 1, Γₕ_quad), truesfcarea, rtol = 1e-14)
 

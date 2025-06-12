@@ -673,8 +673,14 @@ function elements_containing_nodes(n2e, nodes)
     return intersect(els...)
 end
 
-function curve_mesh(msh::Mesh{2,Float64}, ψ, order::Int, patch_sample_num::Int; face_element_on_curved_surface = nothing)
-    order  > 0 || error("smoothness order must be positive")
+function curve_mesh(
+    msh::Mesh{2,Float64},
+    ψ,
+    order::Int,
+    patch_sample_num::Int;
+    face_element_on_curved_surface = nothing,
+)
+    order > 0 || error("smoothness order must be positive")
     # implemented up to order=5 below but need interpolation routines to turn
     # this on
     order <= 4 || notimplemented()
@@ -685,9 +691,15 @@ function curve_mesh(msh::Mesh{2,Float64}, ψ, order::Int, patch_sample_num::Int;
     t = LinRange(0, 1, patch_sample_num)
 
     param_disc = ψ.(t)
-    kdt = KDTree(transpose(stack(param_disc, dims=1)))
+    kdt = KDTree(transpose(stack(param_disc; dims = 1)))
 
-    nbdry_els = size(msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 2, SVector{2, Float64}}])[2]
+    nbdry_els = size(
+        msh.etype2mat[Inti.LagrangeElement{
+            Inti.ReferenceHyperCube{1},
+            2,
+            SVector{2,Float64},
+        }],
+    )[2]
     bdry_node_idx = Vector{Int64}()
     bdry_node_param_loc = Vector{Float64}()
 
@@ -699,8 +711,15 @@ function curve_mesh(msh::Mesh{2,Float64}, ψ, order::Int, patch_sample_num::Int;
     append!(nodes, msh.nodes)
 
     # Re-write nodes to lay on exact boundary
-    for elind = 1:nbdry_els
-        local node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 2, SVector{2, Float64}}][:, elind]
+    for elind in 1:nbdry_els
+        local node_indices = msh.etype2mat[Inti.LagrangeElement{
+            Inti.ReferenceHyperCube{1},
+            2,
+            SVector{2,Float64},
+        }][
+            :,
+            elind,
+        ]
         local straight_nodes = crvmsh.nodes[node_indices]
 
         if face_element_on_curved_surface(straight_nodes)
@@ -731,11 +750,15 @@ function curve_mesh(msh::Mesh{2,Float64}, ψ, order::Int, patch_sample_num::Int;
         # the mesh, such as e.g. quads; This code errors when encountering a quad,
         # but the method can be extended to transfer straight quads to the new mesh,
         # similar to how straight simplices are transferred below.
-        E <: Union{Inti.LagrangeElement{Inti.ReferenceSimplex{2}},
-        Inti.LagrangeElement{Inti.ReferenceHyperCube{1}}, SVector} || error()
+        E <: Union{
+            Inti.LagrangeElement{Inti.ReferenceSimplex{2}},
+            Inti.LagrangeElement{Inti.ReferenceHyperCube{1}},
+            SVector,
+        } || error()
         E <: SVector && continue
         E <: Inti.LagrangeElement{Inti.ReferenceHyperCube{1}} && continue
-        E_straight_bdry = Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 2, SVector{2, Float64}}
+        E_straight_bdry =
+            Inti.LagrangeElement{Inti.ReferenceHyperCube{1},2,SVector{2,Float64}}
         els = Inti.elements(msh, E)
         for elind in eachindex(els)
             node_indices = msh.etype2mat[E][:, elind]
@@ -750,8 +773,14 @@ function curve_mesh(msh::Mesh{2,Float64}, ψ, order::Int, patch_sample_num::Int;
                 append!(connect_curve_bdry, node_indices_on_bdry)
 
                 # Need parametric coordinates of curved mapping to be consistent with straight simplex nodes
-                α₁ = min(node_to_param[node_indices_on_bdry[1]], node_to_param[node_indices_on_bdry[2]])
-                α₂ = max(node_to_param[node_indices_on_bdry[1]], node_to_param[node_indices_on_bdry[2]])
+                α₁ = min(
+                    node_to_param[node_indices_on_bdry[1]],
+                    node_to_param[node_indices_on_bdry[2]],
+                )
+                α₂ = max(
+                    node_to_param[node_indices_on_bdry[1]],
+                    node_to_param[node_indices_on_bdry[2]],
+                )
                 # HACK: handle wrap-around in parameter space when using a global parametrization
                 if abs(α₁ - α₂) > 0.5
                     α₁ = α₂
@@ -764,86 +793,202 @@ function curve_mesh(msh::Mesh{2,Float64}, ψ, order::Int, patch_sample_num::Int;
                 α₁hat = 0.0
                 α₂hat = 1.0
                 f̂ₖ = (t) -> α₁ .+ (α₂ - α₁)*t
-                f̂ₖ_comp = (x) -> f̂ₖ( (x[1] * α₁hat + x[2] * α₂hat)/(x[1] + x[2]) )
+                f̂ₖ_comp = (x) -> f̂ₖ((x[1] * α₁hat + x[2] * α₂hat)/(x[1] + x[2]))
 
                 # l = 1 projection onto linear FE space
-                πₖ¹_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceLine, 2, SVector{2,Float64}})
+                πₖ¹_nodes = Inti.reference_nodes(
+                    Inti.LagrangeElement{Inti.ReferenceLine,2,SVector{2,Float64}},
+                )
                 πₖ¹ψ_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ¹_nodes))
                 for i in eachindex(πₖ¹_nodes)
                     πₖ¹ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ¹_nodes[i][1]))
                 end
                 πₖ¹ψ_reference_nodes = SVector{2}(πₖ¹ψ_reference_nodes)
-                πₖ¹ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceLine}(πₖ¹ψ_reference_nodes)(x)
+                πₖ¹ψ =
+                    (x) -> Inti.LagrangeElement{Inti.ReferenceLine}(πₖ¹ψ_reference_nodes)(x)
 
                 # l = 2 projection onto quadratic FE space
                 if order > 1
-                    πₖ²_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceLine, 3, SVector{3,Float64}})
-                    πₖ²ψ_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ²_nodes))
+                    πₖ²_nodes = Inti.reference_nodes(
+                        Inti.LagrangeElement{Inti.ReferenceLine,3,SVector{3,Float64}},
+                    )
+                    πₖ²ψ_reference_nodes =
+                        Vector{SVector{2,Float64}}(undef, length(πₖ²_nodes))
                     for i in eachindex(πₖ²_nodes)
                         πₖ²ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ²_nodes[i][1]))
                     end
                     πₖ²ψ_reference_nodes = SVector{3}(πₖ²ψ_reference_nodes)
-                    πₖ²ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceLine}(πₖ²ψ_reference_nodes)(x)
+                    πₖ²ψ =
+                        (x) ->
+                            Inti.LagrangeElement{Inti.ReferenceLine}(πₖ²ψ_reference_nodes)(
+                                x,
+                            )
                 end
 
                 # l = 3 projection onto cubic FE space
                 if order > 2
-                    πₖ³_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceLine, 4, SVector{4,Float64}})
-                    πₖ³ψ_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ³_nodes))
+                    πₖ³_nodes = Inti.reference_nodes(
+                        Inti.LagrangeElement{Inti.ReferenceLine,4,SVector{4,Float64}},
+                    )
+                    πₖ³ψ_reference_nodes =
+                        Vector{SVector{2,Float64}}(undef, length(πₖ³_nodes))
                     for i in eachindex(πₖ³_nodes)
                         πₖ³ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ³_nodes[i][1]))
                     end
                     πₖ³ψ_reference_nodes = SVector{4}(πₖ³ψ_reference_nodes)
-                    πₖ³ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceLine}(πₖ³ψ_reference_nodes)(x)
+                    πₖ³ψ =
+                        (x) ->
+                            Inti.LagrangeElement{Inti.ReferenceLine}(πₖ³ψ_reference_nodes)(
+                                x,
+                            )
                 end
 
                 # l = 4 projection onto quartic FE space
                 if order > 3
-                    πₖ⁴_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceLine, 5, SVector{5,Float64}})
-                    πₖ⁴ψ_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ⁴_nodes))
+                    πₖ⁴_nodes = Inti.reference_nodes(
+                        Inti.LagrangeElement{Inti.ReferenceLine,5,SVector{5,Float64}},
+                    )
+                    πₖ⁴ψ_reference_nodes =
+                        Vector{SVector{2,Float64}}(undef, length(πₖ⁴_nodes))
                     for i in eachindex(πₖ⁴_nodes)
                         πₖ⁴ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁴_nodes[i][1]))
                     end
                     πₖ⁴ψ_reference_nodes = SVector{5}(πₖ⁴ψ_reference_nodes)
-                    πₖ⁴ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceLine}(πₖ⁴ψ_reference_nodes)(x)
+                    πₖ⁴ψ =
+                        (x) ->
+                            Inti.LagrangeElement{Inti.ReferenceLine}(πₖ⁴ψ_reference_nodes)(
+                                x,
+                            )
                 end
 
                 # l = 5 projection onto quintic FE space
                 if order > 4
-                    πₖ⁵_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceLine, 6, SVector{6,Float64}})
-                    πₖ⁵ψ_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ⁵_nodes))
+                    πₖ⁵_nodes = Inti.reference_nodes(
+                        Inti.LagrangeElement{Inti.ReferenceLine,6,SVector{6,Float64}},
+                    )
+                    πₖ⁵ψ_reference_nodes =
+                        Vector{SVector{2,Float64}}(undef, length(πₖ⁵_nodes))
                     for i in eachindex(πₖ⁵_nodes)
                         πₖ⁵ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁵_nodes[i][1]))
                     end
                     πₖ⁵ψ_reference_nodes = SVector{6}(πₖ⁵ψ_reference_nodes)
-                    πₖ⁵ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceLine}(πₖ⁵ψ_reference_nodes)(x)
+                    πₖ⁵ψ =
+                        (x) ->
+                            Inti.LagrangeElement{Inti.ReferenceLine}(πₖ⁵ψ_reference_nodes)(
+                                x,
+                            )
                 end
 
                 # Nonlinear map
 
                 # θ = 1
                 if order == 1
-                    Φₖ = (x) -> (x[1] + x[2])^3 * (ψ(f̂ₖ_comp(x)) - πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])))
+                    Φₖ =
+                        (x) ->
+                            (x[1] + x[2])^3 * (
+                                ψ(f̂ₖ_comp(x)) -
+                                πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            )
                 end
 
                 # θ = 2
                 if order == 2
-                    Φₖ = (x) -> (x[1] + x[2])^4 * (ψ(f̂ₖ_comp(x)) - πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^2*(πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])))
+                    Φₖ =
+                        (x) ->
+                            (x[1] + x[2])^4 * (
+                                ψ(f̂ₖ_comp(x)) -
+                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^2*(
+                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            )
                 end
 
                 # θ = 3
                 if order == 3
-                    Φₖ = (x) -> (x[1] + x[2])^5 * (ψ(f̂ₖ_comp(x)) - πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^2*(πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^3*(πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])))
+                    Φₖ =
+                        (x) ->
+                            (x[1] + x[2])^5 * (
+                                ψ(f̂ₖ_comp(x)) -
+                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^2*(
+                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^3*(
+                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            )
                 end
 
                 # θ = 4
                 if order == 4
-                    Φₖ = (x) -> (x[1] + x[2])^6 * (ψ(f̂ₖ_comp(x)) - πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^2*(πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^3*(πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^4*(πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])))
+                    Φₖ =
+                        (x) ->
+                            (x[1] + x[2])^6 * (
+                                ψ(f̂ₖ_comp(x)) -
+                                πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^2*(
+                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^3*(
+                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^4*(
+                                πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            )
                 end
 
                 # θ = 5
                 if order == 5
-                    Φₖ = (x) -> (x[1] + x[2])^6 * (ψ(f̂ₖ_comp(x)) - πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^2*(πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^3*(πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^4*(πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))) + (x[1] + x[2])^5*(πₖ⁵ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) - πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])))
+                    Φₖ =
+                        (x) ->
+                            (x[1] + x[2])^6 * (
+                                ψ(f̂ₖ_comp(x)) -
+                                πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^2*(
+                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^3*(
+                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^4*(
+                                πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^5*(
+                                πₖ⁵ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            )
                 end
 
                 # Zlamal nonlinear map
@@ -853,7 +998,11 @@ function curve_mesh(msh::Mesh{2,Float64}, ψ, order::Int, patch_sample_num::Int;
                 aₖ = crvmsh.nodes[node_indices_on_bdry[1]]
                 bₖ = crvmsh.nodes[setdiff(node_indices, node_indices[verts_on_bdry])[1]]
                 cₖ = crvmsh.nodes[node_indices_on_bdry[2]]
-                F̃ₖ = (x) -> [(cₖ[1] - bₖ[1])*x[1] + (aₖ[1] - bₖ[1])*x[2] + bₖ[1], (cₖ[2] - bₖ[2])*x[1] + (aₖ[2] - bₖ[2])*x[2] + bₖ[2]]
+                F̃ₖ =
+                    (x) -> [
+                        (cₖ[1] - bₖ[1])*x[1] + (aₖ[1] - bₖ[1])*x[2] + bₖ[1],
+                        (cₖ[2] - bₖ[2])*x[1] + (aₖ[2] - bₖ[2])*x[2] + bₖ[2],
+                    ]
 
                 # Full transformation
                 Fₖ = (x) -> F̃ₖ(x) + Φₖ(x)
@@ -875,11 +1024,14 @@ function curve_mesh(msh::Mesh{2,Float64}, ψ, order::Int, patch_sample_num::Int;
                     # (ParametricElement) element.
                     if haskey(msh.ent2etags[k], E)
                         n_straight_vol_els = size(msh.etype2mat[E])[2]
-                        if any((i) -> node_indices == msh.etype2mat[E][:, i], range(1,n_straight_vol_els))
-                            haskey(ent2etags[k], Ecurve) || (ent2etags[k][Ecurve] = Vector{Int64}())
+                        if any(
+                            (i) -> node_indices == msh.etype2mat[E][:, i],
+                            range(1, n_straight_vol_els),
+                        )
+                            haskey(ent2etags[k], Ecurve) ||
+                                (ent2etags[k][Ecurve] = Vector{Int64}())
                             append!(ent2etags[k][Ecurve], length(els_curve))
                         end
-
                     end
                     # find entity that contains straight (LagrangeElement) face
                     # element which is now being replaced by a curved
@@ -887,9 +1039,15 @@ function curve_mesh(msh::Mesh{2,Float64}, ψ, order::Int, patch_sample_num::Int;
                     if haskey(msh.ent2etags[k], E_straight_bdry)
                         k.dim == 1 || continue
                         n_straight_bdry_els = size(msh.etype2mat[E_straight_bdry])[2]
-                        straight_entity_elementind = findall((i) -> sort(node_indices_on_bdry) == sort(msh.etype2mat[E_straight_bdry][:, i]), range(1, n_straight_bdry_els))
+                        straight_entity_elementind = findall(
+                            (i) ->
+                                sort(node_indices_on_bdry) ==
+                                sort(msh.etype2mat[E_straight_bdry][:, i]),
+                            range(1, n_straight_bdry_els),
+                        )
                         if !isempty(straight_entity_elementind)
-                            haskey(ent2etags[k], Ecurvebdry) || (ent2etags[k][Ecurvebdry] = Vector{Int64}())
+                            haskey(ent2etags[k], Ecurvebdry) ||
+                                (ent2etags[k][Ecurvebdry] = Vector{Int64}())
                             append!(ent2etags[k][Ecurvebdry], length(els_curve_bdry))
                         end
                     end
@@ -897,14 +1055,19 @@ function curve_mesh(msh::Mesh{2,Float64}, ψ, order::Int, patch_sample_num::Int;
 
             else
                 append!(connect_straight, node_indices)
-                el = Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{2, Float64}}(straight_nodes)
+                el = Inti.LagrangeElement{Inti.ReferenceSimplex{2},3,SVector{2,Float64}}(
+                    straight_nodes,
+                )
                 push!(els_straight, el)
 
                 for k in Inti.entities(msh)
                     # determine if the straight mesh element belongs to the entity and, if so, add.
                     if haskey(msh.ent2etags[k], E)
                         n_straight_vol_els = size(msh.etype2mat[E])[2]
-                        if any((i) -> node_indices == msh.etype2mat[E][:, i], range(1,n_straight_vol_els))
+                        if any(
+                            (i) -> node_indices == msh.etype2mat[E][:, i],
+                            range(1, n_straight_vol_els),
+                        )
                             haskey(ent2etags[k], E) || (ent2etags[k][E] = Vector{Int64}())
                             append!(ent2etags[k][E], length(els_straight))
                         end
@@ -922,7 +1085,7 @@ function curve_mesh(msh::Mesh{2,Float64}, ψ, order::Int, patch_sample_num::Int;
     nv_bdry = 2 # Number of vertices for connectivity information on the boundary
     Ecurve = typeof(first(els_curve))
     Ecurvebdry = typeof(first(els_curve_bdry))
-    Estraight = Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{2, Float64}} # TODO fix this to auto be a P1 element type
+    Estraight = Inti.LagrangeElement{Inti.ReferenceSimplex{2},3,SVector{2,Float64}} # TODO fix this to auto be a P1 element type
 
     crvmsh.etype2mat[Ecurve] = reshape(connect_curve, nv, :)
     crvmsh.etype2els[Ecurve] = convert(Vector{Ecurve}, els_curve)
@@ -939,8 +1102,14 @@ function curve_mesh(msh::Mesh{2,Float64}, ψ, order::Int, patch_sample_num::Int;
     return crvmsh
 end
 
-function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int; face_element_on_curved_surface = nothing)
-    order  > 0 || error("smoothness order must be positive")
+function curve_mesh(
+    msh::Mesh{3,Float64},
+    ψ,
+    order::Int,
+    patch_sample_num::Int;
+    face_element_on_curved_surface = nothing,
+)
+    order > 0 || error("smoothness order must be positive")
     order <= 5 || notimplemented()
     if isnothing(face_element_on_curved_surface)
         face_element_on_curved_surface = (arg) -> true
@@ -950,8 +1119,8 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
     ϕ = LinRange(0, 2*π, patch_sample_num)
     function ψ⁻¹(v0, p)
         F = (v, p) -> ψ(v) - p
-        prob= NonlinearSolve.NonlinearProblem(F, v0, p)
-        NonlinearSolve.solve(prob, NonlinearSolve.SimpleNewtonRaphson())
+        prob = NonlinearSolve.NonlinearProblem(F, v0, p)
+        return NonlinearSolve.solve(prob, NonlinearSolve.SimpleNewtonRaphson())
     end
 
     chart_1 = Array{SVector{3,Float64}}(undef, length(θ)*length(ϕ))
@@ -959,7 +1128,7 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
     chart_1_cart_idxs_ϕ = []
     for i in eachindex(θ)
         for j in eachindex(ϕ)
-            chart_1[(i-1)*length(ϕ) + j] = [k for k in ψ((θ[i], ϕ[j]))]
+            chart_1[(i-1)*length(ϕ)+j] = [k for k in ψ((θ[i], ϕ[j]))]
             push!(chart_1_cart_idxs_θ, i)
             push!(chart_1_cart_idxs_ϕ, j)
         end
@@ -968,7 +1137,9 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
 
     n2e = Inti.node2etags(msh)
 
-    nbdry_els = size(msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{3, Float64}}])[2]
+    nbdry_els = size(
+        msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2},3,SVector{3,Float64}}],
+    )[2]
     chart_1_bdry_node_idx = Vector{Int64}()
     chart_1_bdry_node_param_loc = Vector{Vector{Float64}}()
 
@@ -980,25 +1151,50 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
     append!(nodes, msh.nodes)
 
     # Set up chart <-> node Dict
-    for elind = 1:nbdry_els
-        node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{3, Float64}}][:, elind]
+    for elind in 1:nbdry_els
+        node_indices = msh.etype2mat[Inti.LagrangeElement{
+            Inti.ReferenceSimplex{2},
+            3,
+            SVector{3,Float64},
+        }][
+            :,
+            elind,
+        ]
         straight_nodes = crvmsh.nodes[node_indices]
 
         if face_element_on_curved_surface(straight_nodes)
             idxs, dists = nn(chart_1_kdt, straight_nodes)
             if node_indices[1] ∉ chart_1_bdry_node_idx
                 crvmsh.nodes[node_indices[1]] = chart_1[idxs[1]]
-                push!(chart_1_bdry_node_param_loc, Vector{Float64}([θ[chart_1_cart_idxs_θ[idxs[1]]], ϕ[chart_1_cart_idxs_ϕ[idxs[1]]]]))
+                push!(
+                    chart_1_bdry_node_param_loc,
+                    Vector{Float64}([
+                        θ[chart_1_cart_idxs_θ[idxs[1]]],
+                        ϕ[chart_1_cart_idxs_ϕ[idxs[1]]],
+                    ]),
+                )
                 push!(chart_1_bdry_node_idx, node_indices[1])
             end
             if node_indices[2] ∉ chart_1_bdry_node_idx
                 crvmsh.nodes[node_indices[2]] = chart_1[idxs[2]]
-                push!(chart_1_bdry_node_param_loc, Vector{Float64}([θ[chart_1_cart_idxs_θ[idxs[2]]], ϕ[chart_1_cart_idxs_ϕ[idxs[2]]]]))
+                push!(
+                    chart_1_bdry_node_param_loc,
+                    Vector{Float64}([
+                        θ[chart_1_cart_idxs_θ[idxs[2]]],
+                        ϕ[chart_1_cart_idxs_ϕ[idxs[2]]],
+                    ]),
+                )
                 push!(chart_1_bdry_node_idx, node_indices[2])
             end
             if node_indices[3] ∉ chart_1_bdry_node_idx
                 crvmsh.nodes[node_indices[3]] = chart_1[idxs[3]]
-                push!(chart_1_bdry_node_param_loc, Vector{Float64}([θ[chart_1_cart_idxs_θ[idxs[3]]], ϕ[chart_1_cart_idxs_ϕ[idxs[3]]]]))
+                push!(
+                    chart_1_bdry_node_param_loc,
+                    Vector{Float64}([
+                        θ[chart_1_cart_idxs_θ[idxs[3]]],
+                        ϕ[chart_1_cart_idxs_ϕ[idxs[3]]],
+                    ]),
+                )
                 push!(chart_1_bdry_node_idx, node_indices[3])
             end
         end
@@ -1018,19 +1214,25 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
         # the mesh, such as e.g. cubes; This code errors when encountering a cube,
         # but the method can be extended to transfer straight cubes to the new mesh,
         # similar to how straight simplices are transferred below.
-        E <: Union{Inti.LagrangeElement{Inti.ReferenceSimplex{3}},Inti.LagrangeElement{Inti.ReferenceSimplex{2}},
-        Inti.LagrangeElement{Inti.ReferenceHyperCube{1}}, SVector} || error()
+        E <: Union{
+            Inti.LagrangeElement{Inti.ReferenceSimplex{3}},
+            Inti.LagrangeElement{Inti.ReferenceSimplex{2}},
+            Inti.LagrangeElement{Inti.ReferenceHyperCube{1}},
+            SVector,
+        } || error()
         E <: SVector && continue
         E <: Inti.LagrangeElement{Inti.ReferenceHyperCube{1}} && continue
         E <: Inti.LagrangeElement{Inti.ReferenceHyperCube{2}} && continue
         E <: Inti.LagrangeElement{Inti.ReferenceSimplex{2}} && continue
-        E <: Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}} || (println(E); error())
-        E_straight_bdry = Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, SVector{3, Float64}}
+        E <: Inti.LagrangeElement{Inti.ReferenceSimplex{3},4,SVector{3,Float64}} ||
+            (println(E); error())
+        E_straight_bdry =
+            Inti.LagrangeElement{Inti.ReferenceSimplex{2},3,SVector{3,Float64}}
         els = Inti.elements(msh, E)
         for elind in eachindex(els)
             node_indices = msh.etype2mat[E][:, elind]
             straight_nodes = crvmsh.nodes[node_indices]
-        
+
             verts_on_bdry = findall(x -> x ∈ chart_1_bdry_node_idx, node_indices)
             # j in C. Bernardi SINUM Sec. 6
             j = 0
@@ -1053,9 +1255,10 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
                     α₃ = copy(node_to_param[node_indices_on_bdry[3]])
                 else
                     # Find missing node α₃ that (non-uniquely) defines the curved face simplex containing α₁, α₂
-                    candidate_els = Inti.elements_containing_nodes(n2e, node_indices_on_bdry)
+                    candidate_els =
+                        Inti.elements_containing_nodes(n2e, node_indices_on_bdry)
                     # Filter out volume elements; should be at most two face simplices remaining
-                    candidate_els = candidate_els[length.(candidate_els).==3]
+                    candidate_els = candidate_els[length.(candidate_els) .== 3]
                     # Take the first face simplex; while either would work if j=2,
                     # if j=3 only one of the candidate face triangles will work, so
                     # find that one
@@ -1080,12 +1283,12 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
                         end
                     end
                     res = ψ⁻¹(α₂, p)
-                    if  res.retcode == ReturnCode.MaxIters
+                    if res.retcode == ReturnCode.MaxIters
                         α₃ = copy(α₂)
                         @assert j == 2
                     else
                         if isdefined(Main, :Infiltrator)
-                          Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+                            Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
                         end
                         α₃ = Vector{Float64}(ψ⁻¹(α₂, p).u)
                         @assert norm(ψ(α₃) - p) < 10^(-14)
@@ -1133,7 +1336,9 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
                 end
 
                 # Try to handle periodicity in ϕ -- case of α straddling 2π
-                if (abs(α₁[2] - α₂[2]) > π) || (abs(α₂[2] - α₃[2]) > π) || (abs(α₁[2] - α₃[2]) > π)
+                if (abs(α₁[2] - α₂[2]) > π) ||
+                   (abs(α₂[2] - α₃[2]) > π) ||
+                   (abs(α₁[2] - α₃[2]) > π)
                     if α₁[2] < π && α₂[2] < π && α₃[2] > 2*(2*π)/3
                         α₃[2] -= 2*π
                     end
@@ -1144,7 +1349,9 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
                         α₂[2] -= 2*π
                     end
                 end
-                if (abs(α₁[2] - α₂[2]) > π) || (abs(α₂[2] - α₃[2]) > π) || (abs(α₁[2] - α₃[2]) > π)
+                if (abs(α₁[2] - α₂[2]) > π) ||
+                   (abs(α₂[2] - α₃[2]) > π) ||
+                   (abs(α₁[2] - α₃[2]) > π)
                     if α₁[2] > 2*(2*π)/3 && α₂[2] > 2*(2*π)/3 && α₃[2] < π
                         α₃[2] += 2*π
                     end
@@ -1156,7 +1363,9 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
                     end
                 end
                 # Try to handle periodicity in ϕ -- case of α straddling 2π
-                if (abs(α₁[1] - α₂[1]) > π) || (abs(α₂[1] - α₃[1]) > π) || (abs(α₁[1] - α₃[1]) > π)
+                if (abs(α₁[1] - α₂[1]) > π) ||
+                   (abs(α₂[1] - α₃[1]) > π) ||
+                   (abs(α₁[1] - α₃[1]) > π)
                     if α₁[1] < π && α₂[1] < π && α₃[1] > 2*(2*π)/3
                         α₃[1] -= 2*π
                     end
@@ -1167,7 +1376,9 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
                         α₂[1] -= 2*π
                     end
                 end
-                if (abs(α₁[1] - α₂[1]) > π) || (abs(α₂[1] - α₃[1]) > π) || (abs(α₁[1] - α₃[1]) > π)
+                if (abs(α₁[1] - α₂[1]) > π) ||
+                   (abs(α₂[1] - α₃[1]) > π) ||
+                   (abs(α₁[1] - α₃[1]) > π)
                     if α₁[1] > 2*(2*π)/3 && α₂[1] > 2*(2*π)/3 && α₃[1] < π
                         α₃[1] += 2*π
                     end
@@ -1178,9 +1389,22 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
                         α₂[1] += 2*π
                     end
                 end
-                @assert ((abs(α₁[1] - α₂[1]) < π/8) && (abs(α₂[1] - α₃[1]) < π/8) && (abs(α₁[1] - α₃[1]) < π/8))
-                if !((abs(α₁[2] - α₂[2]) < π/8) && (abs(α₂[2] - α₃[2]) < π/8) && (abs(α₁[2] - α₃[2]) < π/8))
-                    @warn "Chart parametrization warning at element #", elind, " with ", j, "verts on bdry, at θ ≈ ", max(α₁[1], α₂[1], α₃[1])
+                @assert (
+                    (abs(α₁[1] - α₂[1]) < π/8) &&
+                    (abs(α₂[1] - α₃[1]) < π/8) &&
+                    (abs(α₁[1] - α₃[1]) < π/8)
+                )
+                if !(
+                    (abs(α₁[2] - α₂[2]) < π/8) &&
+                    (abs(α₂[2] - α₃[2]) < π/8) &&
+                    (abs(α₁[2] - α₃[2]) < π/8)
+                )
+                    @warn "Chart parametrization warning at element #",
+                    elind,
+                    " with ",
+                    j,
+                    "verts on bdry, at θ ≈ ",
+                    max(α₁[1], α₂[1], α₃[1])
                 end
                 a₁ = SVector{3,Float64}(ψ(α₁))
                 a₂ = SVector{3,Float64}(ψ(α₂))
@@ -1250,110 +1474,400 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
                 α₂hat = SVector{2,Float64}(0.0, 1.0)
                 α₃hat = SVector{2,Float64}(0.0, 0.0)
 
-                πₖ¹_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, 3, SVector{2,Float64}})
+                πₖ¹_nodes = Inti.reference_nodes(
+                    Inti.LagrangeElement{Inti.ReferenceTriangle,3,SVector{2,Float64}},
+                )
                 α_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ¹_nodes))
                 α_reference_nodes[1] = SVector{2}(α₃)
                 α_reference_nodes[2] = SVector{2}(α₁)
                 α_reference_nodes[3] = SVector{2}(α₂)
                 α_reference_nodes = SVector{3}(α_reference_nodes)
-                f̂ₖ = (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(α_reference_nodes)(x)
+                f̂ₖ =
+                    (x) ->
+                        Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(α_reference_nodes)(x)
 
                 @assert (f̂ₖ(α₁hat) ≈ α₁) && (f̂ₖ(α₂hat) ≈ α₂) && (f̂ₖ(α₃hat) ≈ α₃)
                 @assert a₁ ≈ ψ(f̂ₖ(α₁hat))
                 @assert a₂ ≈ ψ(f̂ₖ(α₂hat))
                 @assert a₃ ≈ ψ(f̂ₖ(α₃hat))
-                @assert a₁ ≈ straight_nodes[1] || a₁ ≈ straight_nodes[2] || a₁ ≈ straight_nodes[3] || a₁ ≈ straight_nodes[4]
-                @assert a₂ ≈ straight_nodes[1] || a₂ ≈ straight_nodes[2] || a₂ ≈ straight_nodes[3] || a₂ ≈ straight_nodes[4]
+                @assert a₁ ≈ straight_nodes[1] ||
+                        a₁ ≈ straight_nodes[2] ||
+                        a₁ ≈ straight_nodes[3] ||
+                        a₁ ≈ straight_nodes[4]
+                @assert a₂ ≈ straight_nodes[1] ||
+                        a₂ ≈ straight_nodes[2] ||
+                        a₂ ≈ straight_nodes[3] ||
+                        a₂ ≈ straight_nodes[4]
                 if j == 3
-                    @assert a₃ ≈ straight_nodes[1] || a₃ ≈ straight_nodes[2] || a₃ ≈ straight_nodes[3] || a₃ ≈ straight_nodes[4]
+                    @assert a₃ ≈ straight_nodes[1] ||
+                            a₃ ≈ straight_nodes[2] ||
+                            a₃ ≈ straight_nodes[3] ||
+                            a₃ ≈ straight_nodes[4]
                 end
                 @assert aₖ ≈ a₁
                 @assert bₖ ≈ a₂
-                F̃ₖ = (x) -> [(aₖ[1] - dₖ[1])*x[1] + (bₖ[1] - dₖ[1])*x[2] + (cₖ[1] - dₖ[1])*x[3] + dₖ[1], (aₖ[2] - dₖ[2])*x[1] + (bₖ[2] - dₖ[2])*x[2] + (cₖ[2] - dₖ[2])*x[3] + dₖ[2], (aₖ[3] - dₖ[3])*x[1] + (bₖ[3] - dₖ[3])*x[2] + (cₖ[3] - dₖ[3])*x[3] + dₖ[3]]
+                F̃ₖ =
+                    (x) -> [
+                        (aₖ[1] - dₖ[1])*x[1] +
+                        (bₖ[1] - dₖ[1])*x[2] +
+                        (cₖ[1] - dₖ[1])*x[3] +
+                        dₖ[1],
+                        (aₖ[2] - dₖ[2])*x[1] +
+                        (bₖ[2] - dₖ[2])*x[2] +
+                        (cₖ[2] - dₖ[2])*x[3] +
+                        dₖ[2],
+                        (aₖ[3] - dₖ[3])*x[1] +
+                        (bₖ[3] - dₖ[3])*x[2] +
+                        (cₖ[3] - dₖ[3])*x[3] +
+                        dₖ[3],
+                    ]
 
                 # l = 1
-                πₖ¹_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, binomial(2+1,2), SVector{2,Float64}})
+                πₖ¹_nodes = Inti.reference_nodes(
+                    Inti.LagrangeElement{
+                        Inti.ReferenceTriangle,
+                        binomial(2+1, 2),
+                        SVector{2,Float64},
+                    },
+                )
                 πₖ¹ψ_reference_nodes = Vector{SVector{3,Float64}}(undef, length(πₖ¹_nodes))
                 for i in eachindex(πₖ¹_nodes)
                     πₖ¹ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ¹_nodes[i]))
                 end
-                πₖ¹ψ_reference_nodes = SVector{binomial(2+1,2)}(πₖ¹ψ_reference_nodes)
-                πₖ¹ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ¹ψ_reference_nodes)(x)
+                πₖ¹ψ_reference_nodes = SVector{binomial(2+1, 2)}(πₖ¹ψ_reference_nodes)
+                πₖ¹ψ =
+                    (x) ->
+                        Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ¹ψ_reference_nodes)(
+                            x,
+                        )
                 #l = 2
                 if order > 1
-                    πₖ²_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, binomial(2+2,2), SVector{2,Float64}})
-                    πₖ²ψ_reference_nodes = Vector{SVector{3,Float64}}(undef, length(πₖ²_nodes))
+                    πₖ²_nodes = Inti.reference_nodes(
+                        Inti.LagrangeElement{
+                            Inti.ReferenceTriangle,
+                            binomial(2+2, 2),
+                            SVector{2,Float64},
+                        },
+                    )
+                    πₖ²ψ_reference_nodes =
+                        Vector{SVector{3,Float64}}(undef, length(πₖ²_nodes))
                     for i in eachindex(πₖ²_nodes)
                         πₖ²ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ²_nodes[i]))
                     end
-                    πₖ²ψ_reference_nodes = SVector{binomial(2+2,2)}(πₖ²ψ_reference_nodes)
-                    πₖ²ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ²ψ_reference_nodes)(x)
+                    πₖ²ψ_reference_nodes = SVector{binomial(2+2, 2)}(πₖ²ψ_reference_nodes)
+                    πₖ²ψ =
+                        (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(
+                            πₖ²ψ_reference_nodes,
+                        )(
+                            x,
+                        )
                 end
                 #l = 3
                 if order > 2
-                    πₖ³_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, binomial(2+3,2), SVector{2,Float64}})
-                    πₖ³ψ_reference_nodes = Vector{SVector{3,Float64}}(undef, length(πₖ³_nodes))
+                    πₖ³_nodes = Inti.reference_nodes(
+                        Inti.LagrangeElement{
+                            Inti.ReferenceTriangle,
+                            binomial(2+3, 2),
+                            SVector{2,Float64},
+                        },
+                    )
+                    πₖ³ψ_reference_nodes =
+                        Vector{SVector{3,Float64}}(undef, length(πₖ³_nodes))
                     for i in eachindex(πₖ³_nodes)
                         πₖ³ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ³_nodes[i]))
                     end
-                    πₖ³ψ_reference_nodes = SVector{binomial(2+3,2)}(πₖ³ψ_reference_nodes)
-                    πₖ³ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ³ψ_reference_nodes)(x)
+                    πₖ³ψ_reference_nodes = SVector{binomial(2+3, 2)}(πₖ³ψ_reference_nodes)
+                    πₖ³ψ =
+                        (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(
+                            πₖ³ψ_reference_nodes,
+                        )(
+                            x,
+                        )
                 end
                 #l = 4
                 if order > 3
-                    πₖ⁴_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, binomial(2+4,2), SVector{2,Float64}})
-                    πₖ⁴ψ_reference_nodes = Vector{SVector{3,Float64}}(undef, length(πₖ⁴_nodes))
+                    πₖ⁴_nodes = Inti.reference_nodes(
+                        Inti.LagrangeElement{
+                            Inti.ReferenceTriangle,
+                            binomial(2+4, 2),
+                            SVector{2,Float64},
+                        },
+                    )
+                    πₖ⁴ψ_reference_nodes =
+                        Vector{SVector{3,Float64}}(undef, length(πₖ⁴_nodes))
                     for i in eachindex(πₖ⁴_nodes)
                         πₖ⁴ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁴_nodes[i]))
                     end
-                    πₖ⁴ψ_reference_nodes = SVector{binomial(2+4,2)}(πₖ⁴ψ_reference_nodes)
-                    πₖ⁴ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ⁴ψ_reference_nodes)(x)
+                    πₖ⁴ψ_reference_nodes = SVector{binomial(2+4, 2)}(πₖ⁴ψ_reference_nodes)
+                    πₖ⁴ψ =
+                        (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(
+                            πₖ⁴ψ_reference_nodes,
+                        )(
+                            x,
+                        )
                 end
                 #l = 5
                 if order > 4
-                    πₖ⁵_nodes = Inti.reference_nodes(Inti.LagrangeElement{Inti.ReferenceTriangle, binomial(2+5,2), SVector{2,Float64}})
-                    πₖ⁵ψ_reference_nodes = Vector{SVector{3,Float64}}(undef, length(πₖ⁵_nodes))
+                    πₖ⁵_nodes = Inti.reference_nodes(
+                        Inti.LagrangeElement{
+                            Inti.ReferenceTriangle,
+                            binomial(2+5, 2),
+                            SVector{2,Float64},
+                        },
+                    )
+                    πₖ⁵ψ_reference_nodes =
+                        Vector{SVector{3,Float64}}(undef, length(πₖ⁵_nodes))
                     for i in eachindex(πₖ⁵_nodes)
                         πₖ⁵ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁵_nodes[i]))
                     end
-                    πₖ⁵ψ_reference_nodes = SVector{binomial(2+5,2)}(πₖ⁵ψ_reference_nodes)
-                    πₖ⁵ψ = (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ⁵ψ_reference_nodes)(x)
+                    πₖ⁵ψ_reference_nodes = SVector{binomial(2+5, 2)}(πₖ⁵ψ_reference_nodes)
+                    πₖ⁵ψ =
+                        (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(
+                            πₖ⁵ψ_reference_nodes,
+                        )(
+                            x,
+                        )
                 end
 
                 # Nonlinear map
                 if j == 3
-                    f̂ₖ_comp = (x) -> f̂ₖ( (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat)/(x[1] + x[2] + x[3]) )
+                    f̂ₖ_comp =
+                        (x) -> f̂ₖ(
+                            (
+                                x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat
+                            )/(x[1] + x[2] + x[3]),
+                        )
                     if order == 1
-                        Φₖ = (x) -> ( (x[1] + x[2] + x[3])^3 * (ψ(f̂ₖ_comp(x)) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))))
+                        Φₖ =
+                            (x) -> (
+                                (x[1] + x[2] + x[3])^3 * (
+                                    ψ(f̂ₖ_comp(x)) - πₖ¹ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                )
+                            )
                     end
                     if order == 2
-                        Φₖ = (x) -> ( (x[1] + x[2] + x[3])^4 * (ψ(f̂ₖ_comp(x)) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))))
+                        Φₖ =
+                            (x) -> (
+                                (x[1] + x[2] + x[3])^4 * (
+                                    ψ(f̂ₖ_comp(x)) - πₖ²ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^2 * (
+                                    πₖ²ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ¹ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                )
+                            )
                     end
                     if order == 3
-                        Φₖ = (x) -> ( (x[1] + x[2] + x[3])^5 * (ψ(f̂ₖ_comp(x)) - πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^3 * (πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) )
+                        Φₖ =
+                            (x) -> (
+                                (x[1] + x[2] + x[3])^5 * (
+                                    ψ(f̂ₖ_comp(x)) - πₖ³ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^2 * (
+                                    πₖ²ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ¹ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^3 * (
+                                    πₖ³ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ²ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                )
+                            )
                     end
                     if order == 4
-                        Φₖ = (x) -> ( (x[1] + x[2] + x[3])^6 * (ψ(f̂ₖ_comp(x)) - πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^3 * (πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^4 * (πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) )
+                        Φₖ =
+                            (x) -> (
+                                (x[1] + x[2] + x[3])^6 * (
+                                    ψ(f̂ₖ_comp(x)) - πₖ⁴ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^2 * (
+                                    πₖ²ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ¹ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^3 * (
+                                    πₖ³ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ²ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^4 * (
+                                    πₖ⁴ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ³ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                )
+                            )
                     end
                     if order == 5
-                        Φₖ = (x) -> ( (x[1] + x[2] + x[3])^7 * (ψ(f̂ₖ_comp(x)) - πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^3 * (πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^4 * (πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))) + (x[1] + x[2] + x[3])^5 * (πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3])) - πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) / (x[1] + x[2] + x[3]))))
+                        Φₖ =
+                            (x) -> (
+                                (x[1] + x[2] + x[3])^7 * (
+                                    ψ(f̂ₖ_comp(x)) - πₖ⁵ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^2 * (
+                                    πₖ²ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ¹ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^3 * (
+                                    πₖ³ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ²ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^4 * (
+                                    πₖ⁴ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ³ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^5 * (
+                                    πₖ⁵ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ⁴ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                )
+                            )
                     end
                 else
-                    f̂ₖ_comp = (x) -> f̂ₖ( (x[1] * α₁hat + x[2] * α₂hat)/(x[1] + x[2]) )
+                    f̂ₖ_comp = (x) -> f̂ₖ((x[1] * α₁hat + x[2] * α₂hat)/(x[1] + x[2]))
                     if order == 1
-                        Φₖ = (x) -> ( (x[1] + x[2])^3 * (ψ(f̂ₖ_comp(x)) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))))
+                        Φₖ =
+                            (x) -> (
+                                (x[1] + x[2])^3 * (
+                                    ψ(f̂ₖ_comp(x)) -
+                                    πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                )
+                            )
                     end
                     if order == 2
-                        Φₖ = (x) -> ( (x[1] + x[2])^4 * (ψ(f̂ₖ_comp(x)) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))))
+                        Φₖ =
+                            (x) -> (
+                                (x[1] + x[2])^4 * (
+                                    ψ(f̂ₖ_comp(x)) -
+                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^2 * (
+                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                )
+                            )
                     end
                     if order == 3
-                        Φₖ = (x) -> ( (x[1] + x[2])^5 * (ψ(f̂ₖ_comp(x)) - πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^3 * (πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))))
+                        Φₖ =
+                            (x) -> (
+                                (x[1] + x[2])^5 * (
+                                    ψ(f̂ₖ_comp(x)) -
+                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^2 * (
+                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^3 * (
+                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                )
+                            )
                     end
                     if order == 4
-                        Φₖ = (x) -> ( (x[1] + x[2])^6 * (ψ(f̂ₖ_comp(x)) - πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^3 * (πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^4 * (πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))))
+                        Φₖ =
+                            (x) -> (
+                                (x[1] + x[2])^6 * (
+                                    ψ(f̂ₖ_comp(x)) -
+                                    πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^2 * (
+                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^3 * (
+                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^4 * (
+                                    πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                )
+                            )
                     end
                     if order == 5
-                        Φₖ = (x) -> ( (x[1] + x[2])^7 * (ψ(f̂ₖ_comp(x)) - πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^2 * (πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^3 * (πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^4 * (πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))) + (x[1] + x[2])^5 * (πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) - πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))))
+                        Φₖ =
+                            (x) -> (
+                                (x[1] + x[2])^7 * (
+                                    ψ(f̂ₖ_comp(x)) -
+                                    πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^2 * (
+                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^3 * (
+                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^4 * (
+                                    πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^5 * (
+                                    πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                )
+                            )
                     end
                 end
 
@@ -1372,8 +1886,14 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
                     @assert norm(Φₖ([0.0, 0.0, 0.3])) < atol
                     @assert norm(Φₖ([0.0, 0.3, 0.0])) < atol
                     @assert norm(Φₖ([0.3, 0.0, 0.0])) < atol
-                    @assert norm(Φₖ([0.3, 0.45, 0.25]) - (ψ(f̂ₖ_comp([0.3, 0.45, 0.25])) - 0.3*a₁ - 0.45*a₂ - 0.25*a₃)) < atol
-                    @assert norm(Φₖ([0.55, 0.45, 0.0]) - (ψ(f̂ₖ_comp([0.55, 0.45, 0.0])) - 0.55*a₁ - 0.45*a₂)) < atol
+                    @assert norm(
+                        Φₖ([0.3, 0.45, 0.25]) -
+                        (ψ(f̂ₖ_comp([0.3, 0.45, 0.25])) - 0.3*a₁ - 0.45*a₂ - 0.25*a₃),
+                    ) < atol
+                    @assert norm(
+                        Φₖ([0.55, 0.45, 0.0]) -
+                        (ψ(f̂ₖ_comp([0.55, 0.45, 0.0])) - 0.55*a₁ - 0.45*a₂),
+                    ) < atol
                 end
                 @assert norm(Φₖ([0.0, 0.0000000000000001, 0.3])) < atol
                 @assert norm(Φₖ([0.0, 0.3, 0.0])) < atol
@@ -1381,7 +1901,10 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
                 if j == 2
                     @assert norm(Φₖ([0.6, 0.0, 0.4])) < atol
                     @assert norm(Φₖ([0.0, 0.6, 0.4])) < atol
-                    @assert norm(Φₖ([0.55, 0.45, 0.0]) - (ψ(f̂ₖ_comp([0.55, 0.45, 0.0])) - 0.55*a₁ - 0.45*a₂)) < atol
+                    @assert norm(
+                        Φₖ([0.55, 0.45, 0.0]) -
+                        (ψ(f̂ₖ_comp([0.55, 0.45, 0.0])) - 0.55*a₁ - 0.45*a₂),
+                    ) < atol
                 end
 
                 D = Inti.ReferenceTetrahedron
@@ -1403,11 +1926,14 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
                     # (ParametricElement) element.
                     if haskey(msh.ent2etags[k], E)
                         n_straight_vol_els = size(msh.etype2mat[E])[2]
-                        if any((i) -> sort(node_indices) == sort(msh.etype2mat[E][:, i]), range(1,n_straight_vol_els))
-                            haskey(ent2etags[k], Ecurve) || (ent2etags[k][Ecurve] = Vector{Int64}())
+                        if any(
+                            (i) -> sort(node_indices) == sort(msh.etype2mat[E][:, i]),
+                            range(1, n_straight_vol_els),
+                        )
+                            haskey(ent2etags[k], Ecurve) ||
+                                (ent2etags[k][Ecurve] = Vector{Int64}())
                             append!(ent2etags[k][Ecurve], length(els_curve))
                         end
-
                     end
                     # find entity that contains straight (LagrangeElement) face
                     # element which is now being replaced by a curved
@@ -1415,22 +1941,33 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
                     if (j == 3) && (haskey(msh.ent2etags[k], E_straight_bdry))
                         k.dim == 2 || continue
                         n_straight_bdry_els = size(msh.etype2mat[E_straight_bdry])[2]
-                        if any((i) -> sort(node_indices_on_bdry) == sort(msh.etype2mat[E_straight_bdry][:, i]), range(1, n_straight_bdry_els))
-                            haskey(ent2etags[k], Ecurvebdry) || (ent2etags[k][Ecurvebdry] = Vector{Int64}())
+                        if any(
+                            (i) ->
+                                sort(node_indices_on_bdry) ==
+                                sort(msh.etype2mat[E_straight_bdry][:, i]),
+                            range(1, n_straight_bdry_els),
+                        )
+                            haskey(ent2etags[k], Ecurvebdry) ||
+                                (ent2etags[k][Ecurvebdry] = Vector{Int64}())
                             append!(ent2etags[k][Ecurvebdry], length(els_curve_bdry))
                         end
                     end
                 end
             else
                 append!(connect_straight, node_indices)
-                el = Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}}(straight_nodes)
+                el = Inti.LagrangeElement{Inti.ReferenceSimplex{3},4,SVector{3,Float64}}(
+                    straight_nodes,
+                )
                 push!(els_straight, el)
 
                 for k in Inti.entities(msh)
                     # determine if the straight mesh element belongs to the entity and, if so, add.
                     if haskey(msh.ent2etags[k], E)
                         n_straight_vol_els = size(msh.etype2mat[E])[2]
-                        if any((i) -> node_indices == msh.etype2mat[E][:, i], range(1,n_straight_vol_els))
+                        if any(
+                            (i) -> node_indices == msh.etype2mat[E][:, i],
+                            range(1, n_straight_vol_els),
+                        )
                             haskey(ent2etags[k], E) || (ent2etags[k][E] = Vector{Int64}())
                             append!(ent2etags[k][E], length(els_straight))
                         end
@@ -1448,7 +1985,7 @@ function curve_mesh(msh::Mesh{3,Float64}, ψ, order::Int, patch_sample_num::Int;
     nv_bdry = 3 # Number of vertices for connectivity information on the boundary
     Ecurve = typeof(first(els_curve))
     Ecurvebdry = typeof(first(els_curve_bdry))
-    Estraight = Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, SVector{3, Float64}} # TODO fix this to auto be a P1 element type
+    Estraight = Inti.LagrangeElement{Inti.ReferenceSimplex{3},4,SVector{3,Float64}} # TODO fix this to auto be a P1 element type
 
     crvmsh.etype2mat[Ecurve] = reshape(connect_curve, nv, :)
     crvmsh.etype2els[Ecurve] = convert(Vector{Ecurve}, els_curve)
