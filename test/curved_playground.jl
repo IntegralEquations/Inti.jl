@@ -36,7 +36,6 @@ end
 Γₕ = view(msh, Γ)
 
 ψ = (t) -> [cos(2*π*t), sin(2*π*t)]
-ψ_der = (t) -> [-2*π*sin(2*π*t), 2*π*cos(2*π*t)]
 
 # Now sample from the patch
 t = LinRange(0, 1, 500*Int(1/meshsize))
@@ -58,8 +57,8 @@ append!(nodes, msh.nodes)
 # Re-write nodes to lay on exact boundary
 for elind = 1:nbdry_els
     local node_indices = msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 2, SVector{2, Float64}}][:, elind]
-    local nodes = crvmsh.nodes[node_indices]
-    idxs, dists = nn(kdt, nodes)
+    local straight_nodes = crvmsh.nodes[node_indices]
+    idxs, dists = nn(kdt, straight_nodes)
     crvmsh.nodes[node_indices[1]] = param_disc[idxs[1]]
     crvmsh.nodes[node_indices[2]] = param_disc[idxs[2]]
     push!(bdry_node_idx, node_indices[1])
