@@ -23,7 +23,8 @@ face_element_on_torus(nodelist, R, r) = all([(sqrt(node[1]^2 + node[2]^2) - R^2)
 face_element_on_curved_surface = (nodelist) -> face_element_on_torus(nodelist, r1, r2)
 
 ψ = (v) -> [(r1 + r2*sin(v[1]))*cos(v[2]), (r1 + r2*sin(v[1]))*sin(v[2]), r2*cos(v[1])]
-crvmsh = Inti.curve_mesh(msh, ψ, 50*Int(1/meshsize); face_element_on_curved_surface = face_element_on_curved_surface)
+θ = 5 # smoothness order of curved elements
+crvmsh = Inti.curve_mesh(msh, ψ, θ, 50*Int(1/meshsize); face_element_on_curved_surface = face_element_on_curved_surface)
 
 Γₕ = crvmsh[Γ]
 Ωₕ = crvmsh[Ω]

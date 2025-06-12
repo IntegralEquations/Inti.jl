@@ -36,7 +36,8 @@ end
 Γₕ = view(msh, Γ)
 
 ψ = (t) -> [cos(2*π*t), sin(2*π*t)]
-crvmsh = Inti.curve_mesh(msh, ψ, 500*Int(1/meshsize))
+θ = 3 # smoothness order of curved elements
+crvmsh = Inti.curve_mesh(msh, ψ, θ, 500*Int(1/meshsize))
 
 Γₕ = crvmsh[Γ]
 Ωₕ = crvmsh[Ω]
