@@ -1287,9 +1287,6 @@ function curve_mesh(
                         α₃ = copy(α₂)
                         @assert j == 2
                     else
-                        if isdefined(Main, :Infiltrator)
-                            Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-                        end
                         α₃ = Vector{Float64}(ψ⁻¹(α₂, p).u)
                         @assert norm(ψ(α₃) - p) < 10^(-14)
                     end
