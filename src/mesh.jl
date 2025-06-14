@@ -1243,7 +1243,6 @@ function curve_mesh(
             if j > 1
                 append!(connect_curve, node_indices)
                 node_indices_on_bdry = copy(node_indices[verts_on_bdry])
-                append!(connect_curve_bdry, node_indices_on_bdry)
                 node_to_param = chart_1_node_to_param
                 α₁ = copy(node_to_param[node_indices_on_bdry[1]])
                 if nverts_in_chart >= 2
@@ -1914,6 +1913,7 @@ function curve_mesh(
                     bdry_el = Inti.ParametricElement{F,T}(s -> ψₖ(s))
                     push!(els_curve_bdry, bdry_el)
                     Ecurvebdry = typeof(first(els_curve_bdry))
+                    append!(connect_curve_bdry, node_indices_on_bdry)
                 end
 
                 Ecurve = typeof(first(els_curve))
