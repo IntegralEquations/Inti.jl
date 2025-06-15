@@ -17,12 +17,16 @@ function domain_and_mesh(; meshsize, meshorder = 1)
     gmsh.model.occ.synchronize()
     gmsh.model.mesh.generate(2)
     gmsh.model.mesh.setOrder(meshorder)
-    Ω, msh = Inti.import_mesh(; dim = 2)
+    msh = Inti.import_mesh(; dim = 2)
+    Ω = Inti.Domain(Inti.entities(msh)) do ent
+        return Inti.geometric_dimension(ent) == 2
+    end
     gmsh.finalize()
     return Ω, msh
 end
 
-meshsize = 0.01
+meshsize = 0.1
+
 interpolation_order = 4
 VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
 bdry_qorder = 2 * VR_qorder
@@ -33,8 +37,17 @@ end
 @info "Mesh generation time: $tmesh"
 
 Γ = Inti.external_boundary(Ω)
-Ωₕ = view(msh, Ω)
-Γₕ = view(msh, Γ)
+#Γₕ = msh[Γ]
+#Ωₕ = msh[Ω]
+
+ψ = (t) -> [cos(2*π*t), sin(2*π*t)]
+θ = 3 # smoothness order of curved elements
+crvmsh = Inti.curve_mesh(msh, ψ, θ, 500*Int(1/meshsize))
+Ωₕ = view(crvmsh, Ω)
+Γₕ = view(crvmsh, Γ)
+#
+#Γₕ = crvmsh[Γ]
+#Ωₕ = crvmsh[Ω]
 
 tquad = @elapsed begin
     # Use VDIM with the Vioreanu-Rokhlin quadrature rule for Ωₕ
@@ -69,7 +82,7 @@ tbnd = @elapsed begin
         target = Ωₕ_quad,
         source = Γₕ_quad,
         compression = (method = :fmm, tol = 1e-14),
-        correction = (method = :dim, maxdist = 5 * meshsize),
+        correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
     )
 end
 @info "Boundary operators time: $tbnd"

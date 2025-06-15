@@ -8,33 +8,44 @@ using HMatrices
 using FMM3D
 using CairoMakie
 
-function domain_and_mesh(; meshsize, meshorder = 1)
-    Inti.clear_entities!()
-    gmsh.initialize()
-    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
-    gmsh.model.occ.addSphere(0, 0, 0, 1)
-    gmsh.model.occ.synchronize()
-    gmsh.model.mesh.generate()
-    gmsh.model.mesh.setOrder(meshorder)
-    Ω, msh = Inti.import_mesh(; dim = 3)
-    gmsh.finalize()
-    return Ω, msh
-end
+include("../test_utils.jl")
 
-meshsize = 0.05
-interpolation_order = 2
-VR_qorder = Inti.Tetrahedron_VR_interpolation_order_to_quadrature_order(interpolation_order)
-bdry_qorder = 2 * VR_qorder
+meshsize = 0.1
+r1 = 1.0
+tmsh = @elapsed begin
+    r2 = 0.5
+    Ω, msh =
+        gmsh_torus(; center = [0.0, 0.0, 0.0], r1 = r1, r2 = r2, meshsize = meshsize)
+    Γ = Inti.external_boundary(Ω)
 
-tmesh = @elapsed begin
-    Ω, msh = domain_and_mesh(; meshsize)
+    function face_element_on_torus(nodelist, R, r)
+        return all([
+            (sqrt(node[1]^2 + node[2]^2) - R^2)^2 + node[3]^2 ≈ r^2 for node in nodelist
+        ])
+    end
+    face_element_on_curved_surface =
+        (nodelist) -> face_element_on_torus(nodelist, r1, r2)
+
+    ψ =
+        (v) ->
+            [(r1 + r2*sin(v[1]))*cos(v[2]), (r1 + r2*sin(v[1]))*sin(v[2]), r2*cos(v[1])]
+    θ = 5 # smoothness order of curved elements
+    crvmsh = Inti.curve_mesh(
+        msh,
+        ψ,
+        θ,
+        50*round(Int, 1/meshsize);
+        face_element_on_curved_surface = face_element_on_curved_surface,
+    )
+
+    Ωₕ = view(crvmsh, Ω)
+    Γₕ = view(crvmsh, Γ)
 end
 @info "Mesh generation time: $tmesh"
 
-Γ = Inti.external_boundary(Ω)
-Ωₕ = view(msh, Ω)
-Γₕ = view(msh, Γ)
+interpolation_order = 2
+VR_qorder = Inti.Tetrahedron_VR_interpolation_order_to_quadrature_order(interpolation_order)
+bdry_qorder = 2 * VR_qorder
 
 tquad = @elapsed begin
     # Use VDIM with the Vioreanu-Rokhlin quadrature rule for Ωₕ
@@ -69,7 +80,7 @@ tbnd = @elapsed begin
         target = Ωₕ_quad,
         source = Γₕ_quad,
         compression = (method = :fmm, tol = 1e-8),
-        correction = (method = :dim, maxdist = 5 * meshsize),
+        correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
     )
 end
 @info "Boundary operators time: $tbnd"

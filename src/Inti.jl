@@ -20,6 +20,7 @@ using StaticArrays
 using Printf
 using TOML
 using Richardson
+using NonlinearSolve
 
 import ElementaryPDESolutions
 import SpecialFunctions
