@@ -19,10 +19,10 @@ msh = Inti.import_mesh(; dim = 3)
 Q = Inti.Quadrature(Γ_msh; qorder = 2)
 gmsh.finalize()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : Meshing curve 1 (Ellipse)
-Info    : Done meshing 1D (Wall 0.000145351s, CPU 0.000141s)
+Info    : Done meshing 1D (Wall 0.000172223s, CPU 0.000168s)
 Info    : Meshing 2D...
 Info    : Meshing surface 1 (Plane, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.0079492s, CPU 0.007949s)
+Info    : Done meshing 2D (Wall 0.00803309s, CPU 0.008031s)
 Info    : 123 nodes 245 elements</code></pre><p>Note that we have used second-order elements for the mesh, which is useful for better representing the edges of the circular crack.</p><h2 id="Integral-operators"><a class="docs-heading-anchor" href="#Integral-operators">Integral operators</a><a id="Integral-operators-1"></a><a class="docs-heading-anchor-permalink" href="#Integral-operators" title="Permalink"></a></h2><p>We will now build an approximation to <span>$T$</span> using:</p><ul><li>A hierarchical matrix representation for the integral operator</li><li>An adaptive correction to account for the singular and nearly singular interactions</li></ul><pre><code class="language-julia hljs">using HMatrices
 using LinearMaps
 using LinearAlgebra
@@ -34,9 +34,7 @@ op = Inti.Elastostatic(; λ, μ, dim = 3)
 K = Inti.HyperSingularKernel(op)
 Top = Inti.IntegralOperator(K, Q)
 T₀ = Inti.assemble_hmatrix(Top)
-δT = Inti.adaptive_correction(Top)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">┌ Warning: type instability likely leading to serious performance issues detected. Further
-│ warnings of this type will be silenced.
-└ @ Inti ~/work/Inti.jl/Inti.jl/src/adaptive_correction.jl:292</code></pre><h2 id="Boundary-conditions"><a class="docs-heading-anchor" href="#Boundary-conditions">Boundary conditions</a><a id="Boundary-conditions-1"></a><a class="docs-heading-anchor-permalink" href="#Boundary-conditions" title="Permalink"></a></h2><p>For the boundary conditions, we consider a constant normal loading on the crack surface, simply given by:</p><pre><code class="language-julia hljs">f = 1.0
+δT = Inti.adaptive_correction(Top)</code></pre><h2 id="Boundary-conditions"><a class="docs-heading-anchor" href="#Boundary-conditions">Boundary conditions</a><a id="Boundary-conditions-1"></a><a class="docs-heading-anchor-permalink" href="#Boundary-conditions" title="Permalink"></a></h2><p>For the boundary conditions, we consider a constant normal loading on the crack surface, simply given by:</p><pre><code class="language-julia hljs">f = 1.0
 t = -[SVector(0,0,f) for _ in Q]</code></pre><p>Note that we used an <code>SVector</code> to represent the traction at a point on the crack surface. For vector-valued problems, <code>SVector</code>s and <code>SMatrix</code>s are often used to represent vectors and tensors, respectively, since their size is known at compile time (and small). This avoids the overhead of dynamic arrays.</p><p>We are now ready to compute the approximate solution.</p><h2 id="Solution"><a class="docs-heading-anchor" href="#Solution">Solution</a><a id="Solution-1"></a><a class="docs-heading-anchor-permalink" href="#Solution" title="Permalink"></a></h2><p>The exact solution for this problem can be obtained by separation of variables in cylindrical coordinates, and can be shown to be:</p><pre><code class="language-julia hljs">σ = 1
 φ₃(r) = 4*(1-ν)*σ / (π*μ) * sqrt(1-r^2)
 uexact(x) = SVector(0, 0, φ₃(norm(x)))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">uexact (generic function with 1 method)</code></pre><p>To compute the approximate solution, we will need to solve the linear system:</p><p class="math-container">\[T[\boldsymbol{\phi}] = \boldsymbol{f},\]</p><p>where <span>$\boldsymbol{\phi}$</span> is the unknown vector of displacements. One difficulty that arises is related to the fact that in our implementation, both <code>\phi</code> and <code>f</code> are represented as <code>Vector</code>s of <code>SVector</code>s. While convenient for some operations, this can lead to difficulties when trying to solve the linear system since most linear algebra libraries expect matrices over a scalar field (usually either <span>$\mathbb{R}$</span> or <span>$\mathbb{C}$</span>). To address this, we will write a short function <code>solve</code> that will convert between the <em>vector of vectors</em> and the vector of <em>scalars</em>.</p><pre><code class="language-julia hljs">using IterativeSolvers
@@ -75,26 +73,26 @@ Inti.singularity_order(::typeof(Kw)) = -3</code></pre><p>With this new kernel, w
 Tw₀ = Inti.assemble_hmatrix(Tw_op)
 δTw = Inti.adaptive_correction(Tw_op; maxdist = 2*meshsize, atol = 1e-2)
 φw = solve(Tw₀, δTw, t)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">636-element Vector{StaticArraysCore.SVector{3, Float64}}:
- [0.0, 0.0, 1.4230577976281051]
- [0.0, 0.0, 1.3912852554661015]
- [0.0, 0.0, 1.3810062366125546]
- [0.0, 0.0, 1.369810651843685]
- [0.0, 0.0, 1.4116170757102924]
- [0.0, 0.0, 1.370515604191675]
- [0.0, 0.0, 1.4091460609598572]
- [0.0, 0.0, 1.4392188997357436]
- [0.0, 0.0, 1.4483940426716337]
- [0.0, 0.0, 1.4162682320438535]
+ [0.0, 0.0, 1.4230577966395288]
+ [0.0, 0.0, 1.3912852547370926]
+ [0.0, 0.0, 1.3810062354070236]
+ [0.0, 0.0, 1.369810651834395]
+ [0.0, 0.0, 1.411617074983003]
+ [0.0, 0.0, 1.370515604234645]
+ [0.0, 0.0, 1.4091460607454607]
+ [0.0, 0.0, 1.439218899177028]
+ [0.0, 0.0, 1.4483940421428139]
+ [0.0, 0.0, 1.4162682326425804]
  ⋮
- [0.0, 0.0, 1.4552500240569803]
- [0.0, 0.0, 1.4548888889935025]
- [0.0, 0.0, 1.4301615522957651]
- [0.0, 0.0, 1.4539704180926176]
- [0.0, 0.0, 1.4578199747933471]
- [0.0, 0.0, 1.4320730785183629]
- [0.0, 0.0, 1.4572383972166758]
- [0.0, 0.0, 1.4507493652778374]
- [0.0, 0.0, 1.4325181377649758]</code></pre><p>We now plot the displacement field again, but this with the weighted kernel approach, and compare it to the previous approach. Note that we must multiply the solution <code>φw</code> by the weight function to obtain the actual displacement jump <code>φ</code>.</p><pre><code class="language-julia hljs">weights = [weight(q.coords) for q in Q]
+ [0.0, 0.0, 1.4552500232823369]
+ [0.0, 0.0, 1.454888888017628]
+ [0.0, 0.0, 1.43016155199291]
+ [0.0, 0.0, 1.4539704181948117]
+ [0.0, 0.0, 1.4578199738163533]
+ [0.0, 0.0, 1.4320730789354137]
+ [0.0, 0.0, 1.4572383962866002]
+ [0.0, 0.0, 1.4507493642981835]
+ [0.0, 0.0, 1.4325181374883704]</code></pre><p>We now plot the displacement field again, but this with the weighted kernel approach, and compare it to the previous approach. Note that we must multiply the solution <code>φw</code> by the weight function to obtain the actual displacement jump <code>φ</code>.</p><pre><code class="language-julia hljs">weights = [weight(q.coords) for q in Q]
 scatter(r, getindex.(φw,3) .* weights, label = &quot;Numerical solution (weighted)&quot;)
 lines!(0:0.01:1, φ₃, label = &quot;Exact solution&quot;, color = :red, linewidth = 4)
 axislegend()
@@ -109,4 +107,4 @@ ax = Axis3(fig[1, 1])
 n = length(Q.mesh.nodes)
 viz!(Q.mesh; color = φ3_nodes, interpolate = false, showsegments=true)
 cb = Colorbar(fig[1, 2]; label = &quot;φ₃&quot;, colorrange)
-fig</code></pre><img src="bb9c5c21.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes_drag/">« Stokes drag</a><a class="docs-footer-nextpage" href="../pep/">Plasmonic eigenvalues »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.12.0 on <span class="colophon-date" title="Sunday 15 June 2025 07:15">Sunday 15 June 2025</span>. Using Julia version 1.11.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+fig</code></pre><img src="bb9c5c21.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes_drag/">« Stokes drag</a><a class="docs-footer-nextpage" href="../pep/">Plasmonic eigenvalues »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.13.0 on <span class="colophon-date" title="Thursday 19 June 2025 19:14">Thursday 19 June 2025</span>. Using Julia version 1.11.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
