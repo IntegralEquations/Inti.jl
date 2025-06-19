@@ -25,7 +25,7 @@ function domain_and_mesh(; meshsize, meshorder = 1)
     return Ω, msh
 end
 
-meshsize = 0.1
+meshsize = 0.05
 
 interpolation_order = 4
 VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)

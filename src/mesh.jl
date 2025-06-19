@@ -681,9 +681,8 @@ function curve_mesh(
     face_element_on_curved_surface = nothing,
 )
     order > 0 || error("smoothness order must be positive")
-    # implemented up to order=5 below but need interpolation routines to turn
-    # this on
-    order <= 4 || notimplemented()
+    # implemented up to order=6 below but can be easily extended
+    order <= 6 || notimplemented()
     if isnothing(face_element_on_curved_surface)
         face_element_on_curved_surface = (arg) -> true
     end
@@ -879,6 +878,24 @@ function curve_mesh(
                             )
                 end
 
+                # l = 6 projection onto sextic FE space
+                if order > 5
+                    πₖ⁶_nodes = Inti.reference_nodes(
+                        Inti.LagrangeElement{Inti.ReferenceLine,7,SVector{7,Float64}},
+                    )
+                    πₖ⁶ψ_reference_nodes =
+                        Vector{SVector{2,Float64}}(undef, length(πₖ⁶_nodes))
+                    for i in eachindex(πₖ⁶_nodes)
+                        πₖ⁶ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁶_nodes[i][1]))
+                    end
+                    πₖ⁶ψ_reference_nodes = SVector{7}(πₖ⁶ψ_reference_nodes)
+                    πₖ⁶ψ =
+                        (x) ->
+                            Inti.LagrangeElement{Inti.ReferenceLine}(πₖ⁶ψ_reference_nodes)(
+                                x,
+                            )
+                end
+
                 # Nonlinear map
 
                 # θ = 1
@@ -961,9 +978,9 @@ function curve_mesh(
                 if order == 5
                     Φₖ =
                         (x) ->
-                            (x[1] + x[2])^6 * (
+                            (x[1] + x[2])^7 * (
                                 ψ(f̂ₖ_comp(x)) -
-                                πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                                πₖ⁵ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
                             ) +
                             (
                                 x[1] + x[2]
@@ -988,6 +1005,46 @@ function curve_mesh(
                             )^5*(
                                 πₖ⁵ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
                                 πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            )
+                end
+
+                # θ = 6
+                if order == 6
+                    Φₖ =
+                        (x) ->
+                            (x[1] + x[2])^8 * (
+                                ψ(f̂ₖ_comp(x)) -
+                                πₖ⁶ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^2*(
+                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^3*(
+                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^4*(
+                                πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^5*(
+                                πₖ⁵ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            ) +
+                            (
+                                x[1] + x[2]
+                            )^6*(
+                                πₖ⁶ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
+                                πₖ⁵ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
                             )
                 end
 
@@ -1110,7 +1167,7 @@ function curve_mesh(
     face_element_on_curved_surface = nothing,
 )
     order > 0 || error("smoothness order must be positive")
-    order <= 5 || notimplemented()
+    order <= 6 || notimplemented()
     if isnothing(face_element_on_curved_surface)
         face_element_on_curved_surface = (arg) -> true
     end
@@ -1624,6 +1681,28 @@ function curve_mesh(
                             x,
                         )
                 end
+                #l = 6
+                if order > 5
+                    πₖ⁶_nodes = Inti.reference_nodes(
+                        Inti.LagrangeElement{
+                            Inti.ReferenceTriangle,
+                            binomial(2+6, 2),
+                            SVector{2,Float64},
+                        },
+                    )
+                    πₖ⁶ψ_reference_nodes =
+                        Vector{SVector{3,Float64}}(undef, length(πₖ⁶_nodes))
+                    for i in eachindex(πₖ⁶_nodes)
+                        πₖ⁶ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁶_nodes[i]))
+                    end
+                    πₖ⁶ψ_reference_nodes = SVector{binomial(2+6, 2)}(πₖ⁶ψ_reference_nodes)
+                    πₖ⁶ψ =
+                        (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(
+                            πₖ⁶ψ_reference_nodes,
+                        )(
+                            x,
+                        )
+                end
 
                 # Nonlinear map
                 if j == 3
@@ -1778,6 +1857,62 @@ function curve_mesh(
                                 )
                             )
                     end
+                    if order == 6
+                        Φₖ =
+                            (x) -> (
+                                (x[1] + x[2] + x[3])^8 * (
+                                    ψ(f̂ₖ_comp(x)) - πₖ⁶ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^2 * (
+                                    πₖ²ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ¹ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^3 * (
+                                    πₖ³ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ²ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^4 * (
+                                    πₖ⁴ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ³ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^5 * (
+                                    πₖ⁵ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ⁴ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                ) +
+                                (x[1] + x[2] + x[3])^6 * (
+                                    πₖ⁶ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    ) - πₖ⁵ψ(
+                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] + x[2] + x[3]),
+                                    )
+                                )
+                            )
+                    end
                 else
                     f̂ₖ_comp = (x) -> f̂ₖ((x[1] * α₁hat + x[2] * α₂hat)/(x[1] + x[2]))
                     if order == 1
@@ -1862,6 +1997,35 @@ function curve_mesh(
                                 (x[1] + x[2])^5 * (
                                     πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
                                     πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                )
+                            )
+                    end
+                    if order == 6
+                        Φₖ =
+                            (x) -> (
+                                (x[1] + x[2])^8 * (
+                                    ψ(f̂ₖ_comp(x)) -
+                                    πₖ⁶ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^2 * (
+                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^3 * (
+                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^4 * (
+                                    πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^5 * (
+                                    πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                ) +
+                                (x[1] + x[2])^6 * (
+                                    πₖ⁶ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
+                                    πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
                                 )
                             )
                     end
