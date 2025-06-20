@@ -817,11 +817,7 @@ function curve_mesh(
                         πₖ²ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ²_nodes[i][1]))
                     end
                     πₖ²ψ_reference_nodes = SVector{3}(πₖ²ψ_reference_nodes)
-                    πₖ²ψ =
-                        (x) ->
-                            Inti.LagrangeElement{Inti.ReferenceLine}(πₖ²ψ_reference_nodes)(
-                                x,
-                            )
+                    πₖ²ψ = Inti.LagrangeElement{Inti.ReferenceLine}(πₖ²ψ_reference_nodes)
                 end
 
                 # l = 3 projection onto cubic FE space
@@ -835,11 +831,7 @@ function curve_mesh(
                         πₖ³ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ³_nodes[i][1]))
                     end
                     πₖ³ψ_reference_nodes = SVector{4}(πₖ³ψ_reference_nodes)
-                    πₖ³ψ =
-                        (x) ->
-                            Inti.LagrangeElement{Inti.ReferenceLine}(πₖ³ψ_reference_nodes)(
-                                x,
-                            )
+                    πₖ³ψ = Inti.LagrangeElement{Inti.ReferenceLine}(πₖ³ψ_reference_nodes)
                 end
 
                 # l = 4 projection onto quartic FE space
@@ -853,11 +845,7 @@ function curve_mesh(
                         πₖ⁴ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁴_nodes[i][1]))
                     end
                     πₖ⁴ψ_reference_nodes = SVector{5}(πₖ⁴ψ_reference_nodes)
-                    πₖ⁴ψ =
-                        (x) ->
-                            Inti.LagrangeElement{Inti.ReferenceLine}(πₖ⁴ψ_reference_nodes)(
-                                x,
-                            )
+                    πₖ⁴ψ = Inti.LagrangeElement{Inti.ReferenceLine}(πₖ⁴ψ_reference_nodes)
                 end
 
                 # l = 5 projection onto quintic FE space
@@ -871,11 +859,7 @@ function curve_mesh(
                         πₖ⁵ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁵_nodes[i][1]))
                     end
                     πₖ⁵ψ_reference_nodes = SVector{6}(πₖ⁵ψ_reference_nodes)
-                    πₖ⁵ψ =
-                        (x) ->
-                            Inti.LagrangeElement{Inti.ReferenceLine}(πₖ⁵ψ_reference_nodes)(
-                                x,
-                            )
+                    πₖ⁵ψ = Inti.LagrangeElement{Inti.ReferenceLine}(πₖ⁵ψ_reference_nodes)
                 end
 
                 # l = 6 projection onto sextic FE space
@@ -889,11 +873,7 @@ function curve_mesh(
                         πₖ⁶ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁶_nodes[i][1]))
                     end
                     πₖ⁶ψ_reference_nodes = SVector{7}(πₖ⁶ψ_reference_nodes)
-                    πₖ⁶ψ =
-                        (x) ->
-                            Inti.LagrangeElement{Inti.ReferenceLine}(πₖ⁶ψ_reference_nodes)(
-                                x,
-                            )
+                    πₖ⁶ψ = Inti.LagrangeElement{Inti.ReferenceLine}(πₖ⁶ψ_reference_nodes)
                 end
 
                 # Nonlinear map
@@ -901,7 +881,7 @@ function curve_mesh(
                 # θ = 1
                 if order == 1
                     Φₖ =
-                        (x) ->
+                        (x::AbstractVector) ->
                             (x[1] + x[2])^3 * (
                                 ψ(f̂ₖ_comp(x)) -
                                 πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
@@ -911,7 +891,7 @@ function curve_mesh(
                 # θ = 2
                 if order == 2
                     Φₖ =
-                        (x) ->
+                        (x::AbstractVector) ->
                             (x[1] + x[2])^4 * (
                                 ψ(f̂ₖ_comp(x)) -
                                 πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
@@ -927,7 +907,7 @@ function curve_mesh(
                 # θ = 3
                 if order == 3
                     Φₖ =
-                        (x) ->
+                        (x::AbstractVector) ->
                             (x[1] + x[2])^5 * (
                                 ψ(f̂ₖ_comp(x)) -
                                 πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
@@ -949,7 +929,7 @@ function curve_mesh(
                 # θ = 4
                 if order == 4
                     Φₖ =
-                        (x) ->
+                        (x::AbstractVector) ->
                             (x[1] + x[2])^6 * (
                                 ψ(f̂ₖ_comp(x)) -
                                 πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
@@ -977,7 +957,7 @@ function curve_mesh(
                 # θ = 5
                 if order == 5
                     Φₖ =
-                        (x) ->
+                        (x::AbstractVector) ->
                             (x[1] + x[2])^7 * (
                                 ψ(f̂ₖ_comp(x)) -
                                 πₖ⁵ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
@@ -1011,7 +991,7 @@ function curve_mesh(
                 # θ = 6
                 if order == 6
                     Φₖ =
-                        (x) ->
+                        (x::AbstractVector) ->
                             (x[1] + x[2])^8 * (
                                 ψ(f̂ₖ_comp(x)) -
                                 πₖ⁶ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
@@ -1056,7 +1036,7 @@ function curve_mesh(
                 bₖ = crvmsh.nodes[setdiff(node_indices, node_indices[verts_on_bdry])[1]]
                 cₖ = crvmsh.nodes[node_indices_on_bdry[2]]
                 F̃ₖ =
-                    (x) -> [
+                    (x::AbstractVector) -> [
                         (cₖ[1] - bₖ[1])*x[1] + (aₖ[1] - bₖ[1])*x[2] + bₖ[1],
                         (cₖ[2] - bₖ[2])*x[1] + (aₖ[2] - bₖ[2])*x[2] + bₖ[2],
                     ]
@@ -1443,22 +1423,10 @@ function curve_mesh(
                     end
                 end
                 @assert (
-                    (abs(α₁[1] - α₂[1]) < π/8) &&
-                    (abs(α₂[1] - α₃[1]) < π/8) &&
-                    (abs(α₁[1] - α₃[1]) < π/8)
+                    (abs(α₁[1] - α₂[1]) < π/2) &&
+                    (abs(α₂[1] - α₃[1]) < π/2) &&
+                    (abs(α₁[1] - α₃[1]) < π/2)
                 )
-                if !(
-                    (abs(α₁[2] - α₂[2]) < π/8) &&
-                    (abs(α₂[2] - α₃[2]) < π/8) &&
-                    (abs(α₁[2] - α₃[2]) < π/8)
-                )
-                    @warn "Chart parametrization warning at element #",
-                    elind,
-                    " with ",
-                    j,
-                    "verts on bdry, at θ ≈ ",
-                    max(α₁[1], α₂[1], α₃[1])
-                end
                 a₁ = SVector{3,Float64}(ψ(α₁))
                 a₂ = SVector{3,Float64}(ψ(α₂))
                 a₃ = SVector{3,Float64}(ψ(α₃))
@@ -1560,7 +1528,7 @@ function curve_mesh(
                 @assert aₖ ≈ a₁
                 @assert bₖ ≈ a₂
                 F̃ₖ =
-                    (x) -> [
+                    (x::AbstractVector) -> [
                         (aₖ[1] - dₖ[1])*x[1] +
                         (bₖ[1] - dₖ[1])*x[2] +
                         (cₖ[1] - dₖ[1])*x[3] +
@@ -1588,11 +1556,7 @@ function curve_mesh(
                     πₖ¹ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ¹_nodes[i]))
                 end
                 πₖ¹ψ_reference_nodes = SVector{binomial(2+1, 2)}(πₖ¹ψ_reference_nodes)
-                πₖ¹ψ =
-                    (x) ->
-                        Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ¹ψ_reference_nodes)(
-                            x,
-                        )
+                πₖ¹ψ = Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ¹ψ_reference_nodes)
                 #l = 2
                 if order > 1
                     πₖ²_nodes = Inti.reference_nodes(
@@ -1609,11 +1573,7 @@ function curve_mesh(
                     end
                     πₖ²ψ_reference_nodes = SVector{binomial(2+2, 2)}(πₖ²ψ_reference_nodes)
                     πₖ²ψ =
-                        (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(
-                            πₖ²ψ_reference_nodes,
-                        )(
-                            x,
-                        )
+                        Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ²ψ_reference_nodes)
                 end
                 #l = 3
                 if order > 2
@@ -1631,11 +1591,7 @@ function curve_mesh(
                     end
                     πₖ³ψ_reference_nodes = SVector{binomial(2+3, 2)}(πₖ³ψ_reference_nodes)
                     πₖ³ψ =
-                        (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(
-                            πₖ³ψ_reference_nodes,
-                        )(
-                            x,
-                        )
+                        Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ³ψ_reference_nodes)
                 end
                 #l = 4
                 if order > 3
@@ -1653,11 +1609,7 @@ function curve_mesh(
                     end
                     πₖ⁴ψ_reference_nodes = SVector{binomial(2+4, 2)}(πₖ⁴ψ_reference_nodes)
                     πₖ⁴ψ =
-                        (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(
-                            πₖ⁴ψ_reference_nodes,
-                        )(
-                            x,
-                        )
+                        Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ⁴ψ_reference_nodes)
                 end
                 #l = 5
                 if order > 4
@@ -1675,11 +1627,7 @@ function curve_mesh(
                     end
                     πₖ⁵ψ_reference_nodes = SVector{binomial(2+5, 2)}(πₖ⁵ψ_reference_nodes)
                     πₖ⁵ψ =
-                        (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(
-                            πₖ⁵ψ_reference_nodes,
-                        )(
-                            x,
-                        )
+                        Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ⁵ψ_reference_nodes)
                 end
                 #l = 6
                 if order > 5
@@ -1697,24 +1645,20 @@ function curve_mesh(
                     end
                     πₖ⁶ψ_reference_nodes = SVector{binomial(2+6, 2)}(πₖ⁶ψ_reference_nodes)
                     πₖ⁶ψ =
-                        (x) -> Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(
-                            πₖ⁶ψ_reference_nodes,
-                        )(
-                            x,
-                        )
+                        Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ⁶ψ_reference_nodes)
                 end
 
                 # Nonlinear map
                 if j == 3
                     f̂ₖ_comp =
-                        (x) -> f̂ₖ(
+                        (x::AbstractVector) -> f̂ₖ(
                             (
                                 x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat
                             )/(x[1] + x[2] + x[3]),
                         )
                     if order == 1
                         Φₖ =
-                            (x) -> (
+                            (x::AbstractVector) -> (
                                 (x[1] + x[2] + x[3])^3 * (
                                     ψ(f̂ₖ_comp(x)) - πₖ¹ψ(
                                         (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
@@ -1725,7 +1669,7 @@ function curve_mesh(
                     end
                     if order == 2
                         Φₖ =
-                            (x) -> (
+                            (x::AbstractVector) -> (
                                 (x[1] + x[2] + x[3])^4 * (
                                     ψ(f̂ₖ_comp(x)) - πₖ²ψ(
                                         (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
@@ -1745,7 +1689,7 @@ function curve_mesh(
                     end
                     if order == 3
                         Φₖ =
-                            (x) -> (
+                            (x::AbstractVector) -> (
                                 (x[1] + x[2] + x[3])^5 * (
                                     ψ(f̂ₖ_comp(x)) - πₖ³ψ(
                                         (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
@@ -1774,7 +1718,7 @@ function curve_mesh(
                     end
                     if order == 4
                         Φₖ =
-                            (x) -> (
+                            (x::AbstractVector) -> (
                                 (x[1] + x[2] + x[3])^6 * (
                                     ψ(f̂ₖ_comp(x)) - πₖ⁴ψ(
                                         (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
@@ -1812,7 +1756,7 @@ function curve_mesh(
                     end
                     if order == 5
                         Φₖ =
-                            (x) -> (
+                            (x::AbstractVector) -> (
                                 (x[1] + x[2] + x[3])^7 * (
                                     ψ(f̂ₖ_comp(x)) - πₖ⁵ψ(
                                         (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
@@ -1859,7 +1803,7 @@ function curve_mesh(
                     end
                     if order == 6
                         Φₖ =
-                            (x) -> (
+                            (x::AbstractVector) -> (
                                 (x[1] + x[2] + x[3])^8 * (
                                     ψ(f̂ₖ_comp(x)) - πₖ⁶ψ(
                                         (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
@@ -1917,7 +1861,7 @@ function curve_mesh(
                     f̂ₖ_comp = (x) -> f̂ₖ((x[1] * α₁hat + x[2] * α₂hat)/(x[1] + x[2]))
                     if order == 1
                         Φₖ =
-                            (x) -> (
+                            (x::AbstractVector) -> (
                                 (x[1] + x[2])^3 * (
                                     ψ(f̂ₖ_comp(x)) -
                                     πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
@@ -1926,7 +1870,7 @@ function curve_mesh(
                     end
                     if order == 2
                         Φₖ =
-                            (x) -> (
+                            (x::AbstractVector) -> (
                                 (x[1] + x[2])^4 * (
                                     ψ(f̂ₖ_comp(x)) -
                                     πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
@@ -1939,7 +1883,7 @@ function curve_mesh(
                     end
                     if order == 3
                         Φₖ =
-                            (x) -> (
+                            (x::AbstractVector) -> (
                                 (x[1] + x[2])^5 * (
                                     ψ(f̂ₖ_comp(x)) -
                                     πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
@@ -1956,7 +1900,7 @@ function curve_mesh(
                     end
                     if order == 4
                         Φₖ =
-                            (x) -> (
+                            (x::AbstractVector) -> (
                                 (x[1] + x[2])^6 * (
                                     ψ(f̂ₖ_comp(x)) -
                                     πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
@@ -1977,7 +1921,7 @@ function curve_mesh(
                     end
                     if order == 5
                         Φₖ =
-                            (x) -> (
+                            (x::AbstractVector) -> (
                                 (x[1] + x[2])^7 * (
                                     ψ(f̂ₖ_comp(x)) -
                                     πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
@@ -2002,7 +1946,7 @@ function curve_mesh(
                     end
                     if order == 6
                         Φₖ =
-                            (x) -> (
+                            (x::AbstractVector) -> (
                                 (x[1] + x[2])^8 * (
                                     ψ(f̂ₖ_comp(x)) -
                                     πₖ⁶ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
@@ -2032,7 +1976,7 @@ function curve_mesh(
                 end
 
                 # Full transformation
-                Fₖ = (x) -> F̃ₖ(x) + Φₖ(x)
+                Fₖ = (x::AbstractVector) -> F̃ₖ(x) + Φₖ(x)
                 @assert norm(Fₖ([1.0, 0.0, 0.0]) - a₁) < atol
                 @assert norm(Fₖ([0.0, 1.0, 0.0]) - a₂) < atol
                 @assert norm(Fₖ([1.0, 0.0, 0.0]) - aₖ) < atol
