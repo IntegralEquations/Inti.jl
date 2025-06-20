@@ -6,7 +6,6 @@ using LinearAlgebra
 using Random
 using StaticArrays
 using ForwardDiff
-using NonlinearSolve
 
 include("test_utils.jl")
 
