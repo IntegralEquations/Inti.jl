@@ -5,7 +5,6 @@ using Gmsh
 using LinearAlgebra
 using Random
 using StaticArrays
-using NearestNeighbors
 using ForwardDiff
 using NonlinearSolve
 

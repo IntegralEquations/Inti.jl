@@ -4,7 +4,6 @@ using StaticArrays
 using GLMakie
 using Gmsh
 using LinearAlgebra
-using NearestNeighbors
 using ForwardDiff
 using Test
 
