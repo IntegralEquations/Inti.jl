@@ -21,6 +21,7 @@ using Printf
 using TOML
 using Richardson
 using NonlinearSolve
+using Memoization
 
 import ElementaryPDESolutions
 import SpecialFunctions
