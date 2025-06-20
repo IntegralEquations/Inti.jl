@@ -281,7 +281,17 @@ function guiggiani_singular_integral(
         v = û(ŷ)
         return ρ * map(v -> M * v, v) * μ
     end
-    acc = zero(return_type(F, Float64, Float64))
+    T = return_type(F, Float64, Float64)
+    acc = if isconcretetype(T)
+        zero(T)
+    else
+        msg = """
+        type instability likely leading to serious performance issues detected. Further
+        warnings of this type will be silenced.
+        """
+        @warn msg maxlog = 1
+        zero(F(1e-8, 0.0))
+    end
     # integrate
     for (theta_min, theta_max, rho_func) in polar_decomposition(ref_shape, x̂)
         delta_theta = theta_max - theta_min
@@ -353,8 +363,17 @@ function guiggiani_singular_integral(
         v = û(ŷ)
         map(v -> M * v, v) * μ
     end
-    acc = zero(return_type(F, Float64, Int))
-    # integrate
+    T = return_type(F, Float64, Float64)
+    if isconcretetype(T)
+        acc = zero(T)
+    else
+        msg = """
+        type instability likely leading to serious performance issues detected. Further
+        warnings of this type will be silenced.
+        """
+        @warn msg maxlog = 1
+        zero(F(1e-8, 1))
+    end
     for (s, rho_max) in ((-1, x̂[1]), (1, 1 - x̂[1]))
         F₋₂, F₋₁, F₀ =
             F₋₂, F₋₁, F₀ = laurent_coefficients(
