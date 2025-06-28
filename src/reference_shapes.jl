@@ -17,6 +17,7 @@ Singleton type representing the N-simplex with N+1 vertices
 """
 struct ReferenceSimplex{N} <: ReferenceShape end
 geometric_dimension(::ReferenceSimplex{N}) where {N} = N
+geometric_dimension(::Type{<:ReferenceSimplex{N}}) where {N} = N
 ambient_dimension(::ReferenceSimplex{N}) where {N} = N
 function Base.in(x, ::ReferenceSimplex{N}) where {N}
     for i in 1:N
@@ -55,6 +56,7 @@ the lower corner at the origin and the upper corner at `(1,1,…,1)`.
 """
 struct ReferenceHyperCube{N} <: ReferenceShape end
 geometric_dimension(::ReferenceHyperCube{N}) where {N} = N
+geometric_dimension(::Type{<:ReferenceHyperCube{N}}) where {N} = N
 ambient_dimension(::ReferenceHyperCube{N}) where {N} = N
 Base.in(x, ::ReferenceHyperCube{N}) where {N} = all(0 .≤ x .≤ 1)
 center(::ReferenceHyperCube{N}) where {N} = svector(i -> 0.5, N)
