@@ -71,8 +71,8 @@ end
     z          = 0.0
     y¹        = SVector(-1.0, -1.0, z)
     y²        = SVector(1.0 + δ, -1.0, z)
-    y³        = SVector(1.0 - δ, 1.0, z)
-    y⁴       = SVector(-1.0, 1.0, z)
+    y³        = SVector(-1.0, 1.0, z)
+    y⁴       = SVector(1.0 - δ, 1.0, z)
     nodes      = (y¹, y², y³, y⁴)
     el         = Inti.LagrangeSquare(nodes)
     ori        = 1
