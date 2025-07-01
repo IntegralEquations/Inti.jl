@@ -654,8 +654,8 @@ function node2etags(msh)
     # that the elements are stored as a tuple (type, index)
     T = Vector{Int}
     node2els = Dict{Int,Vector{T}}()
-    for E in Inti.element_types(msh)
-        mat = Inti.connectivity(msh, E)::Matrix{Int} # connectivity matrix
+    for E in element_types(msh)
+        mat = connectivity(msh, E)::Matrix{Int} # connectivity matrix
         np, Nel = size(mat)
         for n in 1:Nel
             tags = mat[:, n]
@@ -674,8 +674,32 @@ function elements_containing_nodes(n2e, nodes)
 end
 
 function curve_mesh(
+    msh::Mesh{N,Float64},
+    ψ::Function,
+    order::Int,
+    patch_sample_num::Int;
+    face_element_on_curved_surface = nothing,
+) where {N}
+    ψ_by_ent = Dict{EntityKey,Function}()
+    for ent in entities(msh)
+        ent.dim == N || continue
+        length(ψ_by_ent) == 0 || error(
+            "Trying to curve mesh with multiple volumetric entities, but only one parametrization passed",
+        )
+        ψ_by_ent[ent] = ψ
+    end
+    return curve_mesh(
+        msh,
+        ψ_by_ent,
+        order,
+        patch_sample_num;
+        face_element_on_curved_surface = face_element_on_curved_surface,
+    )
+end
+
+function curve_mesh(
     msh::Mesh{2,Float64},
-    ψ,
+    ψ_by_ent::Dict{EntityKey,Function},
     order::Int,
     patch_sample_num::Int;
     face_element_on_curved_surface = nothing,
@@ -689,52 +713,78 @@ function curve_mesh(
     # Sample from the patch
     t = LinRange(0, 1, patch_sample_num)
 
-    param_disc = ψ.(t)
-    kdt = KDTree(transpose(stack(param_disc; dims = 1)))
+    n2e = node2etags(msh)
+    entidxs = EntityKey[]
+    numvolents = 0
+    for ent in entities(msh)
+        ent.dim == 2 || continue
+        # TODO error out if volume entities have nontrivial pairwise boundary intersections
+        numvolents += 1
+        push!(entidxs, ent)
+    end
+    param_disc = Vector{Vector{Vector{Float64}}}(undef, numvolents)
+    kdt_by_ent = Dict{EntityKey,NearestNeighbors.KDTree}()
+    for k in eachindex(entidxs)
+        param_disc[k] = ψ_by_ent[entidxs[k]].(t)
+        kdt_by_ent[entidxs[k]] = KDTree(transpose(stack(param_disc[k]; dims = 1)))
+    end
 
-    nbdry_els = size(
-        msh.etype2mat[Inti.LagrangeElement{
-            Inti.ReferenceHyperCube{1},
-            2,
-            SVector{2,Float64},
-        }],
-    )[2]
-    bdry_node_idx = Vector{Int64}()
-    bdry_node_param_loc = Vector{Float64}()
-
-    uniqueidx(v) = unique(i -> v[i], eachindex(v))
-
-    crvmsh = Inti.Mesh{2,Float64}()
+    crvmsh = Mesh{2,Float64}()
     (; nodes, etype2mat, etype2els, ent2etags) = crvmsh
-    foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), Inti.entities(msh))
+    foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), entities(msh))
     append!(nodes, msh.nodes)
 
-    # Re-write nodes to lay on exact boundary
-    for elind in 1:nbdry_els
-        local node_indices = msh.etype2mat[Inti.LagrangeElement{
-            Inti.ReferenceHyperCube{1},
-            2,
-            SVector{2,Float64},
-        }][
-            :,
-            elind,
-        ]
-        local straight_nodes = crvmsh.nodes[node_indices]
+    nbdry_els =
+        size(msh.etype2mat[LagrangeElement{ReferenceHyperCube{1},2,SVector{2,Float64}}])[2]
 
-        if face_element_on_curved_surface(straight_nodes)
-            idxs, dists = nn(kdt, straight_nodes)
-            crvmsh.nodes[node_indices[1]] = param_disc[idxs[1]]
-            crvmsh.nodes[node_indices[2]] = param_disc[idxs[2]]
-            push!(bdry_node_idx, node_indices[1])
-            push!(bdry_node_idx, node_indices[2])
-            push!(bdry_node_param_loc, t[idxs[1]])
-            push!(bdry_node_param_loc, t[idxs[2]])
+    uniqueidx(v) = unique(i -> v[i], eachindex(v))
+    node_to_param_by_ent = Dict{EntityKey,Dict}()
+    bdry_node_idx_by_ent = Dict{EntityKey,Vector{Int64}}()
+    E_straight_bdry = LagrangeElement{ReferenceHyperCube{1},2,SVector{2,Float64}}
+    Estraight = LagrangeElement{ReferenceSimplex{2},3,SVector{2,Float64}} # TODO fix this to auto be a P1 element type
+    for k in eachindex(entidxs)
+        ent = entidxs[k]
+        kdt = kdt_by_ent[entidxs[k]]
+
+        bdry_node_idx = Vector{Int64}()
+        bdry_node_param_loc = Vector{Float64}()
+
+        # Re-write nodes to lay on exact boundary
+        for elind in 1:nbdry_els
+            local node_indices =
+                msh.etype2mat[LagrangeElement{ReferenceHyperCube{1},2,SVector{2,Float64}}][
+                    :,
+                    elind,
+                ]
+            local straight_nodes = crvmsh.nodes[node_indices]
+            # Determine if this face element belongs to this entity
+            candidate_els = elements_containing_nodes(n2e, node_indices)
+            candidate_els = candidate_els[length.(candidate_els) .== 3][1]
+            el_idxs_in_ent = findall(
+                (i) ->
+                    candidate_els ⊆
+                    msh.etype2mat[Estraight][:, msh.ent2etags[ent][Estraight][i]],
+                range(1, length(msh.ent2etags[ent][Estraight])),
+            )
+            !isempty(el_idxs_in_ent) || continue
+
+            if face_element_on_curved_surface(straight_nodes)
+                idxs, dists = nn(kdt, straight_nodes)
+                crvmsh.nodes[node_indices[1]] = param_disc[k][idxs[1]]
+                crvmsh.nodes[node_indices[2]] = param_disc[k][idxs[2]]
+                push!(bdry_node_idx, node_indices[1])
+                push!(bdry_node_idx, node_indices[2])
+                push!(bdry_node_param_loc, t[idxs[1]])
+                push!(bdry_node_param_loc, t[idxs[2]])
+            end
         end
+        I = uniqueidx(bdry_node_idx)
+        bdry_node_idx = bdry_node_idx[I]
+        bdry_node_param_loc = bdry_node_param_loc[I]
+        node_to_param = Dict(zip(bdry_node_idx, bdry_node_param_loc))
+        node_to_param_by_ent[ent] = node_to_param
+        bdry_node_idx_by_ent[ent] = bdry_node_idx
     end
-    I = uniqueidx(bdry_node_idx)
-    bdry_node_idx = bdry_node_idx[I]
-    bdry_node_param_loc = bdry_node_param_loc[I]
-    node_to_param = Dict(zip(bdry_node_idx, bdry_node_param_loc))
 
     connect_straight = Int[]
     connect_curve = Int[]
@@ -744,26 +794,47 @@ function curve_mesh(
     els_curve = []
     els_curve_bdry = []
 
-    for E in Inti.element_types(msh)
+    for E in element_types(msh)
         # The purpose of this check is to see if other element types are present in
         # the mesh, such as e.g. quads; This code errors when encountering a quad,
         # but the method can be extended to transfer straight quads to the new mesh,
         # similar to how straight simplices are transferred below.
         E <: Union{
-            Inti.LagrangeElement{Inti.ReferenceSimplex{2}},
-            Inti.LagrangeElement{Inti.ReferenceHyperCube{1}},
+            LagrangeElement{ReferenceSimplex{2}},
+            LagrangeElement{ReferenceHyperCube{1}},
             SVector,
         } || error()
         E <: SVector && continue
-        E <: Inti.LagrangeElement{Inti.ReferenceHyperCube{1}} && continue
-        E_straight_bdry =
-            Inti.LagrangeElement{Inti.ReferenceHyperCube{1},2,SVector{2,Float64}}
-        els = Inti.elements(msh, E)
+        E <: LagrangeElement{ReferenceHyperCube{1}} && continue
+        E_straight_bdry = LagrangeElement{ReferenceHyperCube{1},2,SVector{2,Float64}}
+        els = elements(msh, E)
         for elind in eachindex(els)
             node_indices = msh.etype2mat[E][:, elind]
             straight_nodes = crvmsh.nodes[node_indices]
 
-            # First determine if straight or curved
+            # First determine entity to which volume element belongs
+            entity_index = -1
+            for k in eachindex(entidxs)
+                ent = entidxs[k]
+                candidate_els = elements_containing_nodes(n2e, node_indices)
+                candidate_els = candidate_els[length.(candidate_els) .== 3][1]
+                el_idxs_in_ent = findall(
+                    (i) ->
+                        candidate_els ⊆
+                        msh.etype2mat[Estraight][:, msh.ent2etags[ent][Estraight][i]],
+                    range(1, length(msh.ent2etags[ent][Estraight])),
+                )
+                if !isempty(el_idxs_in_ent)
+                    entity_index = k
+                    continue
+                end
+            end
+            ent = entidxs[entity_index]
+            ψ = ψ_by_ent[ent]
+            node_to_param = node_to_param_by_ent[ent]
+            bdry_node_idx = bdry_node_idx_by_ent[ent]
+
+            # Next determine if straight or curved
             verts_on_bdry = findall(x -> x ∈ bdry_node_idx, node_indices)
             j = length(verts_on_bdry) # j in C. Bernardi SINUM Sec. 6
             if j > 1
@@ -795,85 +866,78 @@ function curve_mesh(
                 f̂ₖ_comp = (x) -> f̂ₖ((x[1] * α₁hat + x[2] * α₂hat)/(x[1] + x[2]))
 
                 # l = 1 projection onto linear FE space
-                πₖ¹_nodes = Inti.reference_nodes(
-                    Inti.LagrangeElement{Inti.ReferenceLine,2,SVector{2,Float64}},
-                )
+                πₖ¹_nodes =
+                    reference_nodes(LagrangeElement{ReferenceLine,2,SVector{2,Float64}})
                 πₖ¹ψ_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ¹_nodes))
                 for i in eachindex(πₖ¹_nodes)
                     πₖ¹ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ¹_nodes[i][1]))
                 end
                 πₖ¹ψ_reference_nodes = SVector{2}(πₖ¹ψ_reference_nodes)
-                πₖ¹ψ =
-                    (x) -> Inti.LagrangeElement{Inti.ReferenceLine}(πₖ¹ψ_reference_nodes)(x)
+                πₖ¹ψ = (x) -> LagrangeElement{ReferenceLine}(πₖ¹ψ_reference_nodes)(x)
 
                 # l = 2 projection onto quadratic FE space
                 if order > 1
-                    πₖ²_nodes = Inti.reference_nodes(
-                        Inti.LagrangeElement{Inti.ReferenceLine,3,SVector{3,Float64}},
-                    )
+                    πₖ²_nodes =
+                        reference_nodes(LagrangeElement{ReferenceLine,3,SVector{3,Float64}})
                     πₖ²ψ_reference_nodes =
                         Vector{SVector{2,Float64}}(undef, length(πₖ²_nodes))
                     for i in eachindex(πₖ²_nodes)
                         πₖ²ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ²_nodes[i][1]))
                     end
                     πₖ²ψ_reference_nodes = SVector{3}(πₖ²ψ_reference_nodes)
-                    πₖ²ψ = Inti.LagrangeElement{Inti.ReferenceLine}(πₖ²ψ_reference_nodes)
+                    πₖ²ψ = LagrangeElement{ReferenceLine}(πₖ²ψ_reference_nodes)
                 end
 
                 # l = 3 projection onto cubic FE space
                 if order > 2
-                    πₖ³_nodes = Inti.reference_nodes(
-                        Inti.LagrangeElement{Inti.ReferenceLine,4,SVector{4,Float64}},
-                    )
+                    πₖ³_nodes =
+                        reference_nodes(LagrangeElement{ReferenceLine,4,SVector{4,Float64}})
                     πₖ³ψ_reference_nodes =
                         Vector{SVector{2,Float64}}(undef, length(πₖ³_nodes))
                     for i in eachindex(πₖ³_nodes)
                         πₖ³ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ³_nodes[i][1]))
                     end
                     πₖ³ψ_reference_nodes = SVector{4}(πₖ³ψ_reference_nodes)
-                    πₖ³ψ = Inti.LagrangeElement{Inti.ReferenceLine}(πₖ³ψ_reference_nodes)
+                    πₖ³ψ = LagrangeElement{ReferenceLine}(πₖ³ψ_reference_nodes)
                 end
 
                 # l = 4 projection onto quartic FE space
                 if order > 3
-                    πₖ⁴_nodes = Inti.reference_nodes(
-                        Inti.LagrangeElement{Inti.ReferenceLine,5,SVector{5,Float64}},
-                    )
+                    πₖ⁴_nodes =
+                        reference_nodes(LagrangeElement{ReferenceLine,5,SVector{5,Float64}})
                     πₖ⁴ψ_reference_nodes =
                         Vector{SVector{2,Float64}}(undef, length(πₖ⁴_nodes))
                     for i in eachindex(πₖ⁴_nodes)
                         πₖ⁴ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁴_nodes[i][1]))
                     end
                     πₖ⁴ψ_reference_nodes = SVector{5}(πₖ⁴ψ_reference_nodes)
-                    πₖ⁴ψ = Inti.LagrangeElement{Inti.ReferenceLine}(πₖ⁴ψ_reference_nodes)
+                    πₖ⁴ψ = LagrangeElement{ReferenceLine}(πₖ⁴ψ_reference_nodes)
                 end
 
                 # l = 5 projection onto quintic FE space
                 if order > 4
-                    πₖ⁵_nodes = Inti.reference_nodes(
-                        Inti.LagrangeElement{Inti.ReferenceLine,6,SVector{6,Float64}},
-                    )
+                    πₖ⁵_nodes =
+                        reference_nodes(LagrangeElement{ReferenceLine,6,SVector{6,Float64}})
                     πₖ⁵ψ_reference_nodes =
                         Vector{SVector{2,Float64}}(undef, length(πₖ⁵_nodes))
                     for i in eachindex(πₖ⁵_nodes)
                         πₖ⁵ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁵_nodes[i][1]))
                     end
                     πₖ⁵ψ_reference_nodes = SVector{6}(πₖ⁵ψ_reference_nodes)
-                    πₖ⁵ψ = Inti.LagrangeElement{Inti.ReferenceLine}(πₖ⁵ψ_reference_nodes)
+                    πₖ⁵ψ = LagrangeElement{ReferenceLine}(πₖ⁵ψ_reference_nodes)
                 end
 
                 # l = 6 projection onto sextic FE space
                 if order > 5
-                    πₖ⁶_nodes = Inti.reference_nodes(
-                        Inti.LagrangeElement{Inti.ReferenceLine,7,SVector{7,Float64}},
-                    )
+                    πₖ⁶_nodes =
+                        reference_nodes(LagrangeElement{ReferenceLine,7,SVector{7,Float64}})
                     πₖ⁶ψ_reference_nodes =
                         Vector{SVector{2,Float64}}(undef, length(πₖ⁶_nodes))
                     for i in eachindex(πₖ⁶_nodes)
                         πₖ⁶ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁶_nodes[i][1]))
                     end
                     πₖ⁶ψ_reference_nodes = SVector{7}(πₖ⁶ψ_reference_nodes)
-                    πₖ⁶ψ = Inti.LagrangeElement{Inti.ReferenceLine}(πₖ⁶ψ_reference_nodes)
+                    πₖ⁶ψ = LagrangeElement{ReferenceLine}(πₖ⁶ψ_reference_nodes)
                 end
 
                 # Nonlinear map
@@ -1043,23 +1107,23 @@ function curve_mesh(
 
                 # Full transformation
                 Fₖ = (x) -> F̃ₖ(x) + Φₖ(x)
-                D = Inti.ReferenceTriangle
+                D = ReferenceTriangle
                 T = SVector{2,Float64}
-                el = Inti.ParametricElement{D,T}(x -> Fₖ(x))
+                el = ParametricElement{D,T}(x -> Fₖ(x))
                 push!(els_curve, el)
                 ψₖ = (s) -> Fₖ([1.0 - s[1], s[1]])
-                L = Inti.ReferenceHyperCube{1}
-                bdry_el = Inti.ParametricElement{L,T}(s -> ψₖ(s))
+                L = ReferenceHyperCube{1}
+                bdry_el = ParametricElement{L,T}(s -> ψₖ(s))
                 push!(els_curve_bdry, bdry_el)
 
                 # loop over entities
                 Ecurve = typeof(first(els_curve))
                 Ecurvebdry = typeof(first(els_curve_bdry))
-                for k in Inti.entities(msh)
+                for k in entities(msh)
                     # determine if the straight (LagrangeElement) mesh element
                     # belongs to the entity and, if so, add the curved
                     # (ParametricElement) element.
-                    if haskey(msh.ent2etags[k], E)
+                    if haskey(msh.ent2etags[k], E) && k == entidxs[entity_index]
                         n_straight_vol_els = size(msh.etype2mat[E])[2]
                         if any(
                             (i) -> node_indices == msh.etype2mat[E][:, i],
@@ -1082,7 +1146,8 @@ function curve_mesh(
                                 sort(msh.etype2mat[E_straight_bdry][:, i]),
                             range(1, n_straight_bdry_els),
                         )
-                        if !isempty(straight_entity_elementind)
+                        if !isempty(straight_entity_elementind) &&
+                           straight_entity_elementind[1] ∈ msh.ent2etags[k][E_straight_bdry]
                             haskey(ent2etags[k], Ecurvebdry) ||
                                 (ent2etags[k][Ecurvebdry] = Vector{Int64}())
                             append!(ent2etags[k][Ecurvebdry], length(els_curve_bdry))
@@ -1092,14 +1157,15 @@ function curve_mesh(
 
             else
                 append!(connect_straight, node_indices)
-                el = Inti.LagrangeElement{Inti.ReferenceSimplex{2},3,SVector{2,Float64}}(
+                el = LagrangeElement{ReferenceSimplex{2},3,SVector{2,Float64}}(
                     straight_nodes,
                 )
                 push!(els_straight, el)
 
-                for k in Inti.entities(msh)
+                for k in entities(msh)
                     # determine if the straight mesh element belongs to the entity and, if so, add.
-                    if haskey(msh.ent2etags[k], E)
+                    #if haskey(msh.ent2etags[k], E)
+                    if haskey(msh.ent2etags[k], E) && k == entidxs[entity_index]
                         n_straight_vol_els = size(msh.etype2mat[E])[2]
                         if any(
                             (i) -> node_indices == msh.etype2mat[E][:, i],
@@ -1122,7 +1188,7 @@ function curve_mesh(
     nv_bdry = 2 # Number of vertices for connectivity information on the boundary
     Ecurve = typeof(first(els_curve))
     Ecurvebdry = typeof(first(els_curve_bdry))
-    Estraight = Inti.LagrangeElement{Inti.ReferenceSimplex{2},3,SVector{2,Float64}} # TODO fix this to auto be a P1 element type
+    Estraight = LagrangeElement{ReferenceSimplex{2},3,SVector{2,Float64}} # TODO fix this to auto be a P1 element type
 
     crvmsh.etype2mat[Ecurve] = reshape(connect_curve, nv, :)
     crvmsh.etype2els[Ecurve] = convert(Vector{Ecurve}, els_curve)
@@ -1141,13 +1207,16 @@ end
 
 function curve_mesh(
     msh::Mesh{3,Float64},
-    ψ,
+    ψ_by_ent::Dict{EntityKey,Function},
     order::Int,
     patch_sample_num::Int;
     face_element_on_curved_surface = nothing,
 )
     order > 0 || error("smoothness order must be positive")
     order <= 6 || notimplemented()
+    length(ψ_by_ent) == 1 ||
+        error("Only simply connected 3D curved domains supported presently")
+    ψ = ψ_by_ent[collect(keys(ψ_by_ent))[1]]
     if isnothing(face_element_on_curved_surface)
         face_element_on_curved_surface = (arg) -> true
     end
@@ -1172,31 +1241,27 @@ function curve_mesh(
     end
     chart_1_kdt = KDTree(chart_1; reorder = false)
 
-    n2e = Inti.node2etags(msh)
+    n2e = node2etags(msh)
 
-    nbdry_els = size(
-        msh.etype2mat[Inti.LagrangeElement{Inti.ReferenceSimplex{2},3,SVector{3,Float64}}],
-    )[2]
+    nbdry_els =
+        size(msh.etype2mat[LagrangeElement{ReferenceSimplex{2},3,SVector{3,Float64}}])[2]
     chart_1_bdry_node_idx = Vector{Int64}()
     chart_1_bdry_node_param_loc = Vector{Vector{Float64}}()
 
     uniqueidx(v) = unique(i -> v[i], eachindex(v))
 
-    crvmsh = Inti.Mesh{3,Float64}()
+    crvmsh = Mesh{3,Float64}()
     (; nodes, etype2mat, etype2els, ent2etags) = crvmsh
-    foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), Inti.entities(msh))
+    foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), entities(msh))
     append!(nodes, msh.nodes)
 
     # Set up chart <-> node Dict
     for elind in 1:nbdry_els
-        node_indices = msh.etype2mat[Inti.LagrangeElement{
-            Inti.ReferenceSimplex{2},
-            3,
-            SVector{3,Float64},
-        }][
-            :,
-            elind,
-        ]
+        node_indices =
+            msh.etype2mat[LagrangeElement{ReferenceSimplex{2},3,SVector{3,Float64}}][
+                :,
+                elind,
+            ]
         straight_nodes = crvmsh.nodes[node_indices]
 
         if face_element_on_curved_surface(straight_nodes)
@@ -1246,26 +1311,25 @@ function curve_mesh(
     els_curve = []
     els_curve_bdry = []
 
-    for E in Inti.element_types(msh)
+    for E in element_types(msh)
         # The purpose of this check is to see if other element types are present in
         # the mesh, such as e.g. cubes; This code errors when encountering a cube,
         # but the method can be extended to transfer straight cubes to the new mesh,
         # similar to how straight simplices are transferred below.
         E <: Union{
-            Inti.LagrangeElement{Inti.ReferenceSimplex{3}},
-            Inti.LagrangeElement{Inti.ReferenceSimplex{2}},
-            Inti.LagrangeElement{Inti.ReferenceHyperCube{1}},
+            LagrangeElement{ReferenceSimplex{3}},
+            LagrangeElement{ReferenceSimplex{2}},
+            LagrangeElement{ReferenceHyperCube{1}},
             SVector,
         } || error()
         E <: SVector && continue
-        E <: Inti.LagrangeElement{Inti.ReferenceHyperCube{1}} && continue
-        E <: Inti.LagrangeElement{Inti.ReferenceHyperCube{2}} && continue
-        E <: Inti.LagrangeElement{Inti.ReferenceSimplex{2}} && continue
-        E <: Inti.LagrangeElement{Inti.ReferenceSimplex{3},4,SVector{3,Float64}} ||
+        E <: LagrangeElement{ReferenceHyperCube{1}} && continue
+        E <: LagrangeElement{ReferenceHyperCube{2}} && continue
+        E <: LagrangeElement{ReferenceSimplex{2}} && continue
+        E <: LagrangeElement{ReferenceSimplex{3},4,SVector{3,Float64}} ||
             (println(E); error())
-        E_straight_bdry =
-            Inti.LagrangeElement{Inti.ReferenceSimplex{2},3,SVector{3,Float64}}
-        els = Inti.elements(msh, E)
+        E_straight_bdry = LagrangeElement{ReferenceSimplex{2},3,SVector{3,Float64}}
+        els = elements(msh, E)
         for elind in eachindex(els)
             node_indices = msh.etype2mat[E][:, elind]
             straight_nodes = crvmsh.nodes[node_indices]
@@ -1291,8 +1355,7 @@ function curve_mesh(
                     α₃ = copy(node_to_param[node_indices_on_bdry[3]])
                 else
                     # Find missing node α₃ that (non-uniquely) defines the curved face simplex containing α₁, α₂
-                    candidate_els =
-                        Inti.elements_containing_nodes(n2e, node_indices_on_bdry)
+                    candidate_els = elements_containing_nodes(n2e, node_indices_on_bdry)
                     # Filter out volume elements; should be at most two face simplices remaining
                     candidate_els = candidate_els[length.(candidate_els) .== 3]
                     # Take the first face simplex; while either would work if j=2,
@@ -1495,17 +1558,14 @@ function curve_mesh(
                 α₂hat = SVector{2,Float64}(0.0, 1.0)
                 α₃hat = SVector{2,Float64}(0.0, 0.0)
 
-                πₖ¹_nodes = Inti.reference_nodes(
-                    Inti.LagrangeElement{Inti.ReferenceTriangle,3,SVector{2,Float64}},
-                )
+                πₖ¹_nodes =
+                    reference_nodes(LagrangeElement{ReferenceTriangle,3,SVector{2,Float64}})
                 α_reference_nodes = Vector{SVector{2,Float64}}(undef, length(πₖ¹_nodes))
                 α_reference_nodes[1] = SVector{2}(α₃)
                 α_reference_nodes[2] = SVector{2}(α₁)
                 α_reference_nodes[3] = SVector{2}(α₂)
                 α_reference_nodes = SVector{3}(α_reference_nodes)
-                f̂ₖ =
-                    (x) ->
-                        Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(α_reference_nodes)(x)
+                f̂ₖ = (x) -> LagrangeElement{ReferenceSimplex{2}}(α_reference_nodes)(x)
 
                 @assert (f̂ₖ(α₁hat) ≈ α₁) && (f̂ₖ(α₂hat) ≈ α₂) && (f̂ₖ(α₃hat) ≈ α₃)
                 @assert a₁ ≈ ψ(f̂ₖ(α₁hat))
@@ -1544,24 +1604,20 @@ function curve_mesh(
                     ]
 
                 # l = 1
-                πₖ¹_nodes = Inti.reference_nodes(
-                    Inti.LagrangeElement{
-                        Inti.ReferenceTriangle,
-                        binomial(2+1, 2),
-                        SVector{2,Float64},
-                    },
+                πₖ¹_nodes = reference_nodes(
+                    LagrangeElement{ReferenceTriangle,binomial(2+1, 2),SVector{2,Float64}},
                 )
                 πₖ¹ψ_reference_nodes = Vector{SVector{3,Float64}}(undef, length(πₖ¹_nodes))
                 for i in eachindex(πₖ¹_nodes)
                     πₖ¹ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ¹_nodes[i]))
                 end
                 πₖ¹ψ_reference_nodes = SVector{binomial(2+1, 2)}(πₖ¹ψ_reference_nodes)
-                πₖ¹ψ = Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ¹ψ_reference_nodes)
+                πₖ¹ψ = LagrangeElement{ReferenceSimplex{2}}(πₖ¹ψ_reference_nodes)
                 #l = 2
                 if order > 1
-                    πₖ²_nodes = Inti.reference_nodes(
-                        Inti.LagrangeElement{
-                            Inti.ReferenceTriangle,
+                    πₖ²_nodes = reference_nodes(
+                        LagrangeElement{
+                            ReferenceTriangle,
                             binomial(2+2, 2),
                             SVector{2,Float64},
                         },
@@ -1572,14 +1628,13 @@ function curve_mesh(
                         πₖ²ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ²_nodes[i]))
                     end
                     πₖ²ψ_reference_nodes = SVector{binomial(2+2, 2)}(πₖ²ψ_reference_nodes)
-                    πₖ²ψ =
-                        Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ²ψ_reference_nodes)
+                    πₖ²ψ = LagrangeElement{ReferenceSimplex{2}}(πₖ²ψ_reference_nodes)
                 end
                 #l = 3
                 if order > 2
-                    πₖ³_nodes = Inti.reference_nodes(
-                        Inti.LagrangeElement{
-                            Inti.ReferenceTriangle,
+                    πₖ³_nodes = reference_nodes(
+                        LagrangeElement{
+                            ReferenceTriangle,
                             binomial(2+3, 2),
                             SVector{2,Float64},
                         },
@@ -1590,14 +1645,13 @@ function curve_mesh(
                         πₖ³ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ³_nodes[i]))
                     end
                     πₖ³ψ_reference_nodes = SVector{binomial(2+3, 2)}(πₖ³ψ_reference_nodes)
-                    πₖ³ψ =
-                        Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ³ψ_reference_nodes)
+                    πₖ³ψ = LagrangeElement{ReferenceSimplex{2}}(πₖ³ψ_reference_nodes)
                 end
                 #l = 4
                 if order > 3
-                    πₖ⁴_nodes = Inti.reference_nodes(
-                        Inti.LagrangeElement{
-                            Inti.ReferenceTriangle,
+                    πₖ⁴_nodes = reference_nodes(
+                        LagrangeElement{
+                            ReferenceTriangle,
                             binomial(2+4, 2),
                             SVector{2,Float64},
                         },
@@ -1608,14 +1662,13 @@ function curve_mesh(
                         πₖ⁴ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁴_nodes[i]))
                     end
                     πₖ⁴ψ_reference_nodes = SVector{binomial(2+4, 2)}(πₖ⁴ψ_reference_nodes)
-                    πₖ⁴ψ =
-                        Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ⁴ψ_reference_nodes)
+                    πₖ⁴ψ = LagrangeElement{ReferenceSimplex{2}}(πₖ⁴ψ_reference_nodes)
                 end
                 #l = 5
                 if order > 4
-                    πₖ⁵_nodes = Inti.reference_nodes(
-                        Inti.LagrangeElement{
-                            Inti.ReferenceTriangle,
+                    πₖ⁵_nodes = reference_nodes(
+                        LagrangeElement{
+                            ReferenceTriangle,
                             binomial(2+5, 2),
                             SVector{2,Float64},
                         },
@@ -1626,14 +1679,13 @@ function curve_mesh(
                         πₖ⁵ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁵_nodes[i]))
                     end
                     πₖ⁵ψ_reference_nodes = SVector{binomial(2+5, 2)}(πₖ⁵ψ_reference_nodes)
-                    πₖ⁵ψ =
-                        Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ⁵ψ_reference_nodes)
+                    πₖ⁵ψ = LagrangeElement{ReferenceSimplex{2}}(πₖ⁵ψ_reference_nodes)
                 end
                 #l = 6
                 if order > 5
-                    πₖ⁶_nodes = Inti.reference_nodes(
-                        Inti.LagrangeElement{
-                            Inti.ReferenceTriangle,
+                    πₖ⁶_nodes = reference_nodes(
+                        LagrangeElement{
+                            ReferenceTriangle,
                             binomial(2+6, 2),
                             SVector{2,Float64},
                         },
@@ -1644,8 +1696,7 @@ function curve_mesh(
                         πₖ⁶ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁶_nodes[i]))
                     end
                     πₖ⁶ψ_reference_nodes = SVector{binomial(2+6, 2)}(πₖ⁶ψ_reference_nodes)
-                    πₖ⁶ψ =
-                        Inti.LagrangeElement{Inti.ReferenceSimplex{2}}(πₖ⁶ψ_reference_nodes)
+                    πₖ⁶ψ = LagrangeElement{ReferenceSimplex{2}}(πₖ⁶ψ_reference_nodes)
                 end
 
                 # Nonlinear map
@@ -2011,21 +2062,21 @@ function curve_mesh(
                     ) < atol
                 end
 
-                D = Inti.ReferenceTetrahedron
+                D = ReferenceTetrahedron
                 T = SVector{3,Float64}
-                el = Inti.ParametricElement{D,T}(x -> Fₖ(x))
+                el = ParametricElement{D,T}(x -> Fₖ(x))
                 push!(els_curve, el)
                 if j == 3
                     ψₖ = (s) -> Fₖ([s[1], s[2], 1.0 - s[1] - s[2]])
-                    F = Inti.ReferenceTriangle
-                    bdry_el = Inti.ParametricElement{F,T}(s -> ψₖ(s))
+                    F = ReferenceTriangle
+                    bdry_el = ParametricElement{F,T}(s -> ψₖ(s))
                     push!(els_curve_bdry, bdry_el)
                     Ecurvebdry = typeof(first(els_curve_bdry))
                     append!(connect_curve_bdry, node_indices_on_bdry)
                 end
 
                 Ecurve = typeof(first(els_curve))
-                for k in Inti.entities(msh)
+                for k in entities(msh)
                     # determine if the straight (LagrangeElement) mesh element
                     # belongs to the entity and, if so, add the curved
                     # (ParametricElement) element.
@@ -2060,12 +2111,12 @@ function curve_mesh(
                 end
             else
                 append!(connect_straight, node_indices)
-                el = Inti.LagrangeElement{Inti.ReferenceSimplex{3},4,SVector{3,Float64}}(
+                el = LagrangeElement{ReferenceSimplex{3},4,SVector{3,Float64}}(
                     straight_nodes,
                 )
                 push!(els_straight, el)
 
-                for k in Inti.entities(msh)
+                for k in entities(msh)
                     # determine if the straight mesh element belongs to the entity and, if so, add.
                     if haskey(msh.ent2etags[k], E)
                         n_straight_vol_els = size(msh.etype2mat[E])[2]
@@ -2090,7 +2141,7 @@ function curve_mesh(
     nv_bdry = 3 # Number of vertices for connectivity information on the boundary
     Ecurve = typeof(first(els_curve))
     Ecurvebdry = typeof(first(els_curve_bdry))
-    Estraight = Inti.LagrangeElement{Inti.ReferenceSimplex{3},4,SVector{3,Float64}} # TODO fix this to auto be a P1 element type
+    Estraight = LagrangeElement{ReferenceSimplex{3},4,SVector{3,Float64}} # TODO fix this to auto be a P1 element type
 
     crvmsh.etype2mat[Ecurve] = reshape(connect_curve, nv, :)
     crvmsh.etype2els[Ecurve] = convert(Vector{Ecurve}, els_curve)
