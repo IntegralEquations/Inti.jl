@@ -92,7 +92,7 @@ end
     torus(; r, R, translation, rotation, scaling, labels)
 
 Create a torus entity in 3D, and apply optional transformations. Returns the
-key. The parameters `r` and `R` are the inner and outer radii of the torus.
+key. The parameters `r` and `R` are the minor and major radii of the torus.
 """
 function torus(;
     r = 0.5,

@@ -44,3 +44,7 @@ end
 @safetestset "FMM2D extension" include("fmm2d_test.jl")
 
 @safetestset "FMM3D extension" include("fmm3d_test.jl")
+
+@safetestset "Curve 2D Mesh" include("curved_test_2d.jl")
+
+@safetestset "Curve 3D Mesh" include("curved_test_3d.jl")
