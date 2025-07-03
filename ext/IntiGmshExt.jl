@@ -209,7 +209,7 @@ function _etype_to_type_tag(E::DataType)
     elseif E <: Inti.LagrangeTriangle
         "Triangle"
     elseif E <: Inti.LagrangeSquare
-        "Quadrilateral"
+        "Quadrangle"
     elseif E <: Inti.LagrangeTetrahedron
         "Tetrahedron"
     else
