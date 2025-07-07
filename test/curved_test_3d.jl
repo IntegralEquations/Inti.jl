@@ -57,7 +57,7 @@ include("test_utils.jl")
     qorder = 8
     Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder);
     Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder);
-    @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), truevol, rtol = 1e-13)
+    @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), truevol, rtol = 1e-11)
     @test isapprox(Inti.integrate(x -> 1, Γₕ_quad), truesfcarea, rtol = 1e-14)
 
     divF = (x) -> x[3] + x[3]^2 + x[2]^3

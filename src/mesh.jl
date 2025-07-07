@@ -684,7 +684,7 @@ function curve_mesh(
     for ent in entities(msh)
         ent.dim == N || continue
         length(ψ_by_ent) == 0 || error(
-            "Trying to curve mesh with multiple volumetric entities, but only one parametrization passed",
+            "Trying to curve mesh with multiple volumetric entities, but only one parametrization passed; pass in an entity => parametrization dictionary",
         )
         ψ_by_ent[ent] = ψ
     end
@@ -2081,11 +2081,7 @@ function curve_mesh(
                     # belongs to the entity and, if so, add the curved
                     # (ParametricElement) element.
                     if haskey(msh.ent2etags[k], E)
-                        n_straight_vol_els = size(msh.etype2mat[E])[2]
-                        if any(
-                            (i) -> sort(node_indices) == sort(msh.etype2mat[E][:, i]),
-                            range(1, n_straight_vol_els),
-                        )
+                        if length(elements_containing_nodes(n2e, node_indices)) > 0
                             haskey(ent2etags[k], Ecurve) ||
                                 (ent2etags[k][Ecurve] = Vector{Int64}())
                             append!(ent2etags[k][Ecurve], length(els_curve))
@@ -2097,12 +2093,9 @@ function curve_mesh(
                     if (j == 3) && (haskey(msh.ent2etags[k], E_straight_bdry))
                         k.dim == 2 || continue
                         n_straight_bdry_els = size(msh.etype2mat[E_straight_bdry])[2]
-                        if any(
-                            (i) ->
-                                sort(node_indices_on_bdry) ==
-                                sort(msh.etype2mat[E_straight_bdry][:, i]),
-                            range(1, n_straight_bdry_els),
-                        )
+                        candidate_els = elements_containing_nodes(n2e, node_indices_on_bdry)
+                        candidate_els = candidate_els[length.(candidate_els) .== 3]
+                        if length(candidate_els) > 0
                             haskey(ent2etags[k], Ecurvebdry) ||
                                 (ent2etags[k][Ecurvebdry] = Vector{Int64}())
                             append!(ent2etags[k][Ecurvebdry], length(els_curve_bdry))
@@ -2119,11 +2112,8 @@ function curve_mesh(
                 for k in entities(msh)
                     # determine if the straight mesh element belongs to the entity and, if so, add.
                     if haskey(msh.ent2etags[k], E)
-                        n_straight_vol_els = size(msh.etype2mat[E])[2]
-                        if any(
-                            (i) -> node_indices == msh.etype2mat[E][:, i],
-                            range(1, n_straight_vol_els),
-                        )
+                        #n_straight_vol_els = size(msh.etype2mat[E])[2]
+                        if length(elements_containing_nodes(n2e, node_indices)) > 0
                             haskey(ent2etags[k], E) || (ent2etags[k][E] = Vector{Int64}())
                             append!(ent2etags[k][E], length(els_straight))
                         end
