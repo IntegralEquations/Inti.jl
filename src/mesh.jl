@@ -816,15 +816,15 @@ function curve_mesh(
             entity_index = -1
             for k in eachindex(entidxs)
                 ent = entidxs[k]
-                candidate_els = elements_containing_nodes(n2e, node_indices)
-                candidate_els = candidate_els[length.(candidate_els) .== 3][1]
-                el_idxs_in_ent = findall(
+                #candidate_els = elements_containing_nodes(n2e, node_indices)
+                #candidate_els = candidate_els[length.(candidate_els) .== 3][1]
+                el_idxs_in_ent = findfirst(
                     (i) ->
-                        candidate_els ⊆
+                        node_indices ⊆
                         msh.etype2mat[Estraight][:, msh.ent2etags[ent][Estraight][i]],
                     range(1, length(msh.ent2etags[ent][Estraight])),
                 )
-                if !isempty(el_idxs_in_ent)
+                if !isnothing(el_idxs_in_ent)
                     entity_index = k
                     continue
                 end
@@ -1234,7 +1234,7 @@ function curve_mesh(
     chart_1_cart_idxs_ϕ = []
     for i in eachindex(θ)
         for j in eachindex(ϕ)
-            chart_1[(i-1)*length(ϕ)+j] = [k for k in ψ((θ[i], ϕ[j]))]
+            chart_1[(i-1)*length(ϕ)+j] = SVector{3,Float64}(ψ([θ[i], ϕ[j]]))
             push!(chart_1_cart_idxs_θ, i)
             push!(chart_1_cart_idxs_ϕ, j)
         end
@@ -1343,7 +1343,7 @@ function curve_mesh(
             end
             if j > 1
                 append!(connect_curve, node_indices)
-                node_indices_on_bdry = copy(node_indices[verts_on_bdry])
+                node_indices_on_bdry = node_indices[verts_on_bdry]
                 node_to_param = chart_1_node_to_param
                 α₁ = copy(node_to_param[node_indices_on_bdry[1]])
                 if nverts_in_chart >= 2
@@ -1362,32 +1362,27 @@ function curve_mesh(
                     # if j=3 only one of the candidate face triangles will work, so
                     # find that one
                     if candidate_els[1][1] ∉ node_indices_on_bdry
-                        p = copy(crvmsh.nodes[candidate_els[1][1]])
+                        α₃ = node_to_param[candidate_els[1][1]]
+                        p = crvmsh.nodes[candidate_els[1][1]]
                     elseif candidate_els[1][2] ∉ node_indices_on_bdry
-                        p = copy(crvmsh.nodes[candidate_els[1][2]])
+                        α₃ = node_to_param[candidate_els[1][2]]
+                        p = crvmsh.nodes[candidate_els[1][2]]
                     elseif candidate_els[1][3] ∉ node_indices_on_bdry
-                        p = copy(crvmsh.nodes[candidate_els[1][3]])
+                        α₃ = node_to_param[candidate_els[1][3]]
+                        p = crvmsh.nodes[candidate_els[1][3]]
                     else
                         @assert false
                     end
                     if j == 3 && p ∉ straight_nodes
                         if candidate_els[2][1] ∉ node_indices_on_bdry
-                            p = copy(crvmsh.nodes[candidate_els[2][1]])
+                            α₃ = node_to_param[candidate_els[2][1]]
                         elseif candidate_els[2][2] ∉ node_indices_on_bdry
-                            p = copy(crvmsh.nodes[candidate_els[2][2]])
+                            α₃ = node_to_param[candidate_els[2][2]]
                         elseif candidate_els[2][3] ∉ node_indices_on_bdry
-                            p = copy(crvmsh.nodes[candidate_els[2][3]])
+                            α₃ = node_to_param[candidate_els[2][3]]
                         else
                             @assert false
                         end
-                    end
-                    res = ψ⁻¹(α₂, p)
-                    if res.retcode == ReturnCode.MaxIters
-                        α₃ = copy(α₂)
-                        @assert j == 2
-                    else
-                        α₃ = Vector{Float64}(ψ⁻¹(α₂, p).u)
-                        @assert norm(ψ(α₃) - p) < 10^(-14)
                     end
                 end
                 atol = 10^(-4)
@@ -1530,16 +1525,18 @@ function curve_mesh(
                     if all(norm.(Ref(straight_nodes[4]) .- facenodes) .> atol)
                         (skipnode == 4) || (cₖ = copy(straight_nodes[4]))
                     end
-                    @assert norm(cₖ - a₃) > atol
-                    @assert norm(cₖ - dₖ) > atol
-                    @assert norm(dₖ - a₁) > atol
-                    @assert norm(dₖ - a₂) > atol
+                    # Tests that should be satisfied; commented for performance
+                    #@assert norm(cₖ - a₃) > atol
+                    #@assert norm(cₖ - dₖ) > atol
+                    #@assert norm(dₖ - a₁) > atol
+                    #@assert norm(dₖ - a₂) > atol
                 end
-                @assert !all(norm.(Ref(a₁) .- straight_nodes) .> atol)
-                @assert !all(norm.(Ref(a₂) .- straight_nodes) .> atol)
-                if j == 3
-                    @assert !all(norm.(Ref(a₃) .- straight_nodes) .> atol)
-                end
+                # Tests that should be satisfied; commented for performance
+                #@assert !all(norm.(Ref(a₁) .- straight_nodes) .> atol)
+                #@assert !all(norm.(Ref(a₂) .- straight_nodes) .> atol)
+                #if j == 3
+                #    @assert !all(norm.(Ref(a₃) .- straight_nodes) .> atol)
+                #end
 
                 # The following ensures an ordering of the face nodes so that
                 # the resulting normal vector is properly oriented.
@@ -1565,28 +1562,29 @@ function curve_mesh(
                 α_reference_nodes[2] = SVector{2}(α₁)
                 α_reference_nodes[3] = SVector{2}(α₂)
                 α_reference_nodes = SVector{3}(α_reference_nodes)
-                f̂ₖ = (x) -> LagrangeElement{ReferenceSimplex{2}}(α_reference_nodes)(x)
+                f̂ₖ = LagrangeElement{ReferenceSimplex{2}}(α_reference_nodes)
 
-                @assert (f̂ₖ(α₁hat) ≈ α₁) && (f̂ₖ(α₂hat) ≈ α₂) && (f̂ₖ(α₃hat) ≈ α₃)
-                @assert a₁ ≈ ψ(f̂ₖ(α₁hat))
-                @assert a₂ ≈ ψ(f̂ₖ(α₂hat))
-                @assert a₃ ≈ ψ(f̂ₖ(α₃hat))
-                @assert a₁ ≈ straight_nodes[1] ||
-                        a₁ ≈ straight_nodes[2] ||
-                        a₁ ≈ straight_nodes[3] ||
-                        a₁ ≈ straight_nodes[4]
-                @assert a₂ ≈ straight_nodes[1] ||
-                        a₂ ≈ straight_nodes[2] ||
-                        a₂ ≈ straight_nodes[3] ||
-                        a₂ ≈ straight_nodes[4]
-                if j == 3
-                    @assert a₃ ≈ straight_nodes[1] ||
-                            a₃ ≈ straight_nodes[2] ||
-                            a₃ ≈ straight_nodes[3] ||
-                            a₃ ≈ straight_nodes[4]
-                end
-                @assert aₖ ≈ a₁
-                @assert bₖ ≈ a₂
+                # Tests that should be satisfied; commented for performance
+                #@assert (f̂ₖ(α₁hat) ≈ α₁) && (f̂ₖ(α₂hat) ≈ α₂) && (f̂ₖ(α₃hat) ≈ α₃)
+                #@assert a₁ ≈ ψ(f̂ₖ(α₁hat))
+                #@assert a₂ ≈ ψ(f̂ₖ(α₂hat))
+                #@assert a₃ ≈ ψ(f̂ₖ(α₃hat))
+                #@assert a₁ ≈ straight_nodes[1] ||
+                #        a₁ ≈ straight_nodes[2] ||
+                #        a₁ ≈ straight_nodes[3] ||
+                #        a₁ ≈ straight_nodes[4]
+                #@assert a₂ ≈ straight_nodes[1] ||
+                #        a₂ ≈ straight_nodes[2] ||
+                #        a₂ ≈ straight_nodes[3] ||
+                #        a₂ ≈ straight_nodes[4]
+                #if j == 3
+                #    @assert a₃ ≈ straight_nodes[1] ||
+                #            a₃ ≈ straight_nodes[2] ||
+                #            a₃ ≈ straight_nodes[3] ||
+                #            a₃ ≈ straight_nodes[4]
+                #end
+                #@assert aₖ ≈ a₁
+                #@assert bₖ ≈ a₂
                 F̃ₖ =
                     (x::AbstractVector) -> [
                         (aₖ[1] - dₖ[1])*x[1] +
@@ -2028,39 +2026,40 @@ function curve_mesh(
 
                 # Full transformation
                 Fₖ = (x::AbstractVector) -> F̃ₖ(x) + Φₖ(x)
-                @assert norm(Fₖ([1.0, 0.0, 0.0]) - a₁) < atol
-                @assert norm(Fₖ([0.0, 1.0, 0.0]) - a₂) < atol
-                @assert norm(Fₖ([1.0, 0.0, 0.0]) - aₖ) < atol
-                @assert norm(Fₖ([0.0, 1.0, 0.0]) - bₖ) < atol
-                @assert norm(Fₖ([0.0, 0.0000000000000001, 1.0]) - cₖ) < atol
-                @assert norm(Fₖ([0.0, 0.0000000000000001, 0.0]) - dₖ) < atol
-                if j == 3
-                    @assert norm(a₃ - cₖ) < atol
-                    @assert norm(Fₖ([0.0, 0.0, 1.0]) - cₖ) < atol
-                    @assert norm(Fₖ([0.0, 0.0, 1.0]) - a₃) < atol
-                    @assert norm(Φₖ([0.0, 0.0, 0.3])) < atol
-                    @assert norm(Φₖ([0.0, 0.3, 0.0])) < atol
-                    @assert norm(Φₖ([0.3, 0.0, 0.0])) < atol
-                    @assert norm(
-                        Φₖ([0.3, 0.45, 0.25]) -
-                        (ψ(f̂ₖ_comp([0.3, 0.45, 0.25])) - 0.3*a₁ - 0.45*a₂ - 0.25*a₃),
-                    ) < atol
-                    @assert norm(
-                        Φₖ([0.55, 0.45, 0.0]) -
-                        (ψ(f̂ₖ_comp([0.55, 0.45, 0.0])) - 0.55*a₁ - 0.45*a₂),
-                    ) < atol
-                end
-                @assert norm(Φₖ([0.0, 0.0000000000000001, 0.3])) < atol
-                @assert norm(Φₖ([0.0, 0.3, 0.0])) < atol
-                @assert norm(Φₖ([0.3, 0.0, 0.0])) < atol
-                if j == 2
-                    @assert norm(Φₖ([0.6, 0.0, 0.4])) < atol
-                    @assert norm(Φₖ([0.0, 0.6, 0.4])) < atol
-                    @assert norm(
-                        Φₖ([0.55, 0.45, 0.0]) -
-                        (ψ(f̂ₖ_comp([0.55, 0.45, 0.0])) - 0.55*a₁ - 0.45*a₂),
-                    ) < atol
-                end
+                # Tests that Fₖ should satisfy; commented for performance
+                #@assert norm(Fₖ([1.0, 0.0, 0.0]) - a₁) < atol
+                #@assert norm(Fₖ([0.0, 1.0, 0.0]) - a₂) < atol
+                #@assert norm(Fₖ([1.0, 0.0, 0.0]) - aₖ) < atol
+                #@assert norm(Fₖ([0.0, 1.0, 0.0]) - bₖ) < atol
+                #@assert norm(Fₖ([0.0, 0.0000000000000001, 1.0]) - cₖ) < atol
+                #@assert norm(Fₖ([0.0, 0.0000000000000001, 0.0]) - dₖ) < atol
+                #if j == 3
+                #    @assert norm(a₃ - cₖ) < atol
+                #    @assert norm(Fₖ([0.0, 0.0, 1.0]) - cₖ) < atol
+                #    @assert norm(Fₖ([0.0, 0.0, 1.0]) - a₃) < atol
+                #    @assert norm(Φₖ([0.0, 0.0, 0.3])) < atol
+                #    @assert norm(Φₖ([0.0, 0.3, 0.0])) < atol
+                #    @assert norm(Φₖ([0.3, 0.0, 0.0])) < atol
+                #    @assert norm(
+                #        Φₖ([0.3, 0.45, 0.25]) -
+                #        (ψ(f̂ₖ_comp([0.3, 0.45, 0.25])) - 0.3*a₁ - 0.45*a₂ - 0.25*a₃),
+                #    ) < atol
+                #    @assert norm(
+                #        Φₖ([0.55, 0.45, 0.0]) -
+                #        (ψ(f̂ₖ_comp([0.55, 0.45, 0.0])) - 0.55*a₁ - 0.45*a₂),
+                #    ) < atol
+                #end
+                #@assert norm(Φₖ([0.0, 0.0000000000000001, 0.3])) < atol
+                #@assert norm(Φₖ([0.0, 0.3, 0.0])) < atol
+                #@assert norm(Φₖ([0.3, 0.0, 0.0])) < atol
+                #if j == 2
+                #    @assert norm(Φₖ([0.6, 0.0, 0.4])) < atol
+                #    @assert norm(Φₖ([0.0, 0.6, 0.4])) < atol
+                #    @assert norm(
+                #        Φₖ([0.55, 0.45, 0.0]) -
+                #        (ψ(f̂ₖ_comp([0.55, 0.45, 0.0])) - 0.55*a₁ - 0.45*a₂),
+                #    ) < atol
+                #end
 
                 D = ReferenceTetrahedron
                 T = SVector{3,Float64}

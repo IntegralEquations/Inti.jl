@@ -154,7 +154,7 @@ end
         # Three circles
         gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
         gmsh.model.occ.addDisk(0, 3.0, 0, 1, 1)
-        gmsh.model.occ.addDisk(0, 6.0, 0, 1, 1)
+        gmsh.model.occ.addDisk(0, 8.0, 0, 2, 2)
 
         gmsh.model.occ.synchronize()
         gmsh.model.mesh.generate(2)
@@ -180,7 +180,7 @@ end
     # Three circles
     ψ₁ = (t) -> [cos(2*π*t), sin(2*π*t)]
     ψ₂ = (t) -> [cos(2*π*t), 3.0 + sin(2*π*t)]
-    ψ₃ = (t) -> [cos(2*π*t), 6.0 + sin(2*π*t)]
+    ψ₃ = (t) -> [2*cos(2*π*t), 8.0 + 2*sin(2*π*t)]
     entity_parametrizations = Dict{Inti.EntityKey,Function}()
     entity_parametrizations[collect(keys(Ω))[3]] = ψ₃
     entity_parametrizations[collect(keys(Ω))[2]] = ψ₁
@@ -195,17 +195,23 @@ end
     qorder = 2
     Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder);
     Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder);
-    @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), 3π, rtol = 1e-6)
+    @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), 6π, rtol = 1e-6)
 
     qorder = 5
     Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder);
     Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder);
-    @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), 3π, rtol = 1e-11)
+    @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), 6π, rtol = 1e-11)
 
     qorder = 8
     Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder);
     Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder);
-    @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), 3π, rtol = 1e-14)
+    @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), 6π, rtol = 1e-14)
+
+    # The third circle has larger volume than others, so check that we can pick sub-domains correctly
+    Ω_sub = Inti.Domain(collect(keys(Ω))[3])
+    Ωₕ_sub = crvmsh[Ω_sub]
+    Ωₕ_sub_quad = Inti.Quadrature(Ωₕ_sub; qorder = qorder);
+    @test isapprox(Inti.integrate(x -> 1, Ωₕ_sub_quad), 4π, rtol = 1e-14)
 
     Fvol = (x) -> x[2]^2 - 2*x[2]*x[1]^3
     F = (x) -> [x[1]*x[2]^2, x[1]^3*x[2]^2]

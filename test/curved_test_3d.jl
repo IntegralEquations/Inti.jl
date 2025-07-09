@@ -26,7 +26,9 @@ include("test_utils.jl")
     end
     face_element_on_curved_surface = (nodelist) -> face_element_on_torus(nodelist, r1, r2)
 
-    ψ = (v) -> [(r1 + r2*sin(v[1]))*cos(v[2]), (r1 + r2*sin(v[1]))*sin(v[2]), r2*cos(v[1])]
+    function ψ(v::AbstractVector)
+        return [(r1 + r2*sin(v[1]))*cos(v[2]), (r1 + r2*sin(v[1]))*sin(v[2]), r2*cos(v[1])]
+    end
     θ = 6 # smoothness order of curved elements
     crvmsh = Inti.curve_mesh(
         msh,
