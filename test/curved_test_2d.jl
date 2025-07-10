@@ -147,7 +147,6 @@ end
         Inti.clear_entities!()
 
         gmsh.initialize()
-        meshsize = 2π / 4/8
         gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
         gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
 

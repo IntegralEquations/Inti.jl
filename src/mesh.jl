@@ -707,6 +707,9 @@ function curve_mesh(
     order > 0 || error("smoothness order must be positive")
     # implemented up to order=6 below but can be easily extended
     order <= 6 || notimplemented()
+    E_straight_bdry = LagrangeElement{ReferenceHyperCube{1},2,SVector{2,Float64}}
+    E_straight = LagrangeElement{ReferenceSimplex{2},3,SVector{2,Float64}} # TODO fix this to auto be a P1 element type
+
     if isnothing(face_element_on_curved_surface)
         face_element_on_curved_surface = (arg) -> true
     end
@@ -714,64 +717,77 @@ function curve_mesh(
     t = LinRange(0, 1, patch_sample_num)
 
     n2e = node2etags(msh)
-    entidxs = EntityKey[]
     numvolents = 0
+    param_disc = Dict{EntityKey,Vector{Vector{Float64}}}()
+    kdt_by_ent = Dict{EntityKey,NearestNeighbors.KDTree}()
+    bdryent_to_volent = Dict{EntityKey,EntityKey}()
     for ent in entities(msh)
         ent.dim == 2 || continue
         # TODO error out if volume entities have nontrivial pairwise boundary intersections
         numvolents += 1
-        push!(entidxs, ent)
+        param_disc[ent] = map(ψ_by_ent[ent], t)
+        kdt_by_ent[ent] = KDTree(transpose(stack(param_disc[ent]; dims = 1)))
+
+        # Identify for each boundary ent the corresponding volume entity
+        for bdryent in entities(msh)
+            bdryent.dim == 1 || continue
+            haskey(bdryent_to_volent, bdryent) && continue
+            elind = msh.ent2etags[bdryent][E_straight_bdry][1]
+            bdrynodes = msh.etype2mat[E_straight_bdry][:, elind]
+            bdrynodes = candidate_els = elements_containing_nodes(n2e, bdrynodes)
+            candidate_els = candidate_els[length.(candidate_els) .== 3][1]
+            if any(
+                (i) ->
+                    candidate_els ⊆
+                    msh.etype2mat[E_straight][:, msh.ent2etags[ent][E_straight][i]],
+                range(1, length(msh.ent2etags[ent][E_straight])),
+            )
+                bdryent_to_volent[bdryent] = ent
+            end
+        end
     end
-    param_disc = Vector{Vector{Vector{Float64}}}(undef, numvolents)
-    kdt_by_ent = Dict{EntityKey,NearestNeighbors.KDTree}()
-    for k in eachindex(entidxs)
-        param_disc[k] = ψ_by_ent[entidxs[k]].(t)
-        kdt_by_ent[entidxs[k]] = KDTree(transpose(stack(param_disc[k]; dims = 1)))
-    end
+    # TODO We should error if there are multiple boundary entities per volume entity
+    volent_to_bdryent = Dict(values(bdryent_to_volent) .=> keys(bdryent_to_volent))
 
     crvmsh = Mesh{2,Float64}()
     (; nodes, etype2mat, etype2els, ent2etags) = crvmsh
     foreach(k -> ent2etags[k] = Dict{DataType,Vector{Int}}(), entities(msh))
     append!(nodes, msh.nodes)
 
-    nbdry_els =
-        size(msh.etype2mat[LagrangeElement{ReferenceHyperCube{1},2,SVector{2,Float64}}])[2]
+    nbdry_els = size(msh.etype2mat[E_straight_bdry])[2]
 
     uniqueidx(v) = unique(i -> v[i], eachindex(v))
     node_to_param_by_ent = Dict{EntityKey,Dict}()
     bdry_node_idx_by_ent = Dict{EntityKey,Vector{Int64}}()
-    E_straight_bdry = LagrangeElement{ReferenceHyperCube{1},2,SVector{2,Float64}}
-    Estraight = LagrangeElement{ReferenceSimplex{2},3,SVector{2,Float64}} # TODO fix this to auto be a P1 element type
-    for k in eachindex(entidxs)
-        ent = entidxs[k]
-        kdt = kdt_by_ent[entidxs[k]]
+
+    el2ent = Dict{Tuple{DataType,Int},Inti.EntityKey}()
+    for (ent, etype2tags) in msh.ent2etags
+        for (E, tags) in etype2tags
+            for t in tags
+                el2ent[(E, t)] = ent
+            end
+        end
+    end
+    for ent in entities(msh)
+        ent.dim == 2 || continue
+        kdt = kdt_by_ent[ent]
 
         bdry_node_idx = Vector{Int64}()
         bdry_node_param_loc = Vector{Float64}()
 
         # Re-write nodes to lay on exact boundary
         for elind in 1:nbdry_els
-            local node_indices =
-                msh.etype2mat[LagrangeElement{ReferenceHyperCube{1},2,SVector{2,Float64}}][
-                    :,
-                    elind,
-                ]
-            local straight_nodes = crvmsh.nodes[node_indices]
             # Determine if this face element belongs to this entity
-            candidate_els = elements_containing_nodes(n2e, node_indices)
-            candidate_els = candidate_els[length.(candidate_els) .== 3][1]
-            el_idxs_in_ent = findall(
-                (i) ->
-                    candidate_els ⊆
-                    msh.etype2mat[Estraight][:, msh.ent2etags[ent][Estraight][i]],
-                range(1, length(msh.ent2etags[ent][Estraight])),
-            )
-            !isempty(el_idxs_in_ent) || continue
+            if !(ent == bdryent_to_volent[el2ent[(E_straight_bdry, elind)]])
+                continue
+            end
+            local node_indices = msh.etype2mat[E_straight_bdry][:, elind]
+            local straight_nodes = crvmsh.nodes[node_indices]
 
             if face_element_on_curved_surface(straight_nodes)
                 idxs, dists = nn(kdt, straight_nodes)
-                crvmsh.nodes[node_indices[1]] = param_disc[k][idxs[1]]
-                crvmsh.nodes[node_indices[2]] = param_disc[k][idxs[2]]
+                crvmsh.nodes[node_indices[1]] = param_disc[ent][idxs[1]]
+                crvmsh.nodes[node_indices[2]] = param_disc[ent][idxs[2]]
                 push!(bdry_node_idx, node_indices[1])
                 push!(bdry_node_idx, node_indices[2])
                 push!(bdry_node_param_loc, t[idxs[1]])
@@ -809,27 +825,11 @@ function curve_mesh(
         E_straight_bdry = LagrangeElement{ReferenceHyperCube{1},2,SVector{2,Float64}}
         els = elements(msh, E)
         for elind in eachindex(els)
-            node_indices = msh.etype2mat[E][:, elind]
-            straight_nodes = crvmsh.nodes[node_indices]
+            node_indices = @view msh.etype2mat[E][:, elind]
+            straight_nodes = @view crvmsh.nodes[node_indices]
 
             # First determine entity to which volume element belongs
-            entity_index = -1
-            for k in eachindex(entidxs)
-                ent = entidxs[k]
-                #candidate_els = elements_containing_nodes(n2e, node_indices)
-                #candidate_els = candidate_els[length.(candidate_els) .== 3][1]
-                el_idxs_in_ent = findfirst(
-                    (i) ->
-                        node_indices ⊆
-                        msh.etype2mat[Estraight][:, msh.ent2etags[ent][Estraight][i]],
-                    range(1, length(msh.ent2etags[ent][Estraight])),
-                )
-                if !isnothing(el_idxs_in_ent)
-                    entity_index = k
-                    continue
-                end
-            end
-            ent = entidxs[entity_index]
+            ent = el2ent[(E_straight, elind)]
             ψ = ψ_by_ent[ent]
             node_to_param = node_to_param_by_ent[ent]
             bdry_node_idx = bdry_node_idx_by_ent[ent]
@@ -1119,42 +1119,13 @@ function curve_mesh(
                 # loop over entities
                 Ecurve = typeof(first(els_curve))
                 Ecurvebdry = typeof(first(els_curve_bdry))
-                for k in entities(msh)
-                    # determine if the straight (LagrangeElement) mesh element
-                    # belongs to the entity and, if so, add the curved
-                    # (ParametricElement) element.
-                    if haskey(msh.ent2etags[k], E) && k == entidxs[entity_index]
-                        n_straight_vol_els = size(msh.etype2mat[E])[2]
-                        if any(
-                            (i) -> node_indices == msh.etype2mat[E][:, i],
-                            range(1, n_straight_vol_els),
-                        )
-                            haskey(ent2etags[k], Ecurve) ||
-                                (ent2etags[k][Ecurve] = Vector{Int64}())
-                            append!(ent2etags[k][Ecurve], length(els_curve))
-                        end
-                    end
-                    # find entity that contains straight (LagrangeElement) face
-                    # element which is now being replaced by a curved
-                    # (ParametricElement) face element
-                    if haskey(msh.ent2etags[k], E_straight_bdry)
-                        k.dim == 1 || continue
-                        n_straight_bdry_els = size(msh.etype2mat[E_straight_bdry])[2]
-                        straight_entity_elementind = findall(
-                            (i) ->
-                                sort(node_indices_on_bdry) ==
-                                sort(msh.etype2mat[E_straight_bdry][:, i]),
-                            range(1, n_straight_bdry_els),
-                        )
-                        if !isempty(straight_entity_elementind) &&
-                           straight_entity_elementind[1] ∈ msh.ent2etags[k][E_straight_bdry]
-                            haskey(ent2etags[k], Ecurvebdry) ||
-                                (ent2etags[k][Ecurvebdry] = Vector{Int64}())
-                            append!(ent2etags[k][Ecurvebdry], length(els_curve_bdry))
-                        end
-                    end
-                end
-
+                haskey(ent2etags[ent], Ecurve) || (ent2etags[ent][Ecurve] = Vector{Int64}())
+                append!(ent2etags[ent][Ecurve], length(els_curve))
+                # need boundary ent here
+                bdryent = volent_to_bdryent[ent]
+                haskey(ent2etags[bdryent], Ecurvebdry) ||
+                    (ent2etags[bdryent][Ecurvebdry] = Vector{Int64}())
+                append!(ent2etags[bdryent][Ecurvebdry], length(els_curve_bdry))
             else
                 append!(connect_straight, node_indices)
                 el = LagrangeElement{ReferenceSimplex{2},3,SVector{2,Float64}}(
@@ -1162,24 +1133,8 @@ function curve_mesh(
                 )
                 push!(els_straight, el)
 
-                for k in entities(msh)
-                    # determine if the straight mesh element belongs to the entity and, if so, add.
-                    #if haskey(msh.ent2etags[k], E)
-                    if haskey(msh.ent2etags[k], E) && k == entidxs[entity_index]
-                        n_straight_vol_els = size(msh.etype2mat[E])[2]
-                        if any(
-                            (i) -> node_indices == msh.etype2mat[E][:, i],
-                            range(1, n_straight_vol_els),
-                        )
-                            haskey(ent2etags[k], E) || (ent2etags[k][E] = Vector{Int64}())
-                            append!(ent2etags[k][E], length(els_straight))
-                        end
-                    end
-                    # Note: This code does not consider the possibility of boundary
-                    # entities that are the boundary of straight simplices.  This is
-                    # because of the assumption above that if j > 1 the triangle is
-                    # curved.
-                end
+                haskey(ent2etags[ent], E) || (ent2etags[ent][E] = Vector{Int64}())
+                append!(ent2etags[ent][E], length(els_straight))
             end
         end
     end
@@ -1188,15 +1143,14 @@ function curve_mesh(
     nv_bdry = 2 # Number of vertices for connectivity information on the boundary
     Ecurve = typeof(first(els_curve))
     Ecurvebdry = typeof(first(els_curve_bdry))
-    Estraight = LagrangeElement{ReferenceSimplex{2},3,SVector{2,Float64}} # TODO fix this to auto be a P1 element type
 
     crvmsh.etype2mat[Ecurve] = reshape(connect_curve, nv, :)
     crvmsh.etype2els[Ecurve] = convert(Vector{Ecurve}, els_curve)
     crvmsh.etype2orientation[Ecurve] = ones(length(els_curve))
 
-    crvmsh.etype2mat[Estraight] = reshape(connect_straight, nv, :)
-    crvmsh.etype2els[Estraight] = convert(Vector{Estraight}, els_straight)
-    crvmsh.etype2orientation[Estraight] = ones(length(els_straight))
+    crvmsh.etype2mat[E_straight] = reshape(connect_straight, nv, :)
+    crvmsh.etype2els[E_straight] = convert(Vector{E_straight}, els_straight)
+    crvmsh.etype2orientation[E_straight] = ones(length(els_straight))
 
     crvmsh.etype2mat[Ecurvebdry] = reshape(connect_curve_bdry, nv_bdry, :)
     crvmsh.etype2els[Ecurvebdry] = convert(Vector{Ecurvebdry}, els_curve_bdry)
@@ -2130,15 +2084,15 @@ function curve_mesh(
     nv_bdry = 3 # Number of vertices for connectivity information on the boundary
     Ecurve = typeof(first(els_curve))
     Ecurvebdry = typeof(first(els_curve_bdry))
-    Estraight = LagrangeElement{ReferenceSimplex{3},4,SVector{3,Float64}} # TODO fix this to auto be a P1 element type
+    E_straight = LagrangeElement{ReferenceSimplex{3},4,SVector{3,Float64}} # TODO fix this to auto be a P1 element type
 
     crvmsh.etype2mat[Ecurve] = reshape(connect_curve, nv, :)
     crvmsh.etype2els[Ecurve] = convert(Vector{Ecurve}, els_curve)
     crvmsh.etype2orientation[Ecurve] = ones(length(els_curve))
 
-    crvmsh.etype2mat[Estraight] = reshape(connect_straight, nv, :)
-    crvmsh.etype2els[Estraight] = convert(Vector{Estraight}, els_straight)
-    crvmsh.etype2orientation[Estraight] = ones(length(els_straight))
+    crvmsh.etype2mat[E_straight] = reshape(connect_straight, nv, :)
+    crvmsh.etype2els[E_straight] = convert(Vector{E_straight}, els_straight)
+    crvmsh.etype2orientation[E_straight] = ones(length(els_straight))
 
     crvmsh.etype2mat[Ecurvebdry] = reshape(connect_curve_bdry, nv_bdry, :)
     crvmsh.etype2els[Ecurvebdry] = convert(Vector{Ecurvebdry}, els_curve_bdry)
