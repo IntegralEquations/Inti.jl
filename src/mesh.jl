@@ -850,8 +850,8 @@ function curve_mesh(
                 ## Interpolant πₖʲ construction from Inti
                 α₁hat = 0.0
                 α₂hat = 1.0
-                f̂ₖ = (t) -> α₁ .+ (α₂ - α₁)*t
-                f̂ₖ_comp = (x) -> f̂ₖ((x[1] * α₁hat + x[2] * α₂hat)/(x[1] + x[2]))
+                f̂ₖ = (t) -> α₁ .+ (α₂ - α₁) * t
+                f̂ₖ_comp = (x) -> f̂ₖ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
 
                 # l = 1 projection onto linear FE space
                 πₖ¹_nodes =
@@ -936,7 +936,7 @@ function curve_mesh(
                         (x::AbstractVector) ->
                             (x[1] + x[2])^3 * (
                                 ψ(f̂ₖ_comp(x)) -
-                                πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                                πₖ¹ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             )
                 end
 
@@ -946,13 +946,11 @@ function curve_mesh(
                         (x::AbstractVector) ->
                             (x[1] + x[2])^4 * (
                                 ψ(f̂ₖ_comp(x)) -
-                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                                πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^2*(
-                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^2 * (
+                                πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ¹ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             )
                 end
 
@@ -962,19 +960,15 @@ function curve_mesh(
                         (x::AbstractVector) ->
                             (x[1] + x[2])^5 * (
                                 ψ(f̂ₖ_comp(x)) -
-                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                                πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^2*(
-                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^2 * (
+                                πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ¹ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^3*(
-                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^3 * (
+                                πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             )
                 end
 
@@ -984,25 +978,19 @@ function curve_mesh(
                         (x::AbstractVector) ->
                             (x[1] + x[2])^6 * (
                                 ψ(f̂ₖ_comp(x)) -
-                                πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                                πₖ⁴ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^2*(
-                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^2 * (
+                                πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ¹ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^3*(
-                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^3 * (
+                                πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^4*(
-                                πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^4 * (
+                                πₖ⁴ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             )
                 end
 
@@ -1012,31 +1000,23 @@ function curve_mesh(
                         (x::AbstractVector) ->
                             (x[1] + x[2])^7 * (
                                 ψ(f̂ₖ_comp(x)) -
-                                πₖ⁵ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                                πₖ⁵ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^2*(
-                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^2 * (
+                                πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ¹ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^3*(
-                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^3 * (
+                                πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^4*(
-                                πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^4 * (
+                                πₖ⁴ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^5*(
-                                πₖ⁵ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^5 * (
+                                πₖ⁵ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ⁴ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             )
                 end
 
@@ -1046,37 +1026,27 @@ function curve_mesh(
                         (x::AbstractVector) ->
                             (x[1] + x[2])^8 * (
                                 ψ(f̂ₖ_comp(x)) -
-                                πₖ⁶ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                                πₖ⁶ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^2*(
-                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ¹ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^2 * (
+                                πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ¹ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^3*(
-                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ²ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^3 * (
+                                πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^4*(
-                                πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ³ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^4 * (
+                                πₖ⁴ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^5*(
-                                πₖ⁵ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ⁴ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^5 * (
+                                πₖ⁵ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ⁴ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             ) +
-                            (
-                                x[1] + x[2]
-                            )^6*(
-                                πₖ⁶ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2])) -
-                                πₖ⁵ψ((x[1] * α₁hat + x[2]*α₂hat)/(x[1] + x[2]))
+                            (x[1] + x[2])^6 * (
+                                πₖ⁶ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                πₖ⁵ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                             )
                 end
 
@@ -1089,8 +1059,8 @@ function curve_mesh(
                 cₖ = crvmsh.nodes[node_indices_on_bdry[2]]
                 F̃ₖ =
                     (x::AbstractVector) -> [
-                        (cₖ[1] - bₖ[1])*x[1] + (aₖ[1] - bₖ[1])*x[2] + bₖ[1],
-                        (cₖ[2] - bₖ[2])*x[1] + (aₖ[2] - bₖ[2])*x[2] + bₖ[2],
+                        (cₖ[1] - bₖ[1]) * x[1] + (aₖ[1] - bₖ[1]) * x[2] + bₖ[1],
+                        (cₖ[2] - bₖ[2]) * x[1] + (aₖ[2] - bₖ[2]) * x[2] + bₖ[2],
                     ]
 
                 # Full transformation
@@ -1163,15 +1133,15 @@ function curve_mesh(
         face_element_on_curved_surface = (arg) -> true
     end
     # v = (θ, ϕ)
-    θ = LinRange(0, 2*π, patch_sample_num)
-    ϕ = LinRange(0, 2*π, patch_sample_num)
+    θ = LinRange(0, 2 * π, patch_sample_num)
+    ϕ = LinRange(0, 2 * π, patch_sample_num)
     function ψ⁻¹(v0, p)
         F = (v, p) -> ψ(v) - p
         prob = NonlinearSolve.NonlinearProblem(F, v0, p)
         return NonlinearSolve.solve(prob, NonlinearSolve.SimpleNewtonRaphson())
     end
 
-    chart_1 = Array{SVector{3,Float64}}(undef, length(θ)*length(ϕ))
+    chart_1 = Array{SVector{3,Float64}}(undef, length(θ) * length(ϕ))
     chart_1_cart_idxs_θ = []
     chart_1_cart_idxs_ϕ = []
     for i in eachindex(θ)
@@ -1299,7 +1269,7 @@ function curve_mesh(
                     # Find missing node α₃ that (non-uniquely) defines the curved face simplex containing α₁, α₂
                     candidate_els = elements_containing_nodes(n2e, node_indices_on_bdry)
                     # Filter out volume elements; should be at most two face simplices remaining
-                    candidate_els = candidate_els[length.(candidate_els) .== 3]
+                    candidate_els = candidate_els[length.(candidate_els).==3]
                     # Take the first face simplex; while either would work if j=2,
                     # if j=3 only one of the candidate face triangles will work, so
                     # find that one
@@ -1330,41 +1300,41 @@ function curve_mesh(
                 atol = 10^(-4)
                 # Try to handle periodicity in ϕ
                 if (abs(α₂[2]) < atol) && (abs(α₂[2] - α₁[2]) > π || abs(α₂[2] - α₃[2]) > π)
-                    α₂[2] = 2*π
+                    α₂[2] = 2 * π
                 end
                 if (abs(α₃[2]) < atol) && (abs(α₃[2] - α₁[2]) > π || abs(α₃[2] - α₂[2]) > π)
-                    α₃[2] = 2*π
+                    α₃[2] = 2 * π
                 end
                 if (abs(α₁[2]) < atol) && (abs(α₁[2] - α₂[2]) > π || abs(α₁[2] - α₃[2]) > π)
-                    α₁[2] = 2*π
+                    α₁[2] = 2 * π
                 end
-                if (α₂[2] ≈ 2*π) && (abs(α₂[2] - α₁[2]) > π || abs(α₂[2] - α₃[2]) > π)
+                if (α₂[2] ≈ 2 * π) && (abs(α₂[2] - α₁[2]) > π || abs(α₂[2] - α₃[2]) > π)
                     α₂[2] = 0.0
                 end
-                if (α₃[2] ≈ 2*π) && (abs(α₃[2] - α₁[2]) > π || abs(α₃[2] - α₂[2]) > π)
+                if (α₃[2] ≈ 2 * π) && (abs(α₃[2] - α₁[2]) > π || abs(α₃[2] - α₂[2]) > π)
                     α₃[2] = 0.0
                 end
-                if (α₁[2] ≈ 2*π) && (abs(α₁[2] - α₂[2]) > π || abs(α₁[2] - α₃[2]) > π)
+                if (α₁[2] ≈ 2 * π) && (abs(α₁[2] - α₂[2]) > π || abs(α₁[2] - α₃[2]) > π)
                     α₁[2] = 0.0
                 end
 
                 # Try to handle periodicity in ϕ
                 if (abs(α₂[1]) < atol) && (abs(α₂[1] - α₁[1]) > π || abs(α₂[1] - α₃[1]) > π)
-                    α₂[1] = 2*π
+                    α₂[1] = 2 * π
                 end
                 if (abs(α₃[1]) < atol) && (abs(α₃[1] - α₁[1]) > π || abs(α₃[1] - α₂[1]) > π)
-                    α₃[1] = 2*π
+                    α₃[1] = 2 * π
                 end
                 if (abs(α₁[1]) < atol) && (abs(α₁[1] - α₂[1]) > π || abs(α₁[1] - α₃[1]) > π)
-                    α₁[1] = 2*π
+                    α₁[1] = 2 * π
                 end
-                if (α₂[1] ≈ 2*π) && (abs(α₂[1] - α₁[1]) > π || abs(α₂[1] - α₃[1]) > π)
+                if (α₂[1] ≈ 2 * π) && (abs(α₂[1] - α₁[1]) > π || abs(α₂[1] - α₃[1]) > π)
                     α₂[1] = 0.0
                 end
-                if (α₃[1] ≈ 2*π) && (abs(α₃[1] - α₁[1]) > π || abs(α₃[1] - α₂[1]) > π)
+                if (α₃[1] ≈ 2 * π) && (abs(α₃[1] - α₁[1]) > π || abs(α₃[1] - α₂[1]) > π)
                     α₃[1] = 0.0
                 end
-                if (α₁[1] ≈ 2*π) && (abs(α₁[1] - α₂[1]) > π || abs(α₁[1] - α₃[1]) > π)
+                if (α₁[1] ≈ 2 * π) && (abs(α₁[1] - α₂[1]) > π || abs(α₁[1] - α₃[1]) > π)
                     α₁[1] = 0.0
                 end
 
@@ -1372,60 +1342,60 @@ function curve_mesh(
                 if (abs(α₁[2] - α₂[2]) > π) ||
                    (abs(α₂[2] - α₃[2]) > π) ||
                    (abs(α₁[2] - α₃[2]) > π)
-                    if α₁[2] < π && α₂[2] < π && α₃[2] > 2*(2*π)/3
-                        α₃[2] -= 2*π
+                    if α₁[2] < π && α₂[2] < π && α₃[2] > 2 * (2 * π) / 3
+                        α₃[2] -= 2 * π
                     end
-                    if α₂[2] < π && α₃[2] < π && α₁[2] > 2*(2*π)/3
-                        α₁[2] -= 2*π
+                    if α₂[2] < π && α₃[2] < π && α₁[2] > 2 * (2 * π) / 3
+                        α₁[2] -= 2 * π
                     end
-                    if α₁[2] < π && α₃[2] < π && α₂[2] > 2*(2*π)/3
-                        α₂[2] -= 2*π
+                    if α₁[2] < π && α₃[2] < π && α₂[2] > 2 * (2 * π) / 3
+                        α₂[2] -= 2 * π
                     end
                 end
                 if (abs(α₁[2] - α₂[2]) > π) ||
                    (abs(α₂[2] - α₃[2]) > π) ||
                    (abs(α₁[2] - α₃[2]) > π)
-                    if α₁[2] > 2*(2*π)/3 && α₂[2] > 2*(2*π)/3 && α₃[2] < π
-                        α₃[2] += 2*π
+                    if α₁[2] > 2 * (2 * π) / 3 && α₂[2] > 2 * (2 * π) / 3 && α₃[2] < π
+                        α₃[2] += 2 * π
                     end
-                    if α₂[2] > 2*(2*π)/3 && α₃[2] > 2*(2*π)/3 && α₁[2] < π
-                        α₁[2] += 2*π
+                    if α₂[2] > 2 * (2 * π) / 3 && α₃[2] > 2 * (2 * π) / 3 && α₁[2] < π
+                        α₁[2] += 2 * π
                     end
-                    if α₁[2] > 2*(2*π)/3 && α₃[2] > 2*(2*π)/3 && α₂[2] < π
-                        α₂[2] += 2*π
+                    if α₁[2] > 2 * (2 * π) / 3 && α₃[2] > 2 * (2 * π) / 3 && α₂[2] < π
+                        α₂[2] += 2 * π
                     end
                 end
                 # Try to handle periodicity in ϕ -- case of α straddling 2π
                 if (abs(α₁[1] - α₂[1]) > π) ||
                    (abs(α₂[1] - α₃[1]) > π) ||
                    (abs(α₁[1] - α₃[1]) > π)
-                    if α₁[1] < π && α₂[1] < π && α₃[1] > 2*(2*π)/3
-                        α₃[1] -= 2*π
+                    if α₁[1] < π && α₂[1] < π && α₃[1] > 2 * (2 * π) / 3
+                        α₃[1] -= 2 * π
                     end
-                    if α₂[1] < π && α₃[1] < π && α₁[1] > 2*(2*π)/3
-                        α₁[1] -= 2*π
+                    if α₂[1] < π && α₃[1] < π && α₁[1] > 2 * (2 * π) / 3
+                        α₁[1] -= 2 * π
                     end
-                    if α₁[1] < π && α₃[1] < π && α₂[1] > 2*(2*π)/3
-                        α₂[1] -= 2*π
+                    if α₁[1] < π && α₃[1] < π && α₂[1] > 2 * (2 * π) / 3
+                        α₂[1] -= 2 * π
                     end
                 end
                 if (abs(α₁[1] - α₂[1]) > π) ||
                    (abs(α₂[1] - α₃[1]) > π) ||
                    (abs(α₁[1] - α₃[1]) > π)
-                    if α₁[1] > 2*(2*π)/3 && α₂[1] > 2*(2*π)/3 && α₃[1] < π
-                        α₃[1] += 2*π
+                    if α₁[1] > 2 * (2 * π) / 3 && α₂[1] > 2 * (2 * π) / 3 && α₃[1] < π
+                        α₃[1] += 2 * π
                     end
-                    if α₂[1] > 2*(2*π)/3 && α₃[1] > 2*(2*π)/3 && α₁[1] < π
-                        α₁[1] += 2*π
+                    if α₂[1] > 2 * (2 * π) / 3 && α₃[1] > 2 * (2 * π) / 3 && α₁[1] < π
+                        α₁[1] += 2 * π
                     end
-                    if α₁[1] > 2*(2*π)/3 && α₃[1] > 2*(2*π)/3 && α₂[1] < π
-                        α₂[1] += 2*π
+                    if α₁[1] > 2 * (2 * π) / 3 && α₃[1] > 2 * (2 * π) / 3 && α₂[1] < π
+                        α₂[1] += 2 * π
                     end
                 end
                 @assert (
-                    (abs(α₁[1] - α₂[1]) < π/2) &&
-                    (abs(α₂[1] - α₃[1]) < π/2) &&
-                    (abs(α₁[1] - α₃[1]) < π/2)
+                    (abs(α₁[1] - α₂[1]) < π / 2) &&
+                    (abs(α₂[1] - α₃[1]) < π / 2) &&
+                    (abs(α₁[1] - α₃[1]) < π / 2)
                 )
                 a₁ = SVector{3,Float64}(ψ(α₁))
                 a₂ = SVector{3,Float64}(ψ(α₂))
@@ -1482,7 +1452,7 @@ function curve_mesh(
 
                 # The following ensures an ordering of the face nodes so that
                 # the resulting normal vector is properly oriented.
-                if det([aₖ-dₖ bₖ-dₖ cₖ-dₖ]) < 0
+                if det([aₖ - dₖ bₖ - dₖ cₖ - dₖ]) < 0
                     tmp = deepcopy(α₁)
                     α₁ = deepcopy(α₂)
                     α₂ = tmp
@@ -1529,36 +1499,40 @@ function curve_mesh(
                 #@assert bₖ ≈ a₂
                 F̃ₖ =
                     (x::AbstractVector) -> [
-                        (aₖ[1] - dₖ[1])*x[1] +
-                        (bₖ[1] - dₖ[1])*x[2] +
-                        (cₖ[1] - dₖ[1])*x[3] +
+                        (aₖ[1] - dₖ[1]) * x[1] +
+                        (bₖ[1] - dₖ[1]) * x[2] +
+                        (cₖ[1] - dₖ[1]) * x[3] +
                         dₖ[1],
-                        (aₖ[2] - dₖ[2])*x[1] +
-                        (bₖ[2] - dₖ[2])*x[2] +
-                        (cₖ[2] - dₖ[2])*x[3] +
+                        (aₖ[2] - dₖ[2]) * x[1] +
+                        (bₖ[2] - dₖ[2]) * x[2] +
+                        (cₖ[2] - dₖ[2]) * x[3] +
                         dₖ[2],
-                        (aₖ[3] - dₖ[3])*x[1] +
-                        (bₖ[3] - dₖ[3])*x[2] +
-                        (cₖ[3] - dₖ[3])*x[3] +
+                        (aₖ[3] - dₖ[3]) * x[1] +
+                        (bₖ[3] - dₖ[3]) * x[2] +
+                        (cₖ[3] - dₖ[3]) * x[3] +
                         dₖ[3],
                     ]
 
                 # l = 1
                 πₖ¹_nodes = reference_nodes(
-                    LagrangeElement{ReferenceTriangle,binomial(2+1, 2),SVector{2,Float64}},
+                    LagrangeElement{
+                        ReferenceTriangle,
+                        binomial(2 + 1, 2),
+                        SVector{2,Float64},
+                    },
                 )
                 πₖ¹ψ_reference_nodes = Vector{SVector{3,Float64}}(undef, length(πₖ¹_nodes))
                 for i in eachindex(πₖ¹_nodes)
                     πₖ¹ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ¹_nodes[i]))
                 end
-                πₖ¹ψ_reference_nodes = SVector{binomial(2+1, 2)}(πₖ¹ψ_reference_nodes)
+                πₖ¹ψ_reference_nodes = SVector{binomial(2 + 1, 2)}(πₖ¹ψ_reference_nodes)
                 πₖ¹ψ = LagrangeElement{ReferenceSimplex{2}}(πₖ¹ψ_reference_nodes)
                 #l = 2
                 if order > 1
                     πₖ²_nodes = reference_nodes(
                         LagrangeElement{
                             ReferenceTriangle,
-                            binomial(2+2, 2),
+                            binomial(2 + 2, 2),
                             SVector{2,Float64},
                         },
                     )
@@ -1567,7 +1541,7 @@ function curve_mesh(
                     for i in eachindex(πₖ²_nodes)
                         πₖ²ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ²_nodes[i]))
                     end
-                    πₖ²ψ_reference_nodes = SVector{binomial(2+2, 2)}(πₖ²ψ_reference_nodes)
+                    πₖ²ψ_reference_nodes = SVector{binomial(2 + 2, 2)}(πₖ²ψ_reference_nodes)
                     πₖ²ψ = LagrangeElement{ReferenceSimplex{2}}(πₖ²ψ_reference_nodes)
                 end
                 #l = 3
@@ -1575,7 +1549,7 @@ function curve_mesh(
                     πₖ³_nodes = reference_nodes(
                         LagrangeElement{
                             ReferenceTriangle,
-                            binomial(2+3, 2),
+                            binomial(2 + 3, 2),
                             SVector{2,Float64},
                         },
                     )
@@ -1584,7 +1558,7 @@ function curve_mesh(
                     for i in eachindex(πₖ³_nodes)
                         πₖ³ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ³_nodes[i]))
                     end
-                    πₖ³ψ_reference_nodes = SVector{binomial(2+3, 2)}(πₖ³ψ_reference_nodes)
+                    πₖ³ψ_reference_nodes = SVector{binomial(2 + 3, 2)}(πₖ³ψ_reference_nodes)
                     πₖ³ψ = LagrangeElement{ReferenceSimplex{2}}(πₖ³ψ_reference_nodes)
                 end
                 #l = 4
@@ -1592,7 +1566,7 @@ function curve_mesh(
                     πₖ⁴_nodes = reference_nodes(
                         LagrangeElement{
                             ReferenceTriangle,
-                            binomial(2+4, 2),
+                            binomial(2 + 4, 2),
                             SVector{2,Float64},
                         },
                     )
@@ -1601,7 +1575,7 @@ function curve_mesh(
                     for i in eachindex(πₖ⁴_nodes)
                         πₖ⁴ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁴_nodes[i]))
                     end
-                    πₖ⁴ψ_reference_nodes = SVector{binomial(2+4, 2)}(πₖ⁴ψ_reference_nodes)
+                    πₖ⁴ψ_reference_nodes = SVector{binomial(2 + 4, 2)}(πₖ⁴ψ_reference_nodes)
                     πₖ⁴ψ = LagrangeElement{ReferenceSimplex{2}}(πₖ⁴ψ_reference_nodes)
                 end
                 #l = 5
@@ -1609,7 +1583,7 @@ function curve_mesh(
                     πₖ⁵_nodes = reference_nodes(
                         LagrangeElement{
                             ReferenceTriangle,
-                            binomial(2+5, 2),
+                            binomial(2 + 5, 2),
                             SVector{2,Float64},
                         },
                     )
@@ -1618,7 +1592,7 @@ function curve_mesh(
                     for i in eachindex(πₖ⁵_nodes)
                         πₖ⁵ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁵_nodes[i]))
                     end
-                    πₖ⁵ψ_reference_nodes = SVector{binomial(2+5, 2)}(πₖ⁵ψ_reference_nodes)
+                    πₖ⁵ψ_reference_nodes = SVector{binomial(2 + 5, 2)}(πₖ⁵ψ_reference_nodes)
                     πₖ⁵ψ = LagrangeElement{ReferenceSimplex{2}}(πₖ⁵ψ_reference_nodes)
                 end
                 #l = 6
@@ -1626,7 +1600,7 @@ function curve_mesh(
                     πₖ⁶_nodes = reference_nodes(
                         LagrangeElement{
                             ReferenceTriangle,
-                            binomial(2+6, 2),
+                            binomial(2 + 6, 2),
                             SVector{2,Float64},
                         },
                     )
@@ -1635,7 +1609,7 @@ function curve_mesh(
                     for i in eachindex(πₖ⁶_nodes)
                         πₖ⁶ψ_reference_nodes[i] = ψ(f̂ₖ(πₖ⁶_nodes[i]))
                     end
-                    πₖ⁶ψ_reference_nodes = SVector{binomial(2+6, 2)}(πₖ⁶ψ_reference_nodes)
+                    πₖ⁶ψ_reference_nodes = SVector{binomial(2 + 6, 2)}(πₖ⁶ψ_reference_nodes)
                     πₖ⁶ψ = LagrangeElement{ReferenceSimplex{2}}(πₖ⁶ψ_reference_nodes)
                 end
 
@@ -1643,16 +1617,15 @@ function curve_mesh(
                 if j == 3
                     f̂ₖ_comp =
                         (x::AbstractVector) -> f̂ₖ(
-                            (
-                                x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat
-                            )/(x[1] + x[2] + x[3]),
+                            (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
+                            (x[1] + x[2] + x[3]),
                         )
                     if order == 1
                         Φₖ =
                             (x::AbstractVector) -> (
                                 (x[1] + x[2] + x[3])^3 * (
                                     ψ(f̂ₖ_comp(x)) - πₖ¹ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 )
@@ -1663,16 +1636,16 @@ function curve_mesh(
                             (x::AbstractVector) -> (
                                 (x[1] + x[2] + x[3])^4 * (
                                     ψ(f̂ₖ_comp(x)) - πₖ²ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^2 * (
                                     πₖ²ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ¹ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 )
@@ -1683,25 +1656,25 @@ function curve_mesh(
                             (x::AbstractVector) -> (
                                 (x[1] + x[2] + x[3])^5 * (
                                     ψ(f̂ₖ_comp(x)) - πₖ³ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^2 * (
                                     πₖ²ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ¹ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^3 * (
                                     πₖ³ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ²ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 )
@@ -1712,34 +1685,34 @@ function curve_mesh(
                             (x::AbstractVector) -> (
                                 (x[1] + x[2] + x[3])^6 * (
                                     ψ(f̂ₖ_comp(x)) - πₖ⁴ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^2 * (
                                     πₖ²ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ¹ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^3 * (
                                     πₖ³ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ²ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^4 * (
                                     πₖ⁴ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ³ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 )
@@ -1750,43 +1723,43 @@ function curve_mesh(
                             (x::AbstractVector) -> (
                                 (x[1] + x[2] + x[3])^7 * (
                                     ψ(f̂ₖ_comp(x)) - πₖ⁵ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^2 * (
                                     πₖ²ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ¹ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^3 * (
                                     πₖ³ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ²ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^4 * (
                                     πₖ⁴ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ³ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^5 * (
                                     πₖ⁵ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ⁴ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 )
@@ -1797,65 +1770,65 @@ function curve_mesh(
                             (x::AbstractVector) -> (
                                 (x[1] + x[2] + x[3])^8 * (
                                     ψ(f̂ₖ_comp(x)) - πₖ⁶ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^2 * (
                                     πₖ²ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ¹ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^3 * (
                                     πₖ³ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ²ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^4 * (
                                     πₖ⁴ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ³ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^5 * (
                                     πₖ⁵ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ⁴ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 ) +
                                 (x[1] + x[2] + x[3])^6 * (
                                     πₖ⁶ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     ) - πₖ⁵ψ(
-                                        (x[1]*α₁hat + x[2]*α₂hat + x[3]*α₃hat) /
+                                        (x[1] * α₁hat + x[2] * α₂hat + x[3] * α₃hat) /
                                         (x[1] + x[2] + x[3]),
                                     )
                                 )
                             )
                     end
                 else
-                    f̂ₖ_comp = (x) -> f̂ₖ((x[1] * α₁hat + x[2] * α₂hat)/(x[1] + x[2]))
+                    f̂ₖ_comp = (x) -> f̂ₖ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                     if order == 1
                         Φₖ =
                             (x::AbstractVector) -> (
                                 (x[1] + x[2])^3 * (
                                     ψ(f̂ₖ_comp(x)) -
-                                    πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ¹ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 )
                             )
                     end
@@ -1864,11 +1837,11 @@ function curve_mesh(
                             (x::AbstractVector) -> (
                                 (x[1] + x[2])^4 * (
                                     ψ(f̂ₖ_comp(x)) -
-                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^2 * (
-                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ¹ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 )
                             )
                     end
@@ -1877,15 +1850,15 @@ function curve_mesh(
                             (x::AbstractVector) -> (
                                 (x[1] + x[2])^5 * (
                                     ψ(f̂ₖ_comp(x)) -
-                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^2 * (
-                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ¹ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^3 * (
-                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 )
                             )
                     end
@@ -1894,19 +1867,19 @@ function curve_mesh(
                             (x::AbstractVector) -> (
                                 (x[1] + x[2])^6 * (
                                     ψ(f̂ₖ_comp(x)) -
-                                    πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ⁴ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^2 * (
-                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ¹ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^3 * (
-                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^4 * (
-                                    πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ⁴ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 )
                             )
                     end
@@ -1915,23 +1888,23 @@ function curve_mesh(
                             (x::AbstractVector) -> (
                                 (x[1] + x[2])^7 * (
                                     ψ(f̂ₖ_comp(x)) -
-                                    πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ⁵ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^2 * (
-                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ¹ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^3 * (
-                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^4 * (
-                                    πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ⁴ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^5 * (
-                                    πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ⁵ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ⁴ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 )
                             )
                     end
@@ -1940,27 +1913,27 @@ function curve_mesh(
                             (x::AbstractVector) -> (
                                 (x[1] + x[2])^8 * (
                                     ψ(f̂ₖ_comp(x)) -
-                                    πₖ⁶ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ⁶ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^2 * (
-                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ¹ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ¹ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^3 * (
-                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ²ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ²ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^4 * (
-                                    πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ³ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ⁴ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ³ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^5 * (
-                                    πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ⁴ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ⁵ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ⁴ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 ) +
                                 (x[1] + x[2])^6 * (
-                                    πₖ⁶ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2])) -
-                                    πₖ⁵ψ((x[1]*α₁hat + x[2]*α₂hat) / (x[1] + x[2]))
+                                    πₖ⁶ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2])) -
+                                    πₖ⁵ψ((x[1] * α₁hat + x[2] * α₂hat) / (x[1] + x[2]))
                                 )
                             )
                     end
@@ -2035,7 +2008,7 @@ function curve_mesh(
                         k.dim == 2 || continue
                         n_straight_bdry_els = size(msh.etype2mat[E_straight_bdry])[2]
                         candidate_els = elements_containing_nodes(n2e, node_indices_on_bdry)
-                        candidate_els = candidate_els[length.(candidate_els) .== 3]
+                        candidate_els = candidate_els[length.(candidate_els).==3]
                         if length(candidate_els) > 0
                             haskey(ent2etags[k], Ecurvebdry) ||
                                 (ent2etags[k][Ecurvebdry] = Vector{Int64}())

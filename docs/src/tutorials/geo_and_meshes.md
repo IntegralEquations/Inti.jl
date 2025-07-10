@@ -248,6 +248,51 @@ viz(msh[Inti.boundary(Ω)]; color = :red)
       for three-dimensional transfinite interpolation, as well as transfinite
       formulas for simplices.
 
+## Curving a given mesh
+
+Inti.jl provides some tools to create curved meshes from a given mesh, which
+can be useful when the mesh is not conforming to the geometry and the geometry's boundary is
+available in parametric form. The following example first creates a flat triangulation of
+a disk using splines through Gmsh:
+
+```@example geo-and-meshes
+Inti.clear_entities!() # hide
+gmsh.initialize()
+meshsize = 2π / 4/8
+gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+# Two kites
+f = (s) -> SVector(-1, 0.0) + SVector(cos(2π*s), sin(2π*s))
+bnd1 = Inti.gmsh_curve(f, 0, 1; meshsize)
+cl = gmsh.model.occ.addCurveLoop([bnd1])
+disk = gmsh.model.occ.addPlaneSurface([cl])
+gmsh.model.occ.synchronize()
+gmsh.model.mesh.generate(2)
+msh = Inti.import_mesh(; dim = 2)
+gmsh.finalize()
+Ω = Inti.Domain(Inti.entities(msh)) do ent
+      return Inti.geometric_dimension(ent) == 2
+end
+viz(msh[Ω], showsegments=true)
+Ω_quad = Inti.Quadrature(msh[Ω]; qorder = 10)
+area = Inti.integrate(x->1.0, Ω_quad)
+@assert abs(area - π) > 0.01 # hide
+println("Error in area computation using P1 mesh: ", area)
+```
+
+As can be seen, despite the large quadrature order employed, the approximation error is
+still significant. To improve the accuracy, we can use the `curve_mesh` function
+to create a curved mesh based on the boundary of the domain:
+
+```@example geo-and-meshes
+gorder = 5
+crv_msh = Inti.curve_mesh(msh, f, gorder, 100)
+Ω_crv_quad = Inti.Quadrature(crv_msh[Ω]; qorder = 10)
+area = Inti.integrate(x->1.0, Ω_crv_quad)
+@assert abs(area - π) < 1e-10 # hide
+println("Error in area computation using curved mesh: ", area)
+```
+
 ## Elements of a mesh
 
  To iterate over the elements of a mesh, use the `elements` function:

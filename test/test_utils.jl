@@ -45,7 +45,7 @@ end
 
 function gmsh_torus(; center, r1, r2, meshsize)
     msh = try
-        gmsh.initialize()
+        gmsh.initialize(String[], false)
         gmsh.option.setNumber("General.Verbosity", 2)
         gmsh.model.add("ball")
         # set max and min meshsize to meshsize
@@ -66,12 +66,12 @@ end
 
 function gmsh_cut_ball(; center, radius, meshsize, cutelevation)
     msh = try
-        xmin = -1.1*radius
-        ymin = -1.1*radius
-        xmax = 1.1*radius
-        ymax = 1.1*radius
-        zmin = -(1 - cutelevation)*radius
-        zmax = (1 - cutelevation)*radius
+        xmin = -1.1 * radius
+        ymin = -1.1 * radius
+        xmax = 1.1 * radius
+        ymax = 1.1 * radius
+        zmin = -(1 - cutelevation) * radius
+        zmax = (1 - cutelevation) * radius
         gmsh.initialize()
         gmsh.option.setNumber("General.Verbosity", 2)
         gmsh.model.add("ball")
