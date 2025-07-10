@@ -729,22 +729,10 @@ function curve_mesh(
         kdt_by_ent[ent] = KDTree(transpose(stack(param_disc[ent]; dims = 1)))
 
         # Identify for each boundary ent the corresponding volume entity
-        for bdryent in entities(msh)
-            bdryent.dim == 1 || continue
-            haskey(bdryent_to_volent, bdryent) && continue
-            elind = msh.ent2etags[bdryent][E_straight_bdry][1]
-            bdrynodes = msh.etype2mat[E_straight_bdry][:, elind]
-            bdrynodes = candidate_els = elements_containing_nodes(n2e, bdrynodes)
-            candidate_els = candidate_els[length.(candidate_els) .== 3][1]
-            if any(
-                (i) ->
-                    candidate_els ⊆
-                    msh.etype2mat[E_straight][:, msh.ent2etags[ent][E_straight][i]],
-                range(1, length(msh.ent2etags[ent][E_straight])),
-            )
-                bdryent_to_volent[bdryent] = ent
-            end
-        end
+        length(boundary(ent)) == 1 || error(
+            "Volume Entity of a curved Domain can (currently) only have a boundary with a single entity",
+        )
+        bdryent_to_volent[boundary(ent)[1]] = ent
     end
     # TODO We should error if there are multiple boundary entities per volume entity
     volent_to_bdryent = Dict(values(bdryent_to_volent) .=> keys(bdryent_to_volent))
