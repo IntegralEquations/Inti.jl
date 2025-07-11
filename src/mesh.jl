@@ -1269,7 +1269,7 @@ function curve_mesh(
                     # Find missing node α₃ that (non-uniquely) defines the curved face simplex containing α₁, α₂
                     candidate_els = elements_containing_nodes(n2e, node_indices_on_bdry)
                     # Filter out volume elements; should be at most two face simplices remaining
-                    candidate_els = candidate_els[length.(candidate_els).==3]
+                    candidate_els = candidate_els[length.(candidate_els) .== 3]
                     # Take the first face simplex; while either would work if j=2,
                     # if j=3 only one of the candidate face triangles will work, so
                     # find that one
@@ -2008,7 +2008,7 @@ function curve_mesh(
                         k.dim == 2 || continue
                         n_straight_bdry_els = size(msh.etype2mat[E_straight_bdry])[2]
                         candidate_els = elements_containing_nodes(n2e, node_indices_on_bdry)
-                        candidate_els = candidate_els[length.(candidate_els).==3]
+                        candidate_els = candidate_els[length.(candidate_els) .== 3]
                         if length(candidate_els) > 0
                             haskey(ent2etags[k], Ecurvebdry) ||
                                 (ent2etags[k][Ecurvebdry] = Vector{Int64}())

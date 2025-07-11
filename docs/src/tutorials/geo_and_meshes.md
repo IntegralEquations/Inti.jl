@@ -250,15 +250,17 @@ viz(msh[Inti.boundary(Ω)]; color = :red)
 
 ## Curving a given mesh
 
-Inti.jl provides some tools to create curved meshes from a given mesh, which
+Inti.jl possesses some capability to create curved meshes from a given mesh, which
 can be useful when the mesh is not conforming to the geometry and the geometry's boundary is
-available in parametric form. The following example first creates a flat triangulation of
+available in parametric form. Specifically the methods implement the work of C. Bernardi [bernardi1989optimal](@cite) which provides so-called 'exact' (sometimes called isogeometric) parametrizations of simplicial elements in arbitrary dimension.
+
+The following example first creates a flat triangulation of
 a disk using splines through Gmsh:
 
 ```@example geo-and-meshes
 Inti.clear_entities!() # hide
 gmsh.initialize()
-meshsize = 2π / 4/8
+meshsize = 2π / 32
 gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
 gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
 # Two kites
@@ -277,7 +279,7 @@ viz(msh[Ω], showsegments=true)
 Ω_quad = Inti.Quadrature(msh[Ω]; qorder = 10)
 area = Inti.integrate(x->1.0, Ω_quad)
 @assert abs(area - π) > 0.01 # hide
-println("Error in area computation using P1 mesh: ", area)
+println("Error in area computation using P1 mesh: ", abs(area - π))
 ```
 
 As can be seen, despite the large quadrature order employed, the approximation error is
@@ -286,12 +288,99 @@ to create a curved mesh based on the boundary of the domain:
 
 ```@example geo-and-meshes
 gorder = 5
-crv_msh = Inti.curve_mesh(msh, f, gorder, 100)
-Ω_crv_quad = Inti.Quadrature(crv_msh[Ω]; qorder = 10)
+crvmsh = Inti.curve_mesh(msh, f, gorder, 100)
+Ω_crv_quad = Inti.Quadrature(crvmsh[Ω]; qorder = 10)
 area = Inti.integrate(x->1.0, Ω_crv_quad)
 @assert abs(area - π) < 1e-10 # hide
-println("Error in area computation using curved mesh: ", area)
+println("Error in area computation using curved mesh: ", abs(area - π))
 ```
+
+### Multiple curved domains, subdomains, and curved surfaces
+
+It may be desired to have multiple curved volumes / boundaries. Inti.jl supports this, associating a parametrization with each volumetric entity in a mesh. Note the delicate correspondence between the correct `EntityKey` and the parametrization in setting `entity_parametrization`, and note also the limitations listed below.
+
+```@example geo-and-meshes
+Inti.clear_entities!() # hide
+gmsh.initialize()
+meshsize = 0.075
+gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+
+# Three circles
+gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
+gmsh.model.occ.addDisk(0, 3.0, 0, 1, 1)
+gmsh.model.occ.addDisk(0, 8.0, 0, 2, 2)
+
+gmsh.model.occ.synchronize()
+gmsh.model.mesh.generate(2)
+msh = Inti.import_mesh(; dim = 2)
+gmsh.finalize()
+Ω = Inti.Domain(Inti.entities(msh)) do ent
+    return Inti.geometric_dimension(ent) == 2
+end
+
+Γ = Inti.external_boundary(Ω)
+Ωₕ = view(msh, Ω)
+Γₕ = view(msh, Γ)
+
+# Three circles
+ψ₁ = (t) -> [cos(2*π*t), sin(2*π*t)]
+ψ₂ = (t) -> [cos(2*π*t), 3.0 + sin(2*π*t)]
+ψ₃ = (t) -> [2*cos(2*π*t), 8.0 + 2*sin(2*π*t)]
+entity_parametrizations = Dict{Inti.EntityKey,Function}()
+entity_parametrizations[collect(keys(Ω))[3]] = ψ₃
+entity_parametrizations[collect(keys(Ω))[2]] = ψ₁
+entity_parametrizations[collect(keys(Ω))[1]] = ψ₂
+
+θ = 6 # smoothness order of curved elements
+crvmsh = Inti.curve_mesh(msh, entity_parametrizations, θ, 50*round(Int, 1/meshsize))
+
+Γₕ = crvmsh[Γ]
+Ωₕ = crvmsh[Ω]
+
+qorder = 5;
+Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder);
+Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder);
+```
+
+We can verify once again that the correct area of the region is obtained.
+
+```@example geo-and-meshes
+area = Inti.integrate(x -> 1, Ωₕ_quad)
+@assert abs(area - 6π) < 1e-10 # hide
+println("Error in computing area of three circles: ", abs(area - 6π))
+```
+
+One can extract a subcomponent of the curved (volumetric) domain as usual:
+
+```@example geo-and-meshes
+Ω_sub = Inti.Domain(collect(keys(Ω))[3])
+Ωₕ_sub = crvmsh[Ω_sub]
+Ωₕ_sub_quad = Inti.Quadrature(Ωₕ_sub; qorder = qorder);
+area = Inti.integrate(x -> 1, Ωₕ_sub_quad)
+@assert abs(area - 4π) < 1e-13 # hide
+println("Error in computing area of one (large) circle: ", abs(area - 4π))
+```
+
+The curved mesh also contains surface elements which are, like their volume
+counterparts, 'exact' (or isogeometric). To demonstrate this we compute the area
+using Green's theorem:
+
+```@example geo-and-meshes
+F = (x) -> [1/2*x[1], 1/2*x[2]]
+lineint = Inti.integrate(q -> dot(F(q.coords), q.normal), Γₕ_quad)
+@assert abs(lineint - 6π) < 1e-13 # hide
+println("Error in computing area using line integral: ", abs(lineint - 6π))
+```
+
+Note the following restrictions that (currently) hold for 2D curved meshes:
+1. Only a single boundary entity can be associated with a given curved volume entity
+2. A curved boundary entity cannot be associated with multiple volume entities.
+
+Curved 3D meshes with the same interface are also available with the following two (admittedly significant) restrictions:
+1. The boundary parametrization must be global. Thus, a torus domain is possible but not a sphere.
+2. Only a single curved domain is possible.
+(The second item could be easily addressed in Inti.jl if there is user interest; the first is more difficult to address.)
 
 ## Elements of a mesh
 
