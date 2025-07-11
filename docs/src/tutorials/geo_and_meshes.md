@@ -334,7 +334,7 @@ entity_parametrizations[collect(keys(Ω))[2]] = ψ₁
 entity_parametrizations[collect(keys(Ω))[1]] = ψ₂
 
 θ = 6 # smoothness order of curved elements
-crvmsh = Inti.curve_mesh(msh, entity_parametrizations, θ, 50*round(Int, 1/meshsize))
+crvmsh = Inti.curve_mesh(msh, entity_parametrizations, θ)
 
 Γₕ = crvmsh[Γ]
 Ωₕ = crvmsh[Ω]
