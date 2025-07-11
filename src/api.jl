@@ -6,7 +6,7 @@ Available compression methods for the dense linear operators in [`Inti`](@ref).
 const COMPRESSION_METHODS = [:none, :hmatrix, :fmm]
 
 """
-    const CORRECTION_METHODS = [:none, :dim, :hcubature]
+    const CORRECTION_METHODS = [:none, :dim, :adaptive]
 
 Available correction methods for the singular and nearly-singular integrals in
 [`Inti`](@ref).
@@ -17,51 +17,57 @@ const CORRECTION_METHODS = [:none, :dim, :adaptive]
     single_double_layer(; op, target, source::Quadrature, compression,
     correction, derivative = false)
 
-Construct a discrete approximation to the single- and double-layer integral
-operators for `op`, mapping values defined on the quadrature nodes of `source`
-to values defined on the nodes of `target`. If `derivative = true`, return
-instead the adjoint double-layer and hypersingular operators (which are the
-derivative of the single- and double-layer, respectively).
+Construct a discrete approximation to the single- and double-layer integral operators for
+`op`, mapping values defined on the quadrature nodes of `source` to values defined on the
+nodes of `target`. If `derivative = true`, return instead the adjoint double-layer and
+hypersingular operators (which are the generalized Neumann trace of the single- and
+double-layer, respectively).
 
-You  must choose a `compression` method and a `correction` method, as described
-below.
+For finer control, you must choose a `compression` method and a `correction` method, as
+described below.
 
-## Compression
+# Compression
 
 The `compression` argument is a named tuple with a `method` field followed by
 method-specific fields. It specifies how the dense linear operators should be
 compressed. The available options are:
 
   - `(method = :none, )`: no compression is performed, the resulting matrices
-    are dense.
+    are dense. This is the default, but not recommended for large problems.
   - `(method =:hmatrix, tol)`: the resulting operators are compressed using
     hierarchical matrices with an absolute tolerance `tol` (defaults to `1e-8`).
   - `(method = :fmm, tol)`: the resulting operators are compressed using the
     fast multipole method with an absolute tolerance `tol` (defaults to `1e-8`).
 
-## Correction
+# Correction
 
 The `correction` argument is a named tuple with a `method` field followed by
 method-specific fields. It specifies how the singular and nearly-singular
 integrals should be computed. The available options are:
 
-  - `(method = :none, )`: no correction is performed. This is not recommented,
-    as the resulting approximation will be inaccurate if the source and target
-    are not sufficiently far apart.
-  - `(method = :dim, maxdist, target_location)`: use the density interpolation
-    method to compute the correction. `maxdist` specifies the distance between
-    source and target points above which no correction is performed (defaults to
-    `Inf`). `target_location` should be either `:inside`, `:outside`, or `:on`,
-    and specifies where the `target`` points lie relative to the to the `source`
-    curve/surface (which is assumed to be closed). When `target === source`,
-    `target_location` is not needed.
+  - `(method = :none, )`: no correction is performed. This is not recommended, as the
+    resulting approximation will be inaccurate if the kernel is singular and source and
+    target are not sufficiently far from each other.
+  - `(method = :adaptive, maxdist, tol)`: correct interactions corresponding to entries of
+    `target` and elements of `source` that are within `maxdist` of each other. The singular
+    (including finite part) interactions are computed in polar coordinates, while the
+    near-singular interactions are computing using an adaptive quadrature rule. The `tol`
+    argument specifies the tolerance of the adaptive integration. See
+    [`adaptive_correction`](@ref) for more details.
+  - `(method = :dim, maxdist, target_location)`: use the density interpolation method to
+    compute the correction. `maxdist` specifies the distance between source and target
+    points above which no correction is performed (defaults to `Inf`). `target_location`
+    should be either `:inside`, `:outside`, or `:on`, and specifies where the `target``
+    points lie relative to the to the `source` curve/surface (which is assumed to be
+    closed). When `target === source`, `target_location` is not needed. See
+    [`bdim_correction`](@ref) and [`vdim_correction`] for more details.
 """
 function single_double_layer(;
     op,
     target,
     source,
-    compression,
-    correction,
+    compression = (method = :none,),
+    correction = (method = :adaptive,),
     derivative = false,
 )
     compression = _normalize_compression(compression, target, source)
@@ -148,21 +154,10 @@ function single_double_layer(;
             )
         end
     elseif correction.method == :adaptive
-        derivative && error(
-            "Adaptive quadrature not supported for derivative operators since they are not weakly singular.",
-        )
-        δS = adaptive_correction(
-            Sop;
-            correction.maxdist,
-            correction.maxsplit,
-            correction.tol,
-        )
-        δD = adaptive_correction(
-            Dop;
-            correction.maxdist,
-            correction.maxsplit,
-            correction.tol,
-        )
+        # strip `method` from correction and pass it on
+        correction_kw = Base.structdiff(correction, NamedTuple{(:method,)})
+        δS = adaptive_correction(Sop; correction_kw...)
+        δD = adaptive_correction(Dop; correction_kw...)
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end
@@ -172,8 +167,13 @@ function single_double_layer(;
         S = axpy!(true, δS, Smat)
         D = axpy!(true, δD, Dmat)
     elseif compression.method == :hmatrix
-        S = LinearMap(Smat) + LinearMap(δS)
-        D = LinearMap(Dmat) + LinearMap(δD)
+        if target === source
+            S = axpy!(true, δS, Smat)
+            D = axpy!(true, δD, Dmat)
+        else
+            S = LinearMap(Smat) + LinearMap(δS)
+            D = LinearMap(Dmat) + LinearMap(δD)
+        end
     elseif compression.method == :fmm
         S = Smat + LinearMap(δS)
         D = Dmat + LinearMap(δD)
@@ -193,8 +193,8 @@ function adj_double_layer_hypersingular(;
     op,
     target,
     source = target,
-    compression,
-    correction,
+    compression = (method = :none,),
+    correction = (method = :adaptive,),
 )
     return single_double_layer(;
         op,
@@ -213,10 +213,10 @@ Return the single- and double-layer potentials for `op` as
 [`IntegralPotential`](@ref)s.
 """
 function single_double_layer_potential(; op, source)
-    G  = SingleLayerKernel(op)
-    dG = DoubleLayerKernel(op)
-    𝒮  = IntegralPotential(G, source)
-    𝒟  = IntegralPotential(dG, source)
+    G    = SingleLayerKernel(op)
+    dG   = DoubleLayerKernel(op)
+    𝒮 = IntegralPotential(G, source)
+    𝒟 = IntegralPotential(dG, source)
     return 𝒮, 𝒟
 end
 
@@ -292,6 +292,10 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
     # compute correction
     if correction.method == :none
         return Vmat
+    elseif correction.method == :adaptive
+        # strip `method` from correction and pass it on
+        correction_kw = Base.structdiff(correction, NamedTuple{(:method,)})
+        δV = adaptive_correction(V; correction_kw...)
     elseif correction.method == :dim
         loc = target === source ? :inside : correction.target_location
         μ = _green_multiplier(loc)

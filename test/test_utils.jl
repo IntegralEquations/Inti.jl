@@ -3,7 +3,7 @@ using Gmsh
 
 function gmsh_disk(; center, rx, ry, meshsize, order = 1)
     msh = try
-        gmsh.initialize()
+        gmsh.initialize(String[], false)
         gmsh.option.setNumber("General.Verbosity", 2)
         gmsh.model.add("disk")
         # set max and min meshsize to meshsize
@@ -49,7 +49,7 @@ end
 
 function gmsh_ball(; center, radius, meshsize)
     msh = try
-        gmsh.initialize()
+        gmsh.initialize(String[], false)
         gmsh.option.setNumber("General.Verbosity", 2)
         gmsh.model.add("ball")
         # set max and min meshsize to meshsize

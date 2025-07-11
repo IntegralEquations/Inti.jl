@@ -48,7 +48,7 @@ end
 
 k0 = π
 k  = 0
-θ  = (sin(π / 3) * cos(π / 3), sin(π / 3) * sin(π / 3), cos(π / 3))
+θ = (sin(π / 3) * cos(π / 3), sin(π / 3) * sin(π / 3), cos(π / 3))
 #u  = (x) -> exp(im * k0 * dot(x, θ))
 #du = (x,n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
 u  = (x) -> cos(k0 * dot(x, θ))

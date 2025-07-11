@@ -39,7 +39,7 @@ end
 jacobian(f, s::Real) = jacobian(f, SVector(s))
 
 """
-    hesssian(el,x)
+    hessian(el,x)
 
 Given a (possibly vector-valued) functor `f : 𝐑ᵐ → 𝐅ⁿ`, return the `n × m × m`
 matrix `Aᵢⱼⱼ = ∂²fᵢ/∂xⱼ∂xⱼ`. By default `ForwardDiff` is used to compute the
@@ -107,6 +107,10 @@ end
 
 domain(::ReferenceInterpolant{D,T}) where {D,T} = D()
 domain(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = D()
+
+# TODO: deprecate `domain` in favor of `reference_domain` for clarity
+reference_domain(el) = domain(el)
+
 return_type(::ReferenceInterpolant{D,T}) where {D,T} = T
 return_type(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = T
 domain_dimension(t::ReferenceInterpolant{D,T}) where {D,T} = domain(t) |> center |> length
@@ -230,11 +234,6 @@ vals(el::LagrangeElement) = el.vals
 Return the reference nodes on `domain(el)` used for the polynomial
 interpolation. The function values on these nodes completely determines the
 interpolating polynomial.
-
-We use the same convention as `gmsh` for defining the reference nodes and their
-order (see [node
-ordering](https://gmsh.info/doc/texinfo/gmsh.html#Node-ordering) on `gmsh`
-documentation).
 """
 function reference_nodes(el::LagrangeElement)
     return interface_method(el)
@@ -248,46 +247,25 @@ end
 # a more convenient syntax
 LagrangeElement{D}(x1, xs...) where {D} = LagrangeElement{D}(SVector(x1, xs...))
 
-# construct based on a function
-function LagrangeElement{D}(f::Function) where {D}
-    ref_nodes = reference_nodes(D())
-    vals = svector(i -> f(ref_nodes[i]), length(ref_nodes))
-    return LagrangeElement{D}(vals)
-end
-
 """
     order(el::LagrangeElement)
 
 The order of the element's interpolating polynomial (e.g. a `LagrangeLine` with
 `2` nodes defines a linear polynomial, and thus has order `1`).
 """
-function order(::Type{<:LagrangeElement{D,Np}})::Int where {D,Np}
-    if D == ReferenceLine
-        return Np - 1
-    elseif D == ReferenceTriangle
-        K = (-3 + sqrt(1 + 8 * Np)) / 2
-        isinteger(K) || error("Np must be triangular number")
-        return Int(K)
-    elseif D == ReferenceTetrahedron
-        if Np == 4
-            return 1
-        elseif Np == 10
-            return 2
-        else
-            # TODO: general case of tetrahedron
-            notimplemented()
-        end
-    elseif D == ReferenceSquare
-        K = sqrt(Np) - 1
-        isinteger(K) || error("Np must be square number")
-        return Int(K)
-    elseif D == ReferenceCube
-        K = Np^(1 / 3) - 1
-        isinteger(K) || error("Np must be cubic number")
-        return Int(K)
+@generated function order(::Type{<:LagrangeElement{D,Np}})::Int where {D,Np}
+    if D <: ReferenceHyperCube
+        N = geometric_dimension(D)
+        K = findfirst(i -> i^N == Np, 1:100) - 1
+        isnothing(K) && error("Np must be a perfect $N-th root")
+    elseif D <: ReferenceSimplex
+        N = geometric_dimension(D)
+        K = findfirst(i -> binomial(i + N, N) == Np, 0:100) - 1
+        isnothing(K) && error("Np must be an $N-triangular number")
     else
         notimplemented()
     end
+    return :($K)
 end
 
 """
@@ -330,7 +308,7 @@ Quadrangle2D(args...) = Quadrangle2D{Float64}(args...)
 Quadrangle3D(args...) = Quadrangle3D{Float64}(args...)
 
 """
-    const LagrangeSquare = LagrangeElement{ReferenceSquare}
+    const LagrangeCube = LagrangeElement{ReferenceCube}
 """
 const LagrangeCube = LagrangeElement{ReferenceCube}
 
@@ -340,11 +318,31 @@ const LagrangeCube = LagrangeElement{ReferenceCube}
 
 The indices of the nodes in `el` that define the vertices of the element.
 """
-vertices_idxs(::Type{<:LagrangeLine}) = 1:2
-vertices_idxs(::Type{<:LagrangeTriangle}) = 1:3
-vertices_idxs(::Type{<:LagrangeSquare}) = 1:4
-vertices_idxs(::Type{<:LagrangeTetrahedron}) = 1:4
-vertices_idxs(::Type{<:LagrangeCube}) = 1:8
+vertices_idxs(::Type{<:LagrangeLine{N}}) where {N} = SVector(1, N)
+
+function vertices_idxs(::Type{<:LagrangeSquare{N2}}) where {N2}
+    N = order(LagrangeSquare{N2}) + 1
+    return SVector(1, N, N2, N2 - N + 1)
+end
+
+function vertices_idxs(::Type{<:LagrangeCube{N3}}) where {N3}
+    N = order(LagrangeCube{N3}) + 1
+    N2 = N * N
+    low_face = SVector(1, N, N2 - N + 1, N2)
+    up_face = (N3 - N2) .+ low_face
+    return SVector(low_face..., up_face...)
+end
+
+function vertices_idxs(::Type{<:LagrangeTriangle{Np}}) where {Np}
+    N = order(LagrangeTriangle{Np}) + 1
+    return SVector(1, N, Np)
+end
+
+function vertices_idxs(::Type{<:LagrangeTetrahedron{Np}}) where {Np}
+    N = order(LagrangeTetrahedron{Np}) + 1
+    return SVector(1, N, N * (N + 1) ÷ 2, Np)
+end
+
 vertices_idxs(el::LagrangeElement) = vertices_idxs(typeof(el))
 
 """
@@ -364,205 +362,197 @@ function boundary_idxs(::Type{<:LagrangeLine})
     return 1, 2
 end
 
-function boundary_idxs(::Type{<:LagrangeTriangle{3}})
-    return (1, 2), (2, 3), (3, 1)
+function boundary_idxs(el::LagrangeTriangle)
+    I = vertices_idxs(el)
+    return (I[1], I[2]), (I[2], I[3]), (I[3], I[1])
 end
 
-function boundary_idxs(::Type{<:LagrangeTriangle{6}})
-    return (1, 2, 4), (2, 3, 5), (3, 1, 6)
+function boundary_idxs(el::LagrangeSquare)
+    I = vertices_idxs(el)
+    return (I[1], I[2]), (I[2], I[3]), (I[3], I[4]), (I[4], I[1])
 end
 
-function boundary_idxs(::Type{<:LagrangeTetrahedron{4}})
-    return (3, 2, 1), (1, 4, 3), (2, 3, 4), (1, 2, 4)
-end
-
-function boundarynd(::Type{T}, els, msh) where {T}
-    bdi = Inti.boundary_idxs(T)
-    nedges = length(els) * length(bdi)
-    edgelist = Vector{SVector{length(bdi[1]),Int64}}(undef, nedges)
-    edgelist_unsrt = Vector{SVector{length(bdi[1]),Int64}}(undef, nedges)
-    bords = Vector{MVector{length(bdi[1]),Int64}}(undef, length(bdi))
-    for i in 1:length(bdi)
-        bords[i] = MVector{length(bdi[1]),Int64}(undef)
+# generic ℚₖ elements for ReferenceHyperCube
+function reference_nodes(T::Type{<:LagrangeElement{ReferenceHyperCube{D},Np}}) where {D,Np}
+    n = order(T) + 1
+    @assert abs(n - Np^(1 / D)) < 1e-8 "Np must be a perfect power of D"
+    nodes1d = ntuple(i -> n == 1 ? 0.5 : range(0, 1, n), D)
+    nodes = map(Iterators.product(nodes1d...)) do x
+        return SVector(x...)
     end
-    j = 1
-    for ii in els
-        for k in 1:length(bdi)
-            for jjj in 1:length(bdi[k])
-                bords[k][jjj] = Inti.connectivity(msh, T)[bdi[k][jjj], ii]
+    return SVector{Np}(nodes)
+end
+
+@generated function (el::LagrangeElement{ReferenceHyperCube{D},Np})(u) where {D,Np}
+    n    = order(el) + 1
+    dims = ntuple(i -> n, D)
+    # fetch references nodes on format expected by `lagrange_interp`
+    nodes1d   = n == 1 ? [0.5] : collect(range(0, 1, n))
+    weights1d = barycentric_lagrange_weights(nodes1d)
+    nodes     = ntuple(i -> nodes1d, D)
+    weights   = ntuple(i -> weights1d, D)
+    return quote
+        v = reshape(vals(el), $dims)
+        return tensor_lagrange_interp(SVector(u), v, $nodes, $weights, Val(D), 1, Np)
+    end
+end
+
+"""
+    tensor_lagrange_interp(
+        x::SVector{N,Td},
+        vals::AbstractArray{<:Any,N},
+        nodes::NTuple{N},
+        weights::NTuple{N},
+        ::Val{dim},
+        i1,
+        len,
+        ::Val{SKIP} = Val(false)
+    ) where {N,Td,dim,SKIP}
+
+Low-level function performing tensor-product Lagrange interpolation of an N-dimensional
+function at the point `x`.
+
+# Arguments
+- `x::SVector{N,Td}`: The point at which to interpolate, given as a static vector of length `N`.
+- `vals::AbstractArray{<:Any,N}`: The array of function values at the interpolation nodes, with `N` dimensions.
+- `nodes::NTuple{N}`: A tuple containing the interpolation nodes for each dimension.
+- `weights::NTuple{N}`: A tuple containing the barycentric weights for each dimension.
+- `::Val{dim}`: A type-level value indicating the current dimension for recursion.
+- `i1`: The starting index for the current slice of `vals`.
+- `len`: The stride length for the current dimension.
+
+# Returns
+- The interpolated value at the point `x`, of the same type as the elements of `vals`.
+"""
+@inline function tensor_lagrange_interp(
+    x::SVector{N,Td},
+    vals::AbstractArray{<:Any,N},
+    nodes::NTuple{N},
+    weights::NTuple{N},
+    ::Val{dim},
+    i1,
+    len,
+    ::Val{SKIP} = Val(false),
+) where {N,Td,dim,SKIP}
+    T = eltype(vals)
+    n = size(vals, dim)
+    @inbounds xd = x[dim]
+    @inbounds W = weights[dim]
+    @inbounds X = nodes[dim]
+    num = zero(T)
+    l = one(Td)
+    res = zero(T)
+    δ = one(Td)
+    # although the modified lagrange formula below is backward stable, autodiffing through
+    # it is not if we are close to an interpolation node. The fix here is to switch to a
+    # slightly different representation, which is more stable, if `x` is ever close to an
+    # interpolation node. The `thres` variable below was chosen empirically for `Float64`
+    # types.
+    thres = 1e-3
+    if dim == 1
+        for i in 1:n
+            @inbounds ci = vals[i1+(i-1)]
+            @inbounds wi = W[i]
+            @inbounds x_m_xi = xd - X[i]
+            if SKIP || abs(x_m_xi) > thres || (!iszero(res))
+                l *= x_m_xi
+                num += (wi / x_m_xi) * ci
+            else
+                δ = x_m_xi
+                res = ci * wi
             end
         end
-        for q in bords
-            edgelist_unsrt[j] = q[:]
-            edgelist[j] = sort!(q)
-            j += 1
-        end
-    end
-    I = sortperm(edgelist)
-    uniqlist = Int64[]
-    sizehint!(uniqlist, length(els))
-    i = 1
-    while i <= length(edgelist) - 1
-        if isequal(edgelist[I[i]], edgelist[I[i+1]])
-            i += 1
-        else
-            push!(uniqlist, I[i])
-        end
-        i += 1
-    end
-    if !isequal(edgelist[I[end-1]], edgelist[I[end]])
-        push!(uniqlist, I[end])
-    end
-    return edgelist_unsrt[uniqlist]
-end
-
-#=
-Hardcode some basic elements.
-TODO: Eventually this could/should be automated.
-=#
-
-# P1 for ReferenceLine
-function reference_nodes(::Type{<:LagrangeLine{2}})
-    return SVector(SVector(0.0), SVector(1.0))
-end
-
-function (el::LagrangeLine{2})(u)
-    v = vals(el)
-    return v[1] + (v[2] - v[1]) * u[1]
-end
-
-# P2 for ReferenceLine
-function reference_nodes(::Type{<:LagrangeLine{3}})
-    return SVector(SVector(0.0), SVector(1.0), SVector(0.5))
-end
-
-function (el::LagrangeLine{3})(u)
-    v = vals(el)
-    return v[1] +
-           (4 * v[3] - 3 * v[1] - v[2]) * u[1] +
-           2 * (v[2] + v[1] - 2 * v[3]) * u[1]^2
-end
-
-# P1 for ReferenceTriangle
-function reference_nodes(::Type{<:LagrangeTriangle{3}})
-    return SVector(SVector(0.0, 0.0), SVector(1.0, 0.0), SVector(0.0, 1.0))
-end
-
-function (el::LagrangeTriangle{3})(u)
-    v = vals(el)
-    return v[1] + (v[2] - v[1]) * u[1] + (v[3] - v[1]) * u[2]
-end
-
-# P2 for ReferenceTriangle
-function reference_nodes(::Type{<:LagrangeTriangle{6}})
-    return SVector(
-        SVector(0.0, 0.0),
-        SVector(1.0, 0.0),
-        SVector(0.0, 1.0),
-        SVector(0.5, 0.0),
-        SVector(0.5, 0.5),
-        SVector(0.0, 0.5),
-    )
-end
-
-function (el::LagrangeTriangle{6})(u)
-    v = vals(el)
-    return (1 + u[2] * (-3 + 2u[2]) + u[1] * (-3 + 2u[1] + 4u[2])) * v[1] +
-           u[1] *
-           (-v[2] + u[1] * (2v[2] - 4v[4]) + 4v[4] + u[2] * (-4v[4] + 4v[5] - 4v[6])) +
-           u[2] * (-v[3] + u[2] * (2v[3] - 4v[6]) + 4v[6])
-end
-
-# P3 for ReferenceTriangle
-# source: https://www.math.uci.edu/~chenlong/iFEM/doc/html/dofP3doc.html
-function reference_nodes(::LagrangeTriangle{10})
-    return SVector(
-        SVector(0.0, 0.0),
-        SVector(1.0, 0.0),
-        SVector(0.0, 1.0),
-        SVector(1 / 3, 0.0),
-        SVector(2 / 3, 0.0),
-        SVector(2 / 3, 1 / 3),
-        SVector(1 / 3, 2 / 3),
-        SVector(0.0, 2 / 3),
-        SVector(0.0, 1 / 3),
-        SVector(1 / 3, 1 / 3),
-    )
-end
-
-function (el::LagrangeTriangle{10})(u)
-    λ₁ = 1 - u[1] - u[2]
-    λ₂ = u[1]
-    λ₃ = u[2]
-    ϕ₁ = 0.5 * (3λ₁ - 1) * (3λ₁ - 2) * λ₁
-    ϕ₂ = 0.5 * (3λ₂ - 1) * (3λ₂ - 2) * λ₂
-    ϕ₃ = 0.5 * (3λ₃ - 1) * (3λ₃ - 2) * λ₃
-    ϕ₄ = 4.5 * λ₁ * λ₂ * (3λ₁ - 1)
-    ϕ₅ = 4.5 * λ₁ * λ₂ * (3λ₂ - 1)
-    ϕ₆ = 4.5 * λ₃ * λ₂ * (3λ₂ - 1)
-    ϕ₇ = 4.5 * λ₃ * λ₂ * (3λ₃ - 1)
-    ϕ₈ = 4.5 * λ₁ * λ₃ * (3λ₃ - 1)
-    ϕ₉ = 4.5 * λ₁ * λ₃ * (3λ₁ - 1)
-    ϕ₁₀ = 27 * λ₁ * λ₂ * λ₃
-    v = vals(el)
-    return v[1] * ϕ₁ +
-           v[2] * ϕ₂ +
-           v[3] * ϕ₃ +
-           v[4] * ϕ₄ +
-           v[5] * ϕ₅ +
-           v[6] * ϕ₆ +
-           v[7] * ϕ₇ +
-           v[8] * ϕ₈ +
-           v[9] * ϕ₉ +
-           v[10] * ϕ₁₀
-end
-
-# P1 for ReferenceSquare
-function reference_nodes(::Type{<:LagrangeSquare{4}})
-    return SVector(SVector(0, 0), SVector(1, 0), SVector(1, 1), SVector(0, 1))
-end
-
-function (el::LagrangeElement{ReferenceSquare,4})(u)
-    v = vals(el)
-    return v[1] +
-           (v[2] - v[1]) * u[1] +
-           (v[4] - v[1]) * u[2] +
-           (v[3] + v[1] - v[2] - v[4]) * u[1] * u[2]
-end
-
-# P1 for ReferenceTetrahedron
-function reference_nodes(::LagrangeTetrahedron{4})
-    return SVector(SVector(0, 0, 0), SVector(1, 0, 0), SVector(0, 1, 0), SVector(0, 0, 1))
-end
-
-function (el::LagrangeElement{ReferenceTetrahedron,4})(u)
-    v = vals(el)
-    return v[1] + (v[2] - v[1]) * u[1] + (v[3] - v[1]) * u[2] + (v[4] - v[1]) * u[3]
-end
-
-"""
-    degree(el::LagrangeElement)
-    degree(el::Type{<:LagrangeElement})
-
-The polynomial degree `el`.
-"""
-function degree(::Type{<:LagrangeElement{D,Np}})::Int where {D,Np}
-    if D == ReferenceLine
-        return Np - 1
-    elseif D == ReferenceTriangle
-        K = (-3 + sqrt(1 + 8 * Np)) / 2
-        return K
-    elseif D == ReferenceTetrahedron
-        notimplemented()
-    elseif D == ReferenceSquare
-        return sqrt(Np) - 1
-    elseif D == ReferenceCube
-        return Np^(1 / 3) - 1
+        return res * l + l * δ * num
     else
-        notimplemented()
+        Δi = len ÷ n # column-major stride of current dimension
+        # recurse down on dimension
+        dim′ = Val{dim - 1}()
+        @inbounds for i in 1:n
+            ci =
+                tensor_lagrange_interp(x, vals, nodes, weights, dim′, i1 + (i - 1) * Δi, Δi)
+            wi = W[i]
+            x_m_xi = xd - X[i]
+            if SKIP || abs(x_m_xi) > thres || (!iszero(res))
+                l *= x_m_xi
+                num += (wi / x_m_xi) * ci
+            else
+                δ = x_m_xi
+                res = ci * wi
+            end
+        end
+        return res * l + l * δ * num
     end
 end
-degree(el::LagrangeElement) = typeof(el) |> degree
+
+function barycentric_lagrange_weights(x::AbstractVector)
+    n = length(x)
+    w = map(1:n) do i
+        xᵢ = x[i]
+        prod(Iterators.filter(j -> j ≠ i, 1:n); init = one(eltype(x))) do j
+            xⱼ = x[j]
+            return xᵢ - xⱼ
+        end
+    end
+    w .= 1 ./ w
+    return w
+end
+
+# generic ℙₖ elements for ReferenceSimplex
+function reference_nodes(T::Type{<:LagrangeElement{ReferenceSimplex{D},Np}}) where {D,Np}
+    k = order(T)
+    k == 0 && return SVector{1}((svector(i -> 1 / (D + 1), D),))
+    nodes = SVector{D,Float64}[]
+    for I in Iterators.product(ntuple(i -> 0:k, D)...)
+        sum(I) > k && continue # skip if sum of indices exceeds n
+        x = svector(i -> I[i] / k, D)
+        push!(nodes, x)
+    end
+    return SVector{Np}(nodes)
+end
+
+# Based on a formula found in
+# ``On a class of finite elements generated by Lagrange Interpolation''
+# Nicolaides. SINUM 1972.
+function (el::LagrangeElement{ReferenceSimplex{D},Np})(u) where {D,Np}
+    T = eltype(u)
+    k = order(typeof(el))::Int
+    iszero(k) && return vals(el)[1] # constant element
+    u = SVector{D}(u)
+    x = push(u, 1 - sum(u)) # add the last coordinate
+    lags1d = MMatrix{k + 1,D + 1,T}(undef)
+    @inbounds for dim in 1:(D+1)
+        xk = k * x[dim] # scaled coordinate
+        lags1d[1, dim] = 1.0 # constant term
+        for j in 1:k
+            lags1d[j+1, dim] = lags1d[j, dim] * (xk - (j - 1)) / j
+        end
+    end
+    v = vals(el)
+    acc = zero(eltype(v))
+    @inbounds for (n, I) in enumerate(_barycentric_iterator(el))
+        l = v[n] # value at the current node
+        for d in 1:(D+1)
+            i = I[d] + 1
+            l *= lags1d[i, d]
+        end
+        acc += l
+    end
+    return acc
+end
+
+@generated function _barycentric_iterator(
+    el::LagrangeElement{ReferenceSimplex{D},Np},
+) where {D,Np}
+    k = order(el)
+    idxs = MVector{Np,NTuple{D + 1,Int}}(undef)
+    cc = 0
+    for I in Iterators.product(ntuple(i -> 0:k, D)...)
+        sum(I) > k && continue # skip if sum of indices exceeds n
+        cc += 1
+        idxs[cc] = (I..., k - sum(I)) # add the last coordinate
+    end
+    return :($idxs)
+end
 
 """
     lagrange_basis(E::Type{<:LagrangeElement})
@@ -573,10 +563,4 @@ value of each basis function at `x`.
 function lagrange_basis(::Type{LagrangeElement{D,N,T}}) where {D,N,T}
     vals = svector(i -> svector(j -> i == j, N), N)
     return LagrangeElement{D}(vals)
-end
-
-# construct a LagrangeElement from a reference shape
-function LagrangeElement(::ReferenceLine)
-    v = SVector(SVector(0.0), SVector(1.0))
-    return LagrangeLine(v)
 end

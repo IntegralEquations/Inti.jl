@@ -80,6 +80,8 @@ struct Mesh{N,T} <: AbstractMesh{N,T}
     etype2els::Dict{DataType,AbstractVector}
     # mapping from entity to a dict containing (etype=>tags)
     ent2etags::Dict{EntityKey,Dict{DataType,Vector{Int}}}
+    # keep track if the element orientation should be inverted
+    etype2orientation::Dict{DataType,Vector{Int}}
 end
 
 # empty constructor
@@ -89,6 +91,7 @@ function Mesh{N,T}() where {N,T}
         Dict{DataType,Matrix{Int}}(),
         Dict{DataType,AbstractVector{<:ReferenceInterpolant}}(),
         Dict{EntityKey,Dict{DataType,Vector{Int}}}(),
+        Dict{DataType,Vector{Int}}(),
     )
 end
 
@@ -121,6 +124,14 @@ tags in the matrix refer to the points in `nodes(msh)`
 """
 connectivity(msh::Mesh, E::DataType) = msh.etype2mat[E]
 
+"""
+    orientation(msh::AbstractMesh,E::DataType)
+
+Return the orientation of the elements of type `E` in `msh` (`1` if normal and `-1` if
+inverted).
+"""
+orientation(msh::AbstractMesh, E::DataType) = msh.etype2orientation[E]
+
 function ent2nodetags(msh::Mesh, ent::EntityKey)
     tags = Int[]
     for (E, t) in msh.ent2etags[ent]
@@ -152,6 +163,26 @@ function dom2elt(m::AbstractMesh, Ω::Domain, E::DataType)
     return idxs
 end
 
+function build_orientation!(msh::AbstractMesh)
+    # allocate the orientation vector for each element type
+    for E in element_types(msh)
+        E <: SVector && continue # skip points
+        haskey(msh.etype2orientation, E) && (@warn "recomputing orientation for $E")
+        msh.etype2orientation[E] = Vector{Int}(undef, length(elements(msh, E)))
+    end
+    # for each entity, set the orientation of the elements
+    e2t = ent2etags(msh)
+    for ent in entities(msh)
+        geometric_dimension(ent) == 0 && continue # skip points
+        s = sign(tag(ent))
+        for (E, tags) in e2t[ent]
+            for i in tags
+                msh.etype2orientation[E][i] = s
+            end
+        end
+    end
+end
+
 function Base.getindex(msh::Mesh{N,T}, Ω::Domain) where {N,T}
     new_msh = Mesh{N,T}()
     (; nodes, etype2mat, etype2els, ent2etags) = new_msh
@@ -171,7 +202,7 @@ function Base.getindex(msh::Mesh{N,T}, Ω::Domain) where {N,T}
             # check if parent has elements of type E for the entity
             haskey(msh.ent2etags[k], E) || continue
             etags_glob = msh.ent2etags[k][E]
-            etags_loc  = get!(ent2etags[k], E, Int[])
+            etags_loc = get!(ent2etags[k], E, Int[])
             for iglob in etags_glob
                 etag_loc += 1
                 # add nodes and connectivity matrix
@@ -190,14 +221,15 @@ function Base.getindex(msh::Mesh{N,T}, Ω::Domain) where {N,T}
         end
         isempty(mat) || (etype2mat[E] = reshape(mat, np, :))
     end
+    build_orientation!(new_msh)
     return new_msh
 end
 Base.getindex(msh::Mesh, ent::EntityKey) = getindex(msh, Domain(ent))
 
 """
-    meshgen(Ω, n)
-    meshgen(Ω, n_dict)
-    meshgen(Ω; meshsize)
+    meshgen(Ω, n; T = Float64)
+    meshgen(Ω, n_dict; T = Float64)
+    meshgen(Ω; meshsize, T = Float64)
 
 Generate a `Mesh` for the domain `Ω` where each curve is meshed using
 `n` elements. Passing a dictionary allows for a finer control; in such cases,
@@ -209,6 +241,8 @@ is computed as so as to obtain an *average* mesh size of `meshsize`. Note that
 the actual mesh size may vary significantly for each element if the
 parametrization is far from uniform.
 
+The mesh is created with primitive data of type `T`.
+
 This function requires the entities forming `Ω` to have an explicit
 parametrization.
 
@@ -217,12 +251,12 @@ parametrization.
     the quality of the underlying parametrization. For complex surfaces, you are
     better off using a proper mesher such as `gmsh`.
 """
-function meshgen(Ω::Domain, args...; kwargs...)
+function meshgen(Ω::Domain, args...; T = Float64, kwargs...)
     # extract the ambient dimension for these entities (i.e. are we in 2d or
     # 3d). Only makes sense if all entities have the same ambient dimension.
     N = ambient_dimension(first(Ω))
     @assert all(p -> ambient_dimension(p) == N, entities(Ω)) "Entities must have the same ambient dimension"
-    mesh = Mesh{N,Float64}()
+    mesh = Mesh{N,T}()
     meshgen!(mesh, Ω, args...; kwargs...)
     return mesh
 end
@@ -238,10 +272,14 @@ function meshgen!(msh::Mesh, Ω::Domain, num_elements::Int)
     e1d = filter(k -> geometric_dimension(k) == 1, all_keys(Ω))
     return meshgen!(msh, Ω, Dict(e => num_elements for e in e1d))
 end
-function meshgen!(msh::Mesh, Ω::Domain; meshsize::Real)
-    # compute the length of each curve using an adaptive quadrature
+function meshgen!(msh::Mesh, Ω::Domain; meshsize)
+    # get all 1d entities (i.e. lines)
     e1d = filter(k -> geometric_dimension(k) == 1, all_keys(Ω))
-    dict = Dict(k => ceil(Int, measure(k) / meshsize) for k in e1d)
+    # normalize meshsize to a dictionary
+    isa(meshsize, Real) && (meshsize = Dict(e => meshsize for e in e1d))
+    isa(meshsize, Dict) || error("meshsize must be a number or a dictionary")
+    # compute the length of each curve using an adaptive quadrature
+    dict = Dict(k => ceil(Int, measure(k) / meshsize[k]) for k in e1d)
     # curves which are opposite sides of a surface must have the same number of
     # elements. If they differ, we take the maximum. Because there can be chains
     # of dependencies (i.e. l1 is opposite to l2 and l2 is opposite to l3), we
@@ -266,7 +304,7 @@ function meshgen!(msh::Mesh, Ω::Domain, dict::Dict)
     d = geometric_dimension(Ω)
     for k in keys(Ω)
         if d == 1
-            haskey(dict, k) || error(msg1(k))
+            haskey(dict, k) || error("missing num_elements entry for entity $k")
             sz = dict[k]
             _meshgen!(msh, k, (sz,))
         elseif d == 2
@@ -283,8 +321,8 @@ function meshgen!(msh::Mesh, Ω::Domain, dict::Dict)
                         dict[l] != dict[op_l] &&
                         @warn "num_elements for $l and $op_l must be the same"
                     return dict[l]
-                elseif haskey(dict, l_op)
-                    return dict[l_op]
+                elseif haskey(dict, op_l)
+                    return dict[op_l]
                 else
                     error("missing num_elements entry for entity $b1")
                 end
@@ -301,6 +339,7 @@ function meshgen!(msh::Mesh, Ω::Domain, dict::Dict)
         end
     end
     _build_connectivity!(msh)
+    build_orientation!(msh)
     return msh
 end
 
@@ -340,7 +379,7 @@ function _meshgen(f, d::HyperRectangle, sz::NTuple)
     lc, hc = low_corner(d), high_corner(d)
     Δx = (hc - lc) ./ sz
     map(CartesianIndices(sz)) do I
-        low  = lc + (Tuple(I) .- 1) .* Δx
+        low = lc + (Tuple(I) .- 1) .* Δx
         high = low .+ Δx
         return ParametricElement(f, HyperRectangle(low, high))
     end |> vec
@@ -397,6 +436,7 @@ Base.size(iter::ElementIterator{E,<:Mesh}) where {E} = (length(iter),)
 function Base.getindex(iter::ElementIterator{E,<:Mesh}, i::Int) where {E<:LagrangeElement}
     tags = iter.mesh.etype2mat[E]::Matrix{Int}
     node_tags = view(tags, :, i)
+    orientation = iter.mesh.etype2orientation[E][i]
     vtx = view(iter.mesh.nodes, node_tags)
     el = E(vtx)
     return el
@@ -476,15 +516,18 @@ struct SubMesh{N,T} <: AbstractMesh{N,T}
     # etype2etags maps E => indices of elements in parent mesh contained in the
     # submesh
     etype2etags::Dict{DataType,Vector{Int}}
+    etype2orientation::Dict{DataType,Vector{Int}}
     function SubMesh(mesh::Mesh{N,T}, Ω::Domain) where {N,T}
         etype2etags = Dict{DataType,Vector{Int}}()
         for E in element_types(mesh)
-            # add the indices of the elements of type E in the submesh. Skip if
-            # empty
+            # add the indices of the elements of type E in the submesh. Skip if empty
             idxs = dom2elt(mesh, Ω, E)
             isempty(idxs) || (etype2etags[E] = idxs)
         end
-        return new{N,T}(mesh, Ω, etype2etags)
+        etype2orientation = Dict{DataType,Vector{Bool}}()
+        submsh = new{N,T}(mesh, Ω, etype2etags, etype2orientation)
+        build_orientation!(submsh)
+        return submsh
     end
 end
 

@@ -11,7 +11,15 @@ See also: [`SingleLayerKernel`](@ref),
 """
 abstract type AbstractKernel{T} end
 
-return_type(::AbstractKernel{T}) where {T} = T
+return_type(::AbstractKernel{T}, args...) where {T} = T
+
+"""
+    singularity_order(K)
+
+Given a kernel `K` with signature `K(target,source)::T`, return the order of the singularity
+of `K` at `target = source`. Order `n` means that `K(x,y) ∼ (x - y)^n` as `x -> y`.
+"""
+singularity_order(K) = nothing
 
 """
     abstract type AbstractDifferentialOperator{N}
@@ -33,6 +41,8 @@ function (::Type{K})(
     return K{T,Op}(op)
 end
 
+operator(K::AbstractKernel) = K.op
+
 """
     struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
 
@@ -41,6 +51,11 @@ AbstractDifferentialOperator`.
 """
 struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
+end
+
+function singularity_order(K::SingleLayerKernel)
+    N = ambient_dimension(K.op)
+    return 2 - N
 end
 
 """
@@ -53,6 +68,11 @@ derivative of the fundamental solution respect to the source variable.
 """
 struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
+end
+
+function singularity_order(K::DoubleLayerKernel)
+    N = ambient_dimension(K.op)
+    return 1 - N
 end
 
 """
@@ -68,6 +88,11 @@ struct AdjointDoubleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
 end
 
+function singularity_order(K::AdjointDoubleLayerKernel)
+    N = ambient_dimension(K.op)
+    return 1 - N
+end
+
 """
     struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
 
@@ -79,6 +104,11 @@ variable of the `DoubleLayerKernel`.
 """
 struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
     op::Op
+end
+
+function singularity_order(K::HyperSingularKernel)
+    N = ambient_dimension(K.op)
+    return -N
 end
 
 ################################################################################
@@ -156,7 +186,7 @@ function (HS::HyperSingularKernel{T,Laplace{N}})(
     target,
     source,
     r = coords(target) - coords(source),
-)::T where {N,T}
+) where {N,T}
     nx = normal(target)
     ny = normal(source)
     d = norm(r)
@@ -224,7 +254,6 @@ function (DL::DoubleLayerKernel{T,Yukawa{N,K}})(target, source)::T where {N,T,K}
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        k = im * λ
         return λ / (2 * π * d) * Bessels.besselk(1, λ * d) .* dot(r, ny)
     elseif N == 3
         return 1 / (4π) / d^2 * exp(-λ * d) * (λ + 1 / d) * dot(r, ny)
@@ -550,7 +579,7 @@ function (ADL::AdjointDoubleLayerKernel{T,<:Elastostatic{N}})(target, source)::T
     end
 end
 
-function (HS::HyperSingularKernel{T,<:Elastostatic{N}})(target, source)::T where {N,T}
+function (HS::HyperSingularKernel{T,<:Elastostatic{N}})(target, source) where {N,T}
     μ, λ = HS.op.μ, HS.op.λ
     ν = λ / (2 * (μ + λ))
     x = coords(target)
@@ -589,4 +618,115 @@ function (HS::HyperSingularKernel{T,<:Elastostatic{N}})(target, source)::T where
             ) - (1 - 4ν) * nx * transpose(ny)
         )
     end
+end
+
+################################################################################
+################################# LAPLACE PERIODIC #############################
+################################################################################
+
+struct LaplacePeriodic1D{N,T<:Real} <: AbstractDifferentialOperator{N}
+    period::T
+end
+
+"""
+    LaplacePeriodic1D(; dim, period = 2π)
+
+Laplace's differential operator `-Δu` in `dim` dimension with periodic boundary
+conditions along the first dimension. The `period` is set to `2π` by default, and the
+periodic cell is defined as `[-period/2, period/2]`.
+
+The negative sign is used to match the convention of coercive operators.
+"""
+LaplacePeriodic1D(; dim, period = 2π) = LaplacePeriodic1D{dim,typeof(period)}(period)
+
+function Base.show(io::IO, op::LaplacePeriodic1D{N}) where {N}
+    return print(
+        io,
+        "Periodic Laplace operator -Δu in $N dimensions with periodic conditions along the first dimension",
+    )
+end
+
+default_kernel_eltype(::LaplacePeriodic1D) = Float64
+default_density_eltype(::LaplacePeriodic1D) = Float64
+
+function (SL::SingleLayerKernel{T,<:LaplacePeriodic1D{N}})(
+    target,
+    source,
+    r = coords(target) - coords(source),
+) where {N,T}
+    l = SL.op.period
+    if N == 2
+        d2 = sin(π / l * r[1])^2 + sinh(π / l * r[2])^2
+        out = -1 / 4π * log(d2)
+        return d2 ≤ SAME_POINT_TOLERANCE ? zero(T) : out
+    else
+        error("Single layer kernel for LaplacePeriodic1D not implemented in $N dimensions")
+    end
+end
+
+function (DL::DoubleLayerKernel{T,<:LaplacePeriodic1D{N}})(
+    target,
+    source,
+    r = coords(target) - coords(source),
+) where {N,T}
+    ny = normal(source)
+    if N == 2
+        l   = DL.op.period
+        s   = sin(π / l * r[1])
+        sh  = sinh(π / l * r[2])
+        d2  = s^2 + sh^2
+        out = 1 / (4π * d2) * (2 * π / l * s * cos(π / l * r[1]) * ny[1] + 2 * π / l * sh * cosh(π / l * r[2]) * ny[2])
+        return d2 ≤ SAME_POINT_TOLERANCE ? zero(T) : out
+    else
+        error("Double layer kernel for LaplacePeriodic1D not implemented in $N dimensions")
+    end
+end
+
+function (ADL::AdjointDoubleLayerKernel{T,<:LaplacePeriodic1D{N}})(
+    target,
+    source,
+    r = coords(target) - coords(source),
+) where {N,T}
+    nx = normal(target)
+    if N == 2
+        l   = ADL.op.period
+        s   = sin(π / l * r[1])
+        sh  = sinh(π / l * r[2])
+        d2  = s^2 + sh^2
+        out = -1 / (4π * d2) * (2 * π / l * s * cos(π / l * r[1]) * nx[1] + 2 * π / l * sh * cosh(π / l * r[2]) * nx[2])
+        return d2 ≤ SAME_POINT_TOLERANCE ? zero(T) : out
+    else
+        error(
+            "Adjoint double layer kernel for LaplacePeriodic1D not implemented in $N dimensions",
+        )
+    end
+end
+
+function (HS::HyperSingularKernel{T,<:LaplacePeriodic1D{N}})(
+    target,
+    source,
+    r = coords(target) - coords(source),
+) where {N,T}
+    x = coords(target)
+    nx = normal(target)
+    ny = normal(source)
+    if N == 2
+        dGdny = DoubleLayerKernel(HS.op)
+        # TODO: in the case of the double- and a adjoint double-layer kernerls, I observed
+        # that ForwardDiff is slighly slower than the analytical forms. That may still be
+        # the case here, so we should consider implementing the analytical form.
+        ForwardDiff.derivative(t -> dGdny(x + t * nx, source), 0)
+    else
+        return error(
+            "Hypersingular kernel for LaplacePeriodic1D not implemented in $N dimensions",
+        )
+    end
+end
+
+################################################################################
+################################# HELMHOLTZ PERIODIC ###########################
+################################################################################
+
+function HelmholtzPeriodic1D(args...; kwargs...)
+    return error("HelmholtzPeriodic1D not found. Did you forget to import QPGreen?")
 end

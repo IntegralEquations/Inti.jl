@@ -19,10 +19,12 @@ using SparseArrays
 using StaticArrays
 using Printf
 using TOML
+using Richardson
 
 import ElementaryPDESolutions
 import SpecialFunctions
 import Bessels # faster than SpecialFunctions for Bessel functions with real args
+import HAdaptiveIntegration
 
 # helper functions
 include("utils.jl")
@@ -45,9 +47,9 @@ include("quadrature.jl")
 # Nyström methods
 include("kernels.jl")
 include("nystrom.jl")
+include("adaptive_correction.jl")
 include("bdim.jl")
 include("vdim.jl")
-include("adaptive.jl")
 
 # some zero-argument methods for the Inti's gmsh extension
 include("gmsh_api.jl")

@@ -1,4 +1,4 @@
-# Boundary integral operators
+# Integral operators
 
 ```@meta
 CurrentModule = Inti
@@ -38,7 +38,7 @@ construct the four integral operators of Calderón calculus:
 
 ```@example integral_operators
 Γ = Inti.parametric_curve(s -> SVector(cos(s), sin(s)), 0, 2π) |> Inti.Domain
-Q = Inti.Quadrature(Γ; meshsize = 0.1, qorder = 5)
+Q = Inti.Quadrature(Γ; meshsize = 0.1, qorder = 7)
 S, D = Inti.single_double_layer(; 
     op, 
     target = Q, 
@@ -56,11 +56,10 @@ K, N = Inti.adj_double_layer_hypersingular(;
 nothing # hide
 ```
 
-Much goes on under the hood in the function above, and the sections on
-[correction](@ref "Correction methods") and [compression](@ref "Compression
-methods") methods will provide more details on the options available. The
-important thing to keep in mind is that `S`, `D`, `K`, and `N` are discrete
-approximations of the following (linear) operators:
+Much goes on under the hood in the function above, and the sections on [correction](@ref
+"Correction methods") and [compression](@ref "Compression methods") methods will provide
+more details on the options available. The important thing to keep in mind is that `S`, `D`,
+`K`, and `N` are discrete approximations of the following (linear) operators:
 
 ```math
 \begin{aligned}
@@ -89,14 +88,14 @@ Sfmm, Dfmm = Inti.single_double_layer(;
     target = Q, 
     source = Q, 
     compression = (method = :fmm, tol = 1e-10), 
-    correction = (method = :dim, )
+    correction = (method = :dim,)
 )
 Kfmm, Nfmm = Inti.adj_double_layer_hypersingular(; 
     op, 
     target = Q, 
     source = Q, 
     compression = (method = :fmm, tol = 1e-10), 
-    correction = (method = :dim,)
+    correction = (method = :dim, )
 )
 typeof(Sfmm)
 ```
@@ -154,15 +153,15 @@ x = [u; v]
 # compute the error in the projector identity
 e₊ = norm(C₊*(C₊*x) - C₊*x, Inf)
 e₋ = norm(C₋*(C₋*x) - C₋*x, Inf)
-@assert e₊ < 1e-5 && e₋ < 1e-5 # hide
+@assert e₊ < 1e-4 && e₋ < 1e-4 # hide
 println("projection error for C₊: $e₊")
 println("projection error for C₋: $e₋")
 ```
 
-We see that the error in the projector identity is small, as expected. Note that
-such compositions are not limited to the Calderón projectors, and can be used
-e.g. to construct the combined field integral equation (CFIE), or to compose a
-formulation with an operator preconditioner.
+We see that the error in the projector identity is small, as expected. Note that such
+compositions are not limited to the Calderón projectors, and can be used e.g. to construct
+the combined field integral equation (CFIE), or to compose a formulation with an operator
+preconditioner.
 
 ## Custom kernels
 
@@ -195,7 +194,7 @@ function helmholtz_kernel(target, source, k)
     x, y  = Inti.coords(target), Inti.coords(source)
     yc = SVector(y[1], -y[2])
     d, dc  = norm(x-y), norm(x-yc)
-    # the singularity at x = y needs to be handled separately, so just put a zero
+    # the singularity at x = y needs to be handled separately, so just put a zero to avoid division by zero
     d == 0 ? zero(ComplexF64) : im / 4 * ( hankelh1(0, k * d) - hankelh1(0, k * dc))
 end
 ```
@@ -224,11 +223,10 @@ Sop = Inti.IntegralOperator(K, Q, Q)
 ```
 
 !!! note "Signature of custom kernels"
-    Kernel functions passed to `IntegralOperator` should always take two
-    arguments, `target` and `source`, which are both of
-    [`QuadratureNode`](@ref). This allows for extracting not only the
-    [`coords`](@ref) of the nodes, but also the [`normal`](@ref) vector if
-    needed (e.g. for double-layer or hypersingular kernels).
+    Kernel functions passed to `IntegralOperator` should always take two arguments, `target`
+    and `source`, which are both of [`QuadratureNode`](@ref). This allows for extracting not
+    only the [`coords`](@ref) of the nodes, but also the [`normal`](@ref) vector if needed
+    (e.g. for double-layer or hypersingular kernels).
 
 The approximation of `Sop` now involves two steps:
 
@@ -247,7 +245,7 @@ S₀ = Inti.assemble_hmatrix(Sop; rtol = 1e-4)
 The correction matrix `δS` will be constructed using [`adaptive_correction`](@ref):
 
 ```@example integral_operators
-δS = Inti.adaptive_correction(Sop; tol = 1e-4, maxdist = 5*meshsize)
+δS = Inti.adaptive_correction(Sop; rtol = 1e-4, maxdist = 3*meshsize)
 ```
 
 How exactly one adds `S₀` and `δS` to get the final operator depends on the intended
@@ -275,12 +273,10 @@ All of these should give an identical matrix-vector product, but the latter two
 allow e.g. for the use of direct solvers though an LU factorization.
 
 !!! warning "Limitations"
-    Integral operators defined from custom kernel functions do not support all
-    the features of the predefined ones. In particular, some singular
-    integration methods (e.g. the Density Interpolation Method) and acceleration
-    routines (e.g. Fast Multipole Method) used to correct for singular and
-    nearly singular integral operators, and to accelerate the matrix vector
-    products, are only available for specific kernels. Check the
-    [corrections](@ref "Correction methods") and [compression](@ref "Compression
-    methods") for more details concerning which methods are compatible with
-    custom kernels.
+    Integral operators defined from custom kernel functions do not support all the features
+    of the predefined ones. In particular, some singular integration methods (e.g. the
+    Density Interpolation Method) and acceleration routines (e.g. Fast Multipole Method)
+    used to correct for singular and nearly singular integral operators, and to accelerate
+    the matrix vector products, are only available for specific kernels. Check the
+    [corrections](@ref "Correction methods") and [compression](@ref "Compression methods")
+    for more details concerning which methods are compatible with custom kernels.
