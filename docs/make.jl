@@ -14,7 +14,7 @@ using FMM3D
 
 const ON_CI = get(ENV, "CI", "false") == "true"
 
-draft = false # build docs without running code. Useful for quick local testing
+draft = true # build docs without running code. Useful for quick local testing
 ON_CI && (draft = false) # always full build on CI
 
 # from https://github.com/fonsp/Pluto.jl/pull/2471
