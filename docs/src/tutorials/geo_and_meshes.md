@@ -301,37 +301,49 @@ println("Error in area computation using curved mesh: ", abs(area - π))
 It may be desired to have multiple curved volumes / boundaries. Inti.jl supports this, associating a parametrization with each volumetric entity in a mesh. Note the delicate correspondence between the correct `EntityKey` and the parametrization in setting `entity_parametrization`, and note also the limitations listed below.
 
 ```@example geo-and-meshes
-Inti.clear_entities!() # hide
 gmsh.initialize()
 meshsize = 0.075
 gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
 gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
 
 # Three circles
-gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
-gmsh.model.occ.addDisk(0, 3.0, 0, 1, 1)
-gmsh.model.occ.addDisk(0, 8.0, 0, 2, 2)
-
+c1 = gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
+c2 = gmsh.model.occ.addDisk(0, 3.0, 0, 1, 1)
+c3 = gmsh.model.occ.addDisk(0, 8.0, 0, 2, 2)
 gmsh.model.occ.synchronize()
+
+# Add tags for stable identification of the entities
+gmsh.model.addPhysicalGroup(2, [c1], -1, "c1")
+gmsh.model.addPhysicalGroup(2, [c2], -1, "c2")
+gmsh.model.addPhysicalGroup(2, [c3], -1, "c3")
+
 gmsh.model.mesh.generate(2)
 msh = Inti.import_mesh(; dim = 2)
-gmsh.finalize()
+
 Ω = Inti.Domain(Inti.entities(msh)) do ent
     return Inti.geometric_dimension(ent) == 2
 end
+gmsh.finalize()
 
 Γ = Inti.external_boundary(Ω)
 Ωₕ = view(msh, Ω)
 Γₕ = view(msh, Γ)
 
 # Three circles
-ψ₁ = (t) -> [cos(2*π*t), sin(2*π*t)]
-ψ₂ = (t) -> [cos(2*π*t), 3.0 + sin(2*π*t)]
-ψ₃ = (t) -> [2*cos(2*π*t), 8.0 + 2*sin(2*π*t)]
+ψ₁ = (t) -> [cos(2 * π * t), sin(2 * π * t)]
+ψ₂ = (t) -> [cos(2 * π * t), 3.0 + sin(2 * π * t)]
+ψ₃ = (t) -> [2 * cos(2 * π * t), 8.0 + 2 * sin(2 * π * t)]
 entity_parametrizations = Dict{Inti.EntityKey,Function}()
-entity_parametrizations[collect(keys(Ω))[3]] = ψ₃
-entity_parametrizations[collect(keys(Ω))[2]] = ψ₁
-entity_parametrizations[collect(keys(Ω))[1]] = ψ₂
+for e in Inti.entities(Ω)
+    l = Inti.labels(e)
+    if "c1" in l
+        entity_parametrizations[e] = ψ₁
+    elseif "c2" in l
+        entity_parametrizations[e] = ψ₂
+    elseif "c3" in l
+        entity_parametrizations[e] = ψ₃
+    end
+end
 
 θ = 6 # smoothness order of curved elements
 crvmsh = Inti.curve_mesh(msh, entity_parametrizations, θ)
@@ -339,9 +351,10 @@ crvmsh = Inti.curve_mesh(msh, entity_parametrizations, θ)
 Γₕ = crvmsh[Γ]
 Ωₕ = crvmsh[Ω]
 
-qorder = 5;
-Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder);
-Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder);
+qorder = 5
+Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder)
+Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder)
+nothing # hide
 ```
 
 We can verify once again that the correct area of the region is obtained.
@@ -355,9 +368,9 @@ println("Error in computing area of three circles: ", abs(area - 6π))
 One can extract a subcomponent of the curved (volumetric) domain as usual:
 
 ```@example geo-and-meshes
-Ω_sub = Inti.Domain(collect(keys(Ω))[3])
+Ω_sub = Inti.Domain(e -> "c3" in Inti.labels(e), Inti.entities(Ω))
 Ωₕ_sub = crvmsh[Ω_sub]
-Ωₕ_sub_quad = Inti.Quadrature(Ωₕ_sub; qorder = qorder);
+Ωₕ_sub_quad = Inti.Quadrature(Ωₕ_sub; qorder = qorder)
 area = Inti.integrate(x -> 1, Ωₕ_sub_quad)
 @assert abs(area - 4π) < 1e-13 # hide
 println("Error in computing area of one (large) circle: ", abs(area - 4π))
@@ -375,10 +388,13 @@ println("Error in computing area using line integral: ", abs(lineint - 6π))
 ```
 
 Note the following restrictions that (currently) hold for 2D curved meshes:
+
 1. Only a single boundary entity can be associated with a given curved volume entity
 2. A curved boundary entity cannot be associated with multiple volume entities.
 
-Curved 3D meshes with the same interface are also available with the following two (admittedly significant) restrictions:
+Curved 3D meshes with the same interface are also available with the following two
+(admittedly significant) restrictions:
+
 1. The boundary parametrization must be global. Thus, a torus domain is possible but not a sphere.
 2. Only a single curved domain is possible.
 (The second item could be easily addressed in Inti.jl if there is user interest; the first is more difficult to address.)
