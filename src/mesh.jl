@@ -676,8 +676,8 @@ end
 function curve_mesh(
     msh::Mesh{N,Float64},
     ψ::Function,
-    order::Int,
-    patch_sample_num::Int;
+    order::Int;
+    patch_sample_num = nothing,
     face_element_on_curved_surface = nothing,
 ) where {N}
     ψ_by_ent = Dict{EntityKey,Function}()
@@ -691,8 +691,8 @@ function curve_mesh(
     return curve_mesh(
         msh,
         ψ_by_ent,
-        order,
-        patch_sample_num;
+        order;
+        patch_sample_num = patch_sample_num,
         face_element_on_curved_surface = face_element_on_curved_surface,
     )
 end
@@ -700,19 +700,29 @@ end
 function curve_mesh(
     msh::Mesh{2,Float64},
     ψ_by_ent::Dict{EntityKey,Function},
-    order::Int,
-    patch_sample_num::Int;
+    order::Int;
+    patch_sample_num = nothing,
     face_element_on_curved_surface = nothing,
 )
     order > 0 || error("smoothness order must be positive")
     # implemented up to order=6 below but can be easily extended
     order <= 6 || notimplemented()
     E_straight_bdry = LagrangeElement{ReferenceHyperCube{1},2,SVector{2,Float64}}
-    E_straight = LagrangeElement{ReferenceSimplex{2},3,SVector{2,Float64}} # TODO fix this to auto be a P1 element type
+    E_straight = LagrangeElement{ReferenceSimplex{2},3,SVector{2,Float64}} # TODO fix this to auto be a Pk element type
 
     if isnothing(face_element_on_curved_surface)
         face_element_on_curved_surface = (arg) -> true
     end
+
+    if isnothing(patch_sample_num)
+        patch_sample_num = -1
+        for ent in entities(msh)
+            ent.dim == 1 || continue
+            patch_sample_num =
+                max(patch_sample_num, 10*length(msh.ent2etags[ent][E_straight_bdry]))
+        end
+    end
+
     # Sample from the patch
     t = LinRange(0, 1, patch_sample_num)
 
@@ -1120,8 +1130,8 @@ end
 function curve_mesh(
     msh::Mesh{3,Float64},
     ψ_by_ent::Dict{EntityKey,Function},
-    order::Int,
-    patch_sample_num::Int;
+    order::Int;
+    patch_sample_num = nothing,
     face_element_on_curved_surface = nothing,
 )
     order > 0 || error("smoothness order must be positive")
@@ -1129,17 +1139,26 @@ function curve_mesh(
     length(ψ_by_ent) == 1 ||
         error("Only simply connected 3D curved domains supported presently")
     ψ = ψ_by_ent[collect(keys(ψ_by_ent))[1]]
+
+    E_straight = LagrangeElement{ReferenceSimplex{3},4,SVector{3,Float64}} # TODO fix this to auto be a Pk element type
+    E_straight_bdry = LagrangeElement{ReferenceSimplex{2},3,SVector{3,Float64}}
     if isnothing(face_element_on_curved_surface)
         face_element_on_curved_surface = (arg) -> true
+    end
+
+    if isnothing(patch_sample_num)
+        patch_sample_num = -1
+        for ent in entities(msh)
+            ent.dim == 2 || continue
+            patch_sample_num = max(
+                patch_sample_num,
+                8*round(Int, sqrt(length(msh.ent2etags[ent][E_straight_bdry]))),
+            )
+        end
     end
     # v = (θ, ϕ)
     θ = LinRange(0, 2 * π, patch_sample_num)
     ϕ = LinRange(0, 2 * π, patch_sample_num)
-    function ψ⁻¹(v0, p)
-        F = (v, p) -> ψ(v) - p
-        prob = NonlinearSolve.NonlinearProblem(F, v0, p)
-        return NonlinearSolve.solve(prob, NonlinearSolve.SimpleNewtonRaphson())
-    end
 
     chart_1 = Array{SVector{3,Float64}}(undef, length(θ) * length(ϕ))
     chart_1_cart_idxs_θ = []
@@ -1240,7 +1259,6 @@ function curve_mesh(
         E <: LagrangeElement{ReferenceSimplex{2}} && continue
         E <: LagrangeElement{ReferenceSimplex{3},4,SVector{3,Float64}} ||
             (println(E); error())
-        E_straight_bdry = LagrangeElement{ReferenceSimplex{2},3,SVector{3,Float64}}
         els = elements(msh, E)
         for elind in eachindex(els)
             node_indices = msh.etype2mat[E][:, elind]
@@ -2045,7 +2063,6 @@ function curve_mesh(
     nv_bdry = 3 # Number of vertices for connectivity information on the boundary
     Ecurve = typeof(first(els_curve))
     Ecurvebdry = typeof(first(els_curve_bdry))
-    E_straight = LagrangeElement{ReferenceSimplex{3},4,SVector{3,Float64}} # TODO fix this to auto be a P1 element type
 
     crvmsh.etype2mat[Ecurve] = reshape(connect_curve, nv, :)
     crvmsh.etype2els[Ecurve] = convert(Vector{Ecurve}, els_curve)

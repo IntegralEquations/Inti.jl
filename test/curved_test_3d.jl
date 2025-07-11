@@ -37,8 +37,7 @@ include("test_utils.jl")
     crvmsh = Inti.curve_mesh(
         msh,
         ψ,
-        θ,
-        50 * round(Int, 1 / meshsize);
+        θ;
         face_element_on_curved_surface = face_element_on_curved_surface,
     )
 

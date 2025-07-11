@@ -38,7 +38,7 @@ using Test
 
     ψ = (t) -> [cos(2*π*t), sin(2*π*t)]
     θ = 6 # smoothness order of curved elements
-    crvmsh = Inti.curve_mesh(msh, ψ, θ, 50*round(Int, 1/meshsize))
+    crvmsh = Inti.curve_mesh(msh, ψ, θ)
 
     Γₕ = crvmsh[Γ]
     Ωₕ = crvmsh[Ω]
@@ -124,7 +124,7 @@ end
     entity_parametrizations[collect(keys(Ω))[1]] = ψ₂
     entity_parametrizations[collect(keys(Ω))[2]] = ψ₁
     θ = 6 # smoothness order of curved elements
-    crvmsh = Inti.curve_mesh(msh, entity_parametrizations, θ, 50*round(Int, 1/meshsize))
+    crvmsh = Inti.curve_mesh(msh, entity_parametrizations, θ)
 
     Γₕ = crvmsh[Γ]
     Ωₕ = crvmsh[Ω]
@@ -186,7 +186,7 @@ end
     entity_parametrizations[collect(keys(Ω))[1]] = ψ₂
 
     θ = 6 # smoothness order of curved elements
-    crvmsh = Inti.curve_mesh(msh, entity_parametrizations, θ, 50*round(Int, 1/meshsize))
+    crvmsh = Inti.curve_mesh(msh, entity_parametrizations, θ)
 
     Γₕ = crvmsh[Γ]
     Ωₕ = crvmsh[Ω]

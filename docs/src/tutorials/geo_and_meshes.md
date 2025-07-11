@@ -34,6 +34,7 @@ Here is an example of how to import a mesh from a file:
 ```@example geo-and-meshes
 using Inti
 using Gmsh 
+using LinearAlgebra
 filename = joinpath(Inti.PROJECT_ROOT,"docs", "assets", "piece.msh")
 msh = Inti.import_mesh(filename)
 ```
@@ -287,8 +288,8 @@ still significant. To improve the accuracy, we can use the `curve_mesh` function
 to create a curved mesh based on the boundary of the domain:
 
 ```@example geo-and-meshes
-gorder = 5
-crvmsh = Inti.curve_mesh(msh, f, gorder, 100)
+θ = 5 # smoothness order of curved elements
+crvmsh = Inti.curve_mesh(msh, f, θ)
 Ω_crv_quad = Inti.Quadrature(crvmsh[Ω]; qorder = 10)
 area = Inti.integrate(x->1.0, Ω_crv_quad)
 @assert abs(area - π) < 1e-10 # hide
