@@ -117,7 +117,7 @@ elseif TEST_TYPE == "K"
                 green_multiplier,
                 kneighbor = k,
                 maxdist = 10 * h,
-                qorder_aux = 10 * ceil(Int, abs(log(h))),
+                qorder_aux = 20 * ceil(Int, abs(log(h))),
             )
             Sdim = Smat + δS
             Ddim = Dmat + δD
@@ -132,7 +132,7 @@ elseif TEST_TYPE == "K"
             @show eloc, tldim
             push!(Errl[k], eloc)
         end
-            
+
         tdim = @elapsed δS, δD =
             Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
         Sdim = Smat + δS
@@ -143,4 +143,3 @@ elseif TEST_TYPE == "K"
         push!(Errg, eglo)
     end
 end
-    
