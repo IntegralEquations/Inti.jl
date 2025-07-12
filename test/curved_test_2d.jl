@@ -71,47 +71,38 @@ using Test
 end
 
 @testset begin
-    function domain_and_mesh(; meshsize, meshorder = 1)
-        Inti.clear_entities!()
+    meshsize = 2π / 4/8
+    Inti.clear_entities!()
 
-        gmsh.initialize()
-        meshsize = 2π / 4/8
-        gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-        gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+    gmsh.initialize()
+    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
 
-        # Two kites
-        kite = Inti.gmsh_curve(0, 1; meshsize) do s
-            return SVector(0.25, 0.0) + SVector(
-                cos(2π * s) + 0.65 * cos(4π * s[1]) - 0.65,
-                1.5 * sin(2π * s),
-            )
-        end
-        cl = gmsh.model.occ.addCurveLoop([kite])
-        surf = gmsh.model.occ.addPlaneSurface([cl])
-        kite_trans = Inti.gmsh_curve(0, 1; meshsize) do s
-            return SVector(4.5, 0.0) + SVector(
-                cos(2π * s) + 0.65 * cos(4π * s[1]) - 0.65,
-                1.5 * sin(2π * s),
-            )
-        end
-        cl_trans = gmsh.model.occ.addCurveLoop([kite_trans])
-        surf_trans = gmsh.model.occ.addPlaneSurface([cl_trans])
-        gmsh.model.occ.synchronize()
-        gmsh.model.mesh.generate(2)
-        msh = Inti.import_mesh(; dim = 2)
-        Ω = Inti.Domain(Inti.entities(msh)) do ent
-            return Inti.geometric_dimension(ent) == 2
-        end
-        gmsh.finalize()
-        return Ω, msh
+    # Two kites
+    kite = Inti.gmsh_curve(0, 1; meshsize) do s
+        return SVector(0.25, 0.0) +
+               SVector(cos(2π * s) + 0.65 * cos(4π * s[1]) - 0.65, 1.5 * sin(2π * s))
     end
-
-    meshsize = 0.1
-
-    tmesh = @elapsed begin
-        Ω, msh = domain_and_mesh(; meshsize)
+    cl = gmsh.model.occ.addCurveLoop([kite])
+    surf = gmsh.model.occ.addPlaneSurface([cl])
+    kite_trans = Inti.gmsh_curve(0, 1; meshsize) do s
+        return SVector(4.5, 0.0) +
+               SVector(cos(2π * s) + 0.65 * cos(4π * s[1]) - 0.65, 1.5 * sin(2π * s))
     end
-    @info "Mesh generation time: $tmesh"
+    cl_trans = gmsh.model.occ.addCurveLoop([kite_trans])
+    surf_trans = gmsh.model.occ.addPlaneSurface([cl_trans])
+    gmsh.model.occ.synchronize()
+
+    # Add tags for stable identification of the entities
+    gmsh.model.addPhysicalGroup(2, [surf], -1, "c1")
+    gmsh.model.addPhysicalGroup(2, [surf_trans], -1, "c2")
+
+    gmsh.model.mesh.generate(2)
+    msh = Inti.import_mesh(; dim = 2)
+    Ω = Inti.Domain(Inti.entities(msh)) do ent
+        return Inti.geometric_dimension(ent) == 2
+    end
+    gmsh.finalize()
 
     Γ = Inti.external_boundary(Ω)
     Ωₕ = view(msh, Ω)
@@ -121,8 +112,16 @@ end
     ψ₁ = (t) -> [0.25 + cos(2π * t) + 0.65 * cos(4π * t) - 0.65, 1.5 * sin(2π * t)]
     ψ₂ = (t) -> [4.5 + cos(2π * t) + 0.65 * cos(4π * t) - 0.65, 1.5 * sin(2π * t)]
     entity_parametrizations = Dict{Inti.EntityKey,Function}()
-    entity_parametrizations[collect(keys(Ω))[1]] = ψ₂
-    entity_parametrizations[collect(keys(Ω))[2]] = ψ₁
+    for e in Inti.entities(Ω)
+        l = Inti.labels(e)
+        if "c1" in l
+            entity_parametrizations[e] = ψ₁
+        elseif "c2" in l
+            entity_parametrizations[e] = ψ₂
+        elseif "c3" in l
+            entity_parametrizations[e] = ψ₃
+        end
+    end
     θ = 6 # smoothness order of curved elements
     crvmsh = Inti.curve_mesh(msh, entity_parametrizations, θ)
 
@@ -143,47 +142,50 @@ end
 end
 
 @testset begin
-    function domain_and_mesh(; meshsize, meshorder = 1)
-        Inti.clear_entities!()
-
-        gmsh.initialize()
-        gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-        gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
-
-        # Three circles
-        gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
-        gmsh.model.occ.addDisk(0, 3.0, 0, 1, 1)
-        gmsh.model.occ.addDisk(0, 8.0, 0, 2, 2)
-
-        gmsh.model.occ.synchronize()
-        gmsh.model.mesh.generate(2)
-        msh = Inti.import_mesh(; dim = 2)
-        Ω = Inti.Domain(Inti.entities(msh)) do ent
-            return Inti.geometric_dimension(ent) == 2
-        end
-        gmsh.finalize()
-        return Ω, msh
-    end
-
     meshsize = 0.075
+    Inti.clear_entities!()
 
-    tmesh = @elapsed begin
-        Ω, msh = domain_and_mesh(; meshsize)
+    gmsh.initialize()
+    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+
+    # Three circles
+    c1 = gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
+    c2 = gmsh.model.occ.addDisk(0, 3.0, 0, 1, 1)
+    c3 = gmsh.model.occ.addDisk(0, 8.0, 0, 2, 2)
+    gmsh.model.occ.synchronize()
+
+    # Add tags for stable identification of the entities
+    gmsh.model.addPhysicalGroup(2, [c1], -1, "c1")
+    gmsh.model.addPhysicalGroup(2, [c2], -1, "c2")
+    gmsh.model.addPhysicalGroup(2, [c3], -1, "c3")
+
+    gmsh.model.mesh.generate(2)
+    msh = Inti.import_mesh(; dim = 2)
+    Ω = Inti.Domain(Inti.entities(msh)) do ent
+        return Inti.geometric_dimension(ent) == 2
     end
-    @info "Mesh generation time: $tmesh"
+    gmsh.finalize()
 
     Γ = Inti.external_boundary(Ω)
     Ωₕ = view(msh, Ω)
     Γₕ = view(msh, Γ)
 
     # Three circles
-    ψ₁ = (t) -> [cos(2*π*t), sin(2*π*t)]
-    ψ₂ = (t) -> [cos(2*π*t), 3.0 + sin(2*π*t)]
-    ψ₃ = (t) -> [2*cos(2*π*t), 8.0 + 2*sin(2*π*t)]
+    ψ₁ = (t) -> [cos(2 * π * t), sin(2 * π * t)]
+    ψ₂ = (t) -> [cos(2 * π * t), 3.0 + sin(2 * π * t)]
+    ψ₃ = (t) -> [2 * cos(2 * π * t), 8.0 + 2 * sin(2 * π * t)]
     entity_parametrizations = Dict{Inti.EntityKey,Function}()
-    entity_parametrizations[collect(keys(Ω))[3]] = ψ₃
-    entity_parametrizations[collect(keys(Ω))[2]] = ψ₁
-    entity_parametrizations[collect(keys(Ω))[1]] = ψ₂
+    for e in Inti.entities(Ω)
+        l = Inti.labels(e)
+        if "c1" in l
+            entity_parametrizations[e] = ψ₁
+        elseif "c2" in l
+            entity_parametrizations[e] = ψ₂
+        elseif "c3" in l
+            entity_parametrizations[e] = ψ₃
+        end
+    end
 
     θ = 6 # smoothness order of curved elements
     crvmsh = Inti.curve_mesh(msh, entity_parametrizations, θ)
