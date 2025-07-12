@@ -11,10 +11,10 @@ if TEST_TYPE == "QORDER"
         errg = Errg[qorder]
         for h in H
             # k = ceil(Int, 0.1 / h)
-    
+
             # Ω, msh = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = h, order = 2)
             # Γ = Inti.external_boundary(Ω)
-    
+
             msh = Inti.meshgen(Γ; meshsize = h)
             Γ_msh = msh[Γ]
             nel = sum(Inti.element_types(Γ_msh)) do E
@@ -22,41 +22,41 @@ if TEST_TYPE == "QORDER"
             end
             @info h, k, nel
             ##
-    
+
             quad = Inti.Quadrature(Γ_msh; qorder)
             ubnd = map(u, quad)
             utst = map(u, tset)
             utst_norm = norm(utst, Inf)
             # single and double layer
-            G = Inti.SingleLayerKernel(pde)
-            S = Inti.IntegralOperator(G, quad)
+            G     = Inti.SingleLayerKernel(pde)
+            S     = Inti.IntegralOperator(G, quad)
             Smat  = Inti.assemble_matrix(S)
             Stest = Inti.IntegralOperator(G, tset, quad)
-    
-            dG = Inti.DoubleLayerKernel(pde)
-            D = Inti.IntegralOperator(dG, quad)
+
+            dG    = Inti.DoubleLayerKernel(pde)
+            D     = Inti.IntegralOperator(dG, quad)
             Dmat  = Inti.assemble_matrix(D)
             Dtest = Inti.IntegralOperator(dG, tset, quad)
-    
+
             μ = t == :interior ? -0.5 : 0.5
-            σ    = (α * Smat + β * (Dmat + μ*I)) \ ubnd
+            σ = (α * Smat + β * (Dmat + μ * I)) \ ubnd
             # @show norm(α * Smat * σ - ubnd, Inf)
             # @show norm(ubnd, Inf)
             # @show norm(Stest, Inf)
             usol = (α * Stest + β * Dtest) * σ
             # @show  utst
-            e0   = norm(usol - utst, Inf) / utst_norm
-    
+            e0 = norm(usol - utst, Inf) / utst_norm
+
             green_multiplier = fill(-0.5, length(quad))
             # δS, δD = Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
-    
+
             # qnodes = Inti.local_bdim_correction(pde, quad, quad; green_multiplier)
             # X = [q.coords[1] for q in qnodes]; Y = [q.coords[2] for q in qnodes]
             # u = [q.normal[1] for q in qnodes]; v = [q.normal[2] for q in qnodes]
             # fig, _, _ = scatter(X, Y)
             # arrows!(X, Y, u, v, lengthscale=0.01)
             # display(fig)
-    
+
             tldim = @elapsed δS, δD = Inti.local_bdim_correction(
                 pde,
                 quad,
@@ -64,7 +64,7 @@ if TEST_TYPE == "QORDER"
                 green_multiplier,
                 kneighbor = k,
                 maxdist = 10 * h,
-                qorder_aux = 10 * ceil(Int, abs(log(h))),
+                qorder_aux = 20 * ceil(Int, abs(log(h))),
             )
             Sdim = Smat + δS
             Ddim = Dmat + δD
@@ -75,17 +75,16 @@ if TEST_TYPE == "QORDER"
             #     compression = (method = :none,),
             #     correction  = (method = :ldim,),
             # )
-            σ    = (α * Sdim + β * (Ddim + μ*I)) \ ubnd
+            σ    = (α * Sdim + β * (Ddim + μ * I)) \ ubnd
             usol = (α * Stest + β * Dtest) * σ
-            eloc   = norm(usol - utst, Inf) / utst_norm
-    
-            tdim = @elapsed δS, δD =
-                Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
+            eloc = norm(usol - utst, Inf) / utst_norm
+
+            tdim = @elapsed δS, δD = Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
             Sdim = Smat + δS
             Ddim = Dmat + δD
-            σ    = (α * Sdim + β * (Ddim + μ*I)) \ ubnd
+            σ    = (α * Sdim + β * (Ddim + μ * I)) \ ubnd
             usol = (α * Stest + β * Dtest) * σ
-            eglo   = norm(usol - utst, Inf) / utst_norm
+            eglo = norm(usol - utst, Inf) / utst_norm
             # @show norm(e0, Inf)
             @show e0
             @show eloc
@@ -117,13 +116,13 @@ elseif TEST_TYPE == "K"
         utst = map(u, tset)
         utst_norm = norm(utst, Inf)
         # single and double layer
-        G = Inti.SingleLayerKernel(pde)
-        S = Inti.IntegralOperator(G, quad)
+        G     = Inti.SingleLayerKernel(pde)
+        S     = Inti.IntegralOperator(G, quad)
         Smat  = Inti.assemble_matrix(S)
         Stest = Inti.IntegralOperator(G, tset, quad)
 
-        dG = Inti.DoubleLayerKernel(pde)
-        D = Inti.IntegralOperator(dG, quad)
+        dG    = Inti.DoubleLayerKernel(pde)
+        D     = Inti.IntegralOperator(dG, quad)
         Dmat  = Inti.assemble_matrix(D)
         Dtest = Inti.IntegralOperator(dG, tset, quad)
 
@@ -153,12 +152,12 @@ elseif TEST_TYPE == "K"
                 quad;
                 green_multiplier,
                 kneighbor = k,
-                maxdist = 10 * h,
-                qorder_aux = 10 * ceil(Int, abs(log(h))),
+                maxdist = 20 * h,
+                qorder_aux = 20 * ceil(Int, abs(log(h))),
             )
             Sdim = Smat + δS
             Ddim = Dmat + δD
-            
+
             # Sdim, Ddim = Inti.single_double_layer(;
             #     pde,
             #     target      = quad,
@@ -166,30 +165,53 @@ elseif TEST_TYPE == "K"
             #     compression = (method = :none,),
             #     correction  = (method = :ldim,),
             # )
-            lm =  FunctionMap{Float64}(N*length(quad)) do x
+            Lop = (α * Sdim + β * (Ddim + μ * I))
+            lm = FunctionMap{Float64}(N * length(quad)) do x
                 xs = reinterpret(T, x)
-                ys = (α * Sdim + β * (Ddim + μ*I)) * xs
-                reinterpret(Float64, ys)
+                ys = Lop * xs
+                return reinterpret(Float64, ys)
             end
-            σ = gmres(lm, reinterpret(Float64, ubnd), reltol=1e-15)
+            # local t = @elapsed begin
+            #     σ, hist_ = gmres(
+            #         lm,
+            #         reinterpret(Float64, ubnd);
+            #         reltol = 1e-12,
+            #         maxiter = 100,
+            #         restart = 100,
+            #         log = true,
+            #     )
+            # end
+            # @show hist
+            # @info t
+            σ = Lop.data \ reinterpret(Float64, ubnd)
             usol = (α * Stest + β * Dtest) * reinterpret(T, σ)
-            eloc   = norm(usol - utst, Inf) / utst_norm
+            eloc = norm(usol - utst, Inf) / utst_norm
             @show eloc, tldim
-            push!(Errl[k], eloc) 
+            push!(Errl[k], eloc)
         end
 
         tdim = @elapsed δS, δD =
             Inti.bdim_correction(pde, quad, quad, Smat, Dmat; green_multiplier)
         Sdim = Smat + δS
         Ddim = Dmat + δD
-        lm =  FunctionMap{Float64}(N*length(quad)) do x
+        L = (α * Sdim + β * (Ddim + μ * I))
+        lm = FunctionMap{Float64}(N * length(quad)) do x
             xs = reinterpret(T, x)
-            ys = (α * Sdim + β * (Ddim + μ*I)) * xs
-            reinterpret(Float64, ys)
+            ys = L * xs
+            return reinterpret(Float64, ys)
         end
-        σ = gmres(lm, reinterpret(Float64, ubnd), reltol=1e-15)
+        # σ, hist = gmres(
+        #     lm,
+        #     reinterpret(Float64, ubnd);
+        #     reltol = 1e-12,
+        #     maxiter = 100,
+        #     restart = 100,
+        #     log = true,
+        # )
+        # @show hist
+        σ = L.data \ reinterpret(Float64, ubnd)
         usol = (α * Stest + β * Dtest) * reinterpret(T, σ)
-        eglo   = norm(usol - utst, Inf) / utst_norm
+        local eglo = norm(usol - utst, Inf) / utst_norm
         # @show norm(e0, Inf)
         @show eglo
         @show tdim
