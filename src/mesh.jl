@@ -61,7 +61,7 @@ function element_types end
     struct Mesh{N,T} <: AbstractMesh{N,T}
 
 Unstructured mesh defined by a set of `nodes`` (of type `SVector{N,T}`), and a
-dictionary mapping element types to connectivity matrices. Each columns of a
+dictionary mapping element types to connectivity matrices. Each column of a
 given connectivity matrix stores the integer tags of the nodes in the mesh
 comprising the element.
 

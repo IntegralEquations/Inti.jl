@@ -64,7 +64,7 @@ end
 Given an operator `Op`, construct its free-space double-layer kernel. This
 corresponds to the `γ₁` trace of the [`SingleLayerKernel`](@ref). For operators
 such as [`Laplace`](@ref) or [`Helmholtz`](@ref), this is simply the normal
-derivative of the fundamental solution respect to the source variable.
+derivative of the fundamental solution with respect to the source variable.
 """
 struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op

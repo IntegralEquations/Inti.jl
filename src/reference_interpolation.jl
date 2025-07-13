@@ -1,7 +1,7 @@
 """
     abstract type ReferenceInterpolant{D,T}
 
-Interpolanting function mapping points on the domain `D<:ReferenceShape`
+Interpolating function mapping points on the domain `D<:ReferenceShape`
 (of singleton type) to a value of type `T`.
 
 Instances `el` of `ReferenceInterpolant` are expected to implement:

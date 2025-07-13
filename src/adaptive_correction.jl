@@ -5,12 +5,13 @@
 This function computes a sparse correction for the integral operator `iop`, addressing its
 singular or nearly singular entries.
 
-The parameter `maxdist` specifies the maximum distance between target points  and source
+The parameter `maxdist` specifies the maximum distance between target points and source
 elements to be considered for correction (only interactions within this distance are
 corrected).
 
 The parameters `atol` and `rtol` define the absolute and relative tolerances for the
-adaptive quadrature used to compute the corrections for singular or nearly singular entries.
+adaptive quadrature used to compute the corrections for singular or nearly singular
+entries.
 
 Additional `kwargs` arguments are passed to [`adaptive_quadrature`](@ref); see its
 documentation for more information.
@@ -22,7 +23,7 @@ ideal values depend on the kernel and the mesh/quadrature rule applied.
 
 By default, `maxdist` and `(atol,rtol)` are estimated using the
 [`local_correction_dist_and_tol`](@ref), but it is often possible to improve performance by
-manually tunning these parameters.
+manually tuning these parameters.
 
 # Advanced usage
 
@@ -49,7 +50,7 @@ for E in Inti.element_types(msh)
     quads = (
         nearfield_quad = Inti.adaptive_quadrature(ref_domain; atol),
         radial_quad    = Inti.GaussLegendre(;order=5),
-        angular_quad   = Inti.GuassLegendre(;order=20),
+        angular_quad   = Inti.GaussLegendre(;order=20),
     )
     quads_dict[E] = quads
 end

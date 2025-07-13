@@ -95,7 +95,7 @@ reference quadrature `q = etype2qrule[E]` is used. When a single `qrule` is
 passed, it is used for all element types in `msh`.
 
 If an `order` keyword is passed, a default quadrature of the desired order is
-used for each element type usig [`_qrule_for_reference_shape`](@ref).
+used for each element type using [`_qrule_for_reference_shape`](@ref).
 
 For co-dimension one elements, the normal vector is also computed and stored in
 the [`QuadratureNode`](@ref)s.
