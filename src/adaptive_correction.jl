@@ -5,12 +5,13 @@
 This function computes a sparse correction for the integral operator `iop`, addressing its
 singular or nearly singular entries.
 
-The parameter `maxdist` specifies the maximum distance between target points  and source
+The parameter `maxdist` specifies the maximum distance between target points and source
 elements to be considered for correction (only interactions within this distance are
 corrected).
 
 The parameters `atol` and `rtol` define the absolute and relative tolerances for the
-adaptive quadrature used to compute the corrections for singular or nearly singular entries.
+adaptive quadrature used to compute the corrections for singular or nearly singular
+entries.
 
 Additional `kwargs` arguments are passed to [`adaptive_quadrature`](@ref); see its
 documentation for more information.
@@ -22,7 +23,7 @@ ideal values depend on the kernel and the mesh/quadrature rule applied.
 
 By default, `maxdist` and `(atol,rtol)` are estimated using the
 [`local_correction_dist_and_tol`](@ref), but it is often possible to improve performance by
-manually tunning these parameters.
+manually tuning these parameters.
 
 # Advanced usage
 
@@ -49,7 +50,7 @@ for E in Inti.element_types(msh)
     quads = (
         nearfield_quad = Inti.adaptive_quadrature(ref_domain; atol),
         radial_quad    = Inti.GaussLegendre(;order=5),
-        angular_quad   = Inti.GuassLegendre(;order=20),
+        angular_quad   = Inti.GaussLegendre(;order=20),
     )
     quads_dict[E] = quads
 end
@@ -281,7 +282,17 @@ function guiggiani_singular_integral(
         v = û(ŷ)
         return ρ * map(v -> M * v, v) * μ
     end
-    acc = zero(return_type(F, Float64, Float64))
+    T = return_type(F, Float64, Float64)
+    acc = if isconcretetype(T)
+        zero(T)
+    else
+        msg = """
+        type instability likely leading to serious performance issues detected. Further
+        warnings of this type will be silenced.
+        """
+        @warn msg maxlog = 1
+        zero(F(1e-8, 0.0))
+    end
     # integrate
     for (theta_min, theta_max, rho_func) in polar_decomposition(ref_shape, x̂)
         delta_theta = theta_max - theta_min
@@ -353,8 +364,17 @@ function guiggiani_singular_integral(
         v = û(ŷ)
         map(v -> M * v, v) * μ
     end
-    acc = zero(return_type(F, Float64, Int))
-    # integrate
+    T = return_type(F, Float64, Float64)
+    if isconcretetype(T)
+        acc = zero(T)
+    else
+        msg = """
+        type instability likely leading to serious performance issues detected. Further
+        warnings of this type will be silenced.
+        """
+        @warn msg maxlog = 1
+        zero(F(1e-8, 1))
+    end
     for (s, rho_max) in ((-1, x̂[1]), (1, 1 - x̂[1]))
         F₋₂, F₋₁, F₀ =
             F₋₂, F₋₁, F₀ = laurent_coefficients(

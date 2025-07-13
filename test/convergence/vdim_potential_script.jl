@@ -8,7 +8,25 @@ using HMatrices
 using FMMLIB2D
 using GLMakie
 
-meshsize = 0.1
+function domain_and_mesh(; meshsize, meshorder = 1)
+    Inti.clear_entities!()
+    gmsh.initialize()
+    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+    gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
+    gmsh.model.occ.synchronize()
+    gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(meshorder)
+    msh = Inti.import_mesh(; dim = 2)
+    Ω = Inti.Domain(Inti.entities(msh)) do ent
+        return Inti.geometric_dimension(ent) == 2
+    end
+    gmsh.finalize()
+    return Ω, msh
+end
+
+meshsize = 0.05
+
 interpolation_order = 4
 VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
 bdry_qorder = 2 * VR_qorder
@@ -30,18 +48,18 @@ function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
     end
 end
 
-name = joinpath(@__DIR__, "disk.msh")
-gmsh_disk(; meshsize, order = 2, name)
+Γ = Inti.external_boundary(Ω)
+#Γₕ = msh[Γ]
+#Ωₕ = msh[Ω]
 
-Inti.clear_entities!() # empty the entity cache
-msh = Inti.import_mesh(name; dim = 2)
-Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
-Γ = Inti.boundary(Ω)
-
-Ωₕ = msh[Ω]
-Γₕ = msh[Γ]
-Ωₕ_sub = view(msh, Ω)
-Γₕ_sub = view(msh, Γ)
+ψ = (t) -> [cos(2*π*t), sin(2*π*t)]
+θ = 3 # smoothness order of curved elements
+crvmsh = Inti.curve_mesh(msh, ψ, θ, 500*Int(1/meshsize))
+Ωₕ = view(crvmsh, Ω)
+Γₕ = view(crvmsh, Γ)
+#
+#Γₕ = crvmsh[Γ]
+#Ωₕ = crvmsh[Ω]
 
 tquad = @elapsed begin
     # Use VDIM with the Vioreanu-Rokhlin quadrature rule for Ωₕ
@@ -78,7 +96,7 @@ tbnd = @elapsed begin
         target = Ωₕ_sub_quad,
         source = Γₕ_sub_quad,
         compression = (method = :fmm, tol = 1e-14),
-        correction = (method = :dim, maxdist = 5 * meshsize, target_location = :on),
+        correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
     )
 end
 @info "Boundary operators time: $tbnd"

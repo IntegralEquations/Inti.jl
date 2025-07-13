@@ -34,6 +34,7 @@ Here is an example of how to import a mesh from a file:
 ```@example geo-and-meshes
 using Inti
 using Gmsh 
+using LinearAlgebra
 filename = joinpath(Inti.PROJECT_ROOT,"docs", "assets", "piece.msh")
 msh = Inti.import_mesh(filename)
 ```
@@ -247,6 +248,156 @@ viz(msh[Inti.boundary(Ω)]; color = :red)
       quadrilateral domains is supported. In the future we hope to add support
       for three-dimensional transfinite interpolation, as well as transfinite
       formulas for simplices.
+
+## Curving a given mesh
+
+Inti.jl possesses some capability to create curved meshes from a given mesh, which
+can be useful when the mesh is not conforming to the geometry and the geometry's boundary is
+available in parametric form. Specifically the methods implement the work of C. Bernardi [bernardi1989optimal](@cite) which provides so-called 'exact' (sometimes called isogeometric) parametrizations of simplicial elements in arbitrary dimension.
+
+The following example first creates a flat triangulation of
+a disk using splines through Gmsh:
+
+```@example geo-and-meshes
+Inti.clear_entities!() # hide
+gmsh.initialize()
+meshsize = 2π / 32
+gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+# Two kites
+f = (s) -> SVector(-1, 0.0) + SVector(cos(2π*s), sin(2π*s))
+bnd1 = Inti.gmsh_curve(f, 0, 1; meshsize)
+cl = gmsh.model.occ.addCurveLoop([bnd1])
+disk = gmsh.model.occ.addPlaneSurface([cl])
+gmsh.model.occ.synchronize()
+gmsh.model.mesh.generate(2)
+msh = Inti.import_mesh(; dim = 2)
+gmsh.finalize()
+Ω = Inti.Domain(Inti.entities(msh)) do ent
+      return Inti.geometric_dimension(ent) == 2
+end
+viz(msh[Ω], showsegments=true)
+Ω_quad = Inti.Quadrature(msh[Ω]; qorder = 10)
+area = Inti.integrate(x->1.0, Ω_quad)
+@assert abs(area - π) > 0.01 # hide
+println("Error in area computation using P1 mesh: ", abs(area - π))
+```
+
+As can be seen, despite the large quadrature order employed, the approximation error is
+still significant. To improve the accuracy, we can use the `curve_mesh` function
+to create a curved mesh based on the boundary of the domain:
+
+```@example geo-and-meshes
+θ = 5 # smoothness order of curved elements
+crvmsh = Inti.curve_mesh(msh, f, θ)
+Ω_crv_quad = Inti.Quadrature(crvmsh[Ω]; qorder = 10)
+area = Inti.integrate(x->1.0, Ω_crv_quad)
+@assert abs(area - π) < 1e-10 # hide
+println("Error in area computation using curved mesh: ", abs(area - π))
+```
+
+### Multiple curved domains, subdomains, and curved surfaces
+
+It may be desired to have multiple curved volumes / boundaries. Inti.jl supports this, associating a parametrization with each volumetric entity in a mesh. Note the delicate correspondence between the correct `EntityKey` and the parametrization in setting `entity_parametrization`, and note also the limitations listed below.
+
+```@example geo-and-meshes
+gmsh.initialize()
+meshsize = 0.075
+gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+
+# Three circles
+c1 = gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
+c2 = gmsh.model.occ.addDisk(0, 3.0, 0, 1, 1)
+c3 = gmsh.model.occ.addDisk(0, 8.0, 0, 2, 2)
+gmsh.model.occ.synchronize()
+
+# Add tags for stable identification of the entities
+gmsh.model.addPhysicalGroup(2, [c1], -1, "c1")
+gmsh.model.addPhysicalGroup(2, [c2], -1, "c2")
+gmsh.model.addPhysicalGroup(2, [c3], -1, "c3")
+
+gmsh.model.mesh.generate(2)
+msh = Inti.import_mesh(; dim = 2)
+
+Ω = Inti.Domain(Inti.entities(msh)) do ent
+    return Inti.geometric_dimension(ent) == 2
+end
+gmsh.finalize()
+
+Γ = Inti.external_boundary(Ω)
+Ωₕ = view(msh, Ω)
+Γₕ = view(msh, Γ)
+
+# Three circles
+ψ₁ = (t) -> [cos(2 * π * t), sin(2 * π * t)]
+ψ₂ = (t) -> [cos(2 * π * t), 3.0 + sin(2 * π * t)]
+ψ₃ = (t) -> [2 * cos(2 * π * t), 8.0 + 2 * sin(2 * π * t)]
+entity_parametrizations = Dict{Inti.EntityKey,Function}()
+for e in Inti.entities(Ω)
+    l = Inti.labels(e)
+    if "c1" in l
+        entity_parametrizations[e] = ψ₁
+    elseif "c2" in l
+        entity_parametrizations[e] = ψ₂
+    elseif "c3" in l
+        entity_parametrizations[e] = ψ₃
+    end
+end
+
+θ = 6 # smoothness order of curved elements
+crvmsh = Inti.curve_mesh(msh, entity_parametrizations, θ)
+
+Γₕ = crvmsh[Γ]
+Ωₕ = crvmsh[Ω]
+
+qorder = 5
+Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder)
+Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder)
+nothing # hide
+```
+
+We can verify once again that the correct area of the region is obtained.
+
+```@example geo-and-meshes
+area = Inti.integrate(x -> 1, Ωₕ_quad)
+@assert abs(area - 6π) < 1e-10 # hide
+println("Error in computing area of three circles: ", abs(area - 6π))
+```
+
+One can extract a subcomponent of the curved (volumetric) domain as usual:
+
+```@example geo-and-meshes
+Ω_sub = Inti.Domain(e -> "c3" in Inti.labels(e), Inti.entities(Ω))
+Ωₕ_sub = crvmsh[Ω_sub]
+Ωₕ_sub_quad = Inti.Quadrature(Ωₕ_sub; qorder = qorder)
+area = Inti.integrate(x -> 1, Ωₕ_sub_quad)
+@assert abs(area - 4π) < 1e-13 # hide
+println("Error in computing area of one (large) circle: ", abs(area - 4π))
+```
+
+The curved mesh also contains surface elements which are, like their volume
+counterparts, 'exact' (or isogeometric). To demonstrate this we compute the area
+using Green's theorem:
+
+```@example geo-and-meshes
+F = (x) -> [1/2*x[1], 1/2*x[2]]
+lineint = Inti.integrate(q -> dot(F(q.coords), q.normal), Γₕ_quad)
+@assert abs(lineint - 6π) < 1e-13 # hide
+println("Error in computing area using line integral: ", abs(lineint - 6π))
+```
+
+Note the following restrictions that (currently) hold for 2D curved meshes:
+
+1. Only a single boundary entity can be associated with a given curved volume entity
+2. A curved boundary entity cannot be associated with multiple volume entities.
+
+Curved 3D meshes with the same interface are also available with the following two
+(admittedly significant) restrictions:
+
+1. The boundary parametrization must be global. Thus, a torus domain is possible but not a sphere.
+2. Only a single curved domain is possible.
+(The second item could be easily addressed in Inti.jl if there is user interest; the first is more difficult to address.)
 
 ## Elements of a mesh
 

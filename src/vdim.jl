@@ -545,6 +545,21 @@ function translation_and_scaling(el::LagrangeTriangle)
     return c, r, diam
 end
 
+function translation_and_scaling(el::ParametricElement{ReferenceSimplex{3}})
+    straight_nodes =
+        [el([0.0, 0.0, 0.0]), el([1.0, 0.0, 0.0]), el([0.0, 1.0, 0.0]), el([0.0, 0.0, 1.0])]
+    return translation_and_scaling(
+        LagrangeElement{ReferenceSimplex{3},4,SVector{3,Float64}}(straight_nodes),
+    )
+end
+
+function translation_and_scaling(el::ParametricElement{ReferenceSimplex{2}})
+    straight_nodes = [el([1e-18, 1e-18]), el([1.0, 0.0]), el([0.0, 1.0])]
+    return translation_and_scaling(
+        LagrangeElement{ReferenceSimplex{2},3,SVector{2,Float64}}(straight_nodes),
+    )
+end
+
 function translation_and_scaling(el::LagrangeTetrahedron)
     vertices = el.vals[1:4]
     # Compute the circumcenter in barycentric coordinates

@@ -51,16 +51,16 @@ integrals should be computed. The available options are:
   - `(method = :adaptive, maxdist, tol)`: correct interactions corresponding to entries of
     `target` and elements of `source` that are within `maxdist` of each other. The singular
     (including finite part) interactions are computed in polar coordinates, while the
-    near-singular interactions are computing using an adaptive quadrature rule. The `tol`
+    near-singular interactions are computed using an adaptive quadrature rule. The `tol`
     argument specifies the tolerance of the adaptive integration. See
     [`adaptive_correction`](@ref) for more details.
   - `(method = :dim, maxdist, target_location)`: use the density interpolation method to
     compute the correction. `maxdist` specifies the distance between source and target
     points above which no correction is performed (defaults to `Inf`). `target_location`
-    should be either `:inside`, `:outside`, or `:on`, and specifies where the `target``
+    should be either `:inside`, `:outside`, or `:on`, and specifies where the `target`
     points lie relative to the to the `source` curve/surface (which is assumed to be
     closed). When `target === source`, `target_location` is not needed. See
-    [`bdim_correction`](@ref) and [`vdim_correction`] for more details.
+    [`bdim_correction`](@ref) and [`vdim_correction`](@ref) for more details.
 """
 function single_double_layer(;
     op,
