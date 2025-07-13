@@ -8,7 +8,6 @@ using Gmsh
 using LinearAlgebra
 using HMatrices
 using FMMLIB2D
-using CairoMakie
 using Meshes
 
 #meshsize = 0.001/8

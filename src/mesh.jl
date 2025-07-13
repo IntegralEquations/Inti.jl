@@ -707,6 +707,8 @@ end
 
 function viz_elements(args...; kwargs...) end
 
+function viz_elements_bords(args...; kwargs...) end
+
 function node2etags(msh)
     # dictionary mapping a node index to all elements containing it. Note
     # that the elements are stored as a tuple (type, index)

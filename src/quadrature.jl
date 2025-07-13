@@ -140,7 +140,7 @@ function Quadrature(
         QuadratureNode{N,T}[],
         Dict{DataType,Matrix{Int}}(),
     )
-    ori = ones(length(elementlist))
+    ori = ones(Int64, length(elementlist))
     # loop element types and generate quadrature for each
     _build_quadrature!(quad, elementlist, ori, qrule; center, scale)
 

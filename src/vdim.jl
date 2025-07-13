@@ -622,7 +622,7 @@ function translation_and_scaling(el::LagrangeTetrahedron)
 end
 
 # function barrier for type stability purposes
-_newbord_line(vtxs) = LagrangeLine(SVector{3}(vtxs))
+_newbord_line(vtxs) = LagrangeLine(SVector{2}(vtxs))
 
 # function barrier for type stability purposes
 _newbord_tri(vtxs) = LagrangeElement{ReferenceSimplex{2}}(SVector{3}(vtxs))
@@ -652,7 +652,7 @@ function _local_vdim_construct_local_quadratures(
     loc_bdry = boundarynd(T, els_idxs, mesh)
     # TODO handle curved boundary of Γ??
     if N == 2
-        bords = LagrangeElement{ReferenceHyperCube{N - 1},3,SVector{N,Float64}}[]
+        bords = LagrangeElement{ReferenceHyperCube{N - 1},2,SVector{N,Float64}}[]
     else
         bords = LagrangeElement{ReferenceSimplex{N - 1},3,SVector{N,Float64}}[]
     end
