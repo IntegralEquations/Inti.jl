@@ -1,4 +1,3 @@
-
 module IntiFMM2DExt
 
 import Inti
@@ -10,16 +9,6 @@ function __init__()
 end
 
 function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
-    sources, targets = _fmm2d_get_sources_and_targets(iop)
-    weights = _fmm2d_get_weights(iop)
-    m, n = size(iop)
-    same_surface =
-        m == n ? isapprox(targets, sources; atol = Inti.SAME_POINT_TOLERANCE) : false
-    return _fmm2d_map(iop.kernel, sources, targets, weights, iop, rtol, Val(same_surface))
-end
-
-# Helper functions
-function _fmm2d_get_sources_and_targets(iop)
     m, n = size(iop)
     targets = Matrix{Float64}(undef, 2, m)
     for i in 1:m
@@ -29,29 +18,10 @@ function _fmm2d_get_sources_and_targets(iop)
     for j in 1:n
         sources[:, j] = Inti.coords(iop.source[j])
     end
-    return sources, targets
-end
-
-function _fmm2d_get_weights(iop)
-    return [q.weight for q in iop.source]
-end
-
-function _fmm2d_get_target_normals(iop)
-    m, _ = size(iop)
-    normals = Matrix{Float64}(undef, 2, m)
-    for i in 1:m
-        normals[:, i] = Inti.normal(iop.target[i])
-    end
-    return normals
-end
-
-function _fmm2d_get_source_normals(iop)
-    _, n = size(iop)
-    normals = Matrix{Float64}(undef, 2, n)
-    for i in 1:n
-        normals[:, i] = Inti.normal(iop.source[i])
-    end
-    return normals
+    weights = [q.weight for q in iop.source]
+    same_surface =
+        m == n ? isapprox(targets, sources; atol = Inti.SAME_POINT_TOLERANCE) : false
+    return _fmm2d_map(iop.kernel, sources, targets, weights, iop, rtol, Val(same_surface))
 end
 
 # Laplace
@@ -68,8 +38,19 @@ function _fmm2d_map(
     charges = Vector{Float64}(undef, n)
     return LinearMaps.LinearMap{Float64}(m, n) do y, x
         @. charges = -1 / (2 * π) * weights * x
-        out = _rfmm2d(sources, targets, charges, rtol, same_surface, Val(1))
-        return copyto!(y, _get_potential(out, same_surface))
+        if same_surface == Val(true)
+            out = FMM2D.rfmm2d(; sources = sources, charges = charges, eps = rtol, pg = 1)
+            return copyto!(y, out.pot)
+        else
+            out = FMM2D.rfmm2d(;
+                sources = sources,
+                charges = charges,
+                targets = targets,
+                eps = rtol,
+                pgt = 1,
+            )
+            return copyto!(y, out.pottarg)
+        end
     end
 end
 
@@ -83,7 +64,10 @@ function _fmm2d_map(
     same_surface,
 )
     m, n = size(iop)
-    normals = _fmm2d_get_source_normals(iop)
+    normals = Matrix{Float64}(undef, 2, n)
+    for i in 1:n
+        normals[:, i] = Inti.normal(iop.source[i])
+    end
     dipvecs = similar(normals)
     dipstr = Vector{Float64}(undef, n)
     return LinearMaps.LinearMap{Float64}(m, n) do y, x
@@ -91,8 +75,26 @@ function _fmm2d_map(
             dipvecs[:, j] = -1 / (2 * π) * view(normals, :, j) * weights[j]
         end
         @. dipstr = x
-        out = _rfmm2d(sources, targets, dipstr, dipvecs, rtol, same_surface, Val(1))
-        return copyto!(y, _get_potential(out, same_surface))
+        if same_surface == Val(true)
+            out = FMM2D.rfmm2d(;
+                sources = sources,
+                dipstr = dipstr,
+                dipvecs = dipvecs,
+                eps = rtol,
+                pg = 1,
+            )
+            return copyto!(y, out.pot)
+        else
+            out = FMM2D.rfmm2d(;
+                sources = sources,
+                targets = targets,
+                dipstr = dipstr,
+                dipvecs = dipvecs,
+                eps = rtol,
+                pgt = 1,
+            )
+            return copyto!(y, out.pottarg)
+        end
     end
 end
 
@@ -106,15 +108,27 @@ function _fmm2d_map(
     same_surface,
 )
     m, n = size(iop)
-    xnormals = _fmm2d_get_target_normals(iop)
+    xnormals = Matrix{Float64}(undef, 2, m)
+    for i in 1:m
+        xnormals[:, i] = Inti.normal(iop.target[i])
+    end
     charges = Vector{Float64}(undef, n)
     return LinearMaps.LinearMap{Float64}(m, n) do y, x
         @. charges = -1 / (2 * π) * weights * x
-        out = _rfmm2d(sources, targets, charges, rtol, same_surface, Val(2))
-        return copyto!(
-            y,
-            sum(xnormals .* _get_gradient(out, same_surface); dims = 1) |> vec,
-        )
+        if same_surface == Val(true)
+            out = FMM2D.rfmm2d(; sources = sources, charges = charges, eps = rtol, pg = 2)
+            grad = out.grad
+        else
+            out = FMM2D.rfmm2d(;
+                sources = sources,
+                charges = charges,
+                targets = targets,
+                eps = rtol,
+                pgt = 2,
+            )
+            grad = out.gradtarg
+        end
+        return copyto!(y, sum(xnormals .* grad; dims = 1) |> vec)
     end
 end
 
@@ -128,8 +142,14 @@ function _fmm2d_map(
     same_surface,
 )
     m, n = size(iop)
-    xnormals = _fmm2d_get_target_normals(iop)
-    ynormals = _fmm2d_get_source_normals(iop)
+    xnormals = Matrix{Float64}(undef, 2, m)
+    for i in 1:m
+        xnormals[:, i] = Inti.normal(iop.target[i])
+    end
+    ynormals = Matrix{Float64}(undef, 2, n)
+    for i in 1:n
+        ynormals[:, i] = Inti.normal(iop.source[i])
+    end
     dipvecs = similar(ynormals, Float64)
     dipstrs = Vector{Float64}(undef, n)
     return LinearMaps.LinearMap{Float64}(m, n) do y, x
@@ -137,11 +157,27 @@ function _fmm2d_map(
             dipvecs[:, j] = -1 / (2 * π) * view(ynormals, :, j) * weights[j]
         end
         @. dipstrs = x
-        out = _rfmm2d(sources, targets, dipstrs, dipvecs, rtol, same_surface, Val(2))
-        return copyto!(
-            y,
-            sum(xnormals .* _get_gradient(out, same_surface); dims = 1) |> vec,
-        )
+        if same_surface == Val(true)
+            out = FMM2D.rfmm2d(;
+                sources = sources,
+                dipstr = dipstrs,
+                dipvecs = dipvecs,
+                eps = rtol,
+                pg = 2,
+            )
+            grad = out.grad
+        else
+            out = FMM2D.rfmm2d(;
+                sources = sources,
+                targets = targets,
+                dipstr = dipstrs,
+                dipvecs = dipvecs,
+                eps = rtol,
+                pgt = 2,
+            )
+            grad = out.gradtarg
+        end
+        return copyto!(y, sum(xnormals .* grad; dims = 1) |> vec)
     end
 end
 
@@ -160,8 +196,21 @@ function _fmm2d_map(
     zk = ComplexF64(K.op.k)
     return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
         @. charges = weights * x
-        out = _hfmm2d(zk, sources, targets, charges, rtol, same_surface, Val(1))
-        return copyto!(y, _get_potential(out, same_surface))
+        if same_surface == Val(true)
+            out =
+                FMM2D.hfmm2d(; zk = zk, sources = sources, charges = charges, eps = rtol, pg = 1)
+            return copyto!(y, out.pot)
+        else
+            out = FMM2D.hfmm2d(;
+                zk = zk,
+                sources = sources,
+                charges = charges,
+                targets = targets,
+                eps = rtol,
+                pgt = 1,
+            )
+            return copyto!(y, out.pottarg)
+        end
     end
 end
 
@@ -175,7 +224,10 @@ function _fmm2d_map(
     same_surface,
 )
     m, n = size(iop)
-    normals = _fmm2d_get_source_normals(iop)
+    normals = Matrix{Float64}(undef, 2, n)
+    for i in 1:n
+        normals[:, i] = Inti.normal(iop.source[i])
+    end
     dipvecs = similar(normals, Float64)
     dipstrs = Vector{ComplexF64}(undef, n)
     zk = ComplexF64(K.op.k)
@@ -184,8 +236,28 @@ function _fmm2d_map(
             dipvecs[:, j] = view(normals, :, j) * weights[j]
         end
         @. dipstrs = x
-        out = _hfmm2d(zk, sources, targets, dipstrs, dipvecs, rtol, same_surface, Val(1))
-        return copyto!(y, _get_potential(out, same_surface))
+        if same_surface == Val(true)
+            out = FMM2D.hfmm2d(;
+                zk = zk,
+                sources = sources,
+                dipstr = dipstrs,
+                dipvecs = dipvecs,
+                eps = rtol,
+                pg = 1,
+            )
+            return copyto!(y, out.pot)
+        else
+            out = FMM2D.hfmm2d(;
+                zk = zk,
+                sources = sources,
+                targets = targets,
+                dipstr = dipstrs,
+                dipvecs = dipvecs,
+                eps = rtol,
+                pgt = 1,
+            )
+            return copyto!(y, out.pottarg)
+        end
     end
 end
 
@@ -199,16 +271,30 @@ function _fmm2d_map(
     same_surface,
 )
     m, n = size(iop)
-    xnormals = _fmm2d_get_target_normals(iop)
+    xnormals = Matrix{Float64}(undef, 2, m)
+    for i in 1:m
+        xnormals[:, i] = Inti.normal(iop.target[i])
+    end
     charges = Vector{ComplexF64}(undef, n)
     zk = ComplexF64(K.op.k)
     return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
         @. charges = x * weights
-        out = _hfmm2d(zk, sources, targets, charges, rtol, same_surface, Val(2))
-        return copyto!(
-            y,
-            sum(xnormals .* _get_gradient(out, same_surface); dims = 1) |> vec,
-        )
+        if same_surface == Val(true)
+            out =
+                FMM2D.hfmm2d(; zk = zk, sources = sources, charges = charges, eps = rtol, pg = 2)
+            grad = out.grad
+        else
+            out = FMM2D.hfmm2d(;
+                zk = zk,
+                sources = sources,
+                charges = charges,
+                targets = targets,
+                eps = rtol,
+                pgt = 2,
+            )
+            grad = out.gradtarg
+        end
+        return copyto!(y, sum(xnormals .* grad; dims = 1) |> vec)
     end
 end
 
@@ -222,8 +308,14 @@ function _fmm2d_map(
     same_surface,
 )
     m, n = size(iop)
-    xnormals = _fmm2d_get_target_normals(iop)
-    ynormals = _fmm2d_get_source_normals(iop)
+    xnormals = Matrix{Float64}(undef, 2, m)
+    for i in 1:m
+        xnormals[:, i] = Inti.normal(iop.target[i])
+    end
+    ynormals = Matrix{Float64}(undef, 2, n)
+    for i in 1:n
+        ynormals[:, i] = Inti.normal(iop.source[i])
+    end
     dipvecs = similar(ynormals, Float64)
     dipstrs = Vector{ComplexF64}(undef, n)
     zk = ComplexF64(K.op.k)
@@ -232,121 +324,34 @@ function _fmm2d_map(
             dipvecs[:, j] = view(ynormals, :, j) * weights[j]
         end
         @. dipstrs = x
-        out = _hfmm2d(zk, sources, targets, dipstrs, dipvecs, rtol, same_surface, Val(2))
-        return copyto!(
-            y,
-            sum(xnormals .* _get_gradient(out, same_surface); dims = 1) |> vec,
-        )
+        if same_surface == Val(true)
+            out = FMM2D.hfmm2d(;
+                zk = zk,
+                sources = sources,
+                dipstr = dipstrs,
+                dipvecs = dipvecs,
+                eps = rtol,
+                pg = 2,
+            )
+            grad = out.grad
+        else
+            out = FMM2D.hfmm2d(;
+                zk = zk,
+                sources = sources,
+                targets = targets,
+                dipstr = dipstrs,
+                dipvecs = dipvecs,
+                eps = rtol,
+                pgt = 2,
+            )
+            grad = out.gradtarg
+        end
+        return copyto!(y, sum(xnormals .* grad; dims = 1) |> vec)
     end
 end
 
 function _fmm2d_map(K, sources, targets, weights, iop, rtol, same_surface)
     return error("integral operator not supported by Inti's FMM2D wrapper")
-end
-
-# FMM2D wrappers
-_get_potential(out, ::Val{true}) = out.pot
-_get_potential(out, ::Val{false}) = out.pottarg
-_get_gradient(out, ::Val{true}) = out.grad
-_get_gradient(out, ::Val{false}) = out.gradtarg
-
-function _rfmm2d(sources, targets, charges, rtol, ::Val{true}, pg::Val{V}) where {V}
-    return FMM2D.rfmm2d(; sources = sources, charges = charges, eps = rtol, pg = V)
-end
-
-function _rfmm2d(sources, targets, charges, rtol, ::Val{false}, pg::Val{V}) where {V}
-    return FMM2D.rfmm2d(;
-        sources = sources,
-        charges = charges,
-        targets = targets,
-        eps = rtol,
-        pgt = V,
-    )
-end
-
-function _rfmm2d(sources, targets, dipstr, dipvecs, rtol, ::Val{true}, pg::Val{V}) where {V}
-    return FMM2D.rfmm2d(;
-        sources = sources,
-        dipstr = dipstr,
-        dipvecs = dipvecs,
-        eps = rtol,
-        pg = V,
-    )
-end
-
-function _rfmm2d(
-    sources,
-    targets,
-    dipstr,
-    dipvecs,
-    rtol,
-    ::Val{false},
-    pg::Val{V},
-) where {V}
-    return FMM2D.rfmm2d(;
-        sources = sources,
-        targets = targets,
-        dipstr = dipstr,
-        dipvecs = dipvecs,
-        eps = rtol,
-        pgt = V,
-    )
-end
-
-function _hfmm2d(zk, sources, targets, charges, rtol, ::Val{true}, pg::Val{V}) where {V}
-    return FMM2D.hfmm2d(; zk = zk, sources = sources, charges = charges, eps = rtol, pg = V)
-end
-
-function _hfmm2d(zk, sources, targets, charges, rtol, ::Val{false}, pg::Val{V}) where {V}
-    return FMM2D.hfmm2d(;
-        zk = zk,
-        sources = sources,
-        charges = charges,
-        targets = targets,
-        eps = rtol,
-        pgt = V,
-    )
-end
-
-function _hfmm2d(
-    zk,
-    sources,
-    targets,
-    dipstr,
-    dipvecs,
-    rtol,
-    ::Val{true},
-    pg::Val{V},
-) where {V}
-    return FMM2D.hfmm2d(;
-        zk = zk,
-        sources = sources,
-        dipstr = dipstr,
-        dipvecs = dipvecs,
-        eps = rtol,
-        pg = V,
-    )
-end
-
-function _hfmm2d(
-    zk,
-    sources,
-    targets,
-    dipstr,
-    dipvecs,
-    rtol,
-    ::Val{false},
-    pg::Val{V},
-) where {V}
-    return FMM2D.hfmm2d(;
-        zk = zk,
-        sources = sources,
-        targets = targets,
-        dipstr = dipstr,
-        dipvecs = dipvecs,
-        eps = rtol,
-        pgt = V,
-    )
 end
 
 end # module

@@ -10,13 +10,6 @@ function __init__()
 end
 
 function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
-    sources, targets = _fmm3d_get_sources_and_targets(iop)
-    weights = _fmm3d_get_weights(iop)
-    return _fmm3d_map(iop.kernel, sources, targets, weights, iop, rtol)
-end
-
-# Helper functions
-function _fmm3d_get_sources_and_targets(iop)
     m, n = size(iop)
     targets = Matrix{Float64}(undef, 3, m)
     for i in 1:m
@@ -26,29 +19,8 @@ function _fmm3d_get_sources_and_targets(iop)
     for j in 1:n
         sources[:, j] = Inti.coords(iop.source[j])
     end
-    return sources, targets
-end
-
-function _fmm3d_get_weights(iop)
-    return [q.weight for q in iop.source]
-end
-
-function _fmm3d_get_target_normals(iop)
-    m, _ = size(iop)
-    normals = Matrix{Float64}(undef, 3, m)
-    for i in 1:m
-        normals[:, i] = Inti.normal(iop.target[i])
-    end
-    return normals
-end
-
-function _fmm3d_get_source_normals(iop)
-    _, n = size(iop)
-    normals = Matrix{Float64}(undef, 3, n)
-    for i in 1:n
-        normals[:, i] = Inti.normal(iop.source[i])
-    end
-    return normals
+    weights = [q.weight for q in iop.source]
+    return _fmm3d_map(iop.kernel, sources, targets, weights, iop, rtol)
 end
 
 # Laplace
@@ -78,7 +50,10 @@ function _fmm3d_map(
     rtol,
 )
     m, n = size(iop)
-    normals = _fmm3d_get_source_normals(iop)
+    normals = Matrix{Float64}(undef, 3, n)
+    for i in 1:n
+        normals[:, i] = Inti.normal(iop.source[i])
+    end
     dipvecs = similar(normals)
     return LinearMaps.LinearMap{Float64}(m, n) do y, x
         for j in 1:n
@@ -98,7 +73,10 @@ function _fmm3d_map(
     rtol,
 )
     m, n = size(iop)
-    xnormals = _fmm3d_get_target_normals(iop)
+    xnormals = Matrix{Float64}(undef, 3, m)
+    for i in 1:m
+        xnormals[:, i] = Inti.normal(iop.target[i])
+    end
     charges = Vector{Float64}(undef, n)
     return LinearMaps.LinearMap{Float64}(m, n) do y, x
         @. charges = 1 / (4 * π) * weights * x
@@ -116,8 +94,14 @@ function _fmm3d_map(
     rtol,
 )
     m, n = size(iop)
-    xnormals = _fmm3d_get_target_normals(iop)
-    ynormals = _fmm3d_get_source_normals(iop)
+    xnormals = Matrix{Float64}(undef, 3, m)
+    for i in 1:m
+        xnormals[:, i] = Inti.normal(iop.target[i])
+    end
+    ynormals = Matrix{Float64}(undef, 3, n)
+    for i in 1:n
+        ynormals[:, i] = Inti.normal(iop.source[i])
+    end
     dipvecs = similar(ynormals, Float64)
     return LinearMaps.LinearMap{Float64}(m, n) do y, x
         for j in 1:n
@@ -156,7 +140,10 @@ function _fmm3d_map(
     rtol,
 )
     m, n = size(iop)
-    normals = _fmm3d_get_source_normals(iop)
+    normals = Matrix{Float64}(undef, 3, n)
+    for i in 1:n
+        normals[:, i] = Inti.normal(iop.source[i])
+    end
     dipvecs = similar(normals, ComplexF64)
     zk = ComplexF64(K.op.k)
     return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
@@ -177,7 +164,10 @@ function _fmm3d_map(
     rtol,
 )
     m, n = size(iop)
-    xnormals = _fmm3d_get_target_normals(iop)
+    xnormals = Matrix{Float64}(undef, 3, m)
+    for i in 1:m
+        xnormals[:, i] = Inti.normal(iop.target[i])
+    end
     charges = Vector{ComplexF64}(undef, n)
     zk = ComplexF64(K.op.k)
     return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
@@ -196,8 +186,14 @@ function _fmm3d_map(
     rtol,
 )
     m, n = size(iop)
-    xnormals = _fmm3d_get_target_normals(iop)
-    ynormals = _fmm3d_get_source_normals(iop)
+    xnormals = Matrix{Float64}(undef, 3, m)
+    for i in 1:m
+        xnormals[:, i] = Inti.normal(iop.target[i])
+    end
+    ynormals = Matrix{Float64}(undef, 3, n)
+    for i in 1:n
+        ynormals[:, i] = Inti.normal(iop.source[i])
+    end
     dipvecs = similar(ynormals, ComplexF64)
     zk = ComplexF64(K.op.k)
     return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
@@ -238,7 +234,10 @@ function _fmm3d_map(
 )
     m, n = size(iop)
     T = SVector{3,Float64}
-    normals = _fmm3d_get_source_normals(iop)
+    normals = Matrix{Float64}(undef, 3, n)
+    for i in 1:n
+        normals[:, i] = Inti.normal(iop.source[i])
+    end
     strsvec = similar(normals, Float64)
     strslet = similar(normals, Float64)
     for j in 1:n
