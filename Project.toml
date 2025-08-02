@@ -42,7 +42,7 @@ IntiQPGreenExt = "QPGreen"
 
 [compat]
 Bessels = "0.2"
-DataStructures = "0.18"
+DataStructures = "0.18, 0.19"
 ElementaryPDESolutions = "0.2 - 0.3"
 FMM2D = "0.2"
 FMM3D = "1"
