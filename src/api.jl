@@ -6,80 +6,86 @@ Available compression methods for the dense linear operators in [`Inti`](@ref).
 const COMPRESSION_METHODS = [:none, :hmatrix, :fmm]
 
 """
-    const CORRECTION_METHODS = [:none, :dim, :hcubature]
+    const CORRECTION_METHODS = [:none, :dim, :adaptive]
 
 Available correction methods for the singular and nearly-singular integrals in
 [`Inti`](@ref).
 """
-const CORRECTION_METHODS = [:none, :dim, :hcubature]
+const CORRECTION_METHODS = [:none, :dim, :adaptive]
 
 """
-    single_double_layer(; pde, target, source::Quadrature, compression,
+    single_double_layer(; op, target, source::Quadrature, compression,
     correction, derivative = false)
 
-Construct a discrete approximation to the single- and double-layer integral
-operators for `pde`, mapping values defined on the quadrature nodes of `source`
-to values defined on the nodes of `target`. If `derivative = true`, return
-instead the adjoint double-layer and hypersingular operators (which are the
-derivative of the single- and double-layer, respectively).
+Construct a discrete approximation to the single- and double-layer integral operators for
+`op`, mapping values defined on the quadrature nodes of `source` to values defined on the
+nodes of `target`. If `derivative = true`, return instead the adjoint double-layer and
+hypersingular operators (which are the generalized Neumann trace of the single- and
+double-layer, respectively).
 
-You  must choose a `compression` method and a `correction` method, as described
-below.
+For finer control, you must choose a `compression` method and a `correction` method, as
+described below.
 
-## Compression
+# Compression
 
 The `compression` argument is a named tuple with a `method` field followed by
 method-specific fields. It specifies how the dense linear operators should be
 compressed. The available options are:
 
   - `(method = :none, )`: no compression is performed, the resulting matrices
-    are dense.
+    are dense. This is the default, but not recommended for large problems.
   - `(method =:hmatrix, tol)`: the resulting operators are compressed using
     hierarchical matrices with an absolute tolerance `tol` (defaults to `1e-8`).
   - `(method = :fmm, tol)`: the resulting operators are compressed using the
     fast multipole method with an absolute tolerance `tol` (defaults to `1e-8`).
 
-## Correction
+# Correction
 
 The `correction` argument is a named tuple with a `method` field followed by
 method-specific fields. It specifies how the singular and nearly-singular
 integrals should be computed. The available options are:
 
-  - `(method = :none, )`: no correction is performed. This is not recommented,
-    as the resulting approximation will be inaccurate if the source and target
-    are not sufficiently far apart.
-  - `(method = :dim, maxdist, target_location)`: use the density interpolation
-    method to compute the correction. `maxdist` specifies the distance between
-    source and target points above which no correction is performed (defaults to
-    `Inf`). `target_location` should be either `:inside`, `:outside`, or `:on`,
-    and specifies where the `target`` points lie relative to the to the `source`
-    curve/surface (which is assumed to be closed). When `target === source`,
-    `target_location` is not needed.
+  - `(method = :none, )`: no correction is performed. This is not recommended, as the
+    resulting approximation will be inaccurate if the kernel is singular and source and
+    target are not sufficiently far from each other.
+  - `(method = :adaptive, maxdist, tol)`: correct interactions corresponding to entries of
+    `target` and elements of `source` that are within `maxdist` of each other. The singular
+    (including finite part) interactions are computed in polar coordinates, while the
+    near-singular interactions are computed using an adaptive quadrature rule. The `tol`
+    argument specifies the tolerance of the adaptive integration. See
+    [`adaptive_correction`](@ref) for more details.
+  - `(method = :dim, maxdist, target_location)`: use the density interpolation method to
+    compute the correction. `maxdist` specifies the distance between source and target
+    points above which no correction is performed (defaults to `Inf`). `target_location`
+    should be either `:inside`, `:outside`, or `:on`, and specifies where the `target`
+    points lie relative to the to the `source` curve/surface (which is assumed to be
+    closed). When `target === source`, `target_location` is not needed. See
+    [`bdim_correction`](@ref) and [`vdim_correction`](@ref) for more details.
 """
 function single_double_layer(;
-    pde,
+    op,
     target,
     source,
-    compression,
-    correction,
+    compression = (method = :none,),
+    correction = (method = :adaptive,),
     derivative = false,
 )
     compression = _normalize_compression(compression, target, source)
     correction  = _normalize_correction(correction, target, source)
-    G           = derivative ? AdjointDoubleLayerKernel(pde) : SingleLayerKernel(pde)
-    dG          = derivative ? HyperSingularKernel(pde) : DoubleLayerKernel(pde)
+    G           = derivative ? AdjointDoubleLayerKernel(op) : SingleLayerKernel(op)
+    dG          = derivative ? HyperSingularKernel(op) : DoubleLayerKernel(op)
     Sop         = IntegralOperator(G, target, source)
     Dop         = IntegralOperator(dG, target, source)
     # handle compression
     if compression.method == :hmatrix
-        Smat = assemble_hmatrix(Sop; atol = compression.tol)
-        Dmat = assemble_hmatrix(Dop; atol = compression.tol)
+        Smat = assemble_hmatrix(Sop; rtol = compression.tol)
+        Dmat = assemble_hmatrix(Dop; rtol = compression.tol)
     elseif compression.method == :none
         Smat = assemble_matrix(Sop)
         Dmat = assemble_matrix(Dop)
     elseif compression.method == :fmm
-        Smat = assemble_fmm(Sop; atol = compression.tol)::LinearMap
-        Dmat = assemble_fmm(Dop; atol = compression.tol)::LinearMap
+        Smat = assemble_fmm(Sop; rtol = compression.tol)::LinearMap
+        Dmat = assemble_fmm(Dop; rtol = compression.tol)::LinearMap
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
@@ -107,14 +113,14 @@ function single_double_layer(;
             Dop_dim = IntegralOperator(dG, target[glob_near_trgs], source)
             # compress 'em
             if compression.method == :hmatrix
-                Sop_dim_mat = assemble_hmatrix(Sop_dim; atol = compression.tol)
-                Dop_dim_mat = assemble_hmatrix(Dop_dim; atol = compression.tol)
+                Sop_dim_mat = assemble_hmatrix(Sop_dim; rtol = compression.tol)
+                Dop_dim_mat = assemble_hmatrix(Dop_dim; rtol = compression.tol)
             elseif compression.method == :none
                 Sop_dim_mat = assemble_matrix(Sop_dim)
                 Dop_dim_mat = assemble_matrix(Dop_dim)
             elseif compression.method == :fmm
-                Sop_dim_mat = assemble_fmm(Sop_dim; atol = compression.tol)::LinearMap
-                Dop_dim_mat = assemble_fmm(Dop_dim; atol = compression.tol)::LinearMap
+                Sop_dim_mat = assemble_fmm(Sop_dim; rtol = compression.tol)::LinearMap
+                Dop_dim_mat = assemble_fmm(Dop_dim; rtol = compression.tol)::LinearMap
             else
                 error("Unknown compression method. Available options: $COMPRESSION_METHODS")
             end
@@ -125,7 +131,7 @@ function single_double_layer(;
                 glob_loc_near_trgs = glob_loc_near_trgs,
             )
             δS, δD = bdim_correction(
-                pde,
+                op,
                 target[glob_near_trgs],
                 source,
                 Sop_dim_mat,
@@ -137,7 +143,7 @@ function single_double_layer(;
             )
         else
             δS, δD = bdim_correction(
-                pde,
+                op,
                 target,
                 source,
                 Smat,
@@ -147,6 +153,11 @@ function single_double_layer(;
                 derivative,
             )
         end
+    elseif correction.method == :adaptive
+        # strip `method` from correction and pass it on
+        correction_kw = Base.structdiff(correction, NamedTuple{(:method,)})
+        δS = adaptive_correction(Sop; correction_kw...)
+        δD = adaptive_correction(Dop; correction_kw...)
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end
@@ -171,7 +182,7 @@ function single_double_layer(;
 end
 
 """
-    adj_double_layer_hypersingular(; pde, target, source, compression,
+    adj_double_layer_hypersingular(; op, target, source, compression,
     correction)
 
 Similar to `single_double_layer`, but for the adjoint double-layer and
@@ -179,14 +190,14 @@ hypersingular operators. See the documentation of [`single_double_layer`] for a
 description of the arguments.
 """
 function adj_double_layer_hypersingular(;
-    pde,
+    op,
     target,
     source = target,
-    compression,
-    correction,
+    compression = (method = :none,),
+    correction = (method = :adaptive,),
 )
     return single_double_layer(;
-        pde,
+        op,
         target,
         source,
         compression,
@@ -196,37 +207,95 @@ function adj_double_layer_hypersingular(;
 end
 
 """
-    single_double_layer_potential(; pde, source)
+    single_double_layer_potential(; op, source)
 
-Return the single- and double-layer potentials for `pde` as
+Return the single- and double-layer potentials for `op` as
 [`IntegralPotential`](@ref)s.
 """
-function single_double_layer_potential(; pde, source)
-    G  = SingleLayerKernel(pde)
-    dG = DoubleLayerKernel(pde)
-    𝒮  = IntegralPotential(G, source)
-    𝒟  = IntegralPotential(dG, source)
+function single_double_layer_potential(; op, source)
+    G    = SingleLayerKernel(op)
+    dG   = DoubleLayerKernel(op)
+    𝒮 = IntegralPotential(G, source)
+    𝒟 = IntegralPotential(dG, source)
     return 𝒮, 𝒟
 end
 
-function volume_potential(; pde, target, source::Quadrature, compression, correction)
+"""
+    volume_potential(; op, target, source::Quadrature, compression, correction)
+
+Compute the volume potential operator for a given PDE.
+
+## Arguments
+- `op`: The PDE (Partial Differential Equation) to solve.
+- `target`: The target domain where the potential is computed.
+- `source`: The source domain where the potential is generated.
+- `compression`: The compression method to use for the potential operator.
+- `correction`: The correction method to use for the potential operator.
+
+## Returns
+
+The volume potential operator `V` that represents the interaction between the
+target and source domains.
+
+## Compression
+
+The `compression` argument is a named tuple with a `method` field followed by
+method-specific fields. It specifies how the dense linear operators should be
+compressed. The available options are:
+
+  - `(method = :none, )`: no compression is performed, the resulting matrices
+    are dense.
+  - `(method =:hmatrix, tol)`: the resulting operators are compressed using
+    hierarchical matrices with an absolute tolerance `tol` (defaults to `1e-8`).
+  - `(method = :fmm, tol)`: the resulting operators are compressed using the
+    fast multipole method with an absolute tolerance `tol` (defaults to `1e-8`).
+
+## Correction
+
+The `correction` argument is a named tuple with a `method` field followed by
+method-specific fields. It specifies how the singular and nearly-singular
+integrals should be computed. The available options are:
+
+  - `(method = :none, )`: no correction is performed. This is not recommented,
+    as the resulting approximation will be inaccurate if the source and target
+    are not sufficiently far apart.
+  - `(method = :dim, maxdist, target_location)`: use the density interpolation
+    method to compute the correction. `maxdist` specifies the distance between
+    source and target points above which no correction is performed (defaults to
+    `Inf`). `target_location` should be either `:inside`, `:outside`, or `:on`,
+    and specifies where the `target`` points lie relative to the to the
+    `source`'s boundary. When `target === source`, `target_location` is not
+    needed.
+
+## Details
+The volume potential operator is computed by assembling the integral operator
+`V` using the single-layer kernel `G`. The operator `V` is then compressed using
+the specified compression method. If no compression is specified, the operator
+is returned as is. If a correction method is specified, the correction is
+computed and added to the compressed operator.
+"""
+function volume_potential(; op, target, source::Quadrature, compression, correction)
     correction = _normalize_correction(correction, target, source)
     compression = _normalize_compression(compression, target, source)
-    G = SingleLayerKernel(pde)
+    G = SingleLayerKernel(op)
     V = IntegralOperator(G, target, source)
     # compress V
     if compression.method == :none
         Vmat = assemble_matrix(V)
     elseif compression.method == :hmatrix
-        Vmat = assemble_hmatrix(V; atol = compression.tol)
+        Vmat = assemble_hmatrix(V; rtol = compression.tol)
     elseif compression.method == :fmm
-        Vmat = assemble_fmm(V; atol = compression.tol)
+        Vmat = assemble_fmm(V; rtol = compression.tol)
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
     # compute correction
     if correction.method == :none
         return Vmat
+    elseif correction.method == :adaptive
+        # strip `method` from correction and pass it on
+        correction_kw = Base.structdiff(correction, NamedTuple{(:method,)})
+        δV = adaptive_correction(V; correction_kw...)
     elseif correction.method == :dim
         loc = target === source ? :inside : correction.target_location
         μ = _green_multiplier(loc)
@@ -237,7 +306,7 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
             Ω = domain(source)
             Γ = external_boundary(Ω)
             par_msh = source.mesh.parent # parent mesh, hopefully containing the boundary
-            all(ent -> ent ∈ entities(par_msh), entities(Γ)) ||
+            all(ent -> ent ∈ entities(par_msh), keys(Γ)) ||
                 error("Boundary not found in parent mesh")
             qmax = maximum(order, values(source.etype2qrule))
             boundary = Quadrature(view(par_msh, Γ); qorder = 2 * qmax)
@@ -247,7 +316,7 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
         # Advanced usage: Use previously constructed layer operators for VDIM
         if !haskey(correction, :S_b2d) || !haskey(correction, :D_b2d)
             S, D = single_double_layer(;
-                pde,
+                op,
                 target,
                 source = boundary,
                 compression,
@@ -259,7 +328,7 @@ function volume_potential(; pde, target, source::Quadrature, compression, correc
         end
         interpolation_order = correction.interpolation_order
         δV = vdim_correction(
-            pde,
+            op,
             target,
             source,
             boundary,

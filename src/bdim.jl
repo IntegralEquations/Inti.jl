@@ -10,23 +10,25 @@ Parameters associated with the density interpolation method used in
 end
 
 """
-    bdim_correction(pde,X,Y,S,D; green_multiplier, kwargs...)
+    bdim_correction(op,X,Y,S,D; green_multiplier, kwargs...)
 
-Given a `pde` and a (possibly innacurate) discretizations of its single and
+Given a `op` and a (possibly inaccurate) discretizations of its single and
 double-layer operators `S` and `D` (taking a vector of values on `Y` and
 returning a vector on of values on `X`), compute corrections `δS` and `δD` such
 that `S + δS` and `D + δD` are more accurate approximations of the underlying
 single- and double-layer integral operators.
 
+See [faria2021general](@cite) for more details on the method.
+
 # Arguments
 
 ## Required:
 
-- `pde` must be an [`AbstractPDE`](@ref)
+- `op` must be an [`AbstractDifferentialOperator`](@ref)
 - `Y` must be a [`Quadrature`](@ref) object of a closed surface
 - `X` is either inside, outside, or on `Y`
 - `S` and `D` are approximations to the single- and double-layer operators for
-  `pde` taking densities in `Y` and returning densities in `X`.
+  `op` taking densities in `Y` and returning densities in `X`.
 - `green_multiplier` (keyword argument) is a vector with the same length as `X`
   storing the value of `μ(x)` for `x ∈ X` in the Green identity `S\\[γ₁u\\](x) -
   D\\[γ₀u\\](x) + μ*u(x) = 0`. See [`_green_multiplier`](@ref).
@@ -43,9 +45,10 @@ single- and double-layer integral operators.
   so that no correction is needed. This is used to determine a threshold for
   nearly-singular corrections when `X` and `Y` are different surfaces. When `X
   === Y`, this is not needed.
+
 """
 function bdim_correction(
-    pde,
+    op,
     target,
     source::Quadrature,
     Sop,
@@ -56,8 +59,10 @@ function bdim_correction(
     maxdist = Inf,
     filter_target_params = nothing,
 )
-    imat_cond = imat_norm = res_norm = rhs_norm = -Inf
+    imat_cond = imat_norm = res_norm = rhs_norm = theta_norm = -Inf
     T = eltype(Sop)
+    # determine type for dense matrices
+    Dense = T <: SMatrix ? BlockArray : Array
     N = ambient_dimension(source)
     @assert eltype(Dop) == T "eltype of S and D must match"
     m, n = length(target), length(source)
@@ -85,18 +90,11 @@ function bdim_correction(
     else
         error("only 2D and 3D supported")
     end
-    # figure out if we are dealing with a scalar or vector PDE
-    σ = if T <: Number
-        1
-    else
-        @assert allequal(size(T))
-        size(T, 1)
-    end
     # compute traces of monopoles on the source mesh
-    G   = SingleLayerKernel(pde, T)
-    γ₁G = AdjointDoubleLayerKernel(pde, T)
-    γ₀B = Matrix{T}(undef, length(source), ns)
-    γ₁B = Matrix{T}(undef, length(source), ns)
+    G = SingleLayerKernel(op, T)
+    γ₁G = AdjointDoubleLayerKernel(op, T)
+    γ₀B = Dense{T}(undef, length(source), ns)
+    γ₁B = Dense{T}(undef, length(source), ns)
     for k in 1:ns
         for j in 1:length(source)
             γ₀B[j, k] = G(source[j], xs[k])
@@ -105,17 +103,36 @@ function bdim_correction(
     end
     # integrate the monopoles/dipoles over Y with target on X. This is the
     # slowest step, and passing a custom S,D can accelerate this computation.
-    Θ = zeros(T, m, ns)
+    Θ = Dense{T}(undef, m, ns)
+    fill!(Θ, zero(T))
     # Compute Θ <-- S * γ₁B - D * γ₀B + μ * B(x) usig in-place matvec
     for k in 1:ns
-        @views mul!(Θ[:, k], Sop, γ₁B[:, k])
-        @views mul!(Θ[:, k], Dop, γ₀B[:, k], -1, 1)
         for i in 1:length(target)
             μ = green_multiplier[i]
             v = derivative ? γ₁G(target[i], xs[k]) : G(target[i], xs[k])
-            Θ[i, k] += μ * v
+            Θ[i, k] = μ * v
         end
     end
+    if Dense <: Array || (Sop isa BlockArray && Dop isa BlockArray)
+        mul!(Θ, Sop, γ₁B, 1, 1)
+        mul!(Θ, Dop, γ₀B, -1, 1)
+    else
+        # for vector value problems, we only assume that Sop and Dop can be multiplied by
+        # Vectors of SVectors, and so we need to perform multiplication column by column
+        P, Q = size(T)
+        S = eltype(T)
+        Θ_data = parent(Θ)
+        γ₀B_data = parent(γ₀B)
+        γ₁B_data = parent(γ₁B)
+        for k in 1:size(Θ_data, 2)
+            y = reinterpret(SVector{P,S}, @view Θ_data[:, k])
+            x = reinterpret(SVector{Q,S}, @view γ₁B_data[:, k])
+            mul!(y, Sop, x, 1, 1)
+            x = reinterpret(SVector{Q,S}, @view γ₀B_data[:, k])
+            mul!(y, Dop, x, -1, 1)
+        end
+    end
+
     # finally compute the corrected weights as sparse matrices
     Is, Js, Ss, Ds = Int[], Int[], T[], T[]
     for (E, qtags) in source.etype2qtags
@@ -128,10 +145,10 @@ function bdim_correction(
         # convert between the `Matrix{<:SMatrix}` and `Matrix{<:Number}` formats
         # by viewing the elements of type `T` as `σ × σ` matrices of
         # `eltype(T)`.
-        M_  = Matrix{eltype(T)}(undef, 2 * nq * σ, ns * σ)
-        W_  = Matrix{eltype(T)}(undef, 2 * nq * σ, σ)
-        W   = T <: Number ? W_ : Matrix{T}(undef, 2 * nq, 1)
-        Θi_ = Matrix{eltype(T)}(undef, σ, ns * σ)
+        M = Dense{T}(undef, 2 * nq, ns)
+        W = Dense{T}(undef, 2 * nq, 1)
+        Θi = Dense{T}(undef, 1, ns)
+        Mdata, Wdata, Θidata = parent(M)::Matrix, parent(W)::Matrix, parent(Θi)::Matrix
         # for each element, we will solve Mᵀ W = Θiᵀ, where W is a vector of
         # size 2nq, and Θi is a row vector of length(ns)
         for n in 1:ne
@@ -139,27 +156,29 @@ function bdim_correction(
             isempty(near_list[n]) && continue
             # copy the monopoles/dipoles for the current element
             jglob = @view qtags[:, n]
-            M0 = @view γ₀B[jglob, :]
-            M1 = @view γ₁B[jglob, :]
-            _copyto!(view(M_, 1:(nq*σ), :), M0)
-            _copyto!(view(M_, (nq*σ+1):2*nq*σ, :), M1)
-            F_ = qr!(transpose(M_))
-            @debug (imat_cond = max(cond(M_), imat_cond)) maxlog = 0
-            @debug (imat_norm = max(norm(M_), imat_norm)) maxlog = 0
+            M[1:nq, :] .= γ₀B[jglob, :]
+            M[(nq+1):2nq, :] .= γ₁B[jglob, :]
+            # TODO: get ride of all this transposing mumble jumble by assembling
+            # the matrix in the correct orientation in the first place
+            F = qr!(transpose(Mdata))
+            @debug (imat_cond = max(cond(Mdata), imat_cond)) maxlog = 0
+            @debug (imat_norm = max(norm(Mdata), imat_norm)) maxlog = 0
             for i in near_list[n]
                 j = glob_loc_near_trgs[i]
-                Θi = @view Θ[j:j, :]
-                Θi_ = _copyto!(Θi_, Θi)
-                @debug (rhs_norm = max(rhs_norm, norm(Θi))) maxlog = 0
-                W_ = ldiv!(W_, F_, transpose(Θi_))
-                @debug (res_norm = max(norm(Matrix(F_) * W_ - transpose(Θi_)), res_norm)) maxlog =
-                    0
-                W = T <: Number ? W_ : _copyto!(W, W_)
+                Θi .= Θ[j:j, :]
+                @debug (rhs_norm = max(rhs_norm, norm(Θidata))) maxlog = 0
+                ldiv!(Wdata, F, transpose(Θidata))
+                @debug (
+                    res_norm = max(norm(Matrix(F) * Wdata - transpose(Θidata)), res_norm)
+                ) maxlog = 0
+                @debug (theta_norm = max(theta_norm, norm(Wdata))) maxlog = 0
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
-                    push!(Ss, -W[nq+k]) # single layer corresponds to α=0,β=-1
-                    push!(Ds, W[k])       # double layer corresponds to α=1,β=0
+                    # Since we actually computed the tranpose of the weights, we
+                    # need to transpose it again. This matters for e.g. elasticity
+                    push!(Ss, -transpose(W[nq+k])) # single layer corresponds to α=0,β=-1
+                    push!(Ds, transpose(W[k]))     # double layer corresponds to α=1,β=0
                 end
             end
         end
@@ -168,6 +187,7 @@ function bdim_correction(
     |-- max interp. matrix cond.: $imat_cond
     |-- max interp. matrix norm : $imat_norm
     |-- max residual error:       $res_norm
+    |-- max correction norm:      $theta_norm
     |-- max norm of source term:  $rhs_norm
     """
     δS = sparse(Is, Js, Ss, num_trgs, n)

@@ -3,8 +3,10 @@ import Pkg                            #src
 docsdir = joinpath(@__DIR__, "../..") #src
 Pkg.activate(docsdir)                 #src
 
+tinit = time() # hide
+
 #nb ## Environment setup
-#nb const DEPENDENCIES = ["CairoMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "FMM3D", "FMM2D"];
+#nb const DEPENDENCIES = ["CairoMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "FMM3D", "FMM2D", "Meshes"];
 #nb ## __NOTEBOOK_SETUP__
 
 # # [Poisson solver](@id poisson)
@@ -34,10 +36,11 @@ using Inti
 #
 # Seeking for a solution $u$ of the form ...
 
-meshsize = 0.05
+meshsize = 0.1
 # `n` in the VDIM paper
 interpolation_order = 3
 qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
+nothing #hide
 
 # ## Meshing
 
@@ -66,7 +69,8 @@ name = joinpath(@__DIR__, "disk.msh")
 gmsh_disk(; meshsize, order = 2, name)
 
 Inti.clear_entities!() # empty the entity cache
-Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 2)
+msh = Inti.import_mesh(name; dim = 2)
+Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
 Γ = Inti.boundary(Ω)
 
 Ωₕ = view(msh, Ω)
@@ -103,18 +107,18 @@ fₑ = (x) -> -8 * uₑ(x)
 # ## Boundary and integral operators
 using FMM2D
 
-pde = Inti.Laplace(; dim = 2)
+op = Inti.Laplace(; dim = 2)
 
 ## Boundary operators
 S_b2b, D_b2b = Inti.single_double_layer(;
-    pde,
+    op,
     target = Γₕ_quad,
     source = Γₕ_quad,
     compression = (method = :fmm, tol = 1e-12),
     correction = (method = :dim,),
 )
 S_b2d, D_b2d = Inti.single_double_layer(;
-    pde,
+    op,
     target = Ωₕ_quad,
     source = Γₕ_quad,
     compression = (method = :fmm, tol = 1e-12),
@@ -123,14 +127,14 @@ S_b2d, D_b2d = Inti.single_double_layer(;
 
 ## Volume potentials
 V_d2d = Inti.volume_potential(;
-    pde,
+    op,
     target = Ωₕ_quad,
     source = Ωₕ_quad,
     compression = (method = :fmm, tol = 1e-12),
     correction = (method = :dim, interpolation_order),
 )
 V_d2b = Inti.volume_potential(;
-    pde,
+    op,
     target = Γₕ_quad,
     source = Ωₕ_quad,
     compression = (method = :fmm, tol = 1e-12),
@@ -171,14 +175,22 @@ er = abs.(uₕ_quad - uₑ_quad)
 @show norm(er, Inf)
 
 # ## Visualize the solution error using Gmsh
-## er_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, er)
-sol_nodes = uₑ.(Inti.nodes(Ωₕ))
-solₕ_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, uₑ_quad)
-er_nodes = abs.(sol_nodes - solₕ_nodes)
 
-gmsh.initialize()
-Inti.write_gmsh_model(msh)
-Inti.write_gmsh_view!(Ωₕ, er_nodes; name = "error")
-Inti.write_gmsh_view!(Ωₕ, sol_nodes; name = "solution")
-isinteractive() && gmsh.fltk.run()
-gmsh.finalize()
+er_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, er)
+uₕ_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, uₕ_quad)
+
+using GLMakie, Meshes
+fig = Figure(; size = (1200, 400))
+ax1 = Axis(fig[1, 1]; aspect = DataAspect(), title = "solution")
+colorrange = extrema(uₕ_nodes)
+viz!(Ωₕ; showsegments = true, color = uₕ_nodes, colorrange)
+Colorbar(fig[1, 2]; colorrange = colorrange)
+ax2 = Axis(fig[1, 3]; aspect = DataAspect(), title = "error")
+colorrange = extrema(er_nodes)
+viz!(Ωₕ; showsegments = false, color = er_nodes, colorrange)
+Colorbar(fig[1, 4]; colorrange = colorrange)
+fig
+
+#-
+tend = time() # hide
+@info "Example completed in $(tend - tinit) seconds" # hide

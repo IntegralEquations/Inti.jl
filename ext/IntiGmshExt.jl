@@ -9,66 +9,95 @@ function __init__()
     @info "Loading Inti.jl Gmsh extension"
 end
 
-function Inti.import_mesh_from_gmsh_model(; dim = 3)
+function Inti.import_mesh(filename = nothing; dim = 3)
     @assert dim ∈ (2, 3) "only 2d and 3d meshes are supported"
-    gmsh.isInitialized() == 1 ||
-        error("gmsh is not initialized. Try gmsh.initialize() first.")
-    msh = Inti.LagrangeMesh{3,Float64}()
-    _import_mesh!(msh)
-    dim == 2 && (msh = Inti._convert_to_2d(msh))
-    # create a Domain with the entities of dimension `dim`
-    Ω = Inti.Domain(Inti.entities(msh)) do ent
-        return Inti.geometric_dimension(ent) == dim
+    if isnothing(filename)
+        gmsh.isInitialized() == 1 ||
+            error("gmsh is not initialized. Try gmsh.initialize() first.")
+        msh = Inti.Mesh{3,Float64}()
+        _import_mesh!(msh)
+        dim == 2 && (msh = Inti._convert_to_2d(msh))
+        # create iterators for the lagrange elements
+        for E in keys(msh.etype2mat)
+            @assert E <: Union{Inti.LagrangeElement,SVector}
+            msh.etype2els[E] = Inti.ElementIterator(msh, E)
+        end
+        Inti.build_orientation!(msh)
+    elseif filename isa String
+        initialized = gmsh.isInitialized() == 1
+        try
+            initialized || gmsh.initialize()
+            gmsh.open(filename)
+        catch
+            @error "could not open $filename"
+        end
+        msh = Inti.import_mesh(; dim)
+        initialized || gmsh.finalize()
+    else
+        error("filename must be a string or nothing to import current gmsh model")
     end
-    return Ω, msh
-end
-
-function Inti.import_mesh_from_gmsh_file(fname; dim = 3)
-    initialized = gmsh.isInitialized() == 1
-    try
-        initialized || gmsh.initialize()
-        gmsh.open(fname)
-    catch
-        @error "could not open $fname"
-    end
-    Ω, msh = Inti.import_mesh_from_gmsh_model(; dim)
-    initialized || gmsh.finalize()
-    return Ω, msh
+    return msh
 end
 
 """
     _import_mesh!(msh)
 
-Import the mesh from gmsh into `msh` as a [`LagrangeMesh`](@ref
-Inti.LagrangeMesh).
+Import the mesh from gmsh into `msh` as a [`Mesh`](@ref
+Inti.Mesh).
 """
 function _import_mesh!(msh)
     # NOTE: when importing the nodes, we will renumber them so that the first node has
     # tag 1, the second node has tag 2, etc. This is not always the case in
     # gmsh, where the global node tags are not necessarily consecutive (AFAIU
     # they the tags need not even be a permutation of 1:N). Below we use a Dict
-    # to map from the gmsh tags to the consecutive tags, but it would be
+    # to map from the gmsh node tags to the consecutive tags, but it would be
     # probably better to force gmsh to use consecutive tags in the first place.
-    tags, coords, _ = gmsh.model.mesh.getNodes()
-    tags_dict = Dict(zip(tags, collect(1:length(tags))))
+    node_tags, coords, _ = gmsh.model.mesh.getNodes()
+    gmsh2loc_node_tags = Dict(zip(node_tags, collect(1:length(node_tags))))
     gmsh_nodes = reinterpret(SVector{3,Float64}, coords) |> collect
     shift = length(msh.nodes) # gmsh node tags need to be shifted in case msh was not empty
     append!(msh.nodes, gmsh_nodes)
     gmsh_dim_tags = gmsh.model.getEntities()
-    for (dim, tag) in gmsh_dim_tags
-        pgroups = gmsh.model.getPhysicalGroupsForEntity(dim, tag)
+    gmsh2loc_ent_tags = Dict{Int,Int}() # local to gmsh entity tags
+    for (dim, gmsh_ent_tag) in gmsh_dim_tags
+        # getEntites will always return positive tags
+        @assert gmsh_ent_tag > 0
+        pgroups = gmsh.model.getPhysicalGroupsForEntity(dim, gmsh_ent_tag)
         labels = map(t -> gmsh.model.getPhysicalName(dim, t), pgroups)
         combined, oriented, recursive = true, true, false
-        bnd_dim_tags = gmsh.model.getBoundary((dim, tag), combined, oriented, recursive)
-        bnd = map(t -> Inti.EntityKey(t[1], t[2]), bnd_dim_tags)
+        bnd_dim_tags =
+            gmsh.model.getBoundary((dim, gmsh_ent_tag), combined, oriented, recursive)
+        bnd = map(bnd_dim_tags) do t
+            # a negative value of the tag indicates that the entity's orientation is flipped
+            return Inti.EntityKey(t[1], sign(t[2]) * gmsh2loc_ent_tags[abs(t[2])])
+        end
         # add entity to global dictionary. The sign of tag is ignored,
         # orientation information is stored in the key. The underlying
         # parametrizatio of the entity is not (easily) available in gmsh, so we
         # set it to nothing.
         push_forward = nothing
-        Inti.GeometricEntity(dim, abs(tag), bnd, labels, push_forward)
+        # create a new tag for the entity, possibly different from the gmsh one
+        tag = Inti.new_tag(dim)
+        gmsh2loc_ent_tags[gmsh_ent_tag] = tag
+        Inti.GeometricEntity(dim, tag, bnd, labels, push_forward)
         key = Inti.EntityKey(dim, tag) # key for the entity
-        _ent_to_mesh!(msh.etype2mat, msh.ent2etags, key, shift, tags_dict)
+        _ent_to_mesh!(
+            msh.etype2mat,
+            msh.ent2etags,
+            key,
+            shift,
+            gmsh2loc_node_tags,
+            gmsh_ent_tag,
+        )
+    end
+
+    for (E, mat) in Inti.etype2mat(msh)
+        E <: SVector && continue # skip point type
+        type_tag = _etype_to_type_tag(E)
+        gmsh2inti = _type_tag_to_node_perm(type_tag)
+        for col in eachcol(mat)
+            col .= col[gmsh2inti] # permute the nodes according to the gmsh order
+        end
     end
     return msh
 end
@@ -88,15 +117,15 @@ where:
 - `etags::Vector{Int}` gives the tags of the elements of type `etype` used to
   mesh the entity with the given `key`.
 """
-function _ent_to_mesh!(etype2mat, ent2etags, key, shift, tags_dict)
+function _ent_to_mesh!(etype2mat, ent2etags, key, shift, gmsh2loc_node_tags, tgmsh)
     d, t = key.dim, key.tag
     haskey(ent2etags, key) && error("entity $key already in ent2etags")
     etype2etags = ent2etags[key] = Dict{DataType,Vector{Int}}()
     # Loop on GMSH element types (integer)
-    type_tags, _, ntagss = gmsh.model.mesh.getElements(d, t)
+    type_tags, _, ntagss = gmsh.model.mesh.getElements(d, tgmsh)
     for (type_tag, ntags) in zip(type_tags, ntagss)
         _, _, _, Np, _ = gmsh.model.mesh.getElementProperties(type_tag)
-        ntags = map(i -> tags_dict[i], reshape(ntags, Int(Np), :))
+        ntags = map(i -> gmsh2loc_node_tags[i], reshape(ntags, Int(Np), :))
         etype = _type_tag_to_etype(type_tag)
         if etype in keys(etype2mat)
             etag = size(etype2mat[etype], 2) .+ collect(1:size(ntags, 2))
@@ -108,6 +137,36 @@ function _ent_to_mesh!(etype2mat, ent2etags, key, shift, tags_dict)
         push!(etype2etags, etype => etag)
     end
     return nothing
+end
+
+"""
+    _type_tag_to_node_perm(tag)
+
+Given a Gmsh element type `tag` as an integer, computes the permutation that maps the node
+ordering from Gmsh's reference element to Inti's reference element for the corresponding
+element type.
+"""
+function _type_tag_to_node_perm(tag)
+    E = _type_tag_to_etype(tag) # Inti's type
+    E <: SVector && return [1] # point type, no permutation needed
+    name, dim, order, num_nodes, ref_nodes, num_primary_nodes =
+        gmsh.model.mesh.getElementProperties(tag)
+    dim = Int(dim) # convert to Int64
+    gmsh_nodes = reshape(ref_nodes, Int(dim), :)
+    inti_nodes = Inti.reference_nodes(E)
+    # gmsh uses [-1,1]^dim as reference elements for cuboids, while Inti uses [0,1]^dim, so
+    # shift Inti reference nodes to match gmsh's
+    if Inti.domain(E) isa Inti.ReferenceHyperCube
+        inti_nodes = map(x -> 2 .* x .- 1, inti_nodes) # map to [-1, 1]^dim
+    end
+    perm = map(eachcol(gmsh_nodes)) do col
+        x_gmsh = SVector{dim,Float64}(col)
+        dist, i = findmin(x -> norm(x - x_gmsh), inti_nodes)
+        dist < 1e-8 || error("node $x_gmsh not found in Inti reference nodes")
+        return i
+    end
+    @assert isperm(perm) "permutation is not a valid permutation"
+    return invperm(perm)
 end
 
 """
@@ -150,7 +209,7 @@ function _etype_to_type_tag(E::DataType)
     elseif E <: Inti.LagrangeTriangle
         "Triangle"
     elseif E <: Inti.LagrangeSquare
-        "Quadrilateral"
+        "Quadrangle"
     elseif E <: Inti.LagrangeTetrahedron
         "Tetrahedron"
     else
@@ -160,7 +219,7 @@ function _etype_to_type_tag(E::DataType)
     return gmsh.model.mesh.getElementType(family_name, order)
 end
 
-function Inti.write_gmsh_model(msh::Inti.LagrangeMesh{N,Float64}; name = "") where {N}
+function Inti.write_gmsh_model(msh::Inti.Mesh{N,Float64}; name = "") where {N}
     @assert N ∈ (2, 3)
     # lift the nodes to 3d if N == 2
     nodes = N == 3 ? Inti.nodes(msh) : [SVector(x[1], x[2], 0) for x in Inti.nodes(msh)]
@@ -225,13 +284,7 @@ function Inti.write_gmsh_view(msh::Inti.SubMesh, data; viewname = "")
     return nothing
 end
 
-"""
-    gmsh_curve(f::Function, a, b; npts=100, tag=-1)
-
-Create a C² curve in the current `gmsh` model that approximates `{f(t) : t ∈ (a,b) }`
-where `f` is a function from `ℝ` to `ℝ²` or `ℝ³`. The curve is approximated by C²
-"""
-function Inti.gmsh_curve(f, a, b; npts = 100, tag = -1)
+function Inti.gmsh_curve(f, a, b; npts = 100, tag = -1, meshsize)
     isclosed = norm(f(a) .- f(b)) < 1e-8
     is2d = length(f(a)) == 2
     pt_tags = Int32[]
@@ -241,7 +294,7 @@ function Inti.gmsh_curve(f, a, b; npts = 100, tag = -1)
         coords = f(a + s * (b - a))
         x, y = coords[1], coords[2]
         z = is2d ? 0 : coords[3]
-        t = gmsh.model.occ.addPoint(x, y, z)
+        t = gmsh.model.occ.addPoint(x, y, z, meshsize)
         push!(pt_tags, t)
     end
     # close the curve by adding the first point again

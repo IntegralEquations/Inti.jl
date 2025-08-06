@@ -24,7 +24,7 @@ Inti.clear_entities!()
 #       u + k^2 \mathcal{V}_k[(1 - \eta) u] &= u^{\textit{inc}}  \quad \text{in } \Omega \\
 #   \end{align}
 # ```
-# where $u^{\textit{inc}} : \Omega \to \mathbb{C}$ is a given free-space Helmholtz 
+# where $u^{\textit{inc}} : \Omega \to \mathbb{C}$ is a given free-space Helmholtz
 # solution.
 #
 
@@ -35,7 +35,7 @@ k₁ = 6π
 k₂ = 2π
 λ₁ = 2π / k₁
 λ₂ = 2π / k₂
-meshsize   = min(λ₁,λ₂) / 7
+meshsize = min(λ₁, λ₂) / 7
 nothing # hide
 
 # !!! note "Refraction Index Perturbation"
@@ -73,7 +73,8 @@ end
 name = joinpath(@__DIR__, "disk.msh")
 gmsh_disk(; meshsize, order = 2, name)
 
-Ω, msh = Inti.import_mesh_from_gmsh_file(name; dim = 2)
+msh = Inti.import_mesh(name; dim = 2)
+Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
 Γ = Inti.boundary(Ω)
 
 Ωₕ = view(msh, Ω)
@@ -87,16 +88,16 @@ dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
 # ## Volume Integral Operators and Volume Integral Equations
 using FMMLIB2D
 
-pde = Inti.Helmholtz(; dim = 2, k = k₁)
+op = Inti.Helmholtz(; dim = 2, k = k₁)
 
 # With quadratures constructed on the volume, we can define a discrete approximation
 # to the volume integral operator ``\mathcal{V}`` using VDIM.
 V_d2d = Inti.volume_potential(;
-    pde,
+    op,
     target = Ωₕ_quad,
     source = Ωₕ_quad,
     compression = (method = :fmm, tol = 1e-7),
-    correction = (method = :dim, interpolation_order)
+    correction = (method = :dim, interpolation_order),
 )
 
 using LinearAlgebra
@@ -109,7 +110,8 @@ rhs = map(Ωₕ_quad) do q
     return uⁱ(x)
 end
 
-# The full VIO incorporates scalar point multiplication using the contrast function η, implemented as a composition of `LinearMap`
+# The full VIO incorporates scalar point multiplication using the contrast
+# function η, implemented as a composition of `LinearMap`
 refr_map_d = map(Ωₕ_quad) do q
     x = q.coords
     return 1 - η(x)
@@ -124,10 +126,10 @@ u, hist =
     gmres(L, rhs; log = true, abstol = 1e-7, verbose = true, restart = 200, maxiter = 200)
 @show hist
 
-𝒱 = Inti.IntegralPotential(Inti.SingleLayerKernel(pde), Ωₕ_quad)
+𝒱 = Inti.IntegralPotential(Inti.SingleLayerKernel(op), Ωₕ_quad)
 
 # The representation formula gives the solution in $\R^2 \setminus \Omega$:
-uˢ = (x) -> uⁱ(x) - k₁^2 * 𝒱[refr_map_d .* u](x)
+uˢ = (x) -> uⁱ(x) - k₁^2 * 𝒱[refr_map_d.*u](x)
 nothing # hide
 
 # To visualize the solution using Gmsh, let's query it at the triangle vertices  in $\Omega$
@@ -136,14 +138,14 @@ solₕ_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, real(-u))
 
 gmsh.initialize()
 Inti.write_gmsh_model(msh)
-Inti.write_gmsh_view!(Ωₕ, solₕ_nodes; name="LS solution")
-"-nopopup" in ARGS || gmsh.fltk.run()
+Inti.write_gmsh_view!(Ωₕ, solₕ_nodes; name = "LS solution")
+isinteractive() && gmsh.fltk.run()
 gmsh.finalize()
 nothing # hide
 
 pt = Inti.Point2D([0.625, -0.65])
 V_d2pt = Inti.volume_potential(;
-    pde,
+    op,
     target = [pt],
     source = Ωₕ_quad,
     compression = (method = :fmm, tol = 1e-7),

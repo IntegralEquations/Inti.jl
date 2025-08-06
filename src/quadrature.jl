@@ -36,11 +36,25 @@ function normal(x::T) where {T}
     end
 end
 
+"""
+    flip_normal(q::QuadratureNode)
+
+Return a new `QuadratureNode` with the normal vector flipped.
+"""
+flip_normal(q::QuadratureNode) = QuadratureNode(q.coords, q.weight, -q.normal)
+
 weight(q::QuadratureNode) = q.weight
 
 # useful for using either a quadrature node or a just a simple point in
 # `IntegralOperators`.
 coords(x::Union{SVector,Tuple}) = SVector(x)
+
+function Base.show(io::IO, q::QuadratureNode)
+    println(io, "Quadrature node:")
+    println(io, "-- coords: $(q.coords)")
+    println(io, "-- normal: $(q.normal)")
+    return print(io, "-- weight: $(q.weight)")
+end
 
 """
     struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
@@ -58,8 +72,14 @@ end
 # AbstractArray interface
 Base.size(quad::Quadrature) = size(quad.qnodes)
 Base.getindex(quad::Quadrature, i) = quad.qnodes[i]
+Base.setindex!(quad::Quadrature, q, i) = (quad.qnodes[i] = q)
 
-ambient_dimension(quad::Quadrature{N}) where {N} = N
+qnodes(quad::Quadrature) = quad.qnodes
+mesh(quad::Quadrature) = quad.mesh
+etype2qtags(quad::Quadrature, E) = quad.etype2qtags[E]
+
+quadrature_rule(quad::Quadrature, E) = quad.etype2qrule[E]
+ambient_dimension(::Quadrature{N}) where {N} = N
 
 function Base.show(io::IO, quad::Quadrature)
     return print(io, " Quadrature with $(length(quad.qnodes)) quadrature nodes")
@@ -67,12 +87,15 @@ end
 
 """
     Quadrature(msh::AbstractMesh, etype2qrule::Dict)
+    Quadrature(msh::AbstractMesh, qrule::ReferenceQuadrature)
     Quadrature(msh::AbstractMesh; qorder)
 
 Construct a `Quadrature` for `msh`, where for each element type `E` in `msh` the
-reference quadrature `q = etype2qrule[E]` is used. If an `order` keyword is
-passed, a default quadrature of the desired order is used for each element type
-usig [`_qrule_for_reference_shape`](@ref).
+reference quadrature `q = etype2qrule[E]` is used. When a single `qrule` is
+passed, it is used for all element types in `msh`.
+
+If an `order` keyword is passed, a default quadrature of the desired order is
+used for each element type using [`_qrule_for_reference_shape`](@ref).
 
 For co-dimension one elements, the normal vector is also computed and stored in
 the [`QuadratureNode`](@ref)s.
@@ -87,12 +110,18 @@ function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
     )
     # loop element types and generate quadrature for each
     for E in element_types(msh)
-        els   = elements(msh, E)
+        els = elements(msh, E)
+        ori = orientation(msh, E)
         qrule = etype2qrule[E]
         # dispatch to type-stable method
-        _build_quadrature!(quad, els, qrule)
+        _build_quadrature!(quad, els, ori, qrule)
     end
     return quad
+end
+
+function Quadrature(msh::AbstractMesh{N,T}, qrule::ReferenceQuadrature) where {N,T}
+    etype2qrule = Dict(E => qrule for E in element_types(msh))
+    return Quadrature(msh, etype2qrule)
 end
 
 function Quadrature(msh::AbstractMesh; qorder)
@@ -102,25 +131,27 @@ function Quadrature(msh::AbstractMesh; qorder)
 end
 
 @noinline function _build_quadrature!(
-    quad,
-    els::ElementIterator{E},
+    quad::Quadrature{N,T},
+    els::AbstractVector{E},
+    orientation::Vector{Int},
     qrule::ReferenceQuadrature,
-) where {E}
-    N = ambient_dimension(quad)
-    x̂, ŵ = qrule() # nodes and weights on reference element
+) where {N,T,E}
+    x̂ = map(x̂ -> T.(x̂), qcoords(qrule))
+    ŵ = map(ŵ -> T.(ŵ), qweights(qrule))
     num_nodes = length(ŵ)
     M = geometric_dimension(domain(E))
     codim = N - M
     istart = length(quad.qnodes) + 1
-    for el in els
+    @assert length(els) == length(orientation)
+    for (s, el) in zip(orientation, els)
         # and all qnodes for that element
         for (x̂i, ŵi) in zip(x̂, ŵ)
             x = el(x̂i)
             jac = jacobian(el, x̂i)
             μ = _integration_measure(jac)
             w = μ * ŵi
-            ν = codim == 1 ? _normal(jac) : nothing
-            qnode = QuadratureNode(x, w, ν)
+            ν = codim == 1 ? T.(s * _normal(jac)) : nothing
+            qnode = QuadratureNode(T.(x), T.(w), ν)
             push!(quad.qnodes, qnode)
         end
     end
@@ -131,11 +162,25 @@ end
 end
 
 """
+    Quadrature(Ω::Domain; meshsize, qorder)
+
+Construct a `Quadrature` over the domain `Ω` with a mesh of size `meshsize` and
+quadrature order `qorder`.
+"""
+function Quadrature(Ω::Domain; meshsize, qorder)
+    msh = meshgen(Ω; meshsize)
+    Q = Quadrature(view(msh, Ω); qorder)
+    return Q
+end
+
+"""
     domain(Q::Quadrature)
 
 The [`Domain`](@ref) over which `Q` performs integration.
 """
 domain(Q::Quadrature) = domain(Q.mesh)
+
+entities(Q::Quadrature) = Q |> mesh |> entities
 
 """
     dom2qtags(Q::Quadrature, dom::Domain)
@@ -146,8 +191,8 @@ its quadrature.
 function dom2qtags(Q::Quadrature, dom::Domain)
     msh = Q.mesh
     tags = Int[]
-    for E in element_types(Q)
-        idxs  = dom2elt(msh, dom, E)
+    for E in element_types(msh)
+        idxs = dom2elt(msh, dom, E)
         qtags = @view Q.etype2qtags[E][:, idxs]
         append!(tags, qtags)
     end
@@ -162,8 +207,8 @@ an appropiate quadrature rule.
 """
 function _qrule_for_reference_shape(ref, order)
     if ref === ReferenceLine() || ref === :line
-        return Fejer(; order)
         # return Fejer(; order)
+        return GaussLegendre(; order)
     elseif ref === ReferenceSquare() || ref === :square
         qx = _qrule_for_reference_shape(ReferenceLine(), order)
         qy = qx
@@ -253,15 +298,51 @@ function quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
     areas = zeros(length(inodes)) # area of neighboring triangles
     for (E, mat) in etype2mat(msh)
         qrule = Q.etype2qrule[E]
-        V = mapreduce(lagrange_basis(E), hcat, qcoords(qrule)) |> Matrix
+        L = lagrange_basis(qrule)
+        coords = reference_nodes(E)
+        # precompute value of quadrature basis at the interpolation nodes
+        Q2I = mapreduce(L, hcat, coords) |> transpose
         ni, nel = size(mat) # number of interpolation nodes by number of elements
         for n in 1:nel
             qtags = Q.etype2qtags[E][:, n]
             itags = mat[:, n]
             area = sum(q -> weight(q), view(Q.qnodes, qtags))
-            ivals[itags] .+= area .* (transpose(V) \ qvals[qtags])
+            ivals[itags] .+= area .* (Q2I * qvals[qtags])
             areas[itags] .+= area
         end
     end
     return ivals ./ areas
+end
+
+"""
+    mean_curvature(Q::Quadrature)
+
+Compute the `mean_curvature` at each quadrature node in `Q`.
+"""
+mean_curvature(Q::Quadrature) = _curvature(mean_curvature, Q)
+
+"""
+    gauss_curvature(Q::Quadrature)
+
+Compute the `gauss_curvature` at each quadrature node in `Q`.
+"""
+gauss_curvature(Q::Quadrature) = _curvature(gauss_curvature, Q)
+
+# helper function for computing curvature
+function _curvature(f, Q)
+    msh = mesh(Q)
+    curv = zeros(length(Q))
+    for (E, tags) in Q.etype2qtags
+        qrule = quadrature_rule(Q, E)
+        q̂, _ = qrule()
+        els = elements(msh, E)
+        for n in 1:size(tags, 2)
+            el = els[n]
+            for i in 1:size(tags, 1)
+                qtag = tags[i, n]
+                curv[qtag] = f(el, q̂[i])
+            end
+        end
+    end
+    return curv
 end

@@ -38,6 +38,24 @@ end
 end
 
 """
+    SingleLayerPotential(op::AbstractDifferentialOperator, source::Quadrature)
+
+An [`IntegralPotential`](@ref) over `source` with kernel given by `SingleLayerKernel(op)`.
+"""
+function SingleLayerPotential(op::AbstractDifferentialOperator, source::Quadrature)
+    return IntegralPotential(SingleLayerKernel(op), source)
+end
+
+"""
+    DoubleLayerPotential(op::AbstractDifferentialOperator, source::Quadrature)
+
+An [`IntegralPotential`](@ref) over `source` with kernel given by `DoubleLayerKernel(op)`.
+"""
+function DoubleLayerPotential(op::AbstractDifferentialOperator, source::Quadrature)
+    return IntegralPotential(DoubleLayerKernel(op), source)
+end
+
+"""
     struct IntegralOperator{T} <: AbstractMatrix{T}
 
 A discrete linear integral operator given by
@@ -55,10 +73,17 @@ struct IntegralOperator{V,K,T,S<:Quadrature} <: AbstractMatrix{V}
 end
 
 kernel(iop::IntegralOperator) = iop.kernel
+target(iop::IntegralOperator) = iop.target
+source(iop::IntegralOperator) = iop.source
 
 function IntegralOperator(k, X, Y::Quadrature = X)
-    T = return_type(k)
-    msg = """IntegralOperator of nonbits being created"""
+    # check that all entities in the quadrature are of the same dimension
+    if !allequal(geometric_dimension(ent) for ent in entities(Y))
+        msg = "entities in the target quadrature have different geometric dimensions"
+        throw(ArgumentError(msg))
+    end
+    T = return_type(k, eltype(X), eltype(Y))
+    msg = """IntegralOperator of nonbits being created: $T"""
     isbitstype(T) || (@warn msg)
     return IntegralOperator{T,typeof(k),typeof(X),typeof(Y)}(k, X, Y)
 end
@@ -73,12 +98,16 @@ end
 """
     assemble_matrix(iop::IntegralOperator; threads = true)
 
-Assemble the dense matrix representation of an `IntegralOperator`.
+Assemble a dense matrix representation of an `IntegralOperator`.
 """
 function assemble_matrix(iop::IntegralOperator; threads = true)
     T    = eltype(iop)
     m, n = size(iop)
-    out  = Matrix{T}(undef, m, n)
+    out  = if T <: SMatrix
+        BlockArray{T}(undef, m, n)
+    else
+        Array{T}(undef, m, n)
+    end
     K    = kernel(iop)
     # function barrier
     _assemble_matrix!(out, K, iop.target, iop.source, threads)
@@ -95,23 +124,23 @@ end
 end
 
 """
-    assemble_fmm(iop; atol)
+    assemble_fmm(iop; rtol)
 
-Set up a 2D or 3D FMM for evaluating the discretized integral operator `iop`
-associated with the `pde`. In 2D the `FMM2D` or `FMMLIB2D` library is used
-(whichever was most recently loaded) while in 3D `FMM3D` is used.
+Set up a 2D or 3D FMM for evaluating the discretized integral operator `iop` associated with
+the `op`. In 2D the `FMM2D` or `FMMLIB2D` library is used (whichever was most recently
+loaded) while in 3D `FMM3D` is used.
 
 !!! warning "FMMLIB2D"
     FMMLIB2D does *no* checking for if the targets and sources coincide, and
     will return `Inf` values if `iop.target !== iop.source`, but there is a
     point `x ∈ iop.target` such that `x ∈ iop.source`.
 """
-function assemble_fmm(iop::IntegralOperator, args...; kwargs...)
+function assemble_fmm(iop::IntegralOperator; rtol)
     N = ambient_dimension(iop.source)
     if N == 2
-        return _assemble_fmm2d(iop, args...; kwargs...)
+        return _assemble_fmm2d(iop; rtol)
     elseif N == 3
-        return _assemble_fmm3d(iop, args...; kwargs...)
+        return _assemble_fmm3d(iop; rtol)
     else
         return error("Only 2D and 3D FMMs are supported")
     end
@@ -131,8 +160,9 @@ end
 Assemble an H-matrix representation of the discretized integral operator `iop`
 using the `HMatrices.jl` library.
 
-See the `assemble_hmatrix` function from `HMatrices.jl` for more details on the
-keyword arguments.
+See the documentation of
+[`HMatrices`](https://github.com/IntegralEquations/HMatrices.jl) for more
+details on usage and other keyword arguments.
 """
 function assemble_hmatrix(args...; kwargs...)
     return error("Inti.assemble_hmatrix not found. Did you forget to import HMatrices?")
@@ -146,8 +176,8 @@ Helper function to help determine the constant σ in the Green identity S\\[γ�
 point is inside a domain or not.
 """
 function _green_multiplier(x::SVector, Q::Quadrature{N}) where {N}
-    pde = Laplace(; dim = N)
-    K = DoubleLayerKernel(pde)
+    op = Laplace(; dim = N)
+    K = DoubleLayerKernel(op)
     σ = sum(Q.qnodes) do q
         return K(x, q) * weight(q)
     end

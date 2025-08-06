@@ -1,11 +1,16 @@
 """
     struct Domain
 
-A set of [`EntityKey`](@ref)s with the same geometric dimension used to
-represent a physical domain.
+Representation of a geometrical domain formed by a set of entities with the same
+geometric dimension. For basic set operations on domains are supported (union,
+intersection, difference, etc), and they all return a new `Domain` object.
+
+Calling `keys(Ω)` returns the set of [`EntityKey`](@ref)s that make up the
+domain; given a key, the underlying entities can be accessed with
+[`global_get_entity(key)`](@ref).
 """
 struct Domain
-    entities::Set{EntityKey}
+    keys::Set{EntityKey}
     function Domain(ents::Set{EntityKey})
         @assert allequal(geometric_dimension(ent) for ent in ents) "entities in a domain have different dimensions"
         return new(ents)
@@ -13,9 +18,11 @@ struct Domain
 end
 
 Domain() = Domain(Set{EntityKey}())
+Domain(ents::Vararg{EntityKey}) = Domain(Set(ents))
+Domain(ents) = Domain(Set(ents))
 
 """
-    Domain([f::Function,] ents)
+    Domain([f::Function,] keys)
 
 Create a domain from a set of [`EntityKey`](@ref)s. Optionally, a filter
 function `f` can be passed to filter the entities.
@@ -25,22 +32,38 @@ Note that all entities in a domain must have the same geometric dimension.
 function Domain(f::Function, ents)
     return Domain(filter(f, ents))
 end
-Domain(ents) = Domain(Set(ents))
+Domain(f::Function, Ω::Domain) = Domain(f, keys(Ω))
+Domain(ents::AbstractVector{EntityKey}) = Domain(Set(ents))
 
 """
     entities(Ω::Domain)
 
-Return all entities making up a domain.
+Return all entities making up a domain (as a set of [`EntityKey`](@ref)s).
 """
-entities(Ω::Domain) = Ω.entities
+entities(Ω::Domain) = Ω.keys
+
+Base.keys(Ω::Domain) = Ω.keys
+
+# helper function to get all keys in a domain recursively
+function all_keys(Ω::Domain)
+    k = Set{EntityKey}()
+    return _all_keys!(k, Ω)
+end
+function _all_keys!(k, Ω::Domain)
+    union!(k, Ω.keys)
+    sk = skeleton(Ω)
+    isempty(sk) && return k
+    _all_keys!(k, skeleton(Ω))
+    return k
+end
 
 function Base.show(io::IO, d::Domain)
-    keys = entities(d)
-    n = length(entities(d))
-    n == 1 ? print(io, "Domain with $n entity:") : print(io, "Domain with $n entities:")
-    for k in keys
+    kk = keys(d)
+    n  = length(entities(d))
+    n == print(io, "Domain with $n ", n == 1 ? "entity" : "entities")
+    for k in kk
         ent = global_get_entity(k)
-        print(io, "\n $(k) --> $ent")
+        print(io, "\n $(k)")
     end
     return io
 end
@@ -97,8 +120,21 @@ See also: [`external_boundary`](@ref), [`internal_boundary`](@ref), [`skeleton`]
 boundary(Ω::Domain) = external_boundary(Ω)
 
 function Base.setdiff(Ω1::Domain, Ω2::Domain)
-    return Domain(setdiff(entities(Ω1), entities(Ω2)))
+    return Domain(setdiff(keys(Ω1), keys(Ω2)))
 end
+
+function Base.intersect(Ω1::Domain, Ω2::Domain)
+    if isempty(Ω1) || isempty(Ω2)
+        return Domain()
+    end
+    d1, d2 = map(geometric_dimension, (Ω1, Ω2))
+    d1 == d2 || error("domains have different dimensions: $d1 and $d2")
+    # try intersection at highest dimension, if empty, try on skeleton
+    Ωinter = Domain(intersect(keys(Ω1), keys(Ω2)))
+    return isempty(Ωinter) ? intersect(skeleton(Ω1), skeleton(Ω2)) : Ωinter
+end
+
+Base.:(==)(Ω1::Domain, Ω2::Domain) = (keys(Ω1) == keys(Ω2))
 
 function geometric_dimension(Ω::Domain)
     l, u = extrema(geometric_dimension(ent) for ent in entities(Ω))
@@ -116,4 +152,9 @@ Base.iterate(Ω::Domain, state = 1) = iterate(entities(Ω), state)
 Base.isempty(Ω::Domain) = isempty(entities(Ω))
 
 Base.in(ent::EntityKey, Ω::Domain) = in(ent, entities(Ω))
-Base.in(Ω1::Domain, Ω2::Domain) = all(ent ∈ Ω2 for ent in entities(Ω1))
+Base.in(Ω1::Domain, Ω2::Domain) = all(ent in Ω2 for ent in entities(Ω1))
+
+Base.union(Ω1::Domain, Ωs...) = Domain(union(Ω1.keys, map(ω -> keys(ω), Ωs)...))
+Base.union(e1::EntityKey, e2::EntityKey) = Domain(e1, e2)
+Base.union(e1::EntityKey, Ω::Domain) = Domain(e1, keys(Ω)...)
+Base.union(Ω::Domain, e::EntityKey) = Domain(keys(Ω)..., e)

@@ -17,17 +17,17 @@ include("test_utils.jl")
 Γ₂ = Inti.external_boundary(Ω₂)
 Γ₂_quad = Inti.Quadrature(view(msh₂, Γ₂); qorder = 3)
 
-for pde in (Inti.Laplace(; dim = 2), Inti.Helmholtz(; dim = 2, k = 1.2))
-    @testset "PDE: $pde" begin
+for op in (Inti.Laplace(; dim = 2), Inti.Helmholtz(; dim = 2, k = 1.2))
+    @testset "PDE: $op" begin
         for K in (
-            Inti.DoubleLayerKernel(pde),
-            Inti.SingleLayerKernel(pde),
-            Inti.AdjointDoubleLayerKernel(pde),
-            Inti.HyperSingularKernel(pde),
+            Inti.DoubleLayerKernel(op),
+            Inti.SingleLayerKernel(op),
+            Inti.AdjointDoubleLayerKernel(op),
+            Inti.HyperSingularKernel(op),
         )
             for Γ_quad in (Γ₁_quad, Γ₂_quad)
                 iop = Inti.IntegralOperator(K, Γ₁_quad, Γ_quad)
-                iop_fmm = Inti.assemble_fmm(iop; atol = 1e-8)
+                iop_fmm = Inti.assemble_fmm(iop; rtol = 1e-8)
                 x = rand(eltype(iop), size(iop, 2))
                 yapprox = iop_fmm * x
                 # test on a given index set
@@ -35,7 +35,7 @@ for pde in (Inti.Laplace(; dim = 2), Inti.Helmholtz(; dim = 2, k = 1.2))
                 exact = iop[idx_test, :] * x
                 # The discrepancy in tolerance for assemble_fmm and the test is because
                 # the library is tuned for error in potential but not in gradient
-                @test yapprox[idx_test] ≈ exact atol = 5e-6
+                @test yapprox[idx_test] ≈ exact rtol = 5e-6
             end
         end
     end

@@ -8,7 +8,7 @@ function __init__()
     @info "Loading Inti.jl FMMLIB2D extension"
 end
 
-function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
+function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
     # unpack the necessary fields in the appropriate format
     m, n = size(iop)
     sources = Matrix{Float64}(undef, 2, n)
@@ -33,14 +33,14 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
             @. charges = -1 / (2 * π) * weights * x
             # FMMLIB2D does no checking for if targets are also sources
             if same_surface
-                out = FMMLIB2D.rfmm2d(; source = sources, charge = charges, tol = atol)
+                out = FMMLIB2D.rfmm2d(; source = sources, charge = charges, tol = rtol)
                 return copyto!(y, out.pot)
             else
                 out = FMMLIB2D.rfmm2d(;
                     source = sources,
                     charge = charges,
                     target = targets,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, out.pottarg)
             end
@@ -66,7 +66,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     source = sources,
                     dipstr = dipstr,
                     dipvec = dipvecs,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, out.pot)
             else
@@ -75,7 +75,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     target = targets,
                     dipstr = dipstr,
                     dipvec = dipvecs,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, out.pottarg)
             end
@@ -95,7 +95,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     charge = charges,
                     source = sources,
                     ifgrad = true,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
             else
@@ -104,7 +104,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     source = sources,
                     target = targets,
                     ifgradtarg = true,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
@@ -135,7 +135,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     dipstr = dipstrs,
                     source = sources,
                     ifgrad = true,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
             else
@@ -145,7 +145,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     source = sources,
                     target = targets,
                     ifgradtarg = true,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
@@ -153,7 +153,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
         # Helmholtz
     elseif K isa Inti.SingleLayerKernel{ComplexF64,<:Inti.Helmholtz{2}}
         charges = Vector{ComplexF64}(undef, n)
-        zk = ComplexF64(K.pde.k)
+        zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights and constant
             @. charges = weights * x
@@ -163,7 +163,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     zk = zk,
                     source = sources,
                     charge = charges,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, out.pot)
             else
@@ -172,7 +172,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     source = sources,
                     charge = charges,
                     target = targets,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, out.pottarg)
             end
@@ -184,7 +184,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
         end
         dipvecs = similar(normals, Float64)
         dipstrs = Vector{ComplexF64}(undef, n)
-        zk = ComplexF64(K.pde.k)
+        zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights and constant
             for j in 1:n
@@ -200,7 +200,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     source = sources,
                     dipstr = dipstrs,
                     dipvec = dipvecs,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, out.pot)
             else
@@ -210,7 +210,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     target = targets,
                     dipstr = dipstrs,
                     dipvec = dipvecs,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, out.pottarg)
             end
@@ -221,7 +221,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
             xnormals[:, j] = Inti.normal(iop.target[j])
         end
         charges = Vector{ComplexF64}(undef, n)
-        zk = ComplexF64(K.pde.k)
+        zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights
             @. charges = x * weights
@@ -232,7 +232,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     charge = charges,
                     source = sources,
                     ifgrad = true,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
             else
@@ -242,7 +242,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     source = sources,
                     target = targets,
                     ifgradtarg = true,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
@@ -258,7 +258,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
         end
         dipvecs = similar(ynormals, Float64)
         dipstrs = Vector{ComplexF64}(undef, n)
-        zk = ComplexF64(K.pde.k)
+        zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights and constant
             for j in 1:n
@@ -275,7 +275,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     dipstr = dipstrs,
                     source = sources,
                     ifgrad = true,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
             else
@@ -286,7 +286,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; atol = sqrt(eps()))
                     source = sources,
                     target = targets,
                     ifgradtarg = true,
-                    tol = atol,
+                    tol = rtol,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end

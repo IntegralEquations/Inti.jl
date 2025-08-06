@@ -4,41 +4,50 @@ using Inti
 using LinearAlgebra
 
 @testset "Lagrange elements" begin
-    @testset "LagrangeLine" begin
-        d = Inti.ReferenceLine()
-        f = x -> x[1]^2
-        x̂ = Inti.reference_nodes(Inti.LagrangeLine{3})
-        vals = f.(x̂)
-        p = Inti.LagrangeLine(vals)
-        @test Inti.return_type(p) == Float64
-        @test p(0) ≈ 0
-        @test p(1) ≈ 1
-        @test p(0.1) ≈ 0.1^2
-        ## line in 3d
-        vtx = SVector(SVector(0.0, 0.0, 0.0), SVector(1.0, 1.0, 1.0))
-        l = Inti.LagrangeLine(vtx)
-        @test Inti.domain(l) == Inti.ReferenceLine()
-        @test l(0.1) ≈ SVector(0.1, 0.1, 0.1)
-        ## line in 2d
-        a = SVector(0.0, 0.0)
-        b = SVector(1.0, 1.0)
-        l = Inti.LagrangeLine((a, b))
-        @test Inti.domain(l) == Inti.ReferenceLine()
+    @testset "ℚₖ" begin
+        for dim in 1:3
+            D = Inti.ReferenceHyperCube{dim}
+            @testset "$D" begin
+                for n in 1:5 # points per dimension
+                    Np = n^dim
+                    T = Inti.LagrangeElement{D,Np}
+                    x = Inti.reference_nodes(T)
+                    # make sure it is exact on polynomials of degree n-1
+                    xtest = rand(SVector{dim}, 100)
+                    p = (x) -> sum(xd -> xd^(n - 1), x)
+                    vals = p.(x)
+                    el = Inti.LagrangeElement{D}(vals)
+                    @test all(norm(el(x) - p(x)) < 1e-12 for x in xtest)
+                    # and not exact on polynomials of degree n
+                    p = (x) -> sum(xd -> xd^(n), x)
+                    vals = p.(x)
+                    el = Inti.LagrangeElement{D}(vals)
+                    @test !all(el(x) ≈ p(x) for x in xtest)
+                end
+            end
+        end
     end
-    @testset "LagrangeTriangle" begin
-        # triangle in 2d
-        vtx = SVector(SVector(0.0, 0.0), SVector(0.0, 1.0), SVector(-1.0, 0))
-        t = Inti.LagrangeTriangle(vtx)
-        @test Inti.return_type(t) == SVector{2,Float64}
-        @test Inti.domain_dimension(t) == 2
-        @test Inti.range_dimension(t) == 2
-        # triangle in 3d
-        vtx = SVector(SVector(0.0, 0.0, 0.0), SVector(0.0, 1.0, 0.0), SVector(-1.0, 0, 0.0))
-        t = Inti.LagrangeTriangle(vtx)
-        @test Inti.range_dimension(t) == 3
-        @test Inti.domain_dimension(t) == 2
-    end
-    @testset "Tetrahedron" begin
-        # TODO: add tests
+    @testset "ℙₖ" begin
+        for dim in 1:3
+            D = Inti.ReferenceSimplex{dim}
+            @testset "$D" begin
+                for k in 0:5
+                    Np = binomial(dim + k, k) # number of points in the simplex
+                    T = Inti.LagrangeElement{D,Np}
+                    Inti.order(T)
+                    x = Inti.reference_nodes(T)
+                    p = (x) -> sum(xd -> xd^k, x)
+                    vals = p.(x)
+                    el = Inti.LagrangeElement{D}(vals)
+                    xtest = rand(SVector{dim}, 10)
+                    @test all(norm(el(x) - p(x)) < 1e-12 for x in xtest)
+                    # test inexactness on polynomials of degree k+1
+                    p = (x) -> sum(xd -> xd^(k + 1), x)
+                    vals = p.(x)
+                    el = Inti.LagrangeElement{D}(vals)
+                    @test !all(el(x) ≈ p(x) for x in xtest)
+                end
+            end
+        end
     end
 end
