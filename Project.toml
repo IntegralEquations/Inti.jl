@@ -29,7 +29,7 @@ IntiHMatricesExt = "HMatrices"
 IntiMeshesExt = "Meshes"
 
 [compat]
-ElementaryPDESolutions = "0.2"
+ElementaryPDESolutions = "0.3"
 FMMLIB2D = "0.3"
 FMM2D = "0.2"
 FMM3D = "1"

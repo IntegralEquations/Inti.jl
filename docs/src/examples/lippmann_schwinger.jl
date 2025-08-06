@@ -13,6 +13,7 @@ Pkg.activate(docsdir)                 #src
 #       - Solving a volume integral equation
 
 using Inti
+Inti.clear_entities!()
 
 # ## Problem definition
 
@@ -30,7 +31,7 @@ using Inti
 interpolation_order = 2 # `interpolation_order` corresponds to `n` in the VDIM paper
 qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
 
-k₁ = 4π
+k₁ = 6π
 k₂ = 2π
 λ₁ = 2π / k₁
 λ₂ = 2π / k₂
@@ -42,7 +43,8 @@ nothing # hide
 #       verified against a BIE formulation.  Generally, we will want to use a
 #       VIE formulation for variable media e.g. `η = (x) -> 1 +
 #       .7*exp(-40*(x[1]^2 + x[2]^2))`.
-η = (x) -> (k₂ / k₁)^2
+η = (x) -> 1 - .7*exp(-40*(x[1]^2 + x[2]^2))
+#η = (x) -> (k₂ / k₁)^2
 nothing # hide
 
 # ## Meshing
@@ -119,7 +121,7 @@ L = I + k₁^2 * V_d2d * Lη
 # The unknown volumetric field $u$:
 using IterativeSolvers
 u, hist =
-    gmres(L, rhs; log = true, abstol = 1e-7, verbose = false, restart = 200, maxiter = 200)
+    gmres(L, rhs; log = true, abstol = 1e-7, verbose = true, restart = 200, maxiter = 200)
 @show hist
 
 𝒱 = Inti.IntegralPotential(Inti.SingleLayerKernel(pde), Ωₕ_quad)
@@ -138,3 +140,13 @@ Inti.write_gmsh_view!(Ωₕ, solₕ_nodes; name="LS solution")
 "-nopopup" in ARGS || gmsh.fltk.run()
 gmsh.finalize()
 nothing # hide
+
+pt = Inti.Point2D([0.625, -0.65])
+V_d2pt = Inti.volume_potential(;
+    pde,
+    target = [pt],
+    source = Ωₕ_quad,
+    compression = (method = :fmm, tol = 1e-7),
+    correction = (method = :dim, interpolation_order, target_location = :inside)
+)
+utrans = uⁱ(pt) .- k₁^2 * V_d2pt * (refr_map_d .* u)
