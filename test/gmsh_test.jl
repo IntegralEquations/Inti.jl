@@ -16,7 +16,7 @@ using Test
         Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, msh)
         Γ = Inti.boundary(Ω)
         gmsh.finalize()
-        vol_quad = Inti.Quadrature(msh[Ω]; qorder = 3)
+        vol_quad = Inti.Quadrature(msh[Ω]; qorder = 4)
         bnd_quad = Inti.Quadrature(msh[Γ]; qorder = 3)
         @test abs(Inti.integrate(x -> 1, vol_quad) - π) < 1e-2
         @test abs(Inti.integrate(x -> 1, bnd_quad) - 2π) < 1e-2
@@ -37,7 +37,7 @@ end
         Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, msh)
         Γ = Inti.boundary(Ω)
         gmsh.finalize()
-        vol_quad = Inti.Quadrature(msh[Ω]; qorder = 3)
+        vol_quad = Inti.Quadrature(msh[Ω]; qorder = 4)
         bnd_quad = Inti.Quadrature(msh[Γ]; qorder = 3)
         @test Inti.integrate(x -> 1, vol_quad) ≈ 4
         @test Inti.integrate(x -> 1, bnd_quad) ≈ 8
@@ -59,7 +59,7 @@ end
         Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 3, msh)
         Γ = Inti.boundary(Ω)
         vol_quad = Inti.Quadrature(msh[Ω]; qorder = 3)
-        bnd_quad = Inti.Quadrature(msh[Γ]; qorder = 3)
+        bnd_quad = Inti.Quadrature(msh[Γ]; qorder = 4)
         @test abs(Inti.integrate(x -> 1, vol_quad) - 4 / 3 * π) < 1e-2
         @test abs(Inti.integrate(x -> 1, bnd_quad) - 4 * π) < 1e-2
     end
@@ -80,7 +80,7 @@ end
         Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 3, msh)
         Γ = Inti.boundary(Ω)
         vol_quad = Inti.Quadrature(msh[Ω]; qorder = 3)
-        bnd_quad = Inti.Quadrature(msh[Γ]; qorder = 3)
+        bnd_quad = Inti.Quadrature(msh[Γ]; qorder = 4)
         @test Inti.integrate(x -> 1, vol_quad) ≈ 8
         @test Inti.integrate(x -> 1, bnd_quad) ≈ 24
     end

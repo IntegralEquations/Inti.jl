@@ -12,9 +12,9 @@ include("test_utils.jl")
 Ω₂, msh₂ = gmsh_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = 0.075)
 # Test on two meshes to test both sources == targets, and not.
 Γ₁ = Inti.external_boundary(Ω₁)
-Γ₁_quad = Inti.Quadrature(view(msh₁, Γ₁); qorder = 3)
+Γ₁_quad = Inti.Quadrature(view(msh₁, Γ₁); qorder = 4)
 Γ₂ = Inti.external_boundary(Ω₂)
-Γ₂_quad = Inti.Quadrature(view(msh₂, Γ₂); qorder = 3)
+Γ₂_quad = Inti.Quadrature(view(msh₂, Γ₂); qorder = 4)
 
 for op in (
     Inti.Laplace(; dim = 3),

@@ -52,13 +52,13 @@ using Inti
                 return Inti.geometric_dimension(e) == 3
             end
             Γ = Inti.external_boundary(Ω)
-            quad = Inti.Quadrature(M[Γ]; qorder = 4) # NystromMesh of surface Γ
+            quad = Inti.Quadrature(M[Γ]; qorder = 5)
             area = Inti.integrate(x -> 1, quad)
             @test isapprox(area, 4 * π * r^2, rtol = 5e-2)
             exact = map(f, M[Γ].nodes)
             approx = Inti.quadrature_to_node_vals(quad, map(q -> f(q.coords), quad))
             @test exact ≈ approx
-            quad = Inti.Quadrature(M[Ω]; qorder = 4) # Nystrom mesh of volume Ω
+            quad = Inti.Quadrature(M[Ω]; qorder = 5)
             volume = Inti.integrate(x -> 1, quad)
             @test isapprox(volume, 4 / 3 * π * r^3, atol = 1e-2)
             exact = map(f, M[Ω].nodes)

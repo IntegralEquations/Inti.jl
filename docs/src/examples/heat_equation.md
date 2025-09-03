@@ -208,8 +208,8 @@ Now we create quadrature rules for both ``\Omega`` and ``\Gamma``, which will be
 accurately integrate our kernel functions over the domain and boundary:
 
 ```@example heat_equation
-Ω_quad = Inti.Quadrature(Ω_msh; qorder = 3)
-Γ_quad = Inti.Quadrature(Γ_msh; qorder = 3)
+Ω_quad = Inti.Quadrature(Ω_msh; qorder = 2)
+Γ_quad = Inti.Quadrature(Γ_msh; qorder = 2)
 nothing # hide
 ```
 
