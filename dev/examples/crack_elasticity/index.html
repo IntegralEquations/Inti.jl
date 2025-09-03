@@ -19,10 +19,10 @@ msh = Inti.import_mesh(; dim = 3)
 Q = Inti.Quadrature(Γ_msh; qorder = 2)
 gmsh.finalize()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : Meshing curve 1 (Ellipse)
-Info    : Done meshing 1D (Wall 0.00015509s, CPU 0.000154s)
+Info    : Done meshing 1D (Wall 0.000157495s, CPU 0.000157s)
 Info    : Meshing 2D...
 Info    : Meshing surface 1 (Plane, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.00804039s, CPU 0.008039s)
+Info    : Done meshing 2D (Wall 0.00787149s, CPU 0.00787s)
 Info    : 123 nodes 245 elements</code></pre><p>Note that we have used second-order elements for the mesh, which is useful for better representing the edges of the circular crack.</p><h2 id="Integral-operators"><a class="docs-heading-anchor" href="#Integral-operators">Integral operators</a><a id="Integral-operators-1"></a><a class="docs-heading-anchor-permalink" href="#Integral-operators" title="Permalink"></a></h2><p>We will now build an approximation to <span>$T$</span> using:</p><ul><li>A hierarchical matrix representation for the integral operator</li><li>An adaptive correction to account for the singular and nearly singular interactions</li></ul><pre><code class="language-julia hljs">using HMatrices
 using LinearMaps
 using LinearAlgebra
@@ -65,7 +65,7 @@ vals = getindex.(φ, 3)
 scatter(r, vals, label = &quot;Numerical solution&quot;)
 lines!(0:0.01:1, φ₃, label = &quot;Exact solution&quot;, color = :red, linewidth = 4)
 axislegend()
-current_figure()</code></pre><img src="9f143310.png" alt="Example block output"/><p>Although the solution is not perfect, it captures the general behavior of the displacement field. One way to make the error smaller is to use a finer mesh and/or higher order quadrature. An alternative way, however, is to use a weight function to incorporate the singular behavior of the displacement field near the edge of the crack, as shown next.</p><h2 id="Improving-the-accuracy"><a class="docs-heading-anchor" href="#Improving-the-accuracy">Improving the accuracy</a><a id="Improving-the-accuracy-1"></a><a class="docs-heading-anchor-permalink" href="#Improving-the-accuracy" title="Permalink"></a></h2><p>It is beneficial to add a weight function to help the solution being more accurate near the crack, where the displacement is singular, asymptotically equal to <span>$d^{1/2}$</span> (<span>$d$</span> is the distance from a point to the crack front) according to the Williams&#39; asymptotic expansion. For this simple example we take the weight function as:</p><p class="math-container">\[w(\boldsymbol x):=\sqrt{1-||\boldsymbol x||}\underset{d\rightarrow
+current_figure()</code></pre><img src="7a74541a.png" alt="Example block output"/><p>Although the solution is not perfect, it captures the general behavior of the displacement field. One way to make the error smaller is to use a finer mesh and/or higher order quadrature. An alternative way, however, is to use a weight function to incorporate the singular behavior of the displacement field near the edge of the crack, as shown next.</p><h2 id="Improving-the-accuracy"><a class="docs-heading-anchor" href="#Improving-the-accuracy">Improving the accuracy</a><a id="Improving-the-accuracy-1"></a><a class="docs-heading-anchor-permalink" href="#Improving-the-accuracy" title="Permalink"></a></h2><p>It is beneficial to add a weight function to help the solution being more accurate near the crack, where the displacement is singular, asymptotically equal to <span>$d^{1/2}$</span> (<span>$d$</span> is the distance from a point to the crack front) according to the Williams&#39; asymptotic expansion. For this simple example we take the weight function as:</p><p class="math-container">\[w(\boldsymbol x):=\sqrt{1-||\boldsymbol x||}\underset{d\rightarrow
 0}{\sim}\sqrt{d(\boldsymbol x)}\]</p><pre><code class="language-julia hljs">weight(x) = sqrt(1 - norm(x))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">weight (generic function with 1 method)</code></pre><p>and define a modified kernel <span>$K_w$</span> as:</p><pre><code class="language-julia hljs">Kw = let w = weight, K = K
     (p,q) -&gt;  K(p,q) * w(q.coords)
 end
@@ -73,30 +73,30 @@ Inti.singularity_order(::typeof(Kw)) = -3</code></pre><p>With this new kernel, w
 Tw₀ = Inti.assemble_hmatrix(Tw_op)
 δTw = Inti.adaptive_correction(Tw_op; maxdist = 2*meshsize, atol = 1e-2)
 φw = solve(Tw₀, δTw, t)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">636-element Vector{StaticArraysCore.SVector{3, Float64}}:
- [0.0, 0.0, 1.4230577976907368]
- [0.0, 0.0, 1.3912852557980615]
- [0.0, 0.0, 1.381006236831446]
- [0.0, 0.0, 1.3698106519731719]
- [0.0, 0.0, 1.4116170757141766]
- [0.0, 0.0, 1.3705156040445328]
- [0.0, 0.0, 1.4091460612593716]
- [0.0, 0.0, 1.4392188998730895]
- [0.0, 0.0, 1.4483940429135769]
- [0.0, 0.0, 1.4162682321963096]
+ [0.0, 0.0, 1.391285254918195]
+ [0.0, 0.0, 1.4230577970969551]
+ [0.0, 0.0, 1.3810062360396425]
+ [0.0, 0.0, 1.4116170747770707]
+ [0.0, 0.0, 1.3698106519039752]
+ [0.0, 0.0, 1.3705156039984776]
+ [0.0, 0.0, 1.43921889906723]
+ [0.0, 0.0, 1.4091460603310921]
+ [0.0, 0.0, 1.4483940413482015]
+ [0.0, 0.0, 1.443138685705927]
  ⋮
- [0.0, 0.0, 1.4552500239297368]
- [0.0, 0.0, 1.4548888887741558]
- [0.0, 0.0, 1.4301615516429198]
- [0.0, 0.0, 1.4539704180206598]
- [0.0, 0.0, 1.4578199747821596]
- [0.0, 0.0, 1.4320730784666098]
- [0.0, 0.0, 1.4572383972320448]
- [0.0, 0.0, 1.4507493653412247]
- [0.0, 0.0, 1.4325181376006666]</code></pre><p>We now plot the displacement field again, but this with the weighted kernel approach, and compare it to the previous approach. Note that we must multiply the solution <code>φw</code> by the weight function to obtain the actual displacement jump <code>φ</code>.</p><pre><code class="language-julia hljs">weights = [weight(q.coords) for q in Q]
+ [0.0, 0.0, 1.4548888885783204]
+ [0.0, 0.0, 1.4552500232544239]
+ [0.0, 0.0, 1.43016155126916]
+ [0.0, 0.0, 1.4578199740855955]
+ [0.0, 0.0, 1.4539704177727035]
+ [0.0, 0.0, 1.432073077962468]
+ [0.0, 0.0, 1.4507493647231902]
+ [0.0, 0.0, 1.4572383954126746]
+ [0.0, 0.0, 1.43251813679951]</code></pre><p>We now plot the displacement field again, but this with the weighted kernel approach, and compare it to the previous approach. Note that we must multiply the solution <code>φw</code> by the weight function to obtain the actual displacement jump <code>φ</code>.</p><pre><code class="language-julia hljs">weights = [weight(q.coords) for q in Q]
 scatter(r, getindex.(φw,3) .* weights, label = &quot;Numerical solution (weighted)&quot;)
 lines!(0:0.01:1, φ₃, label = &quot;Exact solution&quot;, color = :red, linewidth = 4)
 axislegend()
-current_figure()</code></pre><img src="48199ec3.png" alt="Example block output"/><p>The solution is now much more accurate, especially near the crack front, even though the same mesh and quadrature were used. This is a common technique in boundary integral equation: factoring out the asymptotic (non-smooth) behavior of the solution using a weight function.</p><p>Finally, we can visualize the displacement field on the mesh by interpolating the computed values on the quadrature points to the mesh nodes. We use <code>Meshes</code> to visualize the solution:</p><pre><code class="language-julia hljs">using Meshes
+current_figure()</code></pre><img src="4a43269a.png" alt="Example block output"/><p>The solution is now much more accurate, especially near the crack front, even though the same mesh and quadrature were used. This is a common technique in boundary integral equation: factoring out the asymptotic (non-smooth) behavior of the solution using a weight function.</p><p>Finally, we can visualize the displacement field on the mesh by interpolating the computed values on the quadrature points to the mesh nodes. We use <code>Meshes</code> to visualize the solution:</p><pre><code class="language-julia hljs">using Meshes
 φ3w_nodes = Inti.quadrature_to_node_vals(Q, getindex.(φw, 3))
 msh_nodes = Inti.nodes(Q.mesh)
 w_nodes = [weight(x) for x in msh_nodes]
@@ -107,4 +107,4 @@ ax = Axis3(fig[1, 1])
 n = length(Q.mesh.nodes)
 viz!(Q.mesh; color = φ3_nodes, interpolate = false, showsegments=true)
 cb = Colorbar(fig[1, 2]; label = &quot;φ₃&quot;, colorrange)
-fig</code></pre><img src="bb9c5c21.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes_drag/">« Stokes drag</a><a class="docs-footer-nextpage" href="../pep/">Plasmonic eigenvalues »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Sunday 13 July 2025 09:01">Sunday 13 July 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+fig</code></pre><img src="bb9c5c21.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes_drag/">« Stokes drag</a><a class="docs-footer-nextpage" href="../pep/">Plasmonic eigenvalues »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Wednesday 3 September 2025 17:02">Wednesday 3 September 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
