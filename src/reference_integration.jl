@@ -108,7 +108,7 @@ order(::Fejer{N}) where {N} = N - 1
     w = zero(x)
     for j in 1:N
         tmp = 0.0
-        for l in 1:floor(N/2)
+        for l in 1:floor(N / 2)
             tmp += 1 / (4 * l^2 - 1) * cos(2 * l * theta[j])
         end
         w[j] = 2 / N * (1 - 2 * tmp)
@@ -474,14 +474,14 @@ reference shape `ref_domain`. The keyword arguments are passed to
 `HAdaptiveIntegration.integrate`.
 """
 function adaptive_quadrature(ref_domain::ReferenceLine; kwargs...)
-    seg = HAdaptiveIntegration.segment(0.0, 1.0)
+    seg = HAdaptiveIntegration.Orthotope(0.0, 1.0)
     return (f) -> HAdaptiveIntegration.integrate(f, seg; kwargs...)[1]
 end
 function adaptive_quadrature(ref_domain::ReferenceTriangle; kwargs...)
-    tri = HAdaptiveIntegration.triangle((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))
+    tri = HAdaptiveIntegration.Triangle((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))
     return (f) -> HAdaptiveIntegration.integrate(f, tri; kwargs...)[1]
 end
 function adaptive_quadrature(ref_domain::ReferenceSquare; kwargs...)
-    sq = HAdaptiveIntegration.rectangle((0.0, 0.0), (1.0, 1.0))
+    sq = HAdaptiveIntegration.Rectangle((0.0, 0.0), (1.0, 1.0))
     return (f) -> HAdaptiveIntegration.integrate(f, sq; kwargs...)[1]
 end

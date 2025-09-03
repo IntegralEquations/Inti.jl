@@ -158,8 +158,8 @@ for l in [l1, l2, l3, l4]
       push!(tangents, vec(Inti.jacobian(l, 0.5)))
       push!(normals,Inti.normal(l, 0.5))
 end
-arrows!(pts, tangents, color = :blue, linewidth = 2, linestyle = :dash, lengthscale = 1/4, label = "tangent")
-arrows!(pts, normals, color = :black, linewidth = 2, linestyle = :dash, lengthscale = 1/4, label = "normal")
+arrows2d!(pts, tangents, color = :blue, shaftwidth = 2, lengthscale = 1/4, label = "tangent")
+arrows2d!(pts, normals, color = :black, shaftwidth = 2, lengthscale = 1/4, label = "normal")
 axislegend()
 fig # hide
 ```
