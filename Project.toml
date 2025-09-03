@@ -1,6 +1,6 @@
 name = "Inti"
 uuid = "fb74042b-437e-4c5b-88cf-d4e2beb394d5"
-version = "0.1.5"
+version = "0.2.0"
 
 [deps]
 Bessels = "0e736298-9ec6-45e8-9647-e4fc86a2fe38"
