@@ -59,7 +59,7 @@ include("test_utils.jl")
     @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), truevol, rtol = 1e-7)
     @test isapprox(Inti.integrate(x -> 1, Γₕ_quad), truesfcarea, rtol = 1e-7)
 
-    qorder = 8
+    qorder = 7
     Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder)
     Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder)
     @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), truevol, rtol = 1e-11)
