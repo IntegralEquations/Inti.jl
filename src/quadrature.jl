@@ -315,6 +315,32 @@ function quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
 end
 
 """
+    node_vals_to_quadrature(Q::Quadrature, vals::AbstractVector)
+
+Given a vector of `vals` at the interpolation nodes of `Q.mesh`, return a vector of values
+at the quadrature nodes of `Q`.
+"""
+function node_vals_to_quadrature(Q::Quadrature, ivals::AbstractVector)
+    msh = Q.mesh isa SubMesh ? collect(Q.mesh) : Q.mesh
+    qnodes = Q.qnodes
+    qvals = zeros(eltype(ivals), length(qnodes))
+    for (E, mat) in etype2mat(msh)
+        qrule = Q.etype2qrule[E]
+        L = lagrange_basis(E)
+        coords = qcoords(qrule)
+        # precompute value of lagrange basis at the quadrature nodes
+        I2Q = mapreduce(L, hcat, coords) |> transpose
+        ni, nel = size(mat) # number of interpolation nodes by number of elements
+        for n in 1:nel
+            qtags = Q.etype2qtags[E][:, n]
+            itags = mat[:, n]
+            qvals[qtags] .= (I2Q * ivals[itags])
+        end
+    end
+    return qvals
+end
+
+"""
     mean_curvature(Q::Quadrature)
 
 Compute the `mean_curvature` at each quadrature node in `Q`.
