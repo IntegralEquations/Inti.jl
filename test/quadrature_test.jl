@@ -58,12 +58,22 @@ using Inti
             exact = map(f, M[Γ].nodes)
             approx = Inti.quadrature_to_node_vals(quad, map(q -> f(q.coords), quad))
             @test exact ≈ approx
+            # test inverse operation: node_vals_to_quadrature
+            node_vals = map(f, M[Γ].nodes)
+            quad_vals_from_nodes = Inti.node_vals_to_quadrature(quad, node_vals)
+            quad_vals_exact = map(q -> f(q.coords), quad)
+            @test quad_vals_from_nodes ≈ quad_vals_exact
             quad = Inti.Quadrature(M[Ω]; qorder = 5)
             volume = Inti.integrate(x -> 1, quad)
             @test isapprox(volume, 4 / 3 * π * r^3, atol = 1e-2)
             exact = map(f, M[Ω].nodes)
             approx = Inti.quadrature_to_node_vals(quad, map(q -> f(q.coords), quad))
             @test exact ≈ approx
+            # test inverse operation: node_vals_to_quadrature
+            node_vals = map(f, M[Ω].nodes)
+            quad_vals_from_nodes = Inti.node_vals_to_quadrature(quad, node_vals)
+            quad_vals_exact = map(q -> f(q.coords), quad)
+            @test quad_vals_from_nodes ≈ quad_vals_exact
         end
         @testset "Sphere with P2" begin
             r = 0.5
@@ -95,6 +105,11 @@ using Inti
             exact = map(f, M[Γ].nodes)
             approx = Inti.quadrature_to_node_vals(quad, map(q -> f(q.coords), quad))
             @test exact ≈ approx
+            # test inverse operation: node_vals_to_quadrature
+            node_vals = map(f, M[Γ].nodes)
+            quad_vals_from_nodes = Inti.node_vals_to_quadrature(quad, node_vals)
+            quad_vals_exact = map(q -> f(q.coords), quad)
+            @test quad_vals_from_nodes ≈ quad_vals_exact
         end
         @testset "Circle" begin
             r = rx = ry = 0.5
@@ -120,11 +135,21 @@ using Inti
             exact = map(f, M[Ω].nodes)
             approx = Inti.quadrature_to_node_vals(quad, map(q -> f(q.coords), quad))
             @test exact ≈ approx
+            # test inverse operation: node_vals_to_quadrature for area
+            node_vals = map(f, M[Ω].nodes)
+            quad_vals_from_nodes = Inti.node_vals_to_quadrature(quad, node_vals)
+            quad_vals_exact = map(q -> f(q.coords), quad)
+            @test quad_vals_from_nodes ≈ quad_vals_exact
             # test perimeter
             quad = Inti.Quadrature(M[Γ]; qorder = 2)
             exact = map(f, quad.mesh.nodes)
             approx = Inti.quadrature_to_node_vals(quad, map(q -> f(q.coords), quad))
             @test exact ≈ approx
+            # test inverse operation: node_vals_to_quadrature for perimeter
+            node_vals = map(f, quad.mesh.nodes)
+            quad_vals_from_nodes = Inti.node_vals_to_quadrature(quad, node_vals)
+            quad_vals_exact = map(q -> f(q.coords), quad)
+            @test quad_vals_from_nodes ≈ quad_vals_exact
             P = 2π * r
             @test isapprox(P, Inti.integrate(x -> 1, quad); atol = 1e-2)
         end
