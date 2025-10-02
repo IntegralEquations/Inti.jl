@@ -94,9 +94,14 @@ function single_double_layer(;
     if correction.method == :none
         return Smat, Dmat # shortcircuit case without correction
     elseif correction.method == :dim
-        loc = target === source ? :on : correction.target_location
-        μ = _green_multiplier(loc)
-        green_multiplier = fill(μ, length(target))
+        if haskey(correction, :green_multiplier)
+            @assert length(correction.green_multiplier) == length(target)
+            green_multiplier = correction.green_multiplier
+        else
+            loc = target === source ? :on : correction.target_location
+            μ = _green_multiplier(loc)
+            green_multiplier = fill(μ, length(target))
+        end
         dict_near = etype_to_nearest_points(target, source; correction.maxdist)
         # If target != source then we want to filter the near-field points and construct auxiliary
         # IntegralOperator with targets limited to those that will be corrected.
@@ -297,9 +302,13 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         correction_kw = Base.structdiff(correction, NamedTuple{(:method,)})
         δV = adaptive_correction(V; correction_kw...)
     elseif correction.method == :dim
-        loc = target === source ? :inside : correction.target_location
-        μ = _green_multiplier(loc)
-        green_multiplier = fill(μ, length(target))
+        if haskey(correction, :green_multiplier)
+            green_multiplier = correction.green_multiplier
+        else
+            loc = target === source ? :inside : correction.target_location
+            μ = _green_multiplier(loc)
+            green_multiplier = fill(μ, length(target))
+        end
         if haskey(correction, :boundary)
             boundary = correction.boundary
         elseif source.mesh isa SubMesh # attempt to find the boundary in the parent mesh
@@ -315,13 +324,23 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         end
         # Advanced usage: Use previously constructed layer operators for VDIM
         if !haskey(correction, :S_b2d) || !haskey(correction, :D_b2d)
-            S, D = single_double_layer(;
-                op,
-                target,
-                source = boundary,
-                compression,
-                correction = (correction..., target_location = loc),
-            )
+            if haskey(correction, :green_multiplier)
+                S, D = single_double_layer(;
+                    op,
+                    target,
+                    source = boundary,
+                    compression,
+                    correction,
+                )
+            else
+                S, D = single_double_layer(;
+                    op,
+                    target,
+                    source = boundary,
+                    compression,
+                    correction = (correction..., target_location = loc),
+                )
+            end
         else
             S = correction.S_b2d
             D = correction.D_b2d
