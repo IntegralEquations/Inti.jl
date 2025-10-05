@@ -4,6 +4,7 @@ import Inti
 import QPGreen
 import LinearAlgebra
 import ForwardDiff
+import StaticArrays: SMatrix
 
 function __init__()
     @info "Loading Inti.jl QPGreen extension"
@@ -14,11 +15,13 @@ struct HelmholtzPeriodic1D{
     NT<:NamedTuple,
     F1,
     F2<:NamedTuple,
+    F3<:NamedTuple,
     C1<:QPGreen.AbstractIntegrationCache,
 } <: Inti.AbstractDifferentialOperator{N}
     params::NT
     val_interp::F1
     grad_interp::F2
+    hess_interp::F3
     Yε_cache::C1
 end
 
@@ -38,18 +41,20 @@ whether we want to give users control over these parameters in the future.)
 function Inti.HelmholtzPeriodic1D(; alpha, k, dim)
     params = (alpha = alpha, k = k, c = 0.6, c_tilde = 1.0, epsilon = 0.45, order = 8)
     grid_size = 1024
-    val_interp, grad_interp, Yε_cache =
-        QPGreen.init_qp_green_fft(params, grid_size; derivative = true)
+    val_interp, grad_interp, hess_interp, Yε_cache =
+        QPGreen.init_qp_green_fft(params, grid_size; grad = true, hess = true)
     return HelmholtzPeriodic1D{
         dim,
         typeof(params),
         typeof(val_interp),
         typeof(grad_interp),
+        typeof(hess_interp),
         typeof(Yε_cache),
     }(
         params,
         val_interp,
         grad_interp,
+        hess_interp,
         Yε_cache,
     )
 end
@@ -123,13 +128,19 @@ function (HS::Inti.HyperSingularKernel{T,<:HelmholtzPeriodic1D{N}})(
     source,
     r = Inti.coords(target) - Inti.coords(source),
 ) where {N,T}
-    x = Inti.coords(target)
+    d = LinearAlgebra.norm(r)
+    (d ≤ Inti.SAME_POINT_TOLERANCE) && return zero(T)
     nx = Inti.normal(target)
     ny = Inti.normal(source)
     if N == 2
-        dGdny = Inti.DoubleLayerKernel(HS.op)
-        # TODO: consider implementing the second derivative in QPGreen.jl.
-        ForwardDiff.derivative(t -> dGdny(x + t * nx, source), 0)
+        ### Alternative via AutoDiff (only working if evaluate Hankel function with SpecialFunctions.jl)
+        # x = Inti.coords(target)
+        # dGdny = Inti.DoubleLayerKernel(HS.op)
+        # ForwardDiff.derivative(t -> dGdny(x + t * nx, source), 0)
+        hess = QPGreen.hess_qp_green(r, HS.op.params, HS.op.hess_interp, HS.op.Yε_cache;)
+        hess_matrix = SMatrix{2,2}(hess[1], hess[2], hess[2], hess[3])
+        out = -transpose(nx) * hess_matrix * ny
+        return out
     else
         return error(
             "Hypersingular kernel for HelmholtzPeriodic1D not implemented in $N dimensions",

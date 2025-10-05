@@ -11,14 +11,15 @@ using StaticArrays
 using QPGreen
 using ForwardDiff
 
-# Extend QuadGK to support ForwardDiff.Dual types (see https://github.com/JuliaMath/QuadGK.jl/issues/122)
-using QuadGK
-function QuadGK.cachedrule(
-    ::Type{<:ForwardDiff.Dual{<:Any,T}},
-    n::Integer,
-) where {T<:Number}
-    return QuadGK._cachedrule(typeof(float(real(one(T)))), Int(n))
-end
+## Extend QuadGK to support ForwardDiff.Dual types (see https://github.com/JuliaMath/QuadGK.jl/issues/122)
+## (only needed if computing derivatives of QPGreen using ForwardDiff)
+# using QuadGK
+# function QuadGK.cachedrule(
+#     ::Type{<:ForwardDiff.Dual{<:Any,T}},
+#     n::Integer,
+# ) where {T<:Number}
+#     return QuadGK._cachedrule(typeof(float(real(one(T)))), Int(n))
+# end
 
 include("test_utils.jl")
 
