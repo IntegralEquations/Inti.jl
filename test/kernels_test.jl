@@ -4,7 +4,7 @@ using StaticArrays
 using ForwardDiff
 using QPGreen
 
-# Extend QuadGK to support ForwardDiff.Dual types (see https://github.com/JuliaMath/QuadGK.jl/issues/122)
+## Extend QuadGK to support ForwardDiff.Dual types (see https://github.com/JuliaMath/QuadGK.jl/issues/122)
 using QuadGK
 function QuadGK.cachedrule(
     ::Type{<:ForwardDiff.Dual{<:Any,T}},
