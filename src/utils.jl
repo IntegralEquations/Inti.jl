@@ -208,10 +208,14 @@ function _normalize_correction(correction, target, source)
             target === source &&
             correction.target_location != :on &&
             @warn("ignoring target_location field in correction since target === source")
-        # target location required unless target === source
+        # target location or green multiplier must be specified unless target === source
         haskey(correction, :target_location) ||
+            haskey(correction, :green_multiplier) ||
             target === source ||
             error("missing target_location field in correction")
+        # target location and green multiplier must not be both present
+        (haskey(correction, :target_location) && haskey(correction, :green_multiplier)) &&
+            error("conflicting target_location and green_multiplier fields in correction")
         haskey(correction, :maxdist) ||
             target === source ||
             @warn("missing maxdist field in correction: setting to Inf")
