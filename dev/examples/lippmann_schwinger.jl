@@ -52,7 +52,7 @@ nothing # hide
 using Gmsh # this will trigger the loading of Inti's Gmsh extension
 
 function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (1, 1))
-    try
+    return try
         gmsh.initialize()
         gmsh.option.setNumber("General.Terminal", 0)
         gmsh.model.add("circle-mesh")
@@ -94,7 +94,7 @@ V_d2d = Inti.volume_potential(;
     op,
     target = Ωₕ_quad,
     source = Ωₕ_quad,
-    compression = (method = :fmm, tol = 1e-7),
+    compression = (method = :fmm, tol = 1.0e-7),
     correction = (method = :dim, interpolation_order),
 )
 
@@ -121,13 +121,13 @@ L = I + k₁^2 * V_d2d * Lη
 # The unknown volumetric field $u$:
 using IterativeSolvers
 u, hist =
-    gmres(L, rhs; log = true, abstol = 1e-7, verbose = false, restart = 200, maxiter = 200)
+    gmres(L, rhs; log = true, abstol = 1.0e-7, verbose = false, restart = 200, maxiter = 200)
 @show hist
 
 𝒱 = Inti.IntegralPotential(Inti.SingleLayerKernel(op), Ωₕ_quad)
 
 # The representation formula gives the solution in $\R^2 \setminus \Omega$:
-uˢ = (x) -> uⁱ(x) - k₁^2 * 𝒱[refr_map_d.*u](x)
+uˢ = (x) -> uⁱ(x) - k₁^2 * 𝒱[refr_map_d .* u](x)
 nothing # hide
 
 # To visualize the solution using Gmsh, let's query it at the triangle vertices  in $\Omega$

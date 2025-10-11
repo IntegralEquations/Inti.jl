@@ -8,19 +8,19 @@ Pkg.activate(docsdir)                 #src
 
 using Inti
 
-k₁       = 8π
-k₂       = 2π
-λ₁       = 2π / k₁
-λ₂       = 2π / k₂
+k₁ = 8π
+k₂ = 2π
+λ₁ = 2π / k₁
+λ₂ = 2π / k₂
 meshsize = min(λ₁, λ₂) / 10
-qorder   = 4 # quadrature order
-gorder   = 2 # order of geometrical approximation
+qorder = 4 # quadrature order
+gorder = 2 # order of geometrical approximation
 nothing #hide
 
 using Gmsh # this will trigger the loading of Inti's Gmsh extension
 
 function gmsh_circle(; name, meshsize, order = 1, radius = 1, center = (0, 0))
-    try
+    return try
         gmsh.initialize()
         gmsh.model.add("circle-mesh")
         gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
@@ -52,7 +52,7 @@ S₁, D₁ = Inti.single_double_layer(;
     op = op₁,
     target = Q,
     source = Q,
-    compression = (method = :fmm, tol = :1e-8),
+    compression = (method = :fmm, tol = :1.0e-8),
     correction = (method = :dim, maxdist = 5 * meshsize),
 )
 
@@ -60,7 +60,7 @@ K₁, N₁ = Inti.adj_double_layer_hypersingular(;
     op = op₁,
     target = Q,
     source = Q,
-    compression = (method = :fmm, tol = :1e-8),
+    compression = (method = :fmm, tol = :1.0e-8),
     correction = (method = :dim, maxdist = 5 * meshsize),
 )
 
@@ -68,7 +68,7 @@ S₂, D₂ = Inti.single_double_layer(;
     op = op₂,
     target = Q,
     source = Q,
-    compression = (method = :fmm, tol = :1e-8),
+    compression = (method = :fmm, tol = :1.0e-8),
     correction = (method = :dim, maxdist = 5 * meshsize),
 )
 
@@ -76,7 +76,7 @@ K₂, N₂ = Inti.adj_double_layer_hypersingular(;
     op = op₂,
     target = Q,
     source = Q,
-    compression = (method = :fmm, tol = :1e-8),
+    compression = (method = :fmm, tol = :1.0e-8),
     correction = (method = :dim, maxdist = 5 * meshsize),
 )
 
@@ -84,8 +84,8 @@ using LinearAlgebra
 using LinearMaps
 
 L = [
-    I+LinearMap(D₁)-LinearMap(D₂) -LinearMap(S₁)+LinearMap(S₂)
-    LinearMap(N₁)-LinearMap(N₂) I-LinearMap(K₁)+LinearMap(K₂)
+    I + LinearMap(D₁) - LinearMap(D₂) -LinearMap(S₁) + LinearMap(S₂)
+    LinearMap(N₁) - LinearMap(N₂) I - LinearMap(K₁) + LinearMap(K₂)
 ]
 
 θ = π / 4;
@@ -112,7 +112,7 @@ rhs = [rhs₁; rhs₂]
 
 using IterativeSolvers
 sol, hist =
-    gmres(L, rhs; log = true, abstol = 1e-6, verbose = false, restart = 400, maxiter = 400)
+    gmres(L, rhs; log = true, abstol = 1.0e-6, verbose = false, restart = 400, maxiter = 400)
 @show hist
 
 # sol = L \ rhs
@@ -134,7 +134,7 @@ er₁ = maximum(0:0.01:2π) do θ
     xp = [R * cos(θ), R * sin(θ)]
     return abs(v₁(x) - u₁(xp))
 end
-@assert er₁ < 1e-3 #hide
+@assert er₁ < 1.0e-3 #hide
 @info "maximum error = $er₁"
 
 # Here is the maximum error on some points located on a circle of radius `0.5`:
@@ -145,7 +145,7 @@ er₂ = maximum(0:0.01:2π) do θ
     xp = [R * cos(θ), R * sin(θ)]
     return abs(v₂(x) - u₂(xp))
 end
-@assert er₂ < 1e-3 #hide
+@assert er₂ < 1.0e-3 #hide
 @info "maximum error = $er₂"
 
 using GLMakie

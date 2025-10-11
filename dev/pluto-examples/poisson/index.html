@@ -21,16 +21,16 @@ gmsh.model.mesh.setOrder(2)
 msh = Inti.import_mesh(; dim = 2)
 gmsh.finalize()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : Meshing curve 1 (BSpline)
-Info    : Done meshing 1D (Wall 0.0257755s, CPU 0.025762s)
+Info    : Done meshing 1D (Wall 0.0262206s, CPU 0.026221s)
 Info    : Meshing 2D...
 Info    : Meshing surface 1 (Plane, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.0757977s, CPU 0.075793s)
+Info    : Done meshing 2D (Wall 0.0711643s, CPU 0.071162s)
 Info    : 566 nodes 1033 elements
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
 Info    : [ 60%] Meshing surface 1 order 2
 Info    : Surface mesh: worst distortion = 0.451559 (0 elements in ]0, 0.2]); worst gamma = 0.758919
-Info    : Done meshing order 2 (Wall 0.00781592s, CPU 0.007816s)</code></pre><p>We can now extract components of the mesh corresponding to the <span>$\Omega$</span> and <span>$\Gamma$</span> domains:</p><pre><code class="language-julia hljs">Ω = Inti.Domain(e -&gt; Inti.geometric_dimension(e) == 2, msh)
+Info    : Done meshing order 2 (Wall 0.00747879s, CPU 0.007479s)</code></pre><p>We can now extract components of the mesh corresponding to the <span>$\Omega$</span> and <span>$\Gamma$</span> domains:</p><pre><code class="language-julia hljs">Ω = Inti.Domain(e -&gt; Inti.geometric_dimension(e) == 2, msh)
 Γ = Inti.boundary(Ω)
 Ω_msh = view(msh, Ω)
 Γ_msh = view(msh, Γ)</code></pre><p>and visualize them:</p><pre><code class="language-julia hljs">using Meshes, GLMakie
@@ -43,7 +43,7 @@ V_d2b = Inti.volume_potential(;
     op,
     target = Γ_quad,
     source = Ω_quad,
-    compression = (method = :fmm, tol = 1e-12),
+    compression = (method = :fmm, tol = 1.0e-12),
     correction = (method = :dim, maxdist = 5 * meshsize, target_location = :on),
 )</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">336×5100 LinearMaps.LinearCombination{Float64} with 2 maps:
   336×5100 LinearMaps.FunctionMap{Float64,true}(#13; issymmetric=false, ishermitian=false, isposdef=false)
@@ -53,7 +53,7 @@ S_b2b, D_b2b = Inti.single_double_layer(;
     op,
     target = Γ_quad,
     source = Γ_quad,
-    compression = (method = :fmm, tol = 1e-12),
+    compression = (method = :fmm, tol = 1.0e-12),
     correction = (method = :dim,),
 )</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(336×336 LinearMaps.LinearCombination{Float64} with 2 maps:
   336×336 LinearMaps.FunctionMap{Float64,true}(#13; issymmetric=false, ishermitian=false, isposdef=false)
@@ -66,7 +66,7 @@ uₑ = (x) -&gt; cos(2 * x[1]) * sin(2 * x[2])
 fₑ = (x) -&gt; 8 * cos(2 * x[1]) * sin(2 * x[2]) # -Δuₑ
 g = map(q -&gt; uₑ(q.coords), Γ_quad)
 f = map(q -&gt; fₑ(q.coords), Ω_quad)</code></pre><p>With these, we can compute the right-hand-side of the integral equation for the homogeneous part of the solution:</p><pre><code class="language-julia hljs">rhs = g - V_d2b * f</code></pre><p>and solve the integral equation for the integral density function <span>$σ$</span>:</p><pre><code class="language-julia hljs">using IterativeSolvers, LinearAlgebra
-σ = gmres(-I / 2 + D_b2b, rhs; abstol = 1e-8, verbose = true, restart = 1000)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">=== gmres ===
+σ = gmres(-I / 2 + D_b2b, rhs; abstol = 1.0e-8, verbose = true, restart = 1000)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">=== gmres ===
 rest	iter	resnorm
   1	  1	1.58e+00
   1	  2	9.57e-01
@@ -87,7 +87,7 @@ println(&quot;error at $x: &quot;, u(x) - uₑ(x))</code></pre><pre class="docum
     op,
     target = Ω_quad,
     source = Ω_quad,
-    compression = (method = :fmm, tol = 1e-8),
+    compression = (method = :fmm, tol = 1.0e-8),
     correction = (method = :dim,),
 )</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">5100×5100 LinearMaps.LinearCombination{Float64} with 2 maps:
   5100×5100 LinearMaps.FunctionMap{Float64,true}(#13; issymmetric=false, ishermitian=false, isposdef=false)
@@ -108,4 +108,4 @@ colorrange = extrema(log_er)
 colormap = :inferno
 ax = Axis(fig[1, 3]; aspect = DataAspect())
 viz!(Ω_msh; colorrange, colormap, color = log_er, interpolate = true)
-cb = Colorbar(fig[1, 4]; label = &quot;log₁₀|u - uₑ|&quot;, colormap, colorrange)</code></pre><img src="8e51e352.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../helmholtz_scattering/">« Helmholtz scattering</a><a class="docs-footer-nextpage" href="../../examples/heat_equation/">Heat equation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Saturday 11 October 2025 15:06">Saturday 11 October 2025</span>. Using Julia version 1.12.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+cb = Colorbar(fig[1, 4]; label = &quot;log₁₀|u - uₑ|&quot;, colormap, colorrange)</code></pre><img src="8e51e352.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../helmholtz_scattering/">« Helmholtz scattering</a><a class="docs-footer-nextpage" href="../../examples/heat_equation/">Heat equation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Saturday 11 October 2025 16:25">Saturday 11 October 2025</span>. Using Julia version 1.12.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

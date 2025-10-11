@@ -12,7 +12,7 @@ using LinearMaps</code></pre><p>and setup some of the (global) problem parameter
 λ = 2π / k
 qorder = 4 # quadrature order
 gorder = 2 # order of geometrical approximation</code></pre><h2 id="Two-dimensional-scattering"><a class="docs-heading-anchor" href="#Two-dimensional-scattering">Two-dimensional scattering</a><a id="Two-dimensional-scattering-1"></a><a class="docs-heading-anchor-permalink" href="#Two-dimensional-scattering" title="Permalink"></a></h2><p>We will use <a href="https://gmsh.info/doc/texinfo/gmsh.html#Gmsh-application-programming-interface">Gmsh API</a> for creating <code>.msh</code> file containing the desired geometry and mesh. Here is a function to mesh the circle:</p><pre><code class="language-julia hljs">function gmsh_circle(; name, meshsize, order = 1, radius = 1, center = (0, 0))
-    try
+    return try
         gmsh.initialize()
         gmsh.model.add(&quot;circle-mesh&quot;)
         gmsh.option.setNumber(&quot;Mesh.MeshSizeMax&quot;, meshsize)
@@ -29,12 +29,12 @@ end</code></pre><p>Let us now use <code>gmsh_circle</code> to create a <code>cir
 meshsize = λ / 5
 gmsh_circle(; meshsize, order = gorder, name)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : Meshing curve 1 (Ellipse)
-Info    : Done meshing 1D (Wall 0.000117953s, CPU 0.000118s)
+Info    : Done meshing 1D (Wall 0.000108414s, CPU 0.000109s)
 Info    : 63 nodes 64 elements
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
 Info    : [ 60%] Meshing surface 1 order 2
-Info    : Done meshing order 2 (Wall 0.000379907s, CPU 0.000379s)
+Info    : Done meshing order 2 (Wall 0.000360527s, CPU 0.00036s)
 Info    : Writing &#39;/home/runner/work/Inti.jl/Inti.jl/docs/build/pluto-examples/circle.msh&#39;...
 Info    : Done writing &#39;/home/runner/work/Inti.jl/Inti.jl/docs/build/pluto-examples/circle.msh&#39;</code></pre><p>We can now import the file and parse the mesh and domain information into <code>Inti.jl</code> using the <a href="../../docstrings/#Inti.import_mesh-Tuple"><code>import_mesh</code></a> function:</p><pre><code class="language-julia hljs">Inti.clear_entities!() # empty the entity cache
 msh = Inti.import_mesh(name; dim = 2)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Inti.Mesh{2, Float64} containing:
@@ -64,7 +64,7 @@ uₛ = x -&gt; 𝒟[σ](x) - im * k * 𝒮[σ](x)</code></pre><p>The variable <c
     c(n) = -exp(im * n * (π / 2 - θin)) * besselj(n, k * radius) / besselh(n, k * radius)
     u = c(0) * besselh(0, k * r)
     n = 1
-    while (abs(c(n)) &gt; 1e-12)
+    while (abs(c(n)) &gt; 1.0e-12)
         u +=
             c(n) * besselh(n, k * r) * exp(im * n * θ) +
             c(-n) * besselh(-n, k * r) * exp(-im * n * θ)
@@ -78,8 +78,10 @@ er = maximum(0:0.01:2π) do θ
     return abs(uₛ(x) - uₑ(x))
 end
 @info &quot;maximum error = $er&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: maximum error = 2.549471246663243e-6</code></pre><p>As we can see, the error is quite small! Let&#39;s use <code>Makie</code> to visualize the solution in this simple (2d) example:</p><pre><code class="language-julia hljs">xx = yy = range(-4; stop = 4, length = 200)
-vals =
-    map(pt -&gt; Inti.isinside(pt, Q) ? NaN : real(uₛ(pt) + uᵢ(pt)), Iterators.product(xx, yy))
+vals = map(
+    pt -&gt; Inti.isinside(pt, Q) ? NaN : real(uₛ(pt) + uᵢ(pt)),
+    Iterators.product(xx, yy),
+)
 fig, ax, hm = heatmap(
     xx,
     yy,
@@ -155,9 +157,9 @@ end</code></pre><img src="f17f3b81.png" alt="Example block output"/><div class="
 end</code></pre><p>As before, lets write a file with our mesh, and import it into <code>Inti.jl</code>:</p><pre><code class="language-julia hljs">name_sphere = joinpath(@__DIR__, &quot;sphere.msh&quot;)
 gmsh_sphere(; meshsize = (λ / 5), order = gorder, name = name_sphere, visualize = false)
 msh_3d = Inti.import_mesh(name_sphere; dim = 3)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Inti.Mesh{3, Float64} containing:
-	 255 elements of type Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 3, StaticArraysCore.SVector{3, Float64}}
+	 7 elements of type StaticArraysCore.SVector{3, Float64}
 	 6253 elements of type Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 6, StaticArraysCore.SVector{3, Float64}}
-	 7 elements of type StaticArraysCore.SVector{3, Float64}</code></pre><div class="admonition is-success" id="Tip-5085486f162df622"><header class="admonition-header">Tip<a class="admonition-anchor" href="#Tip-5085486f162df622" title="Permalink"></a></header><div class="admonition-body"><p>If you pass <code>visualize=true</code> to <code>gmsh_sphere</code>, it will open a window with the current model. This is done by calling <code>gmsh.fltk.run()</code>. Note that the main julia thread will be blocked until the window is closed.</p></div></div><p>Since we created physical groups in <code>Gmsh</code>, we can use them to extract the relevant domains <code>Ω</code> and <code>Σ</code>:</p><pre><code class="language-julia hljs">Ω_3d = Inti.Domain(e -&gt; &quot;omega&quot; ∈ Inti.labels(e), Inti.entities(msh_3d))
+	 255 elements of type Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 3, StaticArraysCore.SVector{3, Float64}}</code></pre><div class="admonition is-success" id="Tip-5085486f162df622"><header class="admonition-header">Tip<a class="admonition-anchor" href="#Tip-5085486f162df622" title="Permalink"></a></header><div class="admonition-body"><p>If you pass <code>visualize=true</code> to <code>gmsh_sphere</code>, it will open a window with the current model. This is done by calling <code>gmsh.fltk.run()</code>. Note that the main julia thread will be blocked until the window is closed.</p></div></div><p>Since we created physical groups in <code>Gmsh</code>, we can use them to extract the relevant domains <code>Ω</code> and <code>Σ</code>:</p><pre><code class="language-julia hljs">Ω_3d = Inti.Domain(e -&gt; &quot;omega&quot; ∈ Inti.labels(e), Inti.entities(msh_3d))
 Σ_3d = Inti.Domain(e -&gt; &quot;sigma&quot; ∈ Inti.labels(e), Inti.entities(msh_3d))
 Γ_3d = Inti.boundary(Ω_3d)</code></pre><p>We can now create a quadrature as before</p><pre><code class="language-julia hljs">Γ_msh_3d = view(msh_3d, Γ_3d)
 Q_3d = Inti.Quadrature(Γ_msh_3d; qorder)</code></pre><div class="admonition is-success" id="Writing/reading-a-mesh-from-disk-c01fa6c49c9d9864"><header class="admonition-header">Writing/reading a mesh from disk<a class="admonition-anchor" href="#Writing/reading-a-mesh-from-disk-c01fa6c49c9d9864" title="Permalink"></a></header><div class="admonition-body"><p>Writing and reading a mesh to/from disk can be time consuming. You can avoid doing so by using <a href="../../docstrings/#Inti.import_mesh-Tuple"><code>import_mesh</code></a> without a file name to import the mesh from the current <code>gmsh</code> session without the need to write it to disk.</p></div></div><p>Next we assemble the integral operators, indicating that we wish to compress them using hierarchical matrices:</p><pre><code class="language-julia hljs">using HMatrices
@@ -166,9 +168,9 @@ S_3d, D_3d = Inti.single_double_layer(;
     op = op_3d,
     target = Q_3d,
     source = Q_3d,
-    compression = (method = :hmatrix, tol = 1e-4),
+    compression = (method = :hmatrix, tol = 1.0e-4),
     correction = (method = :dim,),
-)</code></pre><p>Here is how much memory it would take to store the dense representation of these matrices:</p><pre><code class="language-julia hljs">mem = 2 * length(S_3d) * 16 / 1e9 # 16 bytes per complex number, 1e9 bytes per GB, two matrices
+)</code></pre><p>Here is how much memory it would take to store the dense representation of these matrices:</p><pre><code class="language-julia hljs">mem = 2 * length(S_3d) * 16 / 1.0e9 # 16 bytes per complex number, 1e9 bytes per GB, two matrices
 println(&quot;memory required to store S and D: $(mem) GB&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">memory required to store S and D: 11.547136512 GB</code></pre><p>Even for this simple example, the dense representation of the integral operators as matrix is already quite expensive!</p><div class="admonition is-info" id="Compression-methods-67f780e08ec8a57e"><header class="admonition-header">Compression methods<a class="admonition-anchor" href="#Compression-methods-67f780e08ec8a57e" title="Permalink"></a></header><div class="admonition-body"><p>It is worth mentioning that hierchical matrices are not the only way to compress such integral operators, and may in fact not even be the best for the problem at hand. For example, one could use a fast multipole method (FMM), which has a much lighter memory footprint. See the the <a href="../../tutorials/compression_methods/#Compression-methods">tutorial on compression methods</a> for more information.</p></div></div><p>We will use the generalized minimal residual (GMRES) iterative solver, for the linear system. This requires us to define a linear operator <code>L</code>, approximating the combined-field operator, that supports the matrix-vector product. While it is possible to add two <code>HMatrix</code> objects to obtain a new <code>HMatrix</code>, this is somewhat more involved due to the addition of low-rank blocks (which requires a recompression). To keep things simple, we will use <code>LinearMaps</code> to lazily compose the operators:</p><pre><code class="language-julia hljs">L_3d = I / 2 + LinearMap(D_3d) - im * k * LinearMap(S_3d)</code></pre><p>We can now solve the linear system using GMRES solver:</p><pre><code class="language-julia hljs">rhs_3d = map(Q_3d) do q
     x = q.coords
     return -uᵢ(x)
@@ -177,7 +179,7 @@ end
     L_3d,
     rhs_3d;
     log = true,
-    abstol = 1e-6,
+    abstol = 1.0e-6,
     verbose = false,
     restart = 100,
     maxiter = 100,
@@ -197,11 +199,11 @@ function sphere_helmholtz_soundsoft(xobs; radius = 1, k = 1, θin = 0, ϕin = 0)
     r &lt; radius &amp;&amp; return u
     function c(l, m)
         return -4π * im^l * sphharmonic(l, -m, θin, ϕin) * sphbesselj(l, k * radius) /
-               sphbesselh(l, k * radius)
+            sphbesselh(l, k * radius)
     end
     l = 0
-    for l = 0:60
-        for m = (-l):l
+    for l in 0:60
+        for m in -l:l
             u += c(l, m) * sphbesselh(l, k * r) * sphharmonic(l, m, θ, ϕ)
         end
         l += 1
@@ -213,14 +215,14 @@ er_3d = maximum(1:100) do _
     x = 2 * x̂
     return abs(uₛ_3d(x) - uₑ_3d(x))
 end
-@info &quot;error with correction = $er_3d&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: error with correction = 2.8826003107626523e-5</code></pre><p>We see that, once again, the approximation is quite accurate. Let us now visualize the solution on the punctured plane (which we labeled as &quot;sigma&quot;). Since evaluating the integral representation of the solution at many points is expensive, we will use again use a method to accelerate the evaluation:</p><pre><code class="language-julia hljs">Σ_msh = view(msh_3d, Σ_3d)
+@info &quot;error with correction = $er_3d&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: error with correction = 2.8779557476418594e-5</code></pre><p>We see that, once again, the approximation is quite accurate. Let us now visualize the solution on the punctured plane (which we labeled as &quot;sigma&quot;). Since evaluating the integral representation of the solution at many points is expensive, we will use again use a method to accelerate the evaluation:</p><pre><code class="language-julia hljs">Σ_msh = view(msh_3d, Σ_3d)
 target = Inti.nodes(Σ_msh)
 
 S_viz, D_viz = Inti.single_double_layer(;
     op = op_3d,
     target,
     source = Q_3d,
-    compression = (method = :hmatrix, tol = 1e-4),
+    compression = (method = :hmatrix, tol = 1.0e-4),
     # correction for the nearfield (for visual purposes, set to `:none` to disable)
     correction = (method = :dim, maxdist = meshsize, target_location = :outside),
 )
@@ -234,4 +236,4 @@ fig_3d = Figure(; size = (800, 500))
 ax_3d = Axis3(fig_3d[1, 1]; aspect = :data)
 viz!(Γ_msh_3d; colorrange, colormap, color = zeros(nv), interpolate = true)
 viz!(Σ_msh; colorrange, colormap, color = real(u_eval_msh))
-cb = Colorbar(fig_3d[1, 2]; label = &quot;real(u)&quot;, colormap, colorrange)</code></pre><img src="9cb74387.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../toy_example/">« Toy example</a><a class="docs-footer-nextpage" href="../poisson/">Poisson problem »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Saturday 11 October 2025 15:06">Saturday 11 October 2025</span>. Using Julia version 1.12.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+cb = Colorbar(fig_3d[1, 2]; label = &quot;real(u)&quot;, colormap, colorrange)</code></pre><img src="9cb74387.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../toy_example/">« Toy example</a><a class="docs-footer-nextpage" href="../poisson/">Poisson problem »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Saturday 11 October 2025 16:25">Saturday 11 October 2025</span>. Using Julia version 1.12.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
