@@ -44,9 +44,9 @@ dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
 μ = 1.0
 λ = 1.0
 
-u  = (x) -> SVector(1.0, 1.0)
+u = (x) -> SVector(1.0, 1.0)
 du = (x, n) -> SVector(0.0, 0.0)
-f  = (x) -> SVector(0.0, 0.0)
+f = (x) -> SVector(0.0, 0.0)
 
 u_d = map(q -> u(q.coords), Ωₕ_quad)
 u_b = map(q -> u(q.coords), Γₕ_quad)
@@ -66,7 +66,7 @@ S_b2d, D_b2d = Inti.single_double_layer(;
     op,
     target = Ωₕ_quad,
     source = Γₕ_quad,
-    compression = (method = :none, tol = 1e-14),
+    compression = (method = :none, tol = 1.0e-14),
     correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
 )
 
@@ -75,13 +75,13 @@ V_d2d = Inti.volume_potential(;
     op,
     target = Ωₕ_quad,
     source = Ωₕ_quad,
-    compression = (method = :none, tol = 1e-14),
+    compression = (method = :none, tol = 1.0e-14),
     correction = (method = :dim, interpolation_order),
 )
 
-vref    = -u_d - D_b2d * u_b + S_b2d * du_b
+vref = -u_d - D_b2d * u_b + S_b2d * du_b
 vapprox = V_d2d * f_d
-er      = vref - vapprox
+er = vref - vapprox
 
 ndofs = length(er)
 @show ndofs, meshsize, norm(er, Inf), t

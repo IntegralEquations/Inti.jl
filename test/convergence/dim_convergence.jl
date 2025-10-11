@@ -8,7 +8,7 @@ using Gmsh
 Random.seed!(1)
 
 atol = 0
-rtol = 1e-8
+rtol = 1.0e-8
 t = :exterior
 σ = t == :interior ? 1 / 2 : -1 / 2
 # For N = 3 one needs to use compression, e.g. `compression = :fmm`, for the operators below

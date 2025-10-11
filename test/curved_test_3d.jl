@@ -20,9 +20,11 @@ include("test_utils.jl")
     Γ_msh = view(msh, Γ)
 
     function face_element_on_torus(nodelist, R, r)
-        return all([
-            (sqrt(node[1]^2 + node[2]^2) - R^2)^2 + node[3]^2 ≈ r^2 for node in nodelist
-        ])
+        return all(
+            [
+                (sqrt(node[1]^2 + node[2]^2) - R^2)^2 + node[3]^2 ≈ r^2 for node in nodelist
+            ]
+        )
     end
     face_element_on_curved_surface = (nodelist) -> face_element_on_torus(nodelist, r1, r2)
 
@@ -50,20 +52,20 @@ include("test_utils.jl")
     qorder = 2
     Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder)
     Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder)
-    @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), truevol, rtol = 1e-5)
-    @test isapprox(Inti.integrate(x -> 1, Γₕ_quad), truesfcarea, rtol = 1e-5)
+    @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), truevol, rtol = 1.0e-5)
+    @test isapprox(Inti.integrate(x -> 1, Γₕ_quad), truesfcarea, rtol = 1.0e-5)
 
     qorder = 5
     Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder)
     Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder)
-    @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), truevol, rtol = 1e-7)
-    @test isapprox(Inti.integrate(x -> 1, Γₕ_quad), truesfcarea, rtol = 1e-7)
+    @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), truevol, rtol = 1.0e-7)
+    @test isapprox(Inti.integrate(x -> 1, Γₕ_quad), truesfcarea, rtol = 1.0e-7)
 
     qorder = 7
     Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorder)
     Γₕ_quad = Inti.Quadrature(Γₕ; qorder = qorder)
-    @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), truevol, rtol = 1e-11)
-    @test isapprox(Inti.integrate(x -> 1, Γₕ_quad), truesfcarea, rtol = 1e-14)
+    @test isapprox(Inti.integrate(x -> 1, Ωₕ_quad), truevol, rtol = 1.0e-11)
+    @test isapprox(Inti.integrate(x -> 1, Γₕ_quad), truesfcarea, rtol = 1.0e-14)
 
     divF = (x) -> x[3] + x[3]^2 + x[2]^3
     F = (x) -> [x[1] * x[3], x[2] * x[3]^2, x[2]^3 * x[3]]
@@ -71,5 +73,5 @@ include("test_utils.jl")
     #F = (x) -> 1/3*[x[1], x[2], x[3]]
     divtest_vol = Inti.integrate(q -> divF(q.coords), Ωₕ_quad)
     divtest_sfc = Inti.integrate(q -> dot(F(q.coords), q.normal), Γₕ_quad)
-    @test isapprox(divtest_vol, divtest_sfc, rtol = 1e-9)
+    @test isapprox(divtest_vol, divtest_sfc, rtol = 1.0e-9)
 end

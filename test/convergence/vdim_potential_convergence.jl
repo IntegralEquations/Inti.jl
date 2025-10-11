@@ -45,11 +45,11 @@ function test_volume_potential(; meshsize, bdry_qorder, interpolation_order)
     @info "Quadrature generation time: $tquad"
 
     k0 = π
-    k  = 2π
+    k = 2π
     θ = (cos(π / 3), sin(π / 3))
-    u  = (x) -> exp(im * k0 * dot(x, θ))
+    u = (x) -> exp(im * k0 * dot(x, θ))
     du = (x, n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
-    f  = (x) -> (k^2 - k0^2) * u(x)
+    f = (x) -> (k^2 - k0^2) * u(x)
 
     u_d = map(q -> u(q.coords), Ωₕ_quad)
     u_b = map(q -> u(q.coords), Γₕ_quad)
@@ -64,7 +64,7 @@ function test_volume_potential(; meshsize, bdry_qorder, interpolation_order)
             op,
             target = Ωₕ_quad,
             source = Γₕ_quad,
-            compression = (method = :hmatrix, tol = 1e-14),
+            compression = (method = :hmatrix, tol = 1.0e-14),
             correction = (method = :dim, maxdist = 5 * meshsize),
         )
     end
@@ -76,15 +76,15 @@ function test_volume_potential(; meshsize, bdry_qorder, interpolation_order)
             op,
             target = Ωₕ_quad,
             source = Ωₕ_quad,
-            compression = (method = :hmatrix, tol = 1e-14),
+            compression = (method = :hmatrix, tol = 1.0e-14),
             correction = (method = :dim, interpolation_order),
         )
     end
     @info "Volume potential time: $tvol"
 
-    vref    = -u_d - D_b2d * u_b + S_b2d * du_b
+    vref = -u_d - D_b2d * u_b + S_b2d * du_b
     vapprox = V_d2d * f_d
-    er      = vref - vapprox
+    er = vref - vapprox
     return er
 end
 

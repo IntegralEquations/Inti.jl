@@ -12,7 +12,7 @@ using Inti
     @test sum(w) ≈ 1
     @test Inti.order(q) == N - 1
     # integrate all polynomial of degree N-1 exactly
-    for n in 1:(N-1)
+    for n in 1:(N - 1)
         @test Inti.integrate(x -> x[1]^n, q) ≈ 1 / (n + 1)
     end
     # check that our quadrature order is maximal
@@ -37,7 +37,7 @@ end
         end
         # check that our declared quadrature order is maximal
         allintegrated = true
-        for i in 0:(p+1), j in 0:(p+1)
+        for i in 0:(p + 1), j in 0:(p + 1)
             i + j > (p + 1) && continue
             Inti.integrate(x -> x[1]^i * x[2]^j, q) ≈ exa(i, j) ||
                 (allintegrated = false; break)
@@ -64,7 +64,7 @@ end
         end
         # check that our declared quadrature order is maximal
         allintegrated = true
-        for i in 0:(p+1), j in 0:(p+1), k in 0:(p+1)
+        for i in 0:(p + 1), j in 0:(p + 1), k in 0:(p + 1)
             i + j + k > (p + 1) && continue
             Inti.integrate(x -> x[1]^i * x[2]^j * x[3]^k, q) ≈ exa(i, j, k) ||
                 (allintegrated = false; break)
@@ -91,7 +91,7 @@ end
         end
         # check that our declared quadrature order is maximal
         allintegrated = true
-        for i in 0:(p+1), j in 0:(p+1)
+        for i in 0:(p + 1), j in 0:(p + 1)
             i + j > (p + 1) && continue
             Inti.integrate(x -> x[1]^i * x[2]^j, q) ≈ exa(i, j) ||
                 (allintegrated = false; break)
@@ -118,7 +118,7 @@ end
         end
         # check that our declared quadrature order is maximal
         allintegrated = true
-        for i in 0:(p+1), j in 0:(p+1), k in 0:(p+1)
+        for i in 0:(p + 1), j in 0:(p + 1), k in 0:(p + 1)
             i + j + k > (p + 1) && continue
             Inti.integrate(x -> x[1]^i * x[2]^j * x[3]^k, q) ≈ exa(i, j, k) ||
                 (allintegrated = false; break)
@@ -145,11 +145,11 @@ end
 
 @testset "Lagrange basis" begin
     for shape in (
-        Inti.ReferenceLine(),
-        Inti.ReferenceSquare(),
-        Inti.ReferenceTriangle(),
-        Inti.ReferenceTetrahedron(),
-    )
+            Inti.ReferenceLine(),
+            Inti.ReferenceSquare(),
+            Inti.ReferenceTriangle(),
+            Inti.ReferenceTetrahedron(),
+        )
         for order in 1:4
             # skip cases where the reference quadrature is not implemented/defined
             try
@@ -162,7 +162,7 @@ end
                         if i == j
                             @test vals[j] ≈ 1
                         else
-                            @test norm(vals[j]) < 1e-12
+                            @test norm(vals[j]) < 1.0e-12
                         end
                     end
                 end

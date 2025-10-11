@@ -157,7 +157,7 @@ begin
         op,
         target = Γ_quad,
         source = Ω_quad,
-        compression = (method = :fmm, tol = 1e-12),
+        compression = (method = :fmm, tol = 1.0e-12),
         correction = (method = :dim, maxdist = 5 * meshsize, target_location = :on),
     )
 end
@@ -183,7 +183,7 @@ S_b2b, D_b2b = Inti.single_double_layer(;
     op,
     target = Γ_quad,
     source = Γ_quad,
-    compression = (method = :fmm, tol = 1e-12),
+    compression = (method = :fmm, tol = 1.0e-12),
     correction = (method = :dim,),
 )
 
@@ -231,7 +231,7 @@ end
 # ╔═╡ 6eb1d813-e792-4148-8d30-975c49e9dbc6
 begin
     using IterativeSolvers, LinearAlgebra
-    σ = gmres(-I / 2 + D_b2b, rhs; abstol = 1e-8, verbose = true, restart = 1000)
+    σ = gmres(-I / 2 + D_b2b, rhs; abstol = 1.0e-8, verbose = true, restart = 1000)
     nothing #hide
 end
 
@@ -247,11 +247,11 @@ With the density function at hand, we can now reconstruct our approximate soluti
 
 # ╔═╡ e0e1fa9c-7a43-45b1-ad45-2510533e1aed
 begin
-    G  = Inti.SingleLayerKernel(op)
+    G = Inti.SingleLayerKernel(op)
     dG = Inti.DoubleLayerKernel(op)
-    𝒱  = Inti.IntegralPotential(G, Ω_quad)
-    𝒟  = Inti.IntegralPotential(dG, Γ_quad)
-    u  = (x) -> 𝒱[f](x) + 𝒟[σ](x)
+    𝒱 = Inti.IntegralPotential(G, Ω_quad)
+    𝒟 = Inti.IntegralPotential(dG, Γ_quad)
+    u = (x) -> 𝒱[f](x) + 𝒟[σ](x)
 end
 
 # ╔═╡ 2c2c943b-30ed-4244-a40c-f061050ca7b8
@@ -287,7 +287,7 @@ V_d2d = Inti.volume_potential(;
     op,
     target = Ω_quad,
     source = Ω_quad,
-    compression = (method = :fmm, tol = 1e-8),
+    compression = (method = :fmm, tol = 1.0e-8),
     correction = (method = :dim,),
 )
 
@@ -302,7 +302,7 @@ S_b2d, D_b2d = Inti.single_double_layer(;
     op,
     target = Ω_quad,
     source = Γ_quad,
-    compression = (method = :fmm, tol = 1e-8),
+    compression = (method = :fmm, tol = 1.0e-8),
     correction = (method = :dim, maxdist = 2 * meshsize, target_location = :inside),
 )
 

@@ -5,6 +5,7 @@
 [![Build Status](https://github.com/IntegralEquations/Inti.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/IntegralEquations/Inti.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![codecov](https://codecov.io/gh/IntegralEquations/Inti.jl/graph/badge.svg?token=2VF6BR8LA0)](https://codecov.io/gh/IntegralEquations/Inti.jl)
 [![project chat](https://img.shields.io/badge/zulip-join_chat-brightgreen.svg)](https://inti.zulipchat.com)
+[![Runic](https://img.shields.io/badge/code%20style-runic-hotpink.svg)](https://github.com/fredrikekre/Runic.jl)
 [![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
 A package for efficient and high-order discretization and application of

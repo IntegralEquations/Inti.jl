@@ -21,13 +21,13 @@ Base.:(==)(e1::EntityKey, e2::EntityKey) = e1.dim == e2.dim && abs(e1.tag) == ab
 
 # defer some functions on EntityKey to the corresponding GeometricEntity
 for f in (
-    :labels,
-    :boundary,
-    :pushforward,
-    :ambient_dimension,
-    :hasparametrization,
-    :parametrization,
-)
+        :labels,
+        :boundary,
+        :pushforward,
+        :ambient_dimension,
+        :hasparametrization,
+        :parametrization,
+    )
     @eval $f(k::EntityKey) = $f(global_get_entity(k))
 end
 
@@ -82,15 +82,15 @@ struct GeometricEntity
 end
 
 function GeometricEntity(;
-    domain::HyperRectangle{N,T},
-    parametrization,
-    boundary = EntityKey[],
-    labels = String[],
-    tag = nothing,
-) where {N,T}
+        domain::HyperRectangle{N, T},
+        parametrization,
+        boundary = EntityKey[],
+        labels = String[],
+        tag = nothing,
+    ) where {N, T}
     d = geometric_dimension(domain)
     t = isnothing(tag) ? new_tag(d) : tag
-    V = return_type(parametrization, SVector{N,T})
+    V = return_type(parametrization, SVector{N, T})
     # try to evaluate to see if that errors
     try
         parametrization(center(domain))
@@ -110,17 +110,17 @@ function GeometricEntity(;
 end
 
 geometric_dimension(e::GeometricEntity) = e.dim
-tag(e::GeometricEntity)                 = e.tag
-boundary(e::GeometricEntity)            = e.boundary
-labels(e::GeometricEntity)              = e.labels
-pushforward(e::GeometricEntity)         = e.pushforward
-domain(e::GeometricEntity)              = e.pushforward.domain
+tag(e::GeometricEntity) = e.tag
+boundary(e::GeometricEntity) = e.boundary
+labels(e::GeometricEntity) = e.labels
+pushforward(e::GeometricEntity) = e.pushforward
+domain(e::GeometricEntity) = e.pushforward.domain
 function parametrization(e::GeometricEntity)
     hasparametrization(e) || error("entity $(key(e)) has no parametrization")
     return e.pushforward.parametrization
 end
 hasparametrization(e::GeometricEntity) = !isnothing(e.pushforward)
-key(e::GeometricEntity)                = EntityKey(geometric_dimension(e), tag(e))
+key(e::GeometricEntity) = EntityKey(geometric_dimension(e), tag(e))
 
 function ambient_dimension(e::GeometricEntity)
     hasparametrization(e) || error("entity $(key(e)) has no parametrization")
@@ -145,7 +145,7 @@ Compute the length/area/volume of the entity `k` using an adaptive quadrature
 with a relative tolerance `rtol`. Assumes that the entity has an explicit
 parametrization.
 """
-function measure(k::EntityKey, rtol = 1e-2)
+function measure(k::EntityKey, rtol = 1.0e-2)
     ent = global_get_entity(k)::GeometricEntity
     geometric_dimension(ent) == 1 || error("measure only supports 1d entities")
     hasparametrization(ent) || error("$k has no parametrization")
@@ -199,7 +199,7 @@ function parametric_curve(f::F, a::Real, b::Real; kwargs...) where {F}
 end
 
 # https://www.ljll.fr/perronnet/transfini/transfini.html
-function transfinite_square(k1::T, k2::T, k3::T, k4::T; kwargs...) where {T<:EntityKey}
+function transfinite_square(k1::T, k2::T, k3::T, k4::T; kwargs...) where {T <: EntityKey}
     c1, c2, c3, c4 = map((k1, k2, k3, k4)) do k
         l = global_get_entity(k)
         hasparametrization(l) || error("entity $(key(l)) has no parametrization")
@@ -217,13 +217,13 @@ function transfinite_square(k1::T, k2::T, k3::T, k4::T; kwargs...) where {T<:Ent
         end
         return f̂
     end
-    same = (x, y) -> isapprox(x, y; atol = 1e-8)
+    same = (x, y) -> isapprox(x, y; atol = 1.0e-8)
     if !(
-        same(c1(1), c2(0)) &&
-        same(c2(1), c3(0)) &&
-        same(c3(1), c4(0)) &&
-        same(c4(1), c1(0))
-    )
+            same(c1(1), c2(0)) &&
+                same(c2(1), c3(0)) &&
+                same(c3(1), c4(0)) &&
+                same(c4(1), c1(0))
+        )
         error("the curves do not form a square")
     end
     # create a closure and compute the parametrization
@@ -242,9 +242,9 @@ function _transfinite_square(c1, c2, c3, c4)
         u, v = x[1], x[2]
         (1 - u) * c4(1 - v) + u * c2(v) + (1 - v) * c1(u) + v * c3(1 - u) - (
             (1 - u) * (1 - v) * c1(0) +
-            u * (1 - v) * c2(0) +
-            u * v * c3(0) +
-            (1 - u) * v * c4(0)
+                u * (1 - v) * c2(0) +
+                u * v * c3(0) +
+                (1 - u) * v * c4(0)
         )
     end
 end
@@ -292,7 +292,7 @@ end
 Dictionary mapping [`EntityKey`](@ref) to [`GeometricEntity`](@ref). Contains
 all entities created in a given session.
 """
-const ENTITIES = Dict{EntityKey,GeometricEntity}()
+const ENTITIES = Dict{EntityKey, GeometricEntity}()
 
 clear_entities!() = empty!(ENTITIES)
 

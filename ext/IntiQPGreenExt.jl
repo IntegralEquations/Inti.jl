@@ -7,17 +7,17 @@ import ForwardDiff
 import StaticArrays: SMatrix
 
 function __init__()
-    @info "Loading Inti.jl QPGreen extension"
+    return @info "Loading Inti.jl QPGreen extension"
 end
 
 struct HelmholtzPeriodic1D{
-    N,
-    NT<:NamedTuple,
-    F1,
-    F2<:NamedTuple,
-    F3<:NamedTuple,
-    C1<:QPGreen.AbstractIntegrationCache,
-} <: Inti.AbstractDifferentialOperator{N}
+        N,
+        NT <: NamedTuple,
+        F1,
+        F2 <: NamedTuple,
+        F3 <: NamedTuple,
+        C1 <: QPGreen.AbstractIntegrationCache,
+    } <: Inti.AbstractDifferentialOperator{N}
     params::NT
     val_interp::F1
     grad_interp::F2
@@ -69,11 +69,11 @@ end
 Inti.default_kernel_eltype(::HelmholtzPeriodic1D) = ComplexF64
 Inti.default_density_eltype(::HelmholtzPeriodic1D) = ComplexF64
 
-function (SL::Inti.SingleLayerKernel{T,<:HelmholtzPeriodic1D{N}})(
-    target,
-    source,
-    r = Inti.coords(target) - Inti.coords(source),
-) where {N,T}
+function (SL::Inti.SingleLayerKernel{T, <:HelmholtzPeriodic1D{N}})(
+        target,
+        source,
+        r = Inti.coords(target) - Inti.coords(source),
+    ) where {N, T}
     d = LinearAlgebra.norm(r)
     (d ≤ Inti.SAME_POINT_TOLERANCE) && return zero(T)
     if N == 2
@@ -85,11 +85,11 @@ function (SL::Inti.SingleLayerKernel{T,<:HelmholtzPeriodic1D{N}})(
     end
 end
 
-function (DL::Inti.DoubleLayerKernel{T,<:HelmholtzPeriodic1D{N}})(
-    target,
-    source,
-    r = Inti.coords(target) - Inti.coords(source),
-) where {N,T}
+function (DL::Inti.DoubleLayerKernel{T, <:HelmholtzPeriodic1D{N}})(
+        target,
+        source,
+        r = Inti.coords(target) - Inti.coords(source),
+    ) where {N, T}
     d = LinearAlgebra.norm(r)
     (d ≤ Inti.SAME_POINT_TOLERANCE) && return zero(T)
     ny = Inti.normal(source)
@@ -104,11 +104,11 @@ function (DL::Inti.DoubleLayerKernel{T,<:HelmholtzPeriodic1D{N}})(
     end
 end
 
-function (ADL::Inti.AdjointDoubleLayerKernel{T,<:HelmholtzPeriodic1D{N}})(
-    target,
-    source,
-    r = Inti.coords(target) - Inti.coords(source),
-) where {N,T}
+function (ADL::Inti.AdjointDoubleLayerKernel{T, <:HelmholtzPeriodic1D{N}})(
+        target,
+        source,
+        r = Inti.coords(target) - Inti.coords(source),
+    ) where {N, T}
     d = LinearAlgebra.norm(r)
     (d ≤ Inti.SAME_POINT_TOLERANCE) && return zero(T)
     nx = Inti.normal(target)
@@ -123,11 +123,11 @@ function (ADL::Inti.AdjointDoubleLayerKernel{T,<:HelmholtzPeriodic1D{N}})(
     end
 end
 
-function (HS::Inti.HyperSingularKernel{T,<:HelmholtzPeriodic1D{N}})(
-    target,
-    source,
-    r = Inti.coords(target) - Inti.coords(source),
-) where {N,T}
+function (HS::Inti.HyperSingularKernel{T, <:HelmholtzPeriodic1D{N}})(
+        target,
+        source,
+        r = Inti.coords(target) - Inti.coords(source),
+    ) where {N, T}
     d = LinearAlgebra.norm(r)
     (d ≤ Inti.SAME_POINT_TOLERANCE) && return zero(T)
     nx = Inti.normal(target)
@@ -137,8 +137,8 @@ function (HS::Inti.HyperSingularKernel{T,<:HelmholtzPeriodic1D{N}})(
         # x = Inti.coords(target)
         # dGdny = Inti.DoubleLayerKernel(HS.op)
         # ForwardDiff.derivative(t -> dGdny(x + t * nx, source), 0)
-        hess = QPGreen.hess_qp_green(r, HS.op.params, HS.op.hess_interp, HS.op.Yε_cache;)
-        hess_matrix = SMatrix{2,2}(hess[1], hess[2], hess[2], hess[3])
+        hess = QPGreen.hess_qp_green(r, HS.op.params, HS.op.hess_interp, HS.op.Yε_cache)
+        hess_matrix = SMatrix{2, 2}(hess[1], hess[2], hess[2], hess[3])
         out = -transpose(nx) * hess_matrix * ny
         return out
     else

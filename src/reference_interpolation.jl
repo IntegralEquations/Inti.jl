@@ -14,14 +14,14 @@ Instances `el` of `ReferenceInterpolant` are expected to implement:
     For performance reasons, both `el(x̂)` and `jacobian(el,x̂)` should
     take as input a `StaticVector` and output a static vector or static array.
 """
-abstract type ReferenceInterpolant{D,T} end
+abstract type ReferenceInterpolant{D, T} end
 
 function (el::ReferenceInterpolant)(x)
     return interface_method(el)
 end
 
-geometric_dimension(::ReferenceInterpolant{D,T}) where {D,T} = geometric_dimension(D)
-ambient_dimension(el::ReferenceInterpolant{D,T}) where {D,T} = length(T)
+geometric_dimension(::ReferenceInterpolant{D, T}) where {D, T} = geometric_dimension(D)
+ambient_dimension(el::ReferenceInterpolant{D, T}) where {D, T} = length(T)
 
 """
     jacobian(f,x)
@@ -51,7 +51,7 @@ Note: both `x` and `f(x)` are expected to be of `SVector` type.
 function hessian(el::ReferenceInterpolant, s)
     N = ambient_dimension(el)
     M = geometric_dimension(el)
-    S = Tuple{N,M,M}
+    S = Tuple{N, M, M}
     return SArray{S}(stack(i -> ForwardDiff.hessian(x -> el(x)[i], s), 1:N; dims = 1))
 end
 
@@ -105,22 +105,22 @@ function gauss_curvature(el::ReferenceInterpolant, x̂)
     return κ
 end
 
-domain(::ReferenceInterpolant{D,T}) where {D,T} = D()
-domain(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = D()
+domain(::ReferenceInterpolant{D, T}) where {D, T} = D()
+domain(::Type{<:ReferenceInterpolant{D, T}}) where {D, T} = D()
 
 # TODO: deprecate `domain` in favor of `reference_domain` for clarity
 reference_domain(el) = domain(el)
 
-return_type(::ReferenceInterpolant{D,T}) where {D,T} = T
-return_type(::Type{<:ReferenceInterpolant{D,T}}) where {D,T} = T
-domain_dimension(t::ReferenceInterpolant{D,T}) where {D,T} = domain(t) |> center |> length
-function domain_dimension(t::Type{<:ReferenceInterpolant{D,T}}) where {D,T}
+return_type(::ReferenceInterpolant{D, T}) where {D, T} = T
+return_type(::Type{<:ReferenceInterpolant{D, T}}) where {D, T} = T
+domain_dimension(t::ReferenceInterpolant{D, T}) where {D, T} = domain(t) |> center |> length
+function domain_dimension(t::Type{<:ReferenceInterpolant{D, T}}) where {D, T}
     return domain(t) |> center |> length
 end
-function range_dimension(el::ReferenceInterpolant{R,T}) where {R,T}
+function range_dimension(el::ReferenceInterpolant{R, T}) where {R, T}
     return domain(el) |> center |> el |> length
 end
-function range_dimension(el::Type{<:ReferenceInterpolant{R,T}}) where {R,T}
+function range_dimension(el::Type{<:ReferenceInterpolant{R, T}}) where {R, T}
     return domain(el) |> center |> el |> length
 end
 
@@ -143,20 +143,20 @@ vertices(el::ReferenceInterpolant{D}) where {D} = el.(vertices(D()))
 Axis-aligned hyperrectangle in `N` dimensions given by
 `low_corner::SVector{N,T}` and `high_corner::SVector{N,T}`.
 """
-struct HyperRectangle{N,T} <: ReferenceInterpolant{ReferenceHyperCube{N},T}
-    low_corner::SVector{N,T}
-    high_corner::SVector{N,T}
+struct HyperRectangle{N, T} <: ReferenceInterpolant{ReferenceHyperCube{N}, T}
+    low_corner::SVector{N, T}
+    high_corner::SVector{N, T}
     # check that low_corner <= high_corner
-    function HyperRectangle(low_corner::SVector{N,T}, high_corner::SVector{N,T}) where {N,T}
+    function HyperRectangle(low_corner::SVector{N, T}, high_corner::SVector{N, T}) where {N, T}
         @assert all(low_corner .<= high_corner) "low_corner must be less than high_corner"
-        return new{N,T}(low_corner, high_corner)
+        return new{N, T}(low_corner, high_corner)
     end
 end
 
 low_corner(el::HyperRectangle) = el.low_corner
 high_corner(el::HyperRectangle) = el.high_corner
-geometric_dimension(::HyperRectangle{N,T}) where {N,T} = N
-ambient_dimension(::HyperRectangle{N,T}) where {N,T} = N
+geometric_dimension(::HyperRectangle{N, T}) where {N, T} = N
+ambient_dimension(::HyperRectangle{N, T}) where {N, T} = N
 
 function (el::HyperRectangle)(u)
     lc = low_corner(el)
@@ -174,16 +174,16 @@ return a `StaticVector` or `StaticArray`.
 
 See also: [`ReferenceInterpolant`](@ref), [`LagrangeElement`](@ref)
 """
-struct ParametricElement{D<:ReferenceShape,T,F} <: ReferenceInterpolant{D,T}
+struct ParametricElement{D <: ReferenceShape, T, F} <: ReferenceInterpolant{D, T}
     parametrization::F
-    function ParametricElement{D,T}(f::F) where {F,D,T}
-        return new{D,T,F}(f)
+    function ParametricElement{D, T}(f::F) where {F, D, T}
+        return new{D, T, F}(f)
     end
 end
 
 parametrization(el::ParametricElement) = el.parametrization
-domain(::ParametricElement{D,T,F}) where {D,T,F} = D()
-return_type(::ParametricElement{D,T,F}) where {D,T,F} = T
+domain(::ParametricElement{D, T, F}) where {D, T, F} = D()
+return_type(::ParametricElement{D, T, F}) where {D, T, F} = T
 
 ambient_dimension(p::ParametricElement) = length(return_type(p))
 
@@ -205,10 +205,10 @@ vertices_idxs(el::ParametricElement) = vertices_idxs(typeof(el))
 
 Construct the element defined as the image of `f` over `d`.
 """
-function ParametricElement(f, d::HyperRectangle{N,T}) where {N,T}
-    V = return_type(f, SVector{N,T})
+function ParametricElement(f, d::HyperRectangle{N, T}) where {N, T}
+    V = return_type(f, SVector{N, T})
     D = ReferenceHyperCube{N}
-    return ParametricElement{D,V}((x) -> f(d(x)))
+    return ParametricElement{D, V}((x) -> f(d(x)))
 end
 
 """
@@ -221,8 +221,8 @@ The return type `T` should be a vector space (i.e. support addition and
 multiplication by scalars). For istance, `T` could be a number or a vector, but
 not a `Tuple`.
 """
-struct LagrangeElement{D<:ReferenceShape,Np,T} <: ReferenceInterpolant{D,T}
-    vals::SVector{Np,T}
+struct LagrangeElement{D <: ReferenceShape, Np, T} <: ReferenceInterpolant{D, T}
+    vals::SVector{Np, T}
 end
 
 vals(el::LagrangeElement) = el.vals
@@ -240,8 +240,8 @@ function reference_nodes(el::LagrangeElement)
 end
 
 # infer missig information from type of vals
-function LagrangeElement{D}(vals::SVector{Np,T}) where {D,Np,T}
-    return LagrangeElement{D,Np,T}(vals)
+function LagrangeElement{D}(vals::SVector{Np, T}) where {D, Np, T}
+    return LagrangeElement{D, Np, T}(vals)
 end
 
 # a more convenient syntax
@@ -253,7 +253,7 @@ LagrangeElement{D}(x1, xs...) where {D} = LagrangeElement{D}(SVector(x1, xs...))
 The order of the element's interpolating polynomial (e.g. a `LagrangeLine` with
 `2` nodes defines a linear polynomial, and thus has order `1`).
 """
-@generated function order(::Type{<:LagrangeElement{D,Np}})::Int where {D,Np}
+@generated function order(::Type{<:LagrangeElement{D, Np}})::Int where {D, Np}
     if D <: ReferenceHyperCube
         N = geometric_dimension(D)
         K = findfirst(i -> i^N == Np, 1:100) - 1
@@ -273,9 +273,9 @@ end
 """
 const LagrangeLine = LagrangeElement{ReferenceLine}
 
-const Line1D{T} = LagrangeElement{ReferenceLine,2,SVector{1,T}}
-const Line2D{T} = LagrangeElement{ReferenceLine,2,SVector{2,T}}
-const Line3D{T} = LagrangeElement{ReferenceLine,2,SVector{3,T}}
+const Line1D{T} = LagrangeElement{ReferenceLine, 2, SVector{1, T}}
+const Line2D{T} = LagrangeElement{ReferenceLine, 2, SVector{2, T}}
+const Line3D{T} = LagrangeElement{ReferenceLine, 2, SVector{3, T}}
 Line1D(args...) = Line1D{Float64}(args...)
 Line2D(args...) = Line2D{Float64}(args...)
 Line3D(args...) = Line3D{Float64}(args...)
@@ -287,8 +287,8 @@ integration_measure(l::Line1D) = norm(vals(l)[2] - vals(l)[1])
 """
 const LagrangeTriangle = LagrangeElement{ReferenceTriangle}
 
-const Triangle2D{T} = LagrangeElement{ReferenceTriangle,3,SVector{2,T}}
-const Triangle3D{T} = LagrangeElement{ReferenceTriangle,3,SVector{3,T}}
+const Triangle2D{T} = LagrangeElement{ReferenceTriangle, 3, SVector{2, T}}
+const Triangle3D{T} = LagrangeElement{ReferenceTriangle, 3, SVector{3, T}}
 Triangle2D(args...) = Triangle2D{Float64}(args...)
 Triangle3D(args...) = Triangle3D{Float64}(args...)
 
@@ -302,8 +302,8 @@ const LagrangeTetrahedron = LagrangeElement{ReferenceTetrahedron}
 """
 const LagrangeSquare = LagrangeElement{ReferenceSquare}
 
-const Quadrangle2D{T} = LagrangeElement{ReferenceSquare,4,SVector{2,T}}
-const Quadrangle3D{T} = LagrangeElement{ReferenceSquare,4,SVector{3,T}}
+const Quadrangle2D{T} = LagrangeElement{ReferenceSquare, 4, SVector{2, T}}
+const Quadrangle3D{T} = LagrangeElement{ReferenceSquare, 4, SVector{3, T}}
 Quadrangle2D(args...) = Quadrangle2D{Float64}(args...)
 Quadrangle3D(args...) = Quadrangle3D{Float64}(args...)
 
@@ -371,9 +371,9 @@ function boundary_idxs(el::LagrangeSquare)
 end
 
 # generic ℚₖ elements for ReferenceHyperCube
-function reference_nodes(T::Type{<:LagrangeElement{ReferenceHyperCube{D},Np}}) where {D,Np}
+function reference_nodes(T::Type{<:LagrangeElement{ReferenceHyperCube{D}, Np}}) where {D, Np}
     n = order(T) + 1
-    @assert abs(n - Np^(1 / D)) < 1e-8 "Np must be a perfect power of D"
+    @assert abs(n - Np^(1 / D)) < 1.0e-8 "Np must be a perfect power of D"
     nodes1d = ntuple(i -> n == 1 ? 0.5 : range(0, 1, n), D)
     nodes = map(Iterators.product(nodes1d...)) do x
         return SVector(x...)
@@ -381,14 +381,14 @@ function reference_nodes(T::Type{<:LagrangeElement{ReferenceHyperCube{D},Np}}) w
     return SVector{Np}(nodes)
 end
 
-@generated function (el::LagrangeElement{ReferenceHyperCube{D},Np})(u) where {D,Np}
-    n    = order(el) + 1
+@generated function (el::LagrangeElement{ReferenceHyperCube{D}, Np})(u) where {D, Np}
+    n = order(el) + 1
     dims = ntuple(i -> n, D)
     # fetch references nodes on format expected by `lagrange_interp`
-    nodes1d   = n == 1 ? [0.5] : collect(range(0, 1, n))
+    nodes1d = n == 1 ? [0.5] : collect(range(0, 1, n))
     weights1d = barycentric_lagrange_weights(nodes1d)
-    nodes     = ntuple(i -> nodes1d, D)
-    weights   = ntuple(i -> weights1d, D)
+    nodes = ntuple(i -> nodes1d, D)
+    weights = ntuple(i -> weights1d, D)
     return quote
         v = reshape(vals(el), $dims)
         return tensor_lagrange_interp(SVector(u), v, $nodes, $weights, Val(D), 1, Np)
@@ -423,15 +423,15 @@ function at the point `x`.
 - The interpolated value at the point `x`, of the same type as the elements of `vals`.
 """
 @inline function tensor_lagrange_interp(
-    x::SVector{N,Td},
-    vals::AbstractArray{<:Any,N},
-    nodes::NTuple{N},
-    weights::NTuple{N},
-    ::Val{dim},
-    i1,
-    len,
-    ::Val{SKIP} = Val(false),
-) where {N,Td,dim,SKIP}
+        x::SVector{N, Td},
+        vals::AbstractArray{<:Any, N},
+        nodes::NTuple{N},
+        weights::NTuple{N},
+        ::Val{dim},
+        i1,
+        len,
+        ::Val{SKIP} = Val(false),
+    ) where {N, Td, dim, SKIP}
     T = eltype(vals)
     n = size(vals, dim)
     @inbounds xd = x[dim]
@@ -446,10 +446,10 @@ function at the point `x`.
     # slightly different representation, which is more stable, if `x` is ever close to an
     # interpolation node. The `thres` variable below was chosen empirically for `Float64`
     # types.
-    thres = 1e-3
+    thres = 1.0e-3
     if dim == 1
         for i in 1:n
-            @inbounds ci = vals[i1+(i-1)]
+            @inbounds ci = vals[i1 + (i - 1)]
             @inbounds wi = W[i]
             @inbounds x_m_xi = xd - X[i]
             if SKIP || abs(x_m_xi) > thres || (!iszero(res))
@@ -496,10 +496,10 @@ function barycentric_lagrange_weights(x::AbstractVector)
 end
 
 # generic ℙₖ elements for ReferenceSimplex
-function reference_nodes(T::Type{<:LagrangeElement{ReferenceSimplex{D},Np}}) where {D,Np}
+function reference_nodes(T::Type{<:LagrangeElement{ReferenceSimplex{D}, Np}}) where {D, Np}
     k = order(T)
     k == 0 && return SVector{1}((svector(i -> 1 / (D + 1), D),))
-    nodes = SVector{D,Float64}[]
+    nodes = SVector{D, Float64}[]
     for I in Iterators.product(ntuple(i -> 0:k, D)...)
         sum(I) > k && continue # skip if sum of indices exceeds n
         x = svector(i -> I[i] / k, D)
@@ -511,25 +511,25 @@ end
 # Based on a formula found in
 # ``On a class of finite elements generated by Lagrange Interpolation''
 # Nicolaides. SINUM 1972.
-function (el::LagrangeElement{ReferenceSimplex{D},Np})(u) where {D,Np}
+function (el::LagrangeElement{ReferenceSimplex{D}, Np})(u) where {D, Np}
     T = eltype(u)
     k = order(typeof(el))::Int
     iszero(k) && return vals(el)[1] # constant element
     u = SVector{D}(u)
     x = push(u, 1 - sum(u)) # add the last coordinate
-    lags1d = MMatrix{k + 1,D + 1,T}(undef)
-    @inbounds for dim in 1:(D+1)
+    lags1d = MMatrix{k + 1, D + 1, T}(undef)
+    @inbounds for dim in 1:(D + 1)
         xk = k * x[dim] # scaled coordinate
         lags1d[1, dim] = 1.0 # constant term
         for j in 1:k
-            lags1d[j+1, dim] = lags1d[j, dim] * (xk - (j - 1)) / j
+            lags1d[j + 1, dim] = lags1d[j, dim] * (xk - (j - 1)) / j
         end
     end
     v = vals(el)
     acc = zero(eltype(v))
     @inbounds for (n, I) in enumerate(_barycentric_iterator(el))
         l = v[n] # value at the current node
-        for d in 1:(D+1)
+        for d in 1:(D + 1)
             i = I[d] + 1
             l *= lags1d[i, d]
         end
@@ -539,10 +539,10 @@ function (el::LagrangeElement{ReferenceSimplex{D},Np})(u) where {D,Np}
 end
 
 @generated function _barycentric_iterator(
-    el::LagrangeElement{ReferenceSimplex{D},Np},
-) where {D,Np}
+        el::LagrangeElement{ReferenceSimplex{D}, Np},
+    ) where {D, Np}
     k = order(el)
-    idxs = MVector{Np,NTuple{D + 1,Int}}(undef)
+    idxs = MVector{Np, NTuple{D + 1, Int}}(undef)
     cc = 0
     for I in Iterators.product(ntuple(i -> 0:k, D)...)
         sum(I) > k && continue # skip if sum of indices exceeds n
@@ -558,7 +558,7 @@ end
 Return the Lagrange basis `B` for the element `E`. Evaluating `B(x)` yields the
 value of each basis function at `x`.
 """
-function lagrange_basis(::Type{LagrangeElement{D,N,T}}) where {D,N,T}
+function lagrange_basis(::Type{LagrangeElement{D, N, T}}) where {D, N, T}
     vals = svector(i -> svector(j -> i == j, N), N)
     return LagrangeElement{D}(vals)
 end
