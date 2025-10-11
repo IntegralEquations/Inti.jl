@@ -69,7 +69,7 @@ G = Inti.SingleLayerKernel(op)
 dG = Inti.DoubleLayerKernel(op)
 
 ## choice of a integral representation
-T = SVector{3,Float64}
+T = SVector{3, Float64}
 σ = zeros(T, length(Q))
 𝒮 = Inti.IntegralPotential(G, Q)
 𝒟 = Inti.IntegralPotential(dG, Q)
@@ -109,7 +109,7 @@ end
 σ_ = reinterpret(Float64, σ)
 f_ = reinterpret(Float64, f)
 
-_, hist = gmres!(σ_, L_, f_; abstol = 1e-8, maxiter = 200, restart = 200, log = true)
+_, hist = gmres!(σ_, L_, f_; abstol = 1.0e-8, maxiter = 200, restart = 200, log = true)
 
 @show hist
 

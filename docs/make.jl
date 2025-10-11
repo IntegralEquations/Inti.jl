@@ -3,7 +3,7 @@ using Documenter
 using DocumenterCitations
 using DocumenterInterLinks
 using Pluto
-using JuliaFormatter
+using Runic
 # packages needed for extensions
 using Gmsh
 using HMatrices
@@ -19,13 +19,13 @@ ON_CI && (draft = false) # always full build on CI
 
 # from https://github.com/fonsp/Pluto.jl/pull/2471
 function generate_plaintext(
-    notebook,
-    strmacrotrim::Union{String,Nothing} = nothing;
-    header::Function = _ -> nothing,
-    footer::Function = _ -> nothing,
-    textcomment::Function = identity,
-    codewrapper::Function,
-)
+        notebook,
+        strmacrotrim::Union{String, Nothing} = nothing;
+        header::Function = _ -> nothing,
+        footer::Function = _ -> nothing,
+        textcomment::Function = identity,
+        codewrapper::Function,
+    )
     cell_strings = String[]
     header_content = header(notebook)
     isnothing(header_content) || push!(cell_strings, header_content)
@@ -64,17 +64,17 @@ function generate_md(input; output = replace(input, r"\.jl$" => ".md"))
     notebook = Pluto.load_notebook(input)
     header =
         _ ->
-            "[![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)]($fname)"
+    "[![Pluto notebook](https://img.shields.io/badge/download-Pluto_notebook-blue)]($fname)"
 
     function codewrapper(cell, _)
         # 1. Strips begin/end block
-        # 2. Reformats code using JuliaFormatter
+        # 2. Reformats code using Runic
         # 3. Wraps all code in same ```@example``` block for documenter
         code = strip(cell.code)
         if startswith(code, "begin") && endswith(code, "end")
-            code = strip(code[6:end-4])  # Remove "begin" and "end" and strip spaces
-            # reformat code using JuliaFormatter
-            code = format_text(String(code))
+            code = strip(code[6:(end - 4)])  # Remove "begin" and "end" and strip spaces
+            # reformat code using Runic
+            code = Runic.format_string(String(code))
         end
         return if cell.code_folded
             string("```@setup $fname\n", code, "\n```")
@@ -117,7 +117,7 @@ notebooks = [
     "Poisson problem" => "poisson.jl",
 ]
 
-notebook_examples = Pair{String,String}[]
+notebook_examples = Pair{String, String}[]
 for notebook in notebooks
     title, fname = notebook
     file_in = joinpath(@__DIR__, "src", "pluto-examples", fname)

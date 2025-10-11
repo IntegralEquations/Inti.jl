@@ -7,10 +7,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install JuliaFormatter and format
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: '1'
+      - name: Install Runic and format
         run: |
-          julia  -e 'import Pkg; Pkg.add("JuliaFormatter")'
-          julia  -e 'using JuliaFormatter; format(".")'
+          julia --project=@runic -e 'import Pkg; Pkg.add("Runic")'
+          julia --project=@runic -e 'using Runic; Runic.main(["--inplace", "."])'
 
       # https://github.com/marketplace/actions/create-pull-request
       # https://github.com/peter-evans/create-pull-request#reference-example
@@ -19,9 +22,9 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: Format .jl files
-          title: 'Automatic JuliaFormatter.jl run'
-          branch: auto-juliaformatter-pr
+          commit-message: Format .jl files with Runic
+          title: 'Automatic Runic.jl run'
+          branch: auto-runic-pr
           delete-branch: true
           labels: formatting, automated pr, no changelog
       - name: Check outputs

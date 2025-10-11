@@ -59,7 +59,7 @@ end
 
 function Base.show(io::IO, d::Domain)
     kk = keys(d)
-    n  = length(entities(d))
+    n = length(entities(d))
     n == print(io, "Domain with $n ", n == 1 ? "entity" : "entities")
     for k in kk
         ent = global_get_entity(k)
@@ -88,7 +88,7 @@ Return the internal boundaries of a `Domain`. These are entities in
 `skeleton(Ω)` which appear at least twice as a boundary of entities in `Ω`.
 """
 function internal_boundary(Ω::Domain)
-    seen     = Set{EntityKey}()
+    seen = Set{EntityKey}()
     repeated = Set{EntityKey}()
     for ω in entities(Ω)
         for γ in boundary(ω)

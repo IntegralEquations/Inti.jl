@@ -6,7 +6,7 @@ import LinearMaps
 using StaticArrays # For Stokes types
 
 function __init__()
-    @info "Loading Inti.jl FMM3D extension"
+    return @info "Loading Inti.jl FMM3D extension"
 end
 
 function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
@@ -23,7 +23,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
     weights = [q.weight for q in iop.source]
     K = iop.kernel
     # Laplace
-    if K isa Inti.SingleLayerKernel{Float64,<:Inti.Laplace{3}}
+    if K isa Inti.SingleLayerKernel{Float64, <:Inti.Laplace{3}}
         charges = Vector{Float64}(undef, n)
         return LinearMaps.LinearMap{Float64}(m, n) do y, x
             # multiply by weights and constant
@@ -31,7 +31,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             out = FMM3D.lfmm3d(rtol, sources; charges, targets, pgt = 1)
             return copyto!(y, out.pottarg)
         end
-    elseif K isa Inti.DoubleLayerKernel{Float64,<:Inti.Laplace{3}}
+    elseif K isa Inti.DoubleLayerKernel{Float64, <:Inti.Laplace{3}}
         normals = Matrix{Float64}(undef, 3, n)
         for j in 1:n
             normals[:, j] = Inti.normal(iop.source[j])
@@ -45,7 +45,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             out = FMM3D.lfmm3d(rtol, sources; dipvecs, targets, pgt = 1)
             return copyto!(y, out.pottarg)
         end
-    elseif K isa Inti.AdjointDoubleLayerKernel{Float64,<:Inti.Laplace{3}}
+    elseif K isa Inti.AdjointDoubleLayerKernel{Float64, <:Inti.Laplace{3}}
         xnormals = Matrix{Float64}(undef, 3, m)
         for j in 1:m
             xnormals[:, j] = Inti.normal(iop.target[j])
@@ -57,7 +57,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             out = FMM3D.lfmm3d(rtol, sources; charges, targets, pgt = 2)
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
         end
-    elseif K isa Inti.HyperSingularKernel{Float64,<:Inti.Laplace{3}}
+    elseif K isa Inti.HyperSingularKernel{Float64, <:Inti.Laplace{3}}
         xnormals = Matrix{Float64}(undef, 3, m)
         ynormals = Matrix{Float64}(undef, 3, n)
         for j in 1:m
@@ -76,7 +76,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
         end
         # Helmholtz
-    elseif K isa Inti.SingleLayerKernel{ComplexF64,<:Inti.Helmholtz{3}}
+    elseif K isa Inti.SingleLayerKernel{ComplexF64, <:Inti.Helmholtz{3}}
         charges = Vector{ComplexF64}(undef, n)
         zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
@@ -85,7 +85,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             out = FMM3D.hfmm3d(rtol, zk, sources; charges, targets, pgt = 1)
             return copyto!(y, out.pottarg)
         end
-    elseif K isa Inti.DoubleLayerKernel{ComplexF64,<:Inti.Helmholtz{3}}
+    elseif K isa Inti.DoubleLayerKernel{ComplexF64, <:Inti.Helmholtz{3}}
         normals = Matrix{Float64}(undef, 3, n)
         for j in 1:n
             normals[:, j] = Inti.normal(iop.source[j])
@@ -100,7 +100,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 1)
             return copyto!(y, out.pottarg)
         end
-    elseif K isa Inti.AdjointDoubleLayerKernel{ComplexF64,<:Inti.Helmholtz{3}}
+    elseif K isa Inti.AdjointDoubleLayerKernel{ComplexF64, <:Inti.Helmholtz{3}}
         xnormals = Matrix{Float64}(undef, 3, m)
         for j in 1:m
             xnormals[:, j] = Inti.normal(iop.target[j])
@@ -113,7 +113,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             out = FMM3D.hfmm3d(rtol, zk, sources; charges, targets, pgt = 2)
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
         end
-    elseif K isa Inti.HyperSingularKernel{ComplexF64,<:Inti.Helmholtz{3}}
+    elseif K isa Inti.HyperSingularKernel{ComplexF64, <:Inti.Helmholtz{3}}
         xnormals = Matrix{Float64}(undef, 3, m)
         ynormals = Matrix{Float64}(undef, 3, n)
         for j in 1:m
@@ -133,17 +133,17 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
         end
         # Stokes
-    elseif K isa Inti.SingleLayerKernel{SMatrix{3,3,Float64,9},<:Inti.Stokes{3,Float64}}
-        T = SVector{3,Float64}
+    elseif K isa Inti.SingleLayerKernel{SMatrix{3, 3, Float64, 9}, <:Inti.Stokes{3, Float64}}
+        T = SVector{3, Float64}
         stoklet = Matrix{Float64}(undef, 3, n)
-        return LinearMaps.LinearMap{SMatrix{3,3,Float64,9}}(m, n) do y, x
+        return LinearMaps.LinearMap{SMatrix{3, 3, Float64, 9}}(m, n) do y, x
             # multiply by weights and constant
             stoklet[:] = 1 / (4 * π * K.op.μ) .* reinterpret(Float64, weights .* x)
             out = FMM3D.stfmm3d(rtol, sources; stoklet, targets, ppregt = 1)
             return copyto!(y, reinterpret(T, out.pottarg))
         end
-    elseif K isa Inti.DoubleLayerKernel{SMatrix{3,3,Float64,9},<:Inti.Stokes{3,Float64}}
-        T = SVector{3,Float64}
+    elseif K isa Inti.DoubleLayerKernel{SMatrix{3, 3, Float64, 9}, <:Inti.Stokes{3, Float64}}
+        T = SVector{3, Float64}
         normals = Matrix{Float64}(undef, 3, n)
         for j in 1:n
             normals[:, j] = Inti.normal(iop.source[j])
@@ -154,7 +154,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         for j in 1:n
             strsvec[:, j] = -1 / (4 * π) * view(normals, :, j) .* weights[j]
         end
-        return LinearMaps.LinearMap{SMatrix{3,3,Float64,9}}(m, n) do y, x
+        return LinearMaps.LinearMap{SMatrix{3, 3, Float64, 9}}(m, n) do y, x
             strslet[:] = reinterpret(Float64, x)
             out = FMM3D.stfmm3d(rtol, sources; strslet, strsvec, targets, ppregt = 1)
             return copyto!(y, reinterpret(T, out.pottarg))

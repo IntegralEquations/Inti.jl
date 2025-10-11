@@ -5,7 +5,7 @@ import FMM2D
 import LinearMaps
 
 function __init__()
-    @info "Loading Inti.jl FMM2D extension"
+    return @info "Loading Inti.jl FMM2D extension"
 end
 
 function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
@@ -26,7 +26,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         m == n ? isapprox(targets, sources; atol = Inti.SAME_POINT_TOLERANCE) : false
     K = iop.kernel
     # Laplace
-    if K isa Inti.SingleLayerKernel{Float64,<:Inti.Laplace{2}}
+    if K isa Inti.SingleLayerKernel{Float64, <:Inti.Laplace{2}}
         charges = Vector{Float64}(undef, n)
         return LinearMaps.LinearMap{Float64}(m, n) do y, x
             # multiply by weights and constant
@@ -40,13 +40,13 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                     sources = sources,
                     charges = charges,
                     targets = targets,
-                    eps     = rtol,
-                    pgt     = 1,
+                    eps = rtol,
+                    pgt = 1,
                 )
                 return copyto!(y, out.pottarg)
             end
         end
-    elseif K isa Inti.DoubleLayerKernel{Float64,<:Inti.Laplace{2}}
+    elseif K isa Inti.DoubleLayerKernel{Float64, <:Inti.Laplace{2}}
         normals = Matrix{Float64}(undef, 2, n)
         for j in 1:n
             normals[:, j] = Inti.normal(iop.source[j])
@@ -64,25 +64,25 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             if same_surface
                 out = FMM2D.rfmm2d(;
                     sources = sources,
-                    dipstr  = dipstr,
+                    dipstr = dipstr,
                     dipvecs = dipvecs,
-                    eps     = rtol,
-                    pg      = 1,
+                    eps = rtol,
+                    pg = 1,
                 )
                 return copyto!(y, out.pot)
             else
                 out = FMM2D.rfmm2d(;
                     sources = sources,
                     targets = targets,
-                    dipstr  = dipstr,
+                    dipstr = dipstr,
                     dipvecs = dipvecs,
-                    eps     = rtol,
-                    pgt     = 1,
+                    eps = rtol,
+                    pgt = 1,
                 )
                 return copyto!(y, out.pottarg)
             end
         end
-    elseif K isa Inti.AdjointDoubleLayerKernel{Float64,<:Inti.Laplace{2}}
+    elseif K isa Inti.AdjointDoubleLayerKernel{Float64, <:Inti.Laplace{2}}
         xnormals = Matrix{Float64}(undef, 2, m)
         for j in 1:m
             xnormals[:, j] = Inti.normal(iop.target[j])
@@ -100,13 +100,13 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                     charges = charges,
                     sources = sources,
                     targets = targets,
-                    eps     = rtol,
-                    pgt     = 2,
+                    eps = rtol,
+                    pgt = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
         end
-    elseif K isa Inti.HyperSingularKernel{Float64,<:Inti.Laplace{2}}
+    elseif K isa Inti.HyperSingularKernel{Float64, <:Inti.Laplace{2}}
         xnormals = Matrix{Float64}(undef, 2, m)
         ynormals = Matrix{Float64}(undef, 2, n)
         for j in 1:m
@@ -128,26 +128,26 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             if same_surface
                 out = FMM2D.rfmm2d(;
                     dipvecs = dipvecs,
-                    dipstr  = dipstrs,
+                    dipstr = dipstrs,
                     sources = sources,
-                    eps     = rtol,
-                    pg      = 2,
+                    eps = rtol,
+                    pg = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
             else
                 out = FMM2D.rfmm2d(;
                     dipvecs = dipvecs,
-                    dipstr  = dipstrs,
+                    dipstr = dipstrs,
                     sources = sources,
                     targets = targets,
-                    eps     = rtol,
-                    pgt     = 2,
+                    eps = rtol,
+                    pgt = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
         end
         # Helmholtz
-    elseif K isa Inti.SingleLayerKernel{ComplexF64,<:Inti.Helmholtz{2}}
+    elseif K isa Inti.SingleLayerKernel{ComplexF64, <:Inti.Helmholtz{2}}
         charges = Vector{ComplexF64}(undef, n)
         zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
@@ -155,26 +155,26 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             @. charges = weights * x
             if same_surface
                 out = FMM2D.hfmm2d(;
-                    zk      = zk,
+                    zk = zk,
                     sources = sources,
                     charges = charges,
-                    eps     = rtol,
-                    pg      = 1,
+                    eps = rtol,
+                    pg = 1,
                 )
                 return copyto!(y, out.pot)
             else
                 out = FMM2D.hfmm2d(;
-                    zk      = zk,
+                    zk = zk,
                     sources = sources,
                     charges = charges,
                     targets = targets,
-                    eps     = rtol,
-                    pgt     = 1,
+                    eps = rtol,
+                    pgt = 1,
                 )
                 return copyto!(y, out.pottarg)
             end
         end
-    elseif K isa Inti.DoubleLayerKernel{ComplexF64,<:Inti.Helmholtz{2}}
+    elseif K isa Inti.DoubleLayerKernel{ComplexF64, <:Inti.Helmholtz{2}}
         normals = Matrix{Float64}(undef, 2, n)
         for j in 1:n
             normals[:, j] = Inti.normal(iop.source[j])
@@ -192,28 +192,28 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             end
             if same_surface
                 out = FMM2D.hfmm2d(;
-                    zk      = zk,
+                    zk = zk,
                     sources = sources,
-                    dipstr  = dipstrs,
+                    dipstr = dipstrs,
                     dipvecs = dipvecs,
-                    eps     = rtol,
-                    pg      = 1,
+                    eps = rtol,
+                    pg = 1,
                 )
                 return copyto!(y, out.pot)
             else
                 out = FMM2D.hfmm2d(;
-                    zk      = zk,
+                    zk = zk,
                     sources = sources,
                     targets = targets,
-                    dipstr  = dipstrs,
+                    dipstr = dipstrs,
                     dipvecs = dipvecs,
-                    eps     = rtol,
-                    pgt     = 1,
+                    eps = rtol,
+                    pgt = 1,
                 )
                 return copyto!(y, out.pottarg)
             end
         end
-    elseif K isa Inti.AdjointDoubleLayerKernel{ComplexF64,<:Inti.Helmholtz{2}}
+    elseif K isa Inti.AdjointDoubleLayerKernel{ComplexF64, <:Inti.Helmholtz{2}}
         xnormals = Matrix{Float64}(undef, 2, m)
         for j in 1:m
             xnormals[:, j] = Inti.normal(iop.target[j])
@@ -225,26 +225,26 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             @. charges = x * weights
             if same_surface
                 out = FMM2D.hfmm2d(;
-                    zk      = zk,
+                    zk = zk,
                     charges = charges,
                     sources = sources,
-                    eps     = rtol,
-                    pg      = 2,
+                    eps = rtol,
+                    pg = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
             else
                 out = FMM2D.hfmm2d(;
-                    zk      = zk,
+                    zk = zk,
                     charges = charges,
                     sources = sources,
                     targets = targets,
-                    eps     = rtol,
-                    pgt     = 2,
+                    eps = rtol,
+                    pgt = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
         end
-    elseif K isa Inti.HyperSingularKernel{ComplexF64,<:Inti.Helmholtz{2}}
+    elseif K isa Inti.HyperSingularKernel{ComplexF64, <:Inti.Helmholtz{2}}
         xnormals = Matrix{Float64}(undef, 2, m)
         ynormals = Matrix{Float64}(undef, 2, n)
         for j in 1:m
@@ -266,23 +266,23 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             end
             if same_surface
                 out = FMM2D.hfmm2d(;
-                    zk      = zk,
+                    zk = zk,
                     dipvecs = dipvecs,
-                    dipstr  = dipstrs,
+                    dipstr = dipstrs,
                     sources = sources,
-                    eps     = rtol,
-                    pg      = 2,
+                    eps = rtol,
+                    pg = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.grad; dims = 1) |> vec)
             else
                 out = FMM2D.hfmm2d(;
-                    zk      = zk,
+                    zk = zk,
                     dipvecs = dipvecs,
-                    dipstr  = dipstrs,
+                    dipstr = dipstrs,
                     sources = sources,
                     targets = targets,
-                    eps     = rtol,
-                    pgt     = 2,
+                    eps = rtol,
+                    pgt = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end

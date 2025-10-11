@@ -6,7 +6,7 @@ using LinearAlgebra
 using StaticArrays
 
 function __init__()
-    @info "Loading Inti.jl Gmsh extension"
+    return @info "Loading Inti.jl Gmsh extension"
 end
 
 function Inti.import_mesh(filename = nothing; dim = 3)
@@ -14,12 +14,12 @@ function Inti.import_mesh(filename = nothing; dim = 3)
     if isnothing(filename)
         gmsh.isInitialized() == 1 ||
             error("gmsh is not initialized. Try gmsh.initialize() first.")
-        msh = Inti.Mesh{3,Float64}()
+        msh = Inti.Mesh{3, Float64}()
         _import_mesh!(msh)
         dim == 2 && (msh = Inti._convert_to_2d(msh))
         # create iterators for the lagrange elements
         for E in keys(msh.etype2mat)
-            @assert E <: Union{Inti.LagrangeElement,SVector}
+            @assert E <: Union{Inti.LagrangeElement, SVector}
             msh.etype2els[E] = Inti.ElementIterator(msh, E)
         end
         Inti.build_orientation!(msh)
@@ -54,11 +54,11 @@ function _import_mesh!(msh)
     # probably better to force gmsh to use consecutive tags in the first place.
     node_tags, coords, _ = gmsh.model.mesh.getNodes()
     gmsh2loc_node_tags = Dict(zip(node_tags, collect(1:length(node_tags))))
-    gmsh_nodes = reinterpret(SVector{3,Float64}, coords) |> collect
+    gmsh_nodes = reinterpret(SVector{3, Float64}, coords) |> collect
     shift = length(msh.nodes) # gmsh node tags need to be shifted in case msh was not empty
     append!(msh.nodes, gmsh_nodes)
     gmsh_dim_tags = gmsh.model.getEntities()
-    gmsh2loc_ent_tags = Dict{Int,Int}() # local to gmsh entity tags
+    gmsh2loc_ent_tags = Dict{Int, Int}() # local to gmsh entity tags
     for (dim, gmsh_ent_tag) in gmsh_dim_tags
         # getEntites will always return positive tags
         @assert gmsh_ent_tag > 0
@@ -120,7 +120,7 @@ where:
 function _ent_to_mesh!(etype2mat, ent2etags, key, shift, gmsh2loc_node_tags, tgmsh)
     d, t = key.dim, key.tag
     haskey(ent2etags, key) && error("entity $key already in ent2etags")
-    etype2etags = ent2etags[key] = Dict{DataType,Vector{Int}}()
+    etype2etags = ent2etags[key] = Dict{DataType, Vector{Int}}()
     # Loop on GMSH element types (integer)
     type_tags, _, ntagss = gmsh.model.mesh.getElements(d, tgmsh)
     for (type_tag, ntags) in zip(type_tags, ntagss)
@@ -160,9 +160,9 @@ function _type_tag_to_node_perm(tag)
         inti_nodes = map(x -> 2 .* x .- 1, inti_nodes) # map to [-1, 1]^dim
     end
     perm = map(eachcol(gmsh_nodes)) do col
-        x_gmsh = SVector{dim,Float64}(col)
+        x_gmsh = SVector{dim, Float64}(col)
         dist, i = findmin(x -> norm(x - x_gmsh), inti_nodes)
-        dist < 1e-8 || error("node $x_gmsh not found in Inti reference nodes")
+        dist < 1.0e-8 || error("node $x_gmsh not found in Inti reference nodes")
         return i
     end
     @assert isperm(perm) "permutation is not a valid permutation"
@@ -176,20 +176,20 @@ Mapping of `gmsh` element types, encoded as an integer, to the internal
 equivalent of those.
 """
 function _type_tag_to_etype(tag)
-    T = SVector{3,Float64} # point type
+    T = SVector{3, Float64} # point type
     name, dim, order, num_nodes, ref_nodes, num_primary_nodes =
         gmsh.model.mesh.getElementProperties(tag)
     num_nodes = Int(num_nodes) #convert to Int64
     if occursin("Point", name)
-        etype = SVector{3,Float64}
+        etype = SVector{3, Float64}
     elseif occursin("Line", name)
-        etype = Inti.LagrangeLine{num_nodes,T}
+        etype = Inti.LagrangeLine{num_nodes, T}
     elseif occursin("Triangle", name)
-        etype = Inti.LagrangeTriangle{num_nodes,T}
+        etype = Inti.LagrangeTriangle{num_nodes, T}
     elseif occursin("Quadrilateral", name)
-        etype = Inti.LagrangeSquare{num_nodes,T}
+        etype = Inti.LagrangeSquare{num_nodes, T}
     elseif occursin("Tetrahedron", name)
-        etype = Inti.LagrangeTetrahedron{num_nodes,T}
+        etype = Inti.LagrangeTetrahedron{num_nodes, T}
     else
         error("unable to parse gmsh element of family $name")
     end
@@ -202,7 +202,7 @@ end
 The inverse of [`_type_tag_to_etype`](@ref).
 """
 function _etype_to_type_tag(E::DataType)
-    family_name = if E <: SVector{3,Float64}
+    family_name = if E <: SVector{3, Float64}
         "Point"
     elseif E <: Inti.LagrangeLine
         "Line"
@@ -219,7 +219,7 @@ function _etype_to_type_tag(E::DataType)
     return gmsh.model.mesh.getElementType(family_name, order)
 end
 
-function Inti.write_gmsh_model(msh::Inti.Mesh{N,Float64}; name = "") where {N}
+function Inti.write_gmsh_model(msh::Inti.Mesh{N, Float64}; name = "") where {N}
     @assert N ∈ (2, 3)
     # lift the nodes to 3d if N == 2
     nodes = N == 3 ? Inti.nodes(msh) : [SVector(x[1], x[2], 0) for x in Inti.nodes(msh)]
@@ -236,9 +236,9 @@ function Inti.write_gmsh_model(msh::Inti.Mesh{N,Float64}; name = "") where {N}
     # add the nodes to each entity.
     # FIXME: this creates many duplicate nodes
     for ent in Inti.entities(msh)
-        dim, tag  = Inti.geometric_dimension(ent), Inti.tag(ent)
+        dim, tag = Inti.geometric_dimension(ent), Inti.tag(ent)
         node_tags = Inti.ent2nodetags(msh, ent)
-        coords    = reinterpret(Float64, [nodes[i] for i in node_tags]) |> collect
+        coords = reinterpret(Float64, [nodes[i] for i in node_tags]) |> collect
         gmsh.model.mesh.addNodes(dim, tag, node_tags, coords)
     end
     # add the elements for each entity
@@ -285,7 +285,7 @@ function Inti.write_gmsh_view(msh::Inti.SubMesh, data; viewname = "")
 end
 
 function Inti.gmsh_curve(f, a, b; npts = 100, tag = -1, meshsize)
-    isclosed = norm(f(a) .- f(b)) < 1e-8
+    isclosed = norm(f(a) .- f(b)) < 1.0e-8
     is2d = length(f(a)) == 2
     pt_tags = Int32[]
     nmax = isclosed ? npts - 2 : npts - 1

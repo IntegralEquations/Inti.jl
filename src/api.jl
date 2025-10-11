@@ -63,19 +63,19 @@ integrals should be computed. The available options are:
     [`bdim_correction`](@ref) and [`vdim_correction`](@ref) for more details.
 """
 function single_double_layer(;
-    op,
-    target,
-    source,
-    compression = (method = :none,),
-    correction = (method = :adaptive,),
-    derivative = false,
-)
+        op,
+        target,
+        source,
+        compression = (method = :none,),
+        correction = (method = :adaptive,),
+        derivative = false,
+    )
     compression = _normalize_compression(compression, target, source)
-    correction  = _normalize_correction(correction, target, source)
-    G           = derivative ? AdjointDoubleLayerKernel(op) : SingleLayerKernel(op)
-    dG          = derivative ? HyperSingularKernel(op) : DoubleLayerKernel(op)
-    Sop         = IntegralOperator(G, target, source)
-    Dop         = IntegralOperator(dG, target, source)
+    correction = _normalize_correction(correction, target, source)
+    G = derivative ? AdjointDoubleLayerKernel(op) : SingleLayerKernel(op)
+    dG = derivative ? HyperSingularKernel(op) : DoubleLayerKernel(op)
+    Sop = IntegralOperator(G, target, source)
+    Dop = IntegralOperator(dG, target, source)
     # handle compression
     if compression.method == :hmatrix
         Smat = assemble_hmatrix(Sop; rtol = compression.tol)
@@ -195,12 +195,12 @@ hypersingular operators. See the documentation of [`single_double_layer`] for a
 description of the arguments.
 """
 function adj_double_layer_hypersingular(;
-    op,
-    target,
-    source = target,
-    compression = (method = :none,),
-    correction = (method = :adaptive,),
-)
+        op,
+        target,
+        source = target,
+        compression = (method = :none,),
+        correction = (method = :adaptive,),
+    )
     return single_double_layer(;
         op,
         target,
@@ -218,8 +218,8 @@ Return the single- and double-layer potentials for `op` as
 [`IntegralPotential`](@ref)s.
 """
 function single_double_layer_potential(; op, source)
-    G    = SingleLayerKernel(op)
-    dG   = DoubleLayerKernel(op)
+    G = SingleLayerKernel(op)
+    dG = DoubleLayerKernel(op)
     𝒮 = IntegralPotential(G, source)
     𝒟 = IntegralPotential(dG, source)
     return 𝒮, 𝒟

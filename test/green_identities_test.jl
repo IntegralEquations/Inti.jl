@@ -26,13 +26,13 @@ include("test_utils.jl")
 Random.seed!(1)
 
 ## parameters for testing
-rtol1 = 1e-2 # single and double layer
-rtol2 = 5e-2 # hypersingular (higher tolerance to avoid use of fine mesh + long unit tests)
+rtol1 = 1.0e-2 # single and double layer
+rtol2 = 5.0e-2 # hypersingular (higher tolerance to avoid use of fine mesh + long unit tests)
 dims = (2, 3)
 meshsize = 0.5
 types = (:interior, :exterior)
 
-corrections = [(method = :dim,), (method = :adaptive, maxdist = 2 * meshsize, rtol = 1e-2)]
+corrections = [(method = :dim,), (method = :adaptive, maxdist = 2 * meshsize, rtol = 1.0e-2)]
 
 for correction in corrections
     @testset "Method = $(correction.method)" begin
@@ -69,9 +69,9 @@ for correction in corrections
                 for op in ops
                     @testset "Greens identity ($t) $(N)d $op" begin
                         if op isa
-                           Base.get_extension(Inti, :IntiQPGreenExt).HelmholtzPeriodic1D &&
-                           correction ==
-                           (method = :adaptive, maxdist = 2 * meshsize, rtol = 1e-2)
+                                Base.get_extension(Inti, :IntiQPGreenExt).HelmholtzPeriodic1D &&
+                                correction ==
+                                (method = :adaptive, maxdist = 2 * meshsize, rtol = 1.0e-2)
                             quad = Inti.Quadrature(Γ; meshsize = 0.2, qorder = 5)
                         end
                         xs = t == :interior ? ntuple(i -> 3, N) : ntuple(i -> 0.1, N)
@@ -93,8 +93,8 @@ for correction in corrections
                         e0 = norm(Smat * γ₁u - Dmat * γ₀u - σ * γ₀u, Inf) / γ₀u_norm
                         S, D = Inti.single_double_layer(;
                             op,
-                            target      = quad,
-                            source      = quad,
+                            target = quad,
+                            source = quad,
                             compression = (method = :none,),
                             correction,
                         )

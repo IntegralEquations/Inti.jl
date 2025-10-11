@@ -87,9 +87,9 @@ end
     end # zero divergence, so the integral over the domain should be zero
     Q = Inti.Quadrature(msh[Γ]; qorder = 10)
     area = π * 2^2 - π * 1^2
-    @test abs(Inti.integrate(f_dot_n, Q) - area) < 1e-4 # mesh is not exact, so approx. errors exist
+    @test abs(Inti.integrate(f_dot_n, Q) - area) < 1.0e-4 # mesh is not exact, so approx. errors exist
     Qv = Inti.Quadrature(view(msh, Γ); qorder = 10)
-    @test abs(Inti.integrate(f_dot_n, Qv) - area) < 1e-4 # mesh is not exact, so approx. errors exist
+    @test abs(Inti.integrate(f_dot_n, Qv) - area) < 1.0e-4 # mesh is not exact, so approx. errors exist
 
     # check that Green's identity holds on this domain
     op = Inti.Laplace(; dim = 2)
@@ -100,15 +100,15 @@ end
     γ₀u = map(u, Q)
     γ₁u = map(dudn, Q)
     γ₀u_norm = norm(norm.(γ₀u, Inf), Inf)
-    for correction in ((method = :adaptive, maxdist = 0.5, atol = 1e-8), (method = :dim,))
+    for correction in ((method = :adaptive, maxdist = 0.5, atol = 1.0e-8), (method = :dim,))
         S, D = Inti.single_double_layer(;
             op,
-            target      = Q,
-            source      = Q,
+            target = Q,
+            source = Q,
             compression = (method = :none,),
             correction,
         )
         er = norm(S * γ₁u - D * γ₀u - 1 / 2 * γ₀u, Inf) / γ₀u_norm
-        @test er < 1e-6
+        @test er < 1.0e-6
     end
 end

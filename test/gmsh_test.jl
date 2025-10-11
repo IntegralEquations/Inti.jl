@@ -18,8 +18,8 @@ using Test
         gmsh.finalize()
         vol_quad = Inti.Quadrature(msh[Ω]; qorder = 4)
         bnd_quad = Inti.Quadrature(msh[Γ]; qorder = 3)
-        @test abs(Inti.integrate(x -> 1, vol_quad) - π) < 1e-2
-        @test abs(Inti.integrate(x -> 1, bnd_quad) - 2π) < 1e-2
+        @test abs(Inti.integrate(x -> 1, vol_quad) - π) < 1.0e-2
+        @test abs(Inti.integrate(x -> 1, bnd_quad) - 2π) < 1.0e-2
     end
 end
 
@@ -60,8 +60,8 @@ end
         Γ = Inti.boundary(Ω)
         vol_quad = Inti.Quadrature(msh[Ω]; qorder = 3)
         bnd_quad = Inti.Quadrature(msh[Γ]; qorder = 4)
-        @test abs(Inti.integrate(x -> 1, vol_quad) - 4 / 3 * π) < 1e-2
-        @test abs(Inti.integrate(x -> 1, bnd_quad) - 4 * π) < 1e-2
+        @test abs(Inti.integrate(x -> 1, vol_quad) - 4 / 3 * π) < 1.0e-2
+        @test abs(Inti.integrate(x -> 1, bnd_quad) - 4 * π) < 1.0e-2
     end
 end
 

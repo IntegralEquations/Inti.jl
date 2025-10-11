@@ -120,8 +120,8 @@ and setup some of the (global) problem parameters:
 
 # ╔═╡ 4cabe108-93c6-4fbf-b8ec-37277abbbda1
 begin
-    k      = 4π
-    λ      = 2π / k
+    k = 4π
+    λ = 2π / k
     qorder = 4 # quadrature order
     gorder = 2 # order of geometrical approximation
     nothing #hide
@@ -137,7 +137,7 @@ We will use [Gmsh API](https://gmsh.info/doc/texinfo/gmsh.html#Gmsh-application-
 # ╔═╡ cb736b4d-bbd6-456c-9041-f69b2155a470
 begin
     function gmsh_circle(; name, meshsize, order = 1, radius = 1, center = (0, 0))
-        try
+        return try
             gmsh.initialize()
             gmsh.model.add("circle-mesh")
             gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
@@ -217,7 +217,7 @@ The object `Q` now contains a quadrature (of order `4`) that can be used to solv
 """
 
 # ╔═╡ 3cfa2da8-c45b-41b3-9b41-07dff363558b
-@assert abs(Inti.integrate(x -> 1, Q) - 2π) < 1e-5
+@assert abs(Inti.integrate(x -> 1, Q) - 2π) < 1.0e-5
 
 # ╔═╡ bb7f702e-eaa3-4751-a6ed-5806647d8ff7
 abs(Inti.integrate(x -> 1, Q) - 2π)
@@ -297,7 +297,7 @@ The variable `σ` contains the value of the approximate density at the quadratur
 # ╔═╡ fd0f2cf4-1b18-4c56-84a9-2339b3dfc10a
 begin
     𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
-    uₛ   = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
+    uₛ = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
     nothing #hide
 end
 
@@ -318,9 +318,9 @@ begin
         u = 0.0
         r < radius && return u
         c(n) = -exp(im * n * (π / 2 - θin)) * besselj(n, k * radius) / besselh(n, k * radius)
-        u    = c(0) * besselh(0, k * r)
-        n    = 1
-        while (abs(c(n)) > 1e-12)
+        u = c(0) * besselh(0, k * r)
+        n = 1
+        while (abs(c(n)) > 1.0e-12)
             u +=
                 c(n) * besselh(n, k * r) * exp(im * n * θ) +
                 c(-n) * besselh(-n, k * r) * exp(-im * n * θ)
@@ -348,7 +348,7 @@ begin
 end
 
 # ╔═╡ 3557cd23-43b2-4c79-a0e9-53c0d9650851
-@assert er < 1e-3
+@assert er < 1.0e-3
 
 # ╔═╡ 42a42555-0c97-4a40-8865-38966983a9e7
 md"""
@@ -520,7 +520,7 @@ begin
         op = op_3d,
         target = Q_3d,
         source = Q_3d,
-        compression = (method = :hmatrix, tol = 1e-4),
+        compression = (method = :hmatrix, tol = 1.0e-4),
         correction = (method = :dim,),
     )
     nothing #hide
@@ -544,7 +544,7 @@ Here is how much memory it would take to store the dense representation of these
 
 # ╔═╡ 54f07c21-339b-44c3-9ac2-22af163d55ae
 begin
-    mem = 2 * length(S_3d) * 16 / 1e9 # 16 bytes per complex number, 1e9 bytes per GB, two matrices
+    mem = 2 * length(S_3d) * 16 / 1.0e9 # 16 bytes per complex number, 1e9 bytes per GB, two matrices
     println("memory required to store S and D: $(mem) GB")
 end
 
@@ -586,7 +586,7 @@ begin
         L_3d,
         rhs_3d;
         log = true,
-        abstol = 1e-6,
+        abstol = 1.0e-6,
         verbose = false,
         restart = 100,
         maxiter = 100,
@@ -627,7 +627,7 @@ begin
         r < radius && return u
         function c(l, m)
             return -4π * im^l * sphharmonic(l, -m, θin, ϕin) * sphbesselj(l, k * radius) /
-                   sphbesselh(l, k * radius)
+                sphbesselh(l, k * radius)
         end
         l = 0
         for l in 0:60
@@ -658,7 +658,7 @@ begin
 end
 
 # ╔═╡ 36ddb3be-7103-429f-9011-99c27c655de5
-@assert er_3d < 1e-3
+@assert er_3d < 1.0e-3
 
 # ╔═╡ 386046f6-6909-4e9e-bb90-80c32df59f70
 md"""
@@ -674,7 +674,7 @@ begin
         op = op_3d,
         target,
         source = Q_3d,
-        compression = (method = :hmatrix, tol = 1e-4),
+        compression = (method = :hmatrix, tol = 1.0e-4),
         # correction for the nearfield (for visual purposes, set to `:none` to disable)
         correction = (method = :dim, maxdist = meshsize, target_location = :outside),
     )

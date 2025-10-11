@@ -11,11 +11,11 @@ is a `d`-dimensional simplex, the space is `ℙₖ = span{𝐱ᶿ : 0≤sum(θ)�
 
 # See also: [`monomial_basis`](@ref), [`lagrange_basis`](@ref)
 """
-struct PolynomialSpace{D,K} end
+struct PolynomialSpace{D, K} end
 
-PolynomialSpace(d::ReferenceShape, k::Int) = PolynomialSpace{typeof(d),k}()
+PolynomialSpace(d::ReferenceShape, k::Int) = PolynomialSpace{typeof(d), k}()
 
-function Base.show(io::IO, ::PolynomialSpace{D,K}) where {D,K}
+function Base.show(io::IO, ::PolynomialSpace{D, K}) where {D, K}
     return print(io, "ℙ$K : space of all polynomials over $D of degree ≤ $K")
 end
 
@@ -27,7 +27,7 @@ domain(sp::PolynomialSpace{D}) where {D} = D()
 The length of a basis for `space`; i.e. the number of linearly independent
 elements required to span `space`.
 """
-function dimension(::Type{PolynomialSpace{D,K}}) where {D,K}
+function dimension(::Type{PolynomialSpace{D, K}}) where {D, K}
     if D == ReferenceLine
         return K + 1
     elseif D == ReferenceTriangle
@@ -53,7 +53,7 @@ space [`PolynomialSpace`](@ref).
 """
 function monomial_basis end
 
-function monomial_basis(::PolynomialSpace{ReferenceLine,K}) where {K}
+function monomial_basis(::PolynomialSpace{ReferenceLine, K}) where {K}
     b = x -> let
         svector(K + 1) do i
             return prod(x .^ (i - 1))
@@ -62,7 +62,7 @@ function monomial_basis(::PolynomialSpace{ReferenceLine,K}) where {K}
     return b
 end
 
-function monomial_basis(::PolynomialSpace{Inti.ReferenceSquare,K}) where {K}
+function monomial_basis(::PolynomialSpace{Inti.ReferenceSquare, K}) where {K}
     # the K+1 monomials x^(0,0), x^(0,1),x^(1,0), ..., x^(K,K)
     I = CartesianIndices((K + 1, K + 1)) .- CartesianIndex(1, 1)
     N = Val((K + 1) * (K + 1))
@@ -74,7 +74,7 @@ function monomial_basis(::PolynomialSpace{Inti.ReferenceSquare,K}) where {K}
     return b
 end
 
-function monomial_basis(::PolynomialSpace{ReferenceTriangle,K}) where {K}
+function monomial_basis(::PolynomialSpace{ReferenceTriangle, K}) where {K}
     # the (K+1)*(K+2)/2 monomials x^(a,b) with a+b ≤ K
     # construct first the indices for the square, then filter only those for
     # which the sum is less than K.
@@ -91,7 +91,7 @@ function monomial_basis(::PolynomialSpace{ReferenceTriangle,K}) where {K}
     return b
 end
 
-function monomial_basis(::PolynomialSpace{ReferenceTetrahedron,K}) where {K}
+function monomial_basis(::PolynomialSpace{ReferenceTetrahedron, K}) where {K}
     # the (K+1)*(K+2)*(K+3)/6 monomials x^(a,b,c) with a+b+c ≤ K
     # construct first the indices for the square, then filter only those for
     # which the sum is less than K.

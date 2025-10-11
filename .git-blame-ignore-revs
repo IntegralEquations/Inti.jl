@@ -1,0 +1,6 @@
+# This file contains a list of commits that should be ignored by git blame.
+# To use this file, run: git config blame.ignoreRevsFile .git-blame-ignore-revs
+# See: https://git-scm.com/docs/git-blame#Documentation/git-blame.txt---ignore-revs-fileltfilegt
+
+# Format all code with Runic.jl (replacing JuliaFormatter)
+# Commit hash will be added after formatting commit is created

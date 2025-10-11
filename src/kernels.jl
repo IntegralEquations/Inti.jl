@@ -35,10 +35,10 @@ ambient_dimension(::AbstractDifferentialOperator{N}) where {N} = N
 
 # convenient constructor for e.g. SingleLayerKernel(op,Float64) or DoubleLayerKernel(op,ComplexF64)
 function (::Type{K})(
-    op::Op,
-    ::Type{T} = default_kernel_eltype(op),
-) where {T,Op,K<:AbstractKernel}
-    return K{T,Op}(op)
+        op::Op,
+        ::Type{T} = default_kernel_eltype(op),
+    ) where {T, Op, K <: AbstractKernel}
+    return K{T, Op}(op)
 end
 
 operator(K::AbstractKernel) = K.op
@@ -49,7 +49,7 @@ operator(K::AbstractKernel) = K.op
 The free-space single-layer kernel (i.e. the fundamental solution) of an `Op <:
 AbstractDifferentialOperator`.
 """
-struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
+struct SingleLayerKernel{T, Op} <: AbstractKernel{T}
     op::Op
 end
 
@@ -66,7 +66,7 @@ corresponds to the `γ₁` trace of the [`SingleLayerKernel`](@ref). For operato
 such as [`Laplace`](@ref) or [`Helmholtz`](@ref), this is simply the normal
 derivative of the fundamental solution with respect to the source variable.
 """
-struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
+struct DoubleLayerKernel{T, Op} <: AbstractKernel{T}
     op::Op
 end
 
@@ -84,7 +84,7 @@ This corresponds to the `transpose(γ₁,ₓ[G])`, where `G` is the
 [`Helmholtz`](@ref), this is simply the normal derivative of the fundamental
 solution respect to the target variable.
 """
-struct AdjointDoubleLayerKernel{T,Op} <: AbstractKernel{T}
+struct AdjointDoubleLayerKernel{T, Op} <: AbstractKernel{T}
     op::Op
 end
 
@@ -102,7 +102,7 @@ corresponds to the `transpose(γ₁,ₓγ₁[G])`, where `G` is the
 [`Helmholtz`](@ref), this is simply the normal derivative respect to the target
 variable of the `DoubleLayerKernel`.
 """
-struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
+struct HyperSingularKernel{T, Op} <: AbstractKernel{T}
     op::Op
 end
 
@@ -134,11 +134,11 @@ end
 default_kernel_eltype(::Laplace) = Float64
 default_density_eltype(::Laplace) = Float64
 
-function (SL::SingleLayerKernel{T,Laplace{N}})(
-    target,
-    source,
-    r = coords(target) - coords(source),
-)::T where {N,T}
+function (SL::SingleLayerKernel{T, Laplace{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    )::T where {N, T}
     d = norm(r)
     (d ≤ SAME_POINT_TOLERANCE) && return zero(T)
     if N == 2
@@ -150,11 +150,11 @@ function (SL::SingleLayerKernel{T,Laplace{N}})(
     end
 end
 
-function (DL::DoubleLayerKernel{T,Laplace{N}})(
-    target,
-    source,
-    r = coords(target) - coords(source),
-)::T where {N,T}
+function (DL::DoubleLayerKernel{T, Laplace{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    )::T where {N, T}
     ny = normal(source)
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
@@ -167,11 +167,11 @@ function (DL::DoubleLayerKernel{T,Laplace{N}})(
     end
 end
 
-function (ADL::AdjointDoubleLayerKernel{T,Laplace{N}})(
-    target,
-    source,
-    r = coords(target) - coords(source),
-)::T where {N,T}
+function (ADL::AdjointDoubleLayerKernel{T, Laplace{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    )::T where {N, T}
     nx = normal(target)
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
@@ -182,11 +182,11 @@ function (ADL::AdjointDoubleLayerKernel{T,Laplace{N}})(
     end
 end
 
-function (HS::HyperSingularKernel{T,Laplace{N}})(
-    target,
-    source,
-    r = coords(target) - coords(source),
-) where {N,T}
+function (HS::HyperSingularKernel{T, Laplace{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
     nx = normal(target)
     ny = normal(source)
     d = norm(r)
@@ -202,7 +202,7 @@ end
 ################################# Yukawa #######################################
 ################################################################################
 
-struct Yukawa{N,K<:Real} <: AbstractDifferentialOperator{N}
+struct Yukawa{N, K <: Real} <: AbstractDifferentialOperator{N}
     λ::K
 end
 
@@ -216,7 +216,7 @@ the Laplacian.
 """
 function Yukawa(; λ, dim)
     @assert λ > 0 "λ must be a positive number"
-    return Yukawa{dim,typeof(λ)}(λ)
+    return Yukawa{dim, typeof(λ)}(λ)
 end
 
 """
@@ -230,10 +230,10 @@ function Base.show(io::IO, ::Yukawa{N}) where {N}
     return print(io, "Yukawa operator in $N dimensions: -Δu + λ²u")
 end
 
-default_kernel_eltype(::Yukawa)  = Float64
+default_kernel_eltype(::Yukawa) = Float64
 default_density_eltype(::Yukawa) = Float64
 
-function (SL::SingleLayerKernel{T,<:Yukawa{N,K}})(target, source)::T where {N,T,K}
+function (SL::SingleLayerKernel{T, <:Yukawa{N, K}})(target, source)::T where {N, T, K}
     x = coords(target)
     y = coords(source)
     λ = SL.op.λ
@@ -247,7 +247,7 @@ function (SL::SingleLayerKernel{T,<:Yukawa{N,K}})(target, source)::T where {N,T,
     end
 end
 
-function (DL::DoubleLayerKernel{T,Yukawa{N,K}})(target, source)::T where {N,T,K}
+function (DL::DoubleLayerKernel{T, Yukawa{N, K}})(target, source)::T where {N, T, K}
     x, y, ny = coords(target), coords(source), normal(source)
     λ = DL.op.λ
     r = x - y
@@ -260,7 +260,7 @@ function (DL::DoubleLayerKernel{T,Yukawa{N,K}})(target, source)::T where {N,T,K}
     end
 end
 
-function (ADL::AdjointDoubleLayerKernel{T,<:Yukawa{N,K}})(target, source)::T where {N,T,K}
+function (ADL::AdjointDoubleLayerKernel{T, <:Yukawa{N, K}})(target, source)::T where {N, T, K}
     x, y, nx = coords(target), coords(source), normal(target)
     λ = ADL.op.λ
     r = x - y
@@ -274,7 +274,7 @@ function (ADL::AdjointDoubleLayerKernel{T,<:Yukawa{N,K}})(target, source)::T whe
     end
 end
 
-function (HS::HyperSingularKernel{T,<:Yukawa{N,K}})(target, source)::T where {N,T,K}
+function (HS::HyperSingularKernel{T, <:Yukawa{N, K}})(target, source)::T where {N, T, K}
     x, y, nx, ny = coords(target), coords(source), normal(target), normal(source)
     λ = HS.op.λ
     r = x - y
@@ -286,11 +286,11 @@ function (HS::HyperSingularKernel{T,<:Yukawa{N,K}})(target, source)::T where {N,
         # TODO: rewrite the operation below in a more clear/efficient way
         val =
             transpose(nx) * (
-                (
-                    -λ^2 / (2π) / d^2 * Bessels.besselk(2, λ * d) * RRT +
+            (
+                -λ^2 / (2π) / d^2 * Bessels.besselk(2, λ * d) * RRT +
                     λ / (2 * π * d) * Bessels.besselk(1, λ * d) * I
-                ) * ny
-            )
+            ) * ny
+        )
         return val
     elseif N == 3
         term1 = 1 / (4π) / d^2 * exp(-λ * d) * (λ + 1 / d) * I
@@ -306,7 +306,7 @@ end
 ################################# Helmholtz ####################################
 ################################################################################
 
-struct Helmholtz{N,K} <: AbstractDifferentialOperator{N}
+struct Helmholtz{N, K} <: AbstractDifferentialOperator{N}
     k::K
 end
 
@@ -330,7 +330,7 @@ function Helmholtz(; k, dim)
             return Helmholtz(; k = real(k), dim = dim)
         end
     end
-    return Helmholtz{dim,typeof(k)}(k)
+    return Helmholtz{dim, typeof(k)}(k)
 end
 
 function Base.show(io::IO, ::Helmholtz{N}) where {N}
@@ -340,10 +340,10 @@ end
 default_kernel_eltype(::Helmholtz) = ComplexF64
 default_density_eltype(::Helmholtz) = ComplexF64
 
-hankelh1(n, x::Real)    = Bessels.hankelh1(n, x)
+hankelh1(n, x::Real) = Bessels.hankelh1(n, x)
 hankelh1(n, x::Complex) = SpecialFunctions.hankelh1(n, x)
 
-function (SL::SingleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T}
+function (SL::SingleLayerKernel{T, <:Helmholtz{N}})(target, source)::T where {N, T}
     x = coords(target)
     y = coords(source)
     k = SL.op.k
@@ -358,7 +358,7 @@ function (SL::SingleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T
 end
 
 # Double Layer Kernel
-function (DL::DoubleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T}
+function (DL::DoubleLayerKernel{T, <:Helmholtz{N}})(target, source)::T where {N, T}
     x, y, ny = coords(target), coords(source), normal(source)
     k = DL.op.k
     r = x - y
@@ -374,7 +374,7 @@ function (DL::DoubleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T
 end
 
 # Adjoint double Layer Kernel
-function (ADL::AdjointDoubleLayerKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T}
+function (ADL::AdjointDoubleLayerKernel{T, <:Helmholtz{N}})(target, source)::T where {N, T}
     x, y, nx = coords(target), coords(source), normal(target)
     k = ADL.op.k
     r = x - y
@@ -390,7 +390,7 @@ function (ADL::AdjointDoubleLayerKernel{T,<:Helmholtz{N}})(target, source)::T wh
 end
 
 # Hypersingular kernel
-function (HS::HyperSingularKernel{T,<:Helmholtz{N}})(target, source)::T where {N,T}
+function (HS::HyperSingularKernel{T, <:Helmholtz{N}})(target, source)::T where {N, T}
     x, y, nx, ny = coords(target), coords(source), normal(target), normal(source)
     k = HS.op.k
     r = x - y
@@ -399,11 +399,11 @@ function (HS::HyperSingularKernel{T,<:Helmholtz{N}})(target, source)::T where {N
     if N == 2
         val =
             transpose(nx) * (
-                (
-                    -im * k^2 / 4 / d^2 * hankelh1(2, k * d) * r * transpose(r) +
+            (
+                -im * k^2 / 4 / d^2 * hankelh1(2, k * d) * r * transpose(r) +
                     im * k / 4 / d * hankelh1(1, k * d) * I
-                ) * ny
-            )
+            ) * ny
+        )
         return val
     elseif N == 3
         RRT = r * transpose(r) # r ⊗ rᵗ
@@ -416,7 +416,7 @@ function (HS::HyperSingularKernel{T,<:Helmholtz{N}})(target, source)::T where {N
 end
 
 ############################ STOKES ############################3
-struct Stokes{N,T} <: AbstractDifferentialOperator{N}
+struct Stokes{N, T} <: AbstractDifferentialOperator{N}
     μ::T
 end
 
@@ -426,17 +426,17 @@ end
 Stokes operator in `dim` dimensions: ``[-μΔu + ∇p, ∇⋅u]``.
 """
 Stokes(; μ, dim = 3) = Stokes{dim}(μ)
-Stokes{N}(μ::T) where {N,T} = Stokes{N,T}(μ)
+Stokes{N}(μ::T) where {N, T} = Stokes{N, T}(μ)
 
 function Base.show(io::IO, op::Stokes{N}) where {N}
     return println(io, "Stokes operator in $N dimensions: [-μΔu + ∇p, ∇⋅u]")
 end
 
-default_kernel_eltype(::Stokes{N}) where {N} = SMatrix{N,N,Float64,N * N}
-default_density_eltype(::Stokes{N}) where {N} = SVector{N,Float64}
+default_kernel_eltype(::Stokes{N}) where {N} = SMatrix{N, N, Float64, N * N}
+default_density_eltype(::Stokes{N}) where {N} = SVector{N, Float64}
 
 # Single Layer
-function (SL::SingleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
+function (SL::SingleLayerKernel{T, <:Stokes{N}})(target, source)::T where {N, T}
     μ = SL.op.μ
     x = coords(target)
     y = coords(source)
@@ -452,7 +452,7 @@ function (SL::SingleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
 end
 
 # Double Layer Kernel
-function (DL::DoubleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
+function (DL::DoubleLayerKernel{T, <:Stokes{N}})(target, source)::T where {N, T}
     x = coords(target)
     y = coords(source)
     ny = normal(source)
@@ -467,7 +467,7 @@ function (DL::DoubleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
 end
 
 # Double Layer Kernel
-function (ADL::AdjointDoubleLayerKernel{T,<:Stokes{N}})(target, source)::T where {N,T}
+function (ADL::AdjointDoubleLayerKernel{T, <:Stokes{N}})(target, source)::T where {N, T}
     x = coords(target)
     nx = normal(target)
     y = coords(source)
@@ -495,21 +495,21 @@ Elastostatic operator in `N` dimensions: -μΔu - (μ+λ)∇(∇⋅u)
 Note that the displacement ``u`` is a vector of length `N` since this is a
 vectorial problem.
 """
-struct Elastostatic{N,T} <: AbstractDifferentialOperator{N}
+struct Elastostatic{N, T} <: AbstractDifferentialOperator{N}
     μ::T
     λ::T
 end
 Elastostatic(; μ, λ, dim) = Elastostatic{dim}(promote(μ, λ)...)
-Elastostatic{N}(μ::T, λ::T) where {N,T} = Elastostatic{N,T}(μ, λ)
+Elastostatic{N}(μ::T, λ::T) where {N, T} = Elastostatic{N, T}(μ, λ)
 
 function Base.show(io::IO, op::Elastostatic{N}) where {N}
     return print(io, "Elastostatic operator in $N dimensions: -μΔu - (μ+λ)∇(∇⋅u)")
 end
 
-default_kernel_eltype(::Elastostatic{N}) where {N} = SMatrix{N,N,Float64,N * N}
-default_density_eltype(::Elastostatic{N}) where {N} = SVector{N,Float64}
+default_kernel_eltype(::Elastostatic{N}) where {N} = SMatrix{N, N, Float64, N * N}
+default_density_eltype(::Elastostatic{N}) where {N} = SVector{N, Float64}
 
-function (SL::SingleLayerKernel{T,<:Elastostatic{N}})(target, source)::T where {N,T}
+function (SL::SingleLayerKernel{T, <:Elastostatic{N}})(target, source)::T where {N, T}
     μ, λ = SL.op.μ, SL.op.λ
     ν = λ / (2 * (μ + λ))
     x = coords(target)
@@ -525,7 +525,7 @@ function (SL::SingleLayerKernel{T,<:Elastostatic{N}})(target, source)::T where {
     end
 end
 
-function (DL::DoubleLayerKernel{T,<:Elastostatic{N}})(target, source)::T where {N,T}
+function (DL::DoubleLayerKernel{T, <:Elastostatic{N}})(target, source)::T where {N, T}
     μ, λ = DL.op.μ, DL.op.λ
     ν = λ / (2 * (μ + λ))
     x = coords(target)
@@ -540,17 +540,17 @@ function (DL::DoubleLayerKernel{T,<:Elastostatic{N}})(target, source)::T where {
     if N == 2
         return -1 / (4π * (1 - ν) * d) * (
             drdn * ((1 - 2ν) * I + 2 * RRT / d^2) +
-            (1 - 2ν) / d * (r * transpose(ny) - ny * transpose(r))
+                (1 - 2ν) / d * (r * transpose(ny) - ny * transpose(r))
         )
     elseif N == 3
         return -1 / (8π * (1 - ν) * d^2) * (
             drdn * ((1 - 2 * ν) * I + 3 * RRT / d^2) +
-            (1 - 2 * ν) / d * (r * transpose(ny) - ny * transpose(r))
+                (1 - 2 * ν) / d * (r * transpose(ny) - ny * transpose(r))
         )
     end
 end
 
-function (ADL::AdjointDoubleLayerKernel{T,<:Elastostatic{N}})(target, source)::T where {N,T}
+function (ADL::AdjointDoubleLayerKernel{T, <:Elastostatic{N}})(target, source)::T where {N, T}
     μ, λ = ADL.op.μ, ADL.op.λ
     ν = λ / (2 * (μ + λ))
     x = coords(target)
@@ -565,21 +565,21 @@ function (ADL::AdjointDoubleLayerKernel{T,<:Elastostatic{N}})(target, source)::T
     if N == 2
         out =
             -1 / (4π * (1 - ν) * d) * (
-                drdn * ((1 - 2ν) * I + 2 * RRT / d^2) +
+            drdn * ((1 - 2ν) * I + 2 * RRT / d^2) +
                 (1 - 2ν) / d * (r * transpose(nx) - nx * transpose(r))
-            )
+        )
         return -transpose(out)
     elseif N == 3
         out =
             -1 / (8π * (1 - ν) * d^2) * (
-                drdn * ((1 - 2 * ν) * I + 3 * RRT / d^2) +
+            drdn * ((1 - 2 * ν) * I + 3 * RRT / d^2) +
                 (1 - 2 * ν) / d * (r * transpose(nx) - nx * transpose(r))
-            )
+        )
         return -transpose(out)
     end
 end
 
-function (HS::HyperSingularKernel{T,<:Elastostatic{N}})(target, source) where {N,T}
+function (HS::HyperSingularKernel{T, <:Elastostatic{N}})(target, source) where {N, T}
     μ, λ = HS.op.μ, HS.op.λ
     ν = λ / (2 * (μ + λ))
     x = coords(target)
@@ -595,26 +595,26 @@ function (HS::HyperSingularKernel{T,<:Elastostatic{N}})(target, source) where {N
         return μ / (2π * (1 - ν) * d^2) * (
             2 * drdn / d * (
                 (1 - 2ν) * nx * transpose(r) + ν * (dot(r, nx) * I + r * transpose(nx)) -
-                4 * dot(r, nx) * RRT / d^2
+                    4 * dot(r, nx) * RRT / d^2
             ) +
-            2 * ν / d^2 * (dot(r, nx) * ny * transpose(r) + dot(nx, ny) * RRT) +
-            (1 - 2 * ν) * (
+                2 * ν / d^2 * (dot(r, nx) * ny * transpose(r) + dot(nx, ny) * RRT) +
+                (1 - 2 * ν) * (
                 2 / d^2 * dot(r, nx) * r * transpose(ny) +
-                dot(nx, ny) * I +
-                ny * transpose(nx)
+                    dot(nx, ny) * I +
+                    ny * transpose(nx)
             ) - (1 - 4ν) * nx * transpose(ny)
         )
     elseif N == 3
         return μ / (4π * (1 - ν) * d^3) * (
             3 * drdn / d * (
                 (1 - 2ν) * nx * transpose(r) + ν * (dot(r, nx) * I + r * transpose(nx)) -
-                5 * dot(r, nx) * RRT / d^2
+                    5 * dot(r, nx) * RRT / d^2
             ) +
-            3 * ν / d^2 * (dot(r, nx) * ny * transpose(r) + dot(nx, ny) * RRT) +
-            (1 - 2 * ν) * (
+                3 * ν / d^2 * (dot(r, nx) * ny * transpose(r) + dot(nx, ny) * RRT) +
+                (1 - 2 * ν) * (
                 3 / d^2 * dot(r, nx) * r * transpose(ny) +
-                dot(nx, ny) * I +
-                ny * transpose(nx)
+                    dot(nx, ny) * I +
+                    ny * transpose(nx)
             ) - (1 - 4ν) * nx * transpose(ny)
         )
     end
@@ -624,7 +624,7 @@ end
 ################################# LAPLACE PERIODIC #############################
 ################################################################################
 
-struct LaplacePeriodic1D{N,T<:Real} <: AbstractDifferentialOperator{N}
+struct LaplacePeriodic1D{N, T <: Real} <: AbstractDifferentialOperator{N}
     period::T
 end
 
@@ -637,7 +637,7 @@ periodic cell is defined as `[-period/2, period/2]`.
 
 The negative sign is used to match the convention of coercive operators.
 """
-LaplacePeriodic1D(; dim, period = 2π) = LaplacePeriodic1D{dim,typeof(period)}(period)
+LaplacePeriodic1D(; dim, period = 2π) = LaplacePeriodic1D{dim, typeof(period)}(period)
 
 function Base.show(io::IO, op::LaplacePeriodic1D{N}) where {N}
     return print(
@@ -649,11 +649,11 @@ end
 default_kernel_eltype(::LaplacePeriodic1D) = Float64
 default_density_eltype(::LaplacePeriodic1D) = Float64
 
-function (SL::SingleLayerKernel{T,<:LaplacePeriodic1D{N}})(
-    target,
-    source,
-    r = coords(target) - coords(source),
-) where {N,T}
+function (SL::SingleLayerKernel{T, <:LaplacePeriodic1D{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
     l = SL.op.period
     if N == 2
         d2 = sin(π / l * r[1])^2 + sinh(π / l * r[2])^2
@@ -664,17 +664,17 @@ function (SL::SingleLayerKernel{T,<:LaplacePeriodic1D{N}})(
     end
 end
 
-function (DL::DoubleLayerKernel{T,<:LaplacePeriodic1D{N}})(
-    target,
-    source,
-    r = coords(target) - coords(source),
-) where {N,T}
+function (DL::DoubleLayerKernel{T, <:LaplacePeriodic1D{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
     ny = normal(source)
     if N == 2
-        l   = DL.op.period
-        s   = sin(π / l * r[1])
-        sh  = sinh(π / l * r[2])
-        d2  = s^2 + sh^2
+        l = DL.op.period
+        s = sin(π / l * r[1])
+        sh = sinh(π / l * r[2])
+        d2 = s^2 + sh^2
         out = 1 / (4π * d2) * (2 * π / l * s * cos(π / l * r[1]) * ny[1] + 2 * π / l * sh * cosh(π / l * r[2]) * ny[2])
         return d2 ≤ SAME_POINT_TOLERANCE ? zero(T) : out
     else
@@ -682,17 +682,17 @@ function (DL::DoubleLayerKernel{T,<:LaplacePeriodic1D{N}})(
     end
 end
 
-function (ADL::AdjointDoubleLayerKernel{T,<:LaplacePeriodic1D{N}})(
-    target,
-    source,
-    r = coords(target) - coords(source),
-) where {N,T}
+function (ADL::AdjointDoubleLayerKernel{T, <:LaplacePeriodic1D{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
     nx = normal(target)
     if N == 2
-        l   = ADL.op.period
-        s   = sin(π / l * r[1])
-        sh  = sinh(π / l * r[2])
-        d2  = s^2 + sh^2
+        l = ADL.op.period
+        s = sin(π / l * r[1])
+        sh = sinh(π / l * r[2])
+        d2 = s^2 + sh^2
         out = -1 / (4π * d2) * (2 * π / l * s * cos(π / l * r[1]) * nx[1] + 2 * π / l * sh * cosh(π / l * r[2]) * nx[2])
         return d2 ≤ SAME_POINT_TOLERANCE ? zero(T) : out
     else
@@ -702,11 +702,11 @@ function (ADL::AdjointDoubleLayerKernel{T,<:LaplacePeriodic1D{N}})(
     end
 end
 
-function (HS::HyperSingularKernel{T,<:LaplacePeriodic1D{N}})(
-    target,
-    source,
-    r = coords(target) - coords(source),
-) where {N,T}
+function (HS::HyperSingularKernel{T, <:LaplacePeriodic1D{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
     x = coords(target)
     nx = normal(target)
     ny = normal(source)

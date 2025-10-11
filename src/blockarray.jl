@@ -19,9 +19,9 @@ B = Inti.BlockArray{T}([i*j for i in 1:4, j in 1:4])
 
 ```
 """
-struct BlockArray{T<:SArray,N,S,M} <: AbstractArray{T,N}
-    data::Array{S,M}
-    function BlockArray{T,N}(data::Array{S,M}) where {T<:SArray,N,S<:Number,M}
+struct BlockArray{T <: SArray, N, S, M} <: AbstractArray{T, N}
+    data::Array{S, M}
+    function BlockArray{T, N}(data::Array{S, M}) where {T <: SArray, N, S <: Number, M}
         @assert S == eltype(T) "eltype of data must match eltype of T: $S != $(eltype(T))"
         bsz = size(T)
         sz = size(data)
@@ -33,13 +33,13 @@ struct BlockArray{T<:SArray,N,S,M} <: AbstractArray{T,N}
                 ),
             )
         end
-        return new{T,N,S,M}(data)
+        return new{T, N, S, M}(data)
     end
 end
-BlockArray{T}(data::Array{<:Any,N}) where {T,N} = BlockArray{T,N}(data)
+BlockArray{T}(data::Array{<:Any, N}) where {T, N} = BlockArray{T, N}(data)
 
-BlockVector{T,S} = BlockArray{T,1,S}
-BlockMatrix{T,S} = BlockArray{T,2,S}
+BlockVector{T, S} = BlockArray{T, 1, S}
+BlockMatrix{T, S} = BlockArray{T, 2, S}
 
 Base.parent(A::BlockArray) = A.data
 
@@ -58,9 +58,9 @@ Like [`blocksize`](@ref), but appends `1`s if `A` is a higher-dimensional.
 For example, a `BlockArray{SVector{3,Float64}, 2}` has a `blocksize` of `(3,)`, but a
 `normalized_blocksize` of `(3, 1)`.
 """
-function _blocksize_normalized(::BlockArray{T,N}) where {T,N}
+function _blocksize_normalized(::BlockArray{T, N}) where {T, N}
     bsz = size(T)
-    M   = length(bsz)
+    M = length(bsz)
     if M < N
         return ntuple(i -> i ≤ M ? bsz[i] : 1, N)
     else
@@ -68,7 +68,7 @@ function _blocksize_normalized(::BlockArray{T,N}) where {T,N}
     end
 end
 
-function one_padding(tp1::Dims{N}, tp2::Dims{M}) where {N,M}
+function one_padding(tp1::Dims{N}, tp2::Dims{M}) where {N, M}
     if N < M
         tp1_pad = ntuple(i -> i ≤ N ? tp1[i] : 1, M)
         return tp1_pad, tp2
@@ -78,14 +78,14 @@ function one_padding(tp1::Dims{N}, tp2::Dims{M}) where {N,M}
     end
 end
 
-function BlockArray(src::AbstractArray{T}) where {T<:SArray}
+function BlockArray(src::AbstractArray{T}) where {T <: SArray}
     dest = BlockArray{T}(undef, size(src))
     dest .= src
     return dest
 end
 
-function Array(src::BlockArray{T,N}) where {T,N}
-    dest = Array{T,N}(undef, size(src))
+function Array(src::BlockArray{T, N}) where {T, N}
+    dest = Array{T, N}(undef, size(src))
     dest .= src
     return dest
 end
@@ -93,50 +93,50 @@ end
 # Array interface:
 # https://docs.julialang.org/en/v1/manual/interfaces/#man-interface-array
 
-function Base.size(A::BlockArray{T,N}) where {T,N}
+function Base.size(A::BlockArray{T, N}) where {T, N}
     bsz = _blocksize_normalized(A)
-    ntuple(N) do dim
+    return ntuple(N) do dim
         return size(A.data, dim) ÷ bsz[dim]
     end
 end
 
-function Base.getindex(A::BlockArray{T,N}, I::Vararg{Int,N}) where {T,N}
+function Base.getindex(A::BlockArray{T, N}, I::Vararg{Int, N}) where {T, N}
     data = parent(A)
     idxs = _blockindex(A, I...)
     return T(view(data, idxs...))
 end
 
-function _blockindex(A::BlockArray{T,N}, I_::Vararg{Int,N}) where {T,N}
+function _blockindex(A::BlockArray{T, N}, I_::Vararg{Int, N}) where {T, N}
     bsz_ = blocksize(A)
     bsz, I = one_padding(bsz_, I_)
     idxs = ntuple(length(I)) do dim
-        return ((I[dim]-1)*bsz[dim]+1):(I[dim]*bsz[dim])
+        return ((I[dim] - 1) * bsz[dim] + 1):(I[dim] * bsz[dim])
     end
     return idxs
 end
 
-function Base.setindex!(A::BlockArray{T,N}, v, I::Vararg{Int,N}) where {T,N}
+function Base.setindex!(A::BlockArray{T, N}, v, I::Vararg{Int, N}) where {T, N}
     data = parent(A)
     idxs = _blockindex(A, I...)
     setindex!(data, v, idxs...)
     return v
 end
 
-function BlockArray{T}(::UndefInitializer, dims_::Dims) where {T<:SArray}
+function BlockArray{T}(::UndefInitializer, dims_::Dims) where {T <: SArray}
     N = length(dims_)
     bsz_ = size(T)
     bsz, dims = one_padding(bsz_, dims_)
     S = eltype(T)
     sz = bsz .* dims
     data = Array{S}(undef, sz)
-    B = BlockArray{T,N}(data)
+    B = BlockArray{T, N}(data)
     return B
 end
 function BlockArray{T}(::UndefInitializer, I::Vararg{Int}) where {T}
     return BlockArray{T}(undef, I)
 end
 
-function Base.similar(::BlockArray, ::Type{T}, dims::Dims) where {T<:SArray}
+function Base.similar(::BlockArray, ::Type{T}, dims::Dims) where {T <: SArray}
     return BlockArray{T}(undef, dims)
 end
 
@@ -145,32 +145,32 @@ end
 Base.BroadcastStyle(::Type{<:BlockArray}) = Broadcast.ArrayStyle{BlockArray}()
 
 function Base.similar(
-    bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{BlockArray}},
-    ::Type{ElType},
-) where {ElType}
+        bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{BlockArray}},
+        ::Type{ElType},
+    ) where {ElType}
     return similar(BlockArray{ElType}, axes(bc))
 end
 
 # Overload some BLAS operations for performance
 
 function LinearAlgebra.mul!(
-    C::BlockArray,
-    A::BlockArray,
-    B::BlockArray,
-    a::Number,
-    b::Number,
-)
+        C::BlockArray,
+        A::BlockArray,
+        B::BlockArray,
+        a::Number,
+        b::Number,
+    )
     mul!(C.data, A.data, B.data, a, b)
     return C
 end
 
 function LinearAlgebra.mul!(
-    C::Vector{<:SVector},
-    A::BlockArray,
-    B::Vector{<:SVector},
-    a::Number,
-    b::Number,
-)
+        C::Vector{<:SVector},
+        A::BlockArray,
+        B::Vector{<:SVector},
+        a::Number,
+        b::Number,
+    )
     C_ = reinterpret(eltype(eltype(C)), C)
     B_ = reinterpret(eltype(eltype(B)), B)
     mul!(C_, A.data, B_, a, b)

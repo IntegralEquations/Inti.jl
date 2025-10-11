@@ -62,13 +62,13 @@ correction in polar coordinates on the reference domain. You can then call
 `adaptive_correction(iop, maxdist, quads_dict)` to use the custom quadrature.
 """
 function adaptive_correction(
-    iop::IntegralOperator;
-    maxdist = nothing,
-    rtol = nothing,
-    atol = nothing,
-    threads = true,
-    kwargs...,
-)
+        iop::IntegralOperator;
+        maxdist = nothing,
+        rtol = nothing,
+        atol = nothing,
+        threads = true,
+        kwargs...,
+    )
     # check if we need to compute a tolerance and/or a maxdist
     hastol = ((rtol !== nothing) || (atol !== nothing))
     if isnothing(maxdist) || !hastol
@@ -79,14 +79,14 @@ function adaptive_correction(
     rtol = isnothing(rtol) ? (hastol ? 0.0 : rtol_) : rtol
     atol = isnothing(atol) ? (hastol ? 0.0 : atol_) : atol
     # go on and compute the correction
-    msh        = mesh(source(iop))
+    msh = mesh(source(iop))
     quads_dict = Dict()
     for E in element_types(msh)
         ref_domain = reference_domain(E)
         quads = (
             nearfield_quad = adaptive_quadrature(ref_domain; rtol, atol, kwargs...),
-            radial_quad    = adaptive_quadrature(ReferenceLine(); rtol, atol, kwargs...),
-            angular_quad   = adaptive_quadrature(ReferenceLine(); rtol, atol, kwargs...),
+            radial_quad = adaptive_quadrature(ReferenceLine(); rtol, atol, kwargs...),
+            angular_quad = adaptive_quadrature(ReferenceLine(); rtol, atol, kwargs...),
         )
         quads_dict[E] = quads
     end
@@ -101,8 +101,8 @@ function adaptive_correction(iop, maxdist, quads_dict::Dict, threads = true)
     msh = mesh(Y)
     # use the singularity order of the kernel and the geometric dimension to compute the
     # singularity order of the kernel in polar/spherical coordinates
-    geo_dim    = geometric_dimension(msh)
-    p          = singularity_order(K) # K(x,y) ~ |x-y|^{-p} as y -> 0
+    geo_dim = geometric_dimension(msh)
+    p = singularity_order(K) # K(x,y) ~ |x-y|^{-p} as y -> 0
     sing_order = if isnothing(p)
         @warn "missing method `singularity_order` for kernel. Assuming finite part integral."
         -2
@@ -141,19 +141,19 @@ function adaptive_correction(iop, maxdist, quads_dict::Dict, threads = true)
 end
 
 @noinline function _adaptive_correction_etype!(
-    correction,
-    el_iter,
-    orientation,
-    quads,
-    L,
-    nearlist,
-    X,
-    Y,
-    K,
-    sorder, # singularity order in polar coordinates
-    nearfield_distance,
-    threads,
-)
+        correction,
+        el_iter,
+        orientation,
+        quads,
+        L,
+        nearlist,
+        X,
+        Y,
+        K,
+        sorder, # singularity order in polar coordinates
+        nearfield_distance,
+        threads,
+    )
     E = eltype(el_iter)
     Xqnodes = collect(X)
     Yqnodes = collect(Y)
@@ -221,7 +221,7 @@ Decompose the square `[0,1] × [0,1]` into four triangles, and return four tuple
 the function that gives the distance from `x̂` to the border of the square in the direction
 `θ`.
 """
-function polar_decomposition(::ReferenceSquare, x::SVector{2,<:Number})
+function polar_decomposition(::ReferenceSquare, x::SVector{2, <:Number})
     theta1 = atan(1 - x[2], 1 - x[1])
     theta2 = atan(x[1], 1 - x[2]) + π / 2
     theta3 = atan(x[2], x[1]) + π
@@ -231,9 +231,9 @@ function polar_decomposition(::ReferenceSquare, x::SVector{2,<:Number})
     rho3 = θ -> x[2] / (-sin(θ))
     rho4 = θ -> (1 - x[1]) / cos(θ)
     return (theta1, theta2, rho1),
-    (theta2, theta3, rho2),
-    (theta3, theta4, rho3),
-    (theta4, theta1 + 2π, rho4)
+        (theta2, theta3, rho2),
+        (theta3, theta4, rho3),
+        (theta4, theta1 + 2π, rho4)
 end
 
 """
@@ -244,7 +244,7 @@ of the form `θₛ, θₑ, ρ` where `θₛ` and `θₑ` are the initial and fin
 triangle, and `ρ` is the function that gives the distance from `x̂` to the border of the
 triangle in the direction `θ`.
 """
-function polar_decomposition(::ReferenceTriangle, x::SVector{2,<:Number})
+function polar_decomposition(::ReferenceTriangle, x::SVector{2, <:Number})
     theta1 = atan(x[1], 1 - x[2]) + π / 2
     theta2 = atan(x[2], x[1]) + π
     theta3 = atan(1 - x[1], x[2]) + 3π / 2
@@ -255,20 +255,20 @@ function polar_decomposition(::ReferenceTriangle, x::SVector{2,<:Number})
 end
 
 function guiggiani_singular_integral(
-    K,
-    û,
-    x̂,
-    el::ReferenceInterpolant{<:Union{ReferenceTriangle,ReferenceSquare}},
-    ori,
-    quad_rho,
-    quad_theta,
-    sorder::Val{P} = Val(-2),
-) where {P}
+        K,
+        û,
+        x̂,
+        el::ReferenceInterpolant{<:Union{ReferenceTriangle, ReferenceSquare}},
+        ori,
+        quad_rho,
+        quad_theta,
+        sorder::Val{P} = Val(-2),
+    ) where {P}
     ref_shape = reference_domain(el)
-    x         = el(x̂)
-    jac_x     = jacobian(el, x̂)
-    nx        = _normal(jac_x, ori)
-    qx        = (coords = x, normal = nx)
+    x = el(x̂)
+    jac_x = jacobian(el, x̂)
+    nx = _normal(jac_x, ori)
+    qx = (coords = x, normal = nx)
     # function to integrate in polar coordinates
     F = (ρ, θ) -> begin
         s, c = sincos(θ)
@@ -291,7 +291,7 @@ function guiggiani_singular_integral(
         warnings of this type will be silenced.
         """
         @warn msg maxlog = 1
-        zero(F(1e-8, 0.0))
+        zero(F(1.0e-8, 0.0))
     end
     # integrate
     for (theta_min, theta_max, rho_func) in polar_decomposition(ref_shape, x̂)
@@ -303,8 +303,8 @@ function guiggiani_singular_integral(
                 rho -> F(rho, theta),
                 rho_max / 2,
                 sorder;
-                atol = 1e-10,
-                rtol = 1e-8,
+                atol = 1.0e-10,
+                rtol = 1.0e-8,
                 contract = 1 / 2,
             )
             I_rho = quad_rho() do (rho_ref,)
@@ -338,15 +338,15 @@ function guiggiani_singular_integral(
 end
 
 function guiggiani_singular_integral(
-    K,
-    û,
-    x̂,
-    el::ReferenceInterpolant{ReferenceLine},
-    ori,
-    quad_rho,
-    quad_theta, # unused, but kept for consistency with the 2D case
-    sorder::Val{P} = Val(-2),
-) where {P}
+        K,
+        û,
+        x̂,
+        el::ReferenceInterpolant{ReferenceLine},
+        ori,
+        quad_rho,
+        quad_theta, # unused, but kept for consistency with the 2D case
+        sorder::Val{P} = Val(-2),
+    ) where {P}
     x = el(x̂)
     jac_x = jacobian(el, x̂)
     nx = _normal(jac_x, ori)
@@ -373,17 +373,17 @@ function guiggiani_singular_integral(
         warnings of this type will be silenced.
         """
         @warn msg maxlog = 1
-        zero(F(1e-8, 1))
+        zero(F(1.0e-8, 1))
     end
     for (s, rho_max) in ((-1, x̂[1]), (1, 1 - x̂[1]))
         F₋₂, F₋₁, F₀ =
             F₋₂, F₋₁, F₀ = laurent_coefficients(
-                rho -> F(rho, s),
-                rho_max / 2,
-                sorder;
-                atol = 1e-10,
-                contract = 1 / 2,
-            )
+            rho -> F(rho, s),
+            rho_max / 2,
+            sorder;
+            atol = 1.0e-10,
+            contract = 1 / 2,
+        )
         I_rho = quad_rho() do (rho_ref,)
             rho = rho_ref * rho_max
             if P == -2
@@ -483,25 +483,25 @@ mesh(source(iop))`:
 5. Return `maxdist = k * h` and `rtol` as the error at distance `k * h`.
 """
 function local_correction_dist_and_tol(iop::IntegralOperator, kmax = 10, ratio = 8)
-    K       = kernel(iop)
-    Q       = source(iop)
-    msh     = mesh(Q)
+    K = kernel(iop)
+    Q = source(iop)
+    msh = mesh(Q)
     maxdist = 0.0
-    rtol    = 0.0
-    atol    = 0.0
+    rtol = 0.0
+    atol = 0.0
     for E in element_types(msh)
         ref_domain = reference_domain(E)
         els = elements(msh, E)
         regular_quad = quadrature_rule(Q, E)
         reference_quad =
-            adaptive_quadrature(ref_domain; rtol = 1e-8, atol = 1e-12, maxsubdiv = 10_000)
+            adaptive_quadrature(ref_domain; rtol = 1.0e-8, atol = 1.0e-12, maxsubdiv = 10_000)
         # pick the biggest element as a reference
         qtags = etype2qtags(Q, E)
         a, i = @views findmax(j -> sum(weight, Q[qtags[:, j]]), 1:size(qtags, 2))
         dist, rel_er, abs_er =
             _regular_integration_errors(els[i], K, regular_quad, reference_quad, kmax)
         # find first index such that er[i+1] > er[i] / ratio
-        i = findfirst(i -> rel_er[i+1] > rel_er[i] / ratio, 1:(kmax-1))
+        i = findfirst(i -> rel_er[i + 1] > rel_er[i] / ratio, 1:(kmax - 1))
         isnothing(i) && (i = kmax; @warn "using $kmax as maxdist")
         maxdist = max(maxdist, dist[i])
         rtol = max(rtol, rel_er[i])
@@ -514,9 +514,9 @@ function _regular_integration_errors(el, K, qreg, qref, maxiter)
     x₀ = center(el) # center
     h = radius(el)  # reasonable scale
     f = (x, ŷ) -> begin
-        y     = el(ŷ)
-        jac   = jacobian(el, ŷ)
-        ν    = _normal(jac)
+        y = el(ŷ)
+        jac = jacobian(el, ŷ)
+        ν = _normal(jac)
         νₓ = (x - x₀) |> normalize
         τ′ = _integration_measure(jac)
         return K((coords = x, normal = νₓ), (coords = y, normal = ν)) * τ′

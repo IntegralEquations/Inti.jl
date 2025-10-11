@@ -21,13 +21,13 @@ geometric_dimension(::Type{<:ReferenceSimplex{N}}) where {N} = N
 ambient_dimension(::ReferenceSimplex{N}) where {N} = N
 function Base.in(x, ::ReferenceSimplex{N}) where {N}
     for i in 1:N
-        0 ≤ x[i] ≤ 1 - sum(x[1:(i-1)]) || return false
+        0 ≤ x[i] ≤ 1 - sum(x[1:(i - 1)]) || return false
     end
     return true
 end
 function vertices(::ReferenceSimplex{N}) where {N}
     return svector(
-        i -> i == 1 ? zero(SVector{N,Int64}) : standard_basis_vector(i - 1, Val(N)),
+        i -> i == 1 ? zero(SVector{N, Int64}) : standard_basis_vector(i - 1, Val(N)),
         N + 1,
     )
 end
