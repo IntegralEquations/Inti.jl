@@ -437,20 +437,12 @@ end
 """
     interpolation_order(qrule::ReferenceQuadrature)
 
-The interpolation order of a quadrature rule is defined as the the smallest `k`
-such that there exists a unique polynomial in `PolynomialSpace{D,k}` that
-minimizes the error in approximating the function `f` at the quadrature nodes.
+The interpolation order of a quadrature rule is defined as the the smallest `k` such that
+there exists a polynomial (not necessarily unique) in `PolynomialSpace{D,k}` that
+interpolates the function `f` at the quadrature nodes.
 
-For an `N`-point Gauss quadrature rule on the segment, the
-interpolation order is `N-1` since `N` points uniquely determine a polynomial of
-degree `N-1`.
-
-For a triangular reference domain, the interpolation order is more difficult to
-define. An unisolvent three-node quadrature on the triangular, for example, has
-an interpolation order `k=1` since the three nodes uniquely determine a linear
-polynomial, but a four-node quadrature may also have an interpolation order
-`k=1` since for `k=2` there are multiple polynomials that pass through the four
-nodes.
+For example, a triangle quadrature containing 3 nodes has an interpolation order of 1, but a
+triangle quadrature containing 4 nodes has an interpolation order of 2.
 """
 function interpolation_order(qrule::ReferenceQuadrature{ReferenceLine})
     N = length(qrule)
@@ -459,19 +451,22 @@ end
 
 function interpolation_order(qrule::ReferenceQuadrature{ReferenceTriangle})
     N = length(qrule)
-    # the last triangular less than or equal to N
-    return floor(Int, (sqrt(8N + 1) - 3) / 2)
+    # Find the smallest k such that (k+1)*(k+2)/2 ≥ N
+    k = 0
+    while (k + 1) * (k + 2) ÷ 2 < N
+        k += 1
+    end
+    return k
 end
 
 function interpolation_order(qrule::ReferenceQuadrature{ReferenceTetrahedron})
     N = length(qrule)
-    # the last tetrahedral number less than or equal to N. For example P1 has at most 4
-    # nodes, P2 has at most 10 nodes, P3 has at most 20 nodes, etc...
-    P = 0
-    while (P + 1) * (P + 2) * (P + 3) / 6 < N
-        P += 1
+    # Find the smallest k such that (k+1)*(k+2)*(k+3)/6 ≥ N
+    k = 0
+    while (k + 1) * (k + 2) * (k + 3) ÷ 6 < N
+        k += 1
     end
-    return P - 1
+    return k
 end
 
 function interpolation_order(qrule::Inti.TensorProductQuadrature)
@@ -488,14 +483,14 @@ reference shape `ref_domain`. The keyword arguments are passed to
 `HAdaptiveIntegration.integrate`.
 """
 function adaptive_quadrature(ref_domain::ReferenceLine; kwargs...)
-    seg = HAdaptiveIntegration.segment(0.0, 1.0)
+    seg = HAdaptiveIntegration.Orthotope(0.0, 1.0)
     return (f) -> HAdaptiveIntegration.integrate(f, seg; kwargs...)[1]
 end
 function adaptive_quadrature(ref_domain::ReferenceTriangle; kwargs...)
-    tri = HAdaptiveIntegration.triangle((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))
+    tri = HAdaptiveIntegration.Triangle((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))
     return (f) -> HAdaptiveIntegration.integrate(f, tri; kwargs...)[1]
 end
 function adaptive_quadrature(ref_domain::ReferenceSquare; kwargs...)
-    sq = HAdaptiveIntegration.rectangle((0.0, 0.0), (1.0, 1.0))
+    sq = HAdaptiveIntegration.Rectangle((0.0, 0.0), (1.0, 1.0))
     return (f) -> HAdaptiveIntegration.integrate(f, sq; kwargs...)[1]
 end

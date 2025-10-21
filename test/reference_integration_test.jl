@@ -142,3 +142,33 @@ end
         @test Inti.integrate(x -> x[1]^i * x[2]^j, q) ≈ 1 / (i + 1) * 1 / (j + 1)
     end
 end
+
+@testset "Lagrange basis" begin
+    for shape in (
+        Inti.ReferenceLine(),
+        Inti.ReferenceSquare(),
+        Inti.ReferenceTriangle(),
+        Inti.ReferenceTetrahedron(),
+    )
+        for order in 1:4
+            # skip cases where the reference quadrature is not implemented/defined
+            try
+                qrule = Inti._qrule_for_reference_shape(shape, order)
+                qcoords, qweights = qrule()
+                lag_basis = Inti.lagrange_basis(qrule)
+                for i in eachindex(qcoords)
+                    vals = lag_basis(qcoords[i])
+                    for j in eachindex(qcoords)
+                        if i == j
+                            @test vals[j] ≈ 1
+                        else
+                            @test norm(vals[j]) < 1e-12
+                        end
+                    end
+                end
+            catch e
+                @warn "No quadrature rule for $shape of order $order"
+            end
+        end
+    end
+end

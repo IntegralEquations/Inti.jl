@@ -117,8 +117,9 @@ and `0` on nodes `j ≂̸ i` for `1 ≤ i ≤ n`.
 function lagrange_basis(nodes, sp::PolynomialSpace)
     # TODO: use a better basis? For "low" degrees, this is fine, but still...
     basis = monomial_basis(sp)
-    V = hcat([basis(x) for x in nodes]...) # Vandermonde matrix
-    # C = typeof(V)(Matrix(V) \ I) # old way... maybe remove?
+    V = hcat([basis(x) for x in nodes]...)
+    # F = factorize(Matrix(V))
+    # lag_basis = x -> F \ basis(x)
     C = pinv(V)
     lag_basis = x -> C * basis(x)
     return lag_basis

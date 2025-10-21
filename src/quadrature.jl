@@ -261,9 +261,9 @@ function _qrule_for_reference_shape(ref, order)
         qy = qz = qx
         return TensorProductQuadrature(qx, qy, qz)
     elseif ref isa ReferenceTriangle || ref === :triangle
-        return Gauss(; domain = ref, order = order)
+        return VioreanuRokhlin(; domain = ref, order = order)
     elseif ref isa ReferenceTetrahedron || ref === :tetrahedron
-        return Gauss(; domain = ref, order = order)
+        return VioreanuRokhlin(; domain = ref, order = order)
     else
         error("no appropriate quadrature rule found.")
     end
