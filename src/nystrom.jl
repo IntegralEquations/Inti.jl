@@ -171,9 +171,12 @@ end
 """
     _green_multiplier(x, quad)
 
-Helper function to help determine the constant σ in the Green identity S\\[γ₁u\\](x)
-- D\\[γ₀u\\](x) + σ*u(x) = 0. This can be used as a predicate to determine whether a
-point is inside a domain or not.
+Helper function to determine the constant σ in the Green identity
+```
+    S[γ₁u](x) - D[γ₀u](x) + σ*u(x) = 0,
+```
+where `u` is an interior solution of the PDE associated with `S` and `D`. This can be used
+as a predicate to determine whether a point is inside a domain or not.
 """
 function _green_multiplier(x::SVector, Q::Quadrature{N}) where {N}
     op = Laplace(; dim = N)
@@ -210,8 +213,8 @@ end
 # depending on whether the target point is inside or outside the obstacle.
 # Assumes `quad` is the quadrature of a closed curve/surface
 function isinside(x::SVector, quad::Quadrature, s = 1)
+    isempty(quad) && return false
     u = _green_multiplier(x, quad)
-    return s * u + 0.5 < 0
-    # u < 0
+    return u + s * 0.5 < 0
 end
 isinside(x::Tuple, quad::Quadrature) = isinside(SVector(x), quad)
