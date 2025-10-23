@@ -69,6 +69,20 @@ struct Quadrature{N, T} <: AbstractVector{QuadratureNode{N, T}}
     etype2qtags::Dict{DataType, Matrix{Int}}
 end
 
+"""
+    Quadrature{N,T}()
+
+Empty constructor for `Inti.Quadrature` type.
+"""
+function Quadrature{N, T}() where {N, T}
+    return Quadrature{N, T}(
+        Mesh{N, T}(),
+        Dict{DataType, Inti.ReferenceQuadrature}(),
+        QuadratureNode{N, T}[],
+        Dict{DataType, Matrix{Int}}(),
+    )
+end
+
 # AbstractArray interface
 Base.size(quad::Quadrature) = size(quad.qnodes)
 Base.getindex(quad::Quadrature, i) = quad.qnodes[i]
@@ -235,8 +249,23 @@ and `wᵢ` are the quadrature weights.
 Note that you must define `f(::QuadratureNode)`: use `q.coords` and `q.normal`
 if you need to access the coordinate or normal vector at que quadrature node.
 """
-function integrate(f, msh::Quadrature)
-    return sum(q -> f(q) * q.weight, msh.qnodes)
+function integrate(f, quad::Quadrature)
+    return sum(q -> f(q) * q.weight, quad.qnodes)
+end
+
+"""
+    integrate(vals::AbstractVector,quad::Quadrature)
+
+Similar to `integrate(f, quad)`, assume that `vals` is a vector of values at the quadrature
+nodes. Note that `length(vals)` must match the number of quadrature nodes in `quad`.
+"""
+function integrate(vals::AbstractVector, quad::Quadrature)
+    msg = "length of vals must match the number of quadrature nodes"
+    @assert length(vals) == length(quad) msg
+    iter = zip(vals, quad.qnodes)
+    return sum(iter) do (v, q)
+        return v * q.weight
+    end
 end
 
 """

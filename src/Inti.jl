@@ -9,6 +9,7 @@ const PROJECT_ROOT = pkgdir(Inti)
 
 using DataStructures
 using ForwardDiff
+using Lebedev
 using LinearAlgebra
 using LinearMaps
 using NearestNeighbors

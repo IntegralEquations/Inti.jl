@@ -1,4 +1,4 @@
-const PREDEFINED_SHAPES = ["ellipsoid", "torus", "bean", "cushion", "acorn"]
+const PREDEFINED_SHAPES = ["ellipsoid", "torus", "bean", "cushion", "acorn", "cassini_oval"]
 
 """
     GeometricEntity(shape::String [; translation, rotation, scaling, kwargs...])
@@ -19,6 +19,7 @@ and returns its `key`.
 - [`bean`](@ref)
 - [`acorn`](@ref)
 - [`cushion`](@ref)
+- [`cassini_oval`](@ref)
 
 """
 function GeometricEntity(
@@ -232,5 +233,83 @@ function _cushion_parametrization(u, v, id, trans, rot, scal)
     th, phi, _ = cart2sph(x̂...)
     r = sqrt(0.8 + 0.5 * (cos(2 * th) - 1) .* (cos(4 * phi) - 1))
     x = r * SVector(cos(th) .* cos(phi), sin(th) .* cos(phi), sin(phi))
+    return rot * (scal .* x) .+ trans
+end
+
+"""
+    cassini_oval(; a, b, translation, rotation, scaling, labels)
+
+Create a Cassini oval (surface of revolution) entity in 3D, and apply optional
+transformations. Returns the key.
+
+A Cassini oval is the locus of points P such that the product of distances to two
+foci F₁ and F₂ is constant: d(P,F₁) × d(P,F₂) = b². The foci are located at
+(±a,0,0) on the x-axis.
+
+The implicit equation is: (x² + y² + z² + a²)² - 4a²x² = b⁴
+
+## Parameters
+- `a`: Half the distance between the two foci (default: 1.0). Must be positive.
+- `b`: The constant product parameter (default: 1.5). Must satisfy b > a for a
+  single connected surface.
+
+## Shape characteristics
+- When b >> a: Approaches a sphere
+- As b → a⁺: Surface becomes increasingly pinched (lemniscate-like)
+- Requires b > a (single smooth oval surface)
+"""
+function cassini_oval(;
+        a = 1.0,
+        b = 1.5,
+        translation = SVector(0, 0, 0),
+        rotation = SVector(0, 0, 0),
+        scaling = SVector(1, 1, 1),
+        labels = String[],
+    )
+    @assert a > 0 "Parameter a must be positive"
+    @assert b > a "Parameter b must be greater than a for a connected surface"
+    lc = SVector(-1.0, -1.0)
+    hc = SVector(1.0, 1.0)
+    bnd = EntityKey[]
+    rot = rotation_matrix(rotation)
+    for i in 1:6
+        patch = parametric_surface(
+            (u, v) -> _cassini_oval_parametrization(u, v, i, a, b, translation, rot, scaling),
+            lc,
+            hc,
+        )
+        push!(bnd, patch)
+    end
+    dim = 3
+    tag = new_tag(dim)
+    pushforward = nothing
+    return GeometricEntity(dim, tag, bnd, labels, pushforward)
+end
+
+function _cassini_oval_parametrization(u, v, id, a, b, trans, rot, scal)
+    x̂ = _unit_sphere_parametrization(u, v, id)
+    # Convert unit sphere point to angles for Cassini parametrization
+    # φ ∈ [0,π] is the polar angle measured from the x-axis
+    # ψ ∈ [0,2π] is the azimuthal angle in the y-z plane
+    phi = acos(clamp(x̂[1], -1.0, 1.0))  # angle from x-axis
+    psi = atan(x̂[3], x̂[2])  # azimuth in y-z plane
+
+    # Cassini oval polar equation with foci at (±a, 0, 0):
+    # r⁴ - 2a²r²cos(2φ) + (a⁴ - b⁴) = 0
+    # Solution: r(φ) = √[a²cos(2φ) + √(b⁴ - a⁴sin²(2φ))]
+    cos_2phi = cos(2 * phi)
+    sin_2phi = sin(2 * phi)
+
+    # Calculate discriminant (guaranteed non-negative since b > a)
+    discriminant = b^4 - (a^4) * (sin_2phi^2)
+
+    # Calculate r
+    r = sqrt(a^2 * cos_2phi + sqrt(discriminant))
+
+    # Convert to Cartesian coordinates:
+    # x = r cos(φ), y = r sin(φ) cos(ψ), z = r sin(φ) sin(ψ)
+    sin_phi = sin(phi)
+    x = SVector(r * cos(phi), r * sin_phi * cos(psi), r * sin_phi * sin(psi))
+
     return rot * (scal .* x) .+ trans
 end
