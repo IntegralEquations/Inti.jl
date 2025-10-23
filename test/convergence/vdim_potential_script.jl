@@ -31,30 +31,14 @@ interpolation_order = 4
 VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
 bdry_qorder = 2 * VR_qorder
 
-function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
-    try
-        gmsh.initialize()
-        gmsh.option.setNumber("General.Terminal", 0)
-        gmsh.model.add("circle-mesh")
-        gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-        gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
-        gmsh.model.occ.addDisk(center[1], center[2], 0, paxis[1], paxis[2])
-        gmsh.model.occ.synchronize()
-        gmsh.model.mesh.generate(2)
-        gmsh.model.mesh.setOrder(order)
-        gmsh.write(name)
-    finally
-        gmsh.finalize()
-    end
-end
-
+Ω, msh = domain_and_mesh(; meshsize)
 Γ = Inti.external_boundary(Ω)
 #Γₕ = msh[Γ]
 #Ωₕ = msh[Ω]
 
-ψ = (t) -> [cos(2*π*t), sin(2*π*t)]
+ψ = (t) -> [cos(2 * π * t), sin(2 * π * t)]
 θ = 3 # smoothness order of curved elements
-crvmsh = Inti.curve_mesh(msh, ψ, θ, 500*Int(1/meshsize))
+crvmsh = Inti.curve_mesh(msh, ψ, θ; patch_sample_num = 500 * Int(1 / meshsize))
 Ωₕ = view(crvmsh, Ω)
 Γₕ = view(crvmsh, Γ)
 #
@@ -66,21 +50,18 @@ tquad = @elapsed begin
     Q = Inti.VioreanuRokhlin(; domain = :triangle, order = VR_qorder)
     dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
     Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
-    Ωₕ_sub_quad = Inti.Quadrature(Ωₕ_sub, dict)
-    # Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorders[1])
     Γₕ_quad = Inti.Quadrature(Γₕ; qorder = bdry_qorder)
-    Γₕ_sub_quad = Inti.Quadrature(Γₕ_sub; qorder = bdry_qorder)
 end
 @info "Quadrature generation time: $tquad"
 
 k0 = π
-k  = 0
+k = 0
 θ = (cos(π / 3), sin(π / 3))
 #u  = (x) -> exp(im * k0 * dot(x, θ))
 #du = (x,n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
-u  = (x) -> cos(k0 * dot(x, θ))
+u = (x) -> cos(k0 * dot(x, θ))
 du = (x, n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
-f  = (x) -> (k^2 - k0^2) * u(x)
+f = (x) -> (k^2 - k0^2) * u(x)
 
 u_d = map(q -> u(q.coords), Ωₕ_quad)
 u_b = map(q -> u(q.coords), Γₕ_quad)
@@ -92,10 +73,10 @@ op = k == 0 ? Inti.Laplace(; dim = 2) : Inti.Helmholtz(; dim = 2, k)
 ## Boundary operators
 tbnd = @elapsed begin
     S_b2d, D_b2d = Inti.single_double_layer(;
-        pde,
-        target = Ωₕ_sub_quad,
-        source = Γₕ_sub_quad,
-        compression = (method = :fmm, tol = 1e-14),
+        op,
+        target = Ωₕ_quad,
+        source = Γₕ_quad,
+        compression = (method = :fmm, tol = 1.0e-14),
         correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
     )
 end
@@ -104,10 +85,10 @@ end
 ## Volume potentials
 tvol = @elapsed begin
     V_d2d = Inti.volume_potential(;
-        pde,
-        target = Ωₕ_sub_quad,
-        source = Ωₕ_sub_quad,
-        compression = (method = :fmm, tol = 1e-14),
+        op,
+        target = Ωₕ_quad,
+        source = Ωₕ_quad,
+        compression = (method = :fmm, tol = 1.0e-14),
         correction = (
             method = :dim,
             interpolation_order,
@@ -119,9 +100,9 @@ tvol = @elapsed begin
 end
 @info "Volume potential time: $tvol"
 
-vref    = -u_d - D_b2d * u_b + S_b2d * du_b
+vref = -u_d - D_b2d * u_b + S_b2d * du_b
 vapprox = V_d2d * f_d
-er      = vref - vapprox
+er = vref - vapprox
 
 ndofs = length(er)
 

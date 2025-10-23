@@ -5,7 +5,7 @@ using Test
 using HMatrices
 
 @testset "Basic functionality" begin
-    T = SVector{3,Float64}
+    T = SVector{3, Float64}
     data = rand(30, 10)
     B = Inti.BlockArray{T}(data)
     @test Inti.one_padding((1, 2), (1, 2, 3)) == ((1, 2, 1), (1, 2, 3))
@@ -24,7 +24,7 @@ using HMatrices
 end
 
 @testset "Undef constructor" begin
-    T = SVector{3,Float64}
+    T = SVector{3, Float64}
     B = Inti.BlockArray{T}(undef, (3, 3))
     @test Inti.blocksize(B) == (3,)
     @test Inti._blocksize_normalized(B) == (3, 1)
@@ -33,12 +33,12 @@ end
 end
 
 @testset "Subset indexing" begin
-    T = SVector{3,Float64}
+    T = SVector{3, Float64}
     B = Inti.BlockArray{T}(undef, (3, 3))
     @test B[1:2, 1] isa Inti.BlockVector
     @test B[:, 1] isa Inti.BlockVector
     @test B[1:2, 1:2] isa Inti.BlockMatrix
-    T = SMatrix{3,3,Float64,9}
+    T = SMatrix{3, 3, Float64, 9}
     B = Inti.BlockArray{T}(undef, (3, 3))
     @test B[:, 1] isa Inti.BlockVector
     @test B[:, 1:1] isa Inti.BlockMatrix
@@ -46,19 +46,19 @@ end
 end
 
 @testset "Cross constructors" begin
-    A = rand(SMatrix{3,3,Float64,9}, 3, 3)
+    A = rand(SMatrix{3, 3, Float64, 9}, 3, 3)
     B = Inti.BlockArray(A)
     @test 2 * B isa Inti.BlockArray
     @test A ≈ B
-    x = rand(SVector{3,Float64}, 3)
+    x = rand(SVector{3, Float64}, 3)
     @test A * x ≈ B * x
-    X = rand(SMatrix{3,3,Float64,9}, 3)
+    X = rand(SMatrix{3, 3, Float64, 9}, 3)
     @test A * X ≈ B * X
 
     # zero it out
     fill!(B.data, 0)
     Azero = Array(B)
-    @test norm(Azero * x) < 1e-14
+    @test norm(Azero * x) < 1.0e-14
 end
 
 @testset "Composition with HMatrix" begin

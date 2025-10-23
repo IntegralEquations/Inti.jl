@@ -29,19 +29,19 @@ See [anderson2024fast](@cite) for more details on the method.
 """
 
 function vdim_correction(
-    op,
-    target,
-    source::Quadrature,
-    boundary::Quadrature,
-    Sop,
-    Dop,
-    Vop;
-    green_multiplier::Vector{<:Real},
-    interpolation_order = nothing,
-    maxdist = Inf,
-    center = nothing,
-    shift::Val{SHIFT} = Val(false),
-) where {SHIFT}
+        op,
+        target,
+        source::Quadrature,
+        boundary::Quadrature,
+        Sop,
+        Dop,
+        Vop;
+        green_multiplier::Vector{<:Real},
+        interpolation_order = nothing,
+        maxdist = Inf,
+        center = nothing,
+        shift::Val{SHIFT} = Val(false),
+    ) where {SHIFT}
     # variables for debugging the condition properties of the method
     vander_cond = vander_norm = rhs_norm = res_norm = shift_norm = -Inf
     T = eltype(Vop)
@@ -55,7 +55,7 @@ function vdim_correction(
     isnothing(interpolation_order) &&
         (interpolation_order = maximum(order, values(source.etype2qrule)))
     # by default basis centered at origin
-    center = isnothing(center) ? zero(SVector{N,Float64}) : center
+    center = isnothing(center) ? zero(SVector{N, Float64}) : center
     p, P, γ₁P, multiindices = polynomial_solutions_vdim(op, interpolation_order, center)
     dict_near = etype_to_nearest_points(target, source; maxdist)
     R = _vdim_auxiliary_quantities(
@@ -549,14 +549,14 @@ function translation_and_scaling(el::ParametricElement{ReferenceSimplex{3}})
     straight_nodes =
         [el([0.0, 0.0, 0.0]), el([1.0, 0.0, 0.0]), el([0.0, 1.0, 0.0]), el([0.0, 0.0, 1.0])]
     return translation_and_scaling(
-        LagrangeElement{ReferenceSimplex{3},4,SVector{3,Float64}}(straight_nodes),
+        LagrangeElement{ReferenceSimplex{3}, 4, SVector{3, Float64}}(straight_nodes),
     )
 end
 
 function translation_and_scaling(el::ParametricElement{ReferenceSimplex{2}})
-    straight_nodes = [el([1e-18, 1e-18]), el([1.0, 0.0]), el([0.0, 1.0])]
+    straight_nodes = [el([1.0e-18, 1.0e-18]), el([1.0, 0.0]), el([0.0, 1.0])]
     return translation_and_scaling(
-        LagrangeElement{ReferenceSimplex{2},3,SVector{2,Float64}}(straight_nodes),
+        LagrangeElement{ReferenceSimplex{2}, 3, SVector{2, Float64}}(straight_nodes),
     )
 end
 
@@ -912,17 +912,17 @@ function _lowfreq_vdim_auxiliary_quantities(
 end
 
 function _vdim_auxiliary_quantities(
-    p,
-    P,
-    γ₁P,
-    X,
-    Y::Quadrature,
-    Γ::Quadrature,
-    μ,
-    Sop,
-    Dop,
-    Vop,
-)
+        p,
+        P,
+        γ₁P,
+        X,
+        Y::Quadrature,
+        Γ::Quadrature,
+        μ,
+        Sop,
+        Dop,
+        Vop,
+    )
     num_basis = length(p)
     num_targets = length(X)
     b = [f(q) for q in Y, f in p]
@@ -950,7 +950,7 @@ and circumradius of the elements of `msh`, respectively.
 function vdim_mesh_center(msh::AbstractMesh)
     N = ambient_dimension(msh)
     M = 0.0
-    xc = zero(SVector{N,Float64})
+    xc = zero(SVector{N, Float64})
     for E in element_types(msh)
         for el in elements(msh, E)
             c, r = translation_and_scaling(el)
@@ -1009,17 +1009,17 @@ trace of `Pₙ`.
 Passing a point `center` will shift the monomials and solutions accordingly.
 """
 function polynomial_solutions_vdim(
-    op::AbstractDifferentialOperator,
-    order::Integer,
-    center = nothing,
-)
+        op::AbstractDifferentialOperator,
+        order::Integer,
+        center = nothing,
+    )
     N = ambient_dimension(op)
-    center = isnothing(center) ? zero(SVector{N,Float64}) : center
+    center = isnothing(center) ? zero(SVector{N, Float64}) : center
     # create empty arrays to store the monomials, solutions, and traces. For the
     # neumann trace, we try to infer the concrete return type instead of simply
     # having a vector of `Function`.
-    monomials = Vector{ElementaryPDESolutions.Polynomial{N,Float64}}()
-    dirchlet_traces = Vector{ElementaryPDESolutions.Polynomial{N,Float64}}()
+    monomials = Vector{ElementaryPDESolutions.Polynomial{N, Float64}}()
+    dirchlet_traces = Vector{ElementaryPDESolutions.Polynomial{N, Float64}}()
     T = return_type(neumann_trace, typeof(op), eltype(dirchlet_traces))
     neumann_traces = Vector{T}()
     multiindices = Vector{MultiIndex{N}}()
@@ -1069,19 +1069,19 @@ function polynomial_solution(op::Yukawa, p::ElementaryPDESolutions.Polynomial)
 end
 
 function neumann_trace(
-    ::Union{Laplace,Helmholtz,Yukawa},
-    P::ElementaryPDESolutions.Polynomial{N,T},
-) where {N,T}
+        ::Union{Laplace, Helmholtz, Yukawa},
+        P::ElementaryPDESolutions.Polynomial{N, T},
+    ) where {N, T}
     return _normal_derivative(P)
 end
 
-function _normal_derivative(P::ElementaryPDESolutions.Polynomial{N,T}) where {N,T}
+function _normal_derivative(P::ElementaryPDESolutions.Polynomial{N, T}) where {N, T}
     ∇P = ElementaryPDESolutions.gradient(P)
     # return (q) -> dot(normal(q), ∇P(coords(q)))
     return (x, n) -> dot(n, ∇P(x))
 end
 
-function (∇P::NTuple{N,<:ElementaryPDESolutions.Polynomial})(x) where {N}
+function (∇P::NTuple{N, <:ElementaryPDESolutions.Polynomial})(x) where {N}
     return ntuple(n -> ∇P[n](x), N)
 end
 

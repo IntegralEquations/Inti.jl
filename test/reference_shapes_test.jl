@@ -66,5 +66,5 @@ end
     @test !in(x, t)
     @test Inti.center(t) == SVector(1 / 5, 1 / 5, 1 / 5, 1 / 5)
     @test Inti.vertices(t) ==
-          SVector([0, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1])
+        SVector([0, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1])
 end

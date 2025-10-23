@@ -113,8 +113,8 @@ using LinearMaps
 
 # and setup some of the (global) problem parameters:
 
-k      = 4π
-λ      = 2π / k
+k = 4π
+λ = 2π / k
 qorder = 4 # quadrature order
 gorder = 2 # order of geometrical approximation
 nothing #hide
@@ -127,7 +127,7 @@ nothing #hide
 # function to mesh the circle:
 
 function gmsh_circle(; name, meshsize, order = 1, radius = 1, center = (0, 0))
-    try
+    return try
         gmsh.initialize()
         gmsh.model.add("circle-mesh")
         gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
@@ -190,7 +190,7 @@ nothing #hide
 # integrating the function `x->1` over `Q` gives an approximation to the
 # perimeter:
 
-@assert abs(Inti.integrate(x -> 1, Q) - 2π) < 1e-5 #hide
+@assert abs(Inti.integrate(x -> 1, Q) - 2π) < 1.0e-5 #hide
 abs(Inti.integrate(x -> 1, Q) - 2π)
 
 # With the [`Quadrature`](@ref Inti.Quadrature) constructed, we now can define
@@ -260,7 +260,7 @@ nothing #hide
 # potentials, and then combine them as follows:
 
 𝒮, 𝒟 = Inti.single_double_layer_potential(; op, source = Q)
-uₛ   = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
+uₛ = x -> 𝒟[σ](x) - im * k * 𝒮[σ](x)
 nothing #hide
 
 # The variable `uₛ` is an anonymous/lambda function representing the approximate
@@ -277,9 +277,9 @@ function circle_helmholtz_soundsoft(pt; radius = 1, k, θin)
     u = 0.0
     r < radius && return u
     c(n) = -exp(im * n * (π / 2 - θin)) * besselj(n, k * radius) / besselh(n, k * radius)
-    u    = c(0) * besselh(0, k * r)
-    n    = 1
-    while (abs(c(n)) > 1e-12)
+    u = c(0) * besselh(0, k * r)
+    n = 1
+    while (abs(c(n)) > 1.0e-12)
         u +=
             c(n) * besselh(n, k * r) * exp(im * n * θ) +
             c(-n) * besselh(-n, k * r) * exp(-im * n * θ)
@@ -297,7 +297,7 @@ er = maximum(0:0.01:2π) do θ
     x = (R * cos(θ), R * sin(θ))
     return abs(uₛ(x) - uₑ(x))
 end
-@assert er < 1e-3 #hide
+@assert er < 1.0e-3 #hide
 @info "maximum error = $er"
 
 # As we can see, the error is quite small! Let's use `Makie` to visualize the solution in this
@@ -450,7 +450,7 @@ S, D = Inti.single_double_layer(;
     op,
     target = Q,
     source = Q,
-    compression = (method = :hmatrix, tol = 1e-4),
+    compression = (method = :hmatrix, tol = 1.0e-4),
     correction = (method = :dim,),
 )
 nothing #hide
@@ -458,7 +458,7 @@ nothing #hide
 # Here is how much memory it would take to store the dense representation of
 # these matrices:
 
-mem = 2 * length(S) * 16 / 1e9 # 16 bytes per complex number, 1e9 bytes per GB, two matrices
+mem = 2 * length(S) * 16 / 1.0e9 # 16 bytes per complex number, 1e9 bytes per GB, two matrices
 println("memory required to store S and D: $(mem) GB")
 
 # Even for this simple example, the dense representation of the integral
@@ -492,7 +492,7 @@ rhs = map(Q) do q
     return -uᵢ(x)
 end
 σ, hist =
-    gmres(L, rhs; log = true, abstol = 1e-6, verbose = false, restart = 100, maxiter = 100)
+    gmres(L, rhs; log = true, abstol = 1.0e-6, verbose = false, restart = 100, maxiter = 100)
 @show hist
 
 # As before, let us represent the solution using `IntegralPotential`s:
@@ -517,7 +517,7 @@ function sphere_helmholtz_soundsoft(xobs; radius = 1, k = 1, θin = 0, ϕin = 0)
     r < radius && return u
     function c(l, m)
         return -4π * im^l * sphharmonic(l, -m, θin, ϕin) * sphbesselj(l, k * radius) /
-               sphbesselh(l, k * radius)
+            sphbesselh(l, k * radius)
     end
     l = 0
     for l in 0:60
@@ -538,7 +538,7 @@ er = maximum(1:100) do _
     x = 2 * x̂
     return abs(uₛ(x) - uₑ(x))
 end
-@assert er < 1e-3 #hide
+@assert er < 1.0e-3 #hide
 @info "error with correction = $er"
 
 # We see that, once again, the approximation is quite accurate. Let us now
@@ -553,7 +553,7 @@ S, D = Inti.single_double_layer(;
     op,
     target,
     source = Q,
-    compression = (method = :hmatrix, tol = 1e-4),
+    compression = (method = :hmatrix, tol = 1.0e-4),
     ## correction for the nearfield (for visual purposes, set to `:none` to disable)
     correction = (method = :dim, maxdist = meshsize, target_location = :outside),
 )

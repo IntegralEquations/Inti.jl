@@ -48,17 +48,17 @@ See [faria2021general](@cite) for more details on the method.
 
 """
 function bdim_correction(
-    op,
-    target,
-    source::Quadrature,
-    Sop,
-    Dop;
-    green_multiplier::Vector{<:Real},
-    parameters = DimParameters(),
-    derivative::Bool = false,
-    maxdist = Inf,
-    filter_target_params = nothing,
-)
+        op,
+        target,
+        source::Quadrature,
+        Sop,
+        Dop;
+        green_multiplier::Vector{<:Real},
+        parameters = DimParameters(),
+        derivative::Bool = false,
+        maxdist = Inf,
+        filter_target_params = nothing,
+    )
     imat_cond = imat_norm = res_norm = rhs_norm = theta_norm = -Inf
     T = eltype(Sop)
     # determine type for dense matrices
@@ -77,7 +77,7 @@ function bdim_correction(
     end
     # find first an appropriate set of source points to center the monopoles
     qmax = sum(size(mat, 1) for mat in values(source.etype2qtags)) # max number of qnodes per el
-    ns   = ceil(Int, parameters.sources_oversample_factor * qmax)
+    ns = ceil(Int, parameters.sources_oversample_factor * qmax)
     # compute a bounding box for source points
     low_corner = reduce((p, q) -> min.(coords(p), coords(q)), source)
     high_corner = reduce((p, q) -> max.(coords(p), coords(q)), source)
@@ -125,10 +125,10 @@ function bdim_correction(
         γ₀B_data = parent(γ₀B)
         γ₁B_data = parent(γ₁B)
         for k in 1:size(Θ_data, 2)
-            y = reinterpret(SVector{P,S}, @view Θ_data[:, k])
-            x = reinterpret(SVector{Q,S}, @view γ₁B_data[:, k])
+            y = reinterpret(SVector{P, S}, @view Θ_data[:, k])
+            x = reinterpret(SVector{Q, S}, @view γ₁B_data[:, k])
             mul!(y, Sop, x, 1, 1)
-            x = reinterpret(SVector{Q,S}, @view γ₀B_data[:, k])
+            x = reinterpret(SVector{Q, S}, @view γ₀B_data[:, k])
             mul!(y, Dop, x, -1, 1)
         end
     end
@@ -157,7 +157,7 @@ function bdim_correction(
             # copy the monopoles/dipoles for the current element
             jglob = @view qtags[:, n]
             M[1:nq, :] .= γ₀B[jglob, :]
-            M[(nq+1):2nq, :] .= γ₁B[jglob, :]
+            M[(nq + 1):2nq, :] .= γ₁B[jglob, :]
             # TODO: get ride of all this transposing mumble jumble by assembling
             # the matrix in the correct orientation in the first place
             F = qr!(transpose(Mdata))
@@ -177,7 +177,7 @@ function bdim_correction(
                     push!(Js, jglob[k])
                     # Since we actually computed the tranpose of the weights, we
                     # need to transpose it again. This matters for e.g. elasticity
-                    push!(Ss, -transpose(W[nq+k])) # single layer corresponds to α=0,β=-1
+                    push!(Ss, -transpose(W[nq + k])) # single layer corresponds to α=0,β=-1
                     push!(Ds, transpose(W[k]))     # double layer corresponds to α=1,β=0
                 end
             end

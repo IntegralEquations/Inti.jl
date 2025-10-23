@@ -22,17 +22,17 @@ using Test
         op,
         target = Q,
         source = Q,
-        compression = (method = :hmatrix, tol = 1e-10),
+        compression = (method = :hmatrix, tol = 1.0e-10),
         correction = (method = :dim,),
     )
     Sfmm, Dfmm = Inti.single_double_layer(;
         op,
         target = Q,
         source = Q,
-        compression = (method = :fmm, tol = 1e-10),
+        compression = (method = :fmm, tol = 1.0e-10),
         correction = (method = :dim,),
     )
-    x = rand(SVector{3,Float64}, size(S, 2))
+    x = rand(SVector{3, Float64}, size(S, 2))
     @test Sfmm * x ≈ S * x
     @test Dfmm * x ≈ D * x
     @test Shmat * x ≈ S * x

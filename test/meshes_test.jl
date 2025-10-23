@@ -35,30 +35,30 @@ el = Inti.LagrangeSquare(a, b, c, d)
 viz(el)
 
 a, b, c, d = SVector(0.0, 0.0, 0.0),
-SVector(1.0, 0.0, 0.5),
-SVector(1.0, 1.0, 1.0),
-SVector(0.0, 1.0, 1.0)
+    SVector(1.0, 0.0, 0.5),
+    SVector(1.0, 1.0, 1.0),
+    SVector(0.0, 1.0, 1.0)
 el = Inti.LagrangeSquare(a, b, c, d)
 rec = Quadrangle(Tuple.(el.vals)...)
 viz(rec; showsegments = true)
 
 # Tetrahedron
 a, b, c, d = SVector(0.0, 0.0, 0.0),
-SVector(1.0, 0.0, 0.0),
-SVector(0.0, 1.0, 0.0),
-SVector(0.0, 0.0, 1.0)
+    SVector(1.0, 0.0, 0.0),
+    SVector(0.0, 1.0, 0.0),
+    SVector(0.0, 0.0, 1.0)
 el = Inti.LagrangeTetrahedron(a, b, c, d)
 viz(el)
 
 # Cube
 p1, p2, p3, p4, p5, p6, p7, p8 = SVector(0.0, 0.0, 0.0),
-SVector(1.0, 0.0, 0.0),
-SVector(1.0, 1.0, 0.0),
-SVector(0.0, 1.0, 0.0),
-SVector(0.0, 0.0, 1.0),
-SVector(1.0, 0.0, 1.0),
-SVector(1.0, 1.0, 1.0),
-SVector(0.0, 1.0, 1.0)
+    SVector(1.0, 0.0, 0.0),
+    SVector(1.0, 1.0, 0.0),
+    SVector(0.0, 1.0, 0.0),
+    SVector(0.0, 0.0, 1.0),
+    SVector(1.0, 0.0, 1.0),
+    SVector(1.0, 1.0, 1.0),
+    SVector(0.0, 1.0, 1.0)
 el = Inti.LagrangeCube(p1, p2, p3, p4, p5, p6, p7, p8)
 viz(el; showsegments = true, alpha = 0.1)
 

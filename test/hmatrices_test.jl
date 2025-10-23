@@ -21,13 +21,13 @@ include("test_utils.jl")
         @testset "PDE = $op" begin
             for K in (Inti.SingleLayerKernel(op), Inti.DoubleLayerKernel(op))
                 iop = Inti.IntegralOperator(K, Γ_quad)
-                H = Inti.assemble_hmatrix(iop; atol = 1e-8)
+                H = Inti.assemble_hmatrix(iop; atol = 1.0e-8)
                 x = rand(eltype(iop), size(iop, 2))
                 yapprox = H * x
                 # test on a given index set
                 idx_test = rand(1:size(iop, 1), 10)
                 exact = iop[idx_test, :] * x
-                @test yapprox[idx_test] ≈ exact atol = 1e-7
+                @test yapprox[idx_test] ≈ exact atol = 1.0e-7
             end
         end
     end

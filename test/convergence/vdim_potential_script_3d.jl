@@ -19,22 +19,24 @@ tmsh = @elapsed begin
     Γ = Inti.external_boundary(Ω)
 
     function face_element_on_torus(nodelist, R, r)
-        return all([
-            (sqrt(node[1]^2 + node[2]^2) - R^2)^2 + node[3]^2 ≈ r^2 for node in nodelist
-        ])
+        return all(
+            [
+                (sqrt(node[1]^2 + node[2]^2) - R^2)^2 + node[3]^2 ≈ r^2 for node in nodelist
+            ]
+        )
     end
     face_element_on_curved_surface =
         (nodelist) -> face_element_on_torus(nodelist, r1, r2)
 
     ψ =
         (v) ->
-            [(r1 + r2*sin(v[1]))*cos(v[2]), (r1 + r2*sin(v[1]))*sin(v[2]), r2*cos(v[1])]
+    [(r1 + r2 * sin(v[1])) * cos(v[2]), (r1 + r2 * sin(v[1])) * sin(v[2]), r2 * cos(v[1])]
     θ = 5 # smoothness order of curved elements
     crvmsh = Inti.curve_mesh(
         msh,
         ψ,
         θ,
-        50*round(Int, 1/meshsize);
+        50 * round(Int, 1 / meshsize);
         face_element_on_curved_surface = face_element_on_curved_surface,
     )
 
@@ -58,13 +60,13 @@ end
 @info "Quadrature generation time: $tquad"
 
 k0 = π
-k  = 0
+k = 0
 θ = (sin(π / 3) * cos(π / 3), sin(π / 3) * sin(π / 3), cos(π / 3))
 #u  = (x) -> exp(im * k0 * dot(x, θ))
 #du = (x,n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
-u  = (x) -> cos(k0 * dot(x, θ))
+u = (x) -> cos(k0 * dot(x, θ))
 du = (x, n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
-f  = (x) -> (k^2 - k0^2) * u(x)
+f = (x) -> (k^2 - k0^2) * u(x)
 
 u_d = map(q -> u(q.coords), Ωₕ_quad)
 u_b = map(q -> u(q.coords), Γₕ_quad)
@@ -79,7 +81,7 @@ tbnd = @elapsed begin
         op,
         target = Ωₕ_quad,
         source = Γₕ_quad,
-        compression = (method = :fmm, tol = 1e-8),
+        compression = (method = :fmm, tol = 1.0e-8),
         correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
     )
 end
@@ -91,7 +93,7 @@ tvol = @elapsed begin
         op,
         target = Ωₕ_quad,
         source = Ωₕ_quad,
-        compression = (method = :fmm, tol = 1e-8),
+        compression = (method = :fmm, tol = 1.0e-8),
         correction = (
             method = :dim,
             interpolation_order,
@@ -103,9 +105,9 @@ tvol = @elapsed begin
 end
 @info "Volume potential time: $tvol"
 
-vref    = -u_d - D_b2d * u_b + S_b2d * du_b
+vref = -u_d - D_b2d * u_b + S_b2d * du_b
 vapprox = V_d2d * f_d
-er      = vref - vapprox
+er = vref - vapprox
 
 ndofs = length(er)
 

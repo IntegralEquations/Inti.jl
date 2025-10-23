@@ -49,7 +49,7 @@ nothing #hide
 using Gmsh # this will trigger the loading of Inti's Gmsh extension
 
 function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
-    try
+    return try
         gmsh.initialize()
         gmsh.option.setNumber("General.Terminal", 0)
         gmsh.model.add("circle-mesh")
@@ -114,14 +114,14 @@ S_b2b, D_b2b = Inti.single_double_layer(;
     op,
     target = Γₕ_quad,
     source = Γₕ_quad,
-    compression = (method = :fmm, tol = 1e-12),
+    compression = (method = :fmm, tol = 1.0e-12),
     correction = (method = :dim,),
 )
 S_b2d, D_b2d = Inti.single_double_layer(;
     op,
     target = Ωₕ_quad,
     source = Γₕ_quad,
-    compression = (method = :fmm, tol = 1e-12),
+    compression = (method = :fmm, tol = 1.0e-12),
     correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
 )
 
@@ -130,14 +130,14 @@ V_d2d = Inti.volume_potential(;
     op,
     target = Ωₕ_quad,
     source = Ωₕ_quad,
-    compression = (method = :fmm, tol = 1e-12),
+    compression = (method = :fmm, tol = 1.0e-12),
     correction = (method = :dim, interpolation_order),
 )
 V_d2b = Inti.volume_potential(;
     op,
     target = Γₕ_quad,
     source = Ωₕ_quad,
-    compression = (method = :fmm, tol = 1e-12),
+    compression = (method = :fmm, tol = 1.0e-12),
     correction = (
         method = :dim,
         maxdist = 5 * meshsize,
@@ -164,14 +164,14 @@ L = -I / 2 + D_b2b
 
 using IterativeSolvers
 σ, hist =
-    gmres(L, rhs; log = true, abstol = 1e-10, verbose = false, restart = 100, maxiter = 100)
+    gmres(L, rhs; log = true, abstol = 1.0e-10, verbose = false, restart = 100, maxiter = 100)
 @show hist
 
 # To check the solution, lets evaluate it at the nodes $\Omega$
 uₕ_quad = -(V_d2d * f) + D_b2d * σ
 uₑ_quad = map(q -> uₑ(q.coords), Ωₕ_quad)
 er = abs.(uₕ_quad - uₑ_quad)
-@assert norm(er) < 1e-5 #hide
+@assert norm(er) < 1.0e-5 #hide
 @show norm(er, Inf)
 
 # ## Visualize the solution error using Gmsh

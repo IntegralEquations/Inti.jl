@@ -4,10 +4,10 @@
 A point in `ℝᴺ` with a `weight` for performing numerical integration. A
 `QuadratureNode` can optionally store a `normal` vector.
 """
-struct QuadratureNode{N,T<:Real}
-    coords::SVector{N,T}
+struct QuadratureNode{N, T <: Real}
+    coords::SVector{N, T}
     weight::T
-    normal::Union{Nothing,SVector{N,T}}
+    normal::Union{Nothing, SVector{N, T}}
 end
 
 """
@@ -47,7 +47,7 @@ weight(q::QuadratureNode) = q.weight
 
 # useful for using either a quadrature node or a just a simple point in
 # `IntegralOperators`.
-coords(x::Union{SVector,Tuple}) = SVector(x)
+coords(x::Union{SVector, Tuple}) = SVector(x)
 
 function Base.show(io::IO, q::QuadratureNode)
     println(io, "Quadrature node:")
@@ -105,13 +105,13 @@ used for each element type using [`_qrule_for_reference_shape`](@ref).
 For co-dimension one elements, the normal vector is also computed and stored in
 the [`QuadratureNode`](@ref)s.
 """
-function Quadrature(msh::AbstractMesh{N,T}, etype2qrule::Dict) where {N,T}
+function Quadrature(msh::AbstractMesh{N, T}, etype2qrule::Dict) where {N, T}
     # initialize mesh with empty fields
-    quad = Quadrature{N,T}(
+    quad = Quadrature{N, T}(
         msh,
         etype2qrule,
-        QuadratureNode{N,T}[],
-        Dict{DataType,Matrix{Int}}(),
+        QuadratureNode{N, T}[],
+        Dict{DataType, Matrix{Int}}(),
     )
     # loop element types and generate quadrature for each
     for E in element_types(msh)
@@ -158,7 +158,7 @@ function Quadrature(
     return quad
 end
 
-function Quadrature(msh::AbstractMesh{N,T}, qrule::ReferenceQuadrature) where {N,T}
+function Quadrature(msh::AbstractMesh{N, T}, qrule::ReferenceQuadrature) where {N, T}
     etype2qrule = Dict(E => qrule for E in element_types(msh))
     return Quadrature(msh, etype2qrule)
 end
@@ -293,7 +293,7 @@ function etype_to_nearest_points(X, Y::Quadrature; maxdist = Inf)
     if X === Y
         # when both surfaces are the same, the "near points" of an element are
         # simply its own quadrature points
-        dict = Dict{DataType,Vector{Vector{Int}}}()
+        dict = Dict{DataType, Vector{Vector{Int}}}()
         for (E, idx_dofs) in Y.etype2qtags
             dict[E] = map(i -> collect(i), eachcol(idx_dofs))
         end
@@ -314,7 +314,7 @@ function _etype_to_nearest_points(X, Y::Quadrature, maxdist)
     end
     # dict[j] now contains indices in X for which the j quadrature node in Y is
     # the closest. Next we reverse the map
-    etype2nearlist = Dict{DataType,Vector{Vector{Int}}}()
+    etype2nearlist = Dict{DataType, Vector{Vector{Int}}}()
     for (E, tags) in Y.etype2qtags
         nq, ne = size(tags)
         etype2nearlist[E] = nearlist = [Int[] for _ in 1:ne]
@@ -355,6 +355,32 @@ function quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
         end
     end
     return ivals ./ areas
+end
+
+"""
+    node_vals_to_quadrature(Q::Quadrature, vals::AbstractVector)
+
+Given a vector of `vals` at the interpolation nodes of `Q.mesh`, return a vector of values
+at the quadrature nodes of `Q`.
+"""
+function node_vals_to_quadrature(Q::Quadrature, ivals::AbstractVector)
+    msh = Q.mesh isa SubMesh ? collect(Q.mesh) : Q.mesh
+    qnodes = Q.qnodes
+    qvals = zeros(eltype(ivals), length(qnodes))
+    for (E, mat) in etype2mat(msh)
+        qrule = Q.etype2qrule[E]
+        L = lagrange_basis(E)
+        coords = qcoords(qrule)
+        # precompute value of lagrange basis at the quadrature nodes
+        I2Q = mapreduce(L, hcat, coords) |> transpose
+        ni, nel = size(mat) # number of interpolation nodes by number of elements
+        for n in 1:nel
+            qtags = Q.etype2qtags[E][:, n]
+            itags = mat[:, n]
+            qvals[qtags] .= (I2Q * ivals[itags])
+        end
+    end
+    return qvals
 end
 
 """

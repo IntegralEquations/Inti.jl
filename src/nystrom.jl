@@ -17,7 +17,7 @@ Assuming `𝒮` is an integral potential and `σ` is a vector of values defined 
 `quadrature`, calling `𝒮[σ]` creates an anonymous function that can be
 evaluated at any point `x`.
 """
-struct IntegralPotential{K,Q<:Quadrature}
+struct IntegralPotential{K, Q <: Quadrature}
     kernel::K
     quadrature::Q
 end
@@ -64,7 +64,7 @@ I[u](x) = \\int_{\\Gamma\\_s} K(x,y)u(y) ds_y, x \\in \\Gamma_{t}
 ```
 where ``\\Gamma_s`` and ``\\Gamma_t`` are the source and target domains, respectively.
 """
-struct IntegralOperator{V,K,T,S} <: AbstractMatrix{V}
+struct IntegralOperator{V, K, T, S <: Quadrature} <: AbstractMatrix{V}
     kernel::K
     # since the target can be as simple as a vector of points, leave it untyped
     target::T
@@ -104,14 +104,14 @@ end
 Assemble a dense matrix representation of an `IntegralOperator`.
 """
 function assemble_matrix(iop::IntegralOperator; threads = true)
-    T    = eltype(iop)
+    T = eltype(iop)
     m, n = size(iop)
-    out  = if T <: SMatrix
+    out = if T <: SMatrix
         BlockArray{T}(undef, m, n)
     else
         Array{T}(undef, m, n)
     end
-    K    = kernel(iop)
+    K = kernel(iop)
     # function barrier
     _assemble_matrix!(out, K, iop.target, iop.source, threads)
     return out

@@ -6,7 +6,7 @@ import Inti
 using StaticArrays
 
 function __init__()
-    @info "Loading Inti.jl Makie extension"
+    return @info "Loading Inti.jl Makie extension"
 end
 
 ## Coversion to Meshes.jl equivalent formates for visualization

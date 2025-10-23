@@ -55,14 +55,14 @@ function integrate(f, q::ReferenceQuadrature)
 end
 
 function integrate(f, x, w)
-    sum(zip(x, w)) do (x, w)
+    return sum(zip(x, w)) do (x, w)
         return f(x) * prod(w)
     end
 end
 
 function (q::ReferenceQuadrature)(f)
     x, w = qcoords(q), qweights(q)
-    sum(zip(x, w)) do (x, w)
+    return sum(zip(x, w)) do (x, w)
         return f(x) * prod(w)
     end
 end
@@ -108,7 +108,7 @@ order(::Fejer{N}) where {N} = N - 1
     w = zero(x)
     for j in 1:N
         tmp = 0.0
-        for l in 1:floor(N/2)
+        for l in 1:floor(N / 2)
             tmp += 1 / (4 * l^2 - 1) * cos(2 * l * theta[j])
         end
         w[j] = 2 / N * (1 - 2 * tmp)
@@ -136,18 +136,18 @@ Inti.integrate(cos,q) ≈ sin(1) - sin(0)
 true
 ```
 """
-struct GaussLegendre{N,T} <: ReferenceQuadrature{ReferenceLine}
-    nodes::SVector{N,SVector{1,T}}
-    weights::SVector{N,T}
+struct GaussLegendre{N, T} <: ReferenceQuadrature{ReferenceLine}
+    nodes::SVector{N, SVector{1, T}}
+    weights::SVector{N, T}
 end
 
-function GaussLegendre{N,T}() where {N,T}
+function GaussLegendre{N, T}() where {N, T}
     x, w = gauss(T, N, 0, 1)
-    V = SVector{1,T}
-    return GaussLegendre(SVector{N,V}(V.(x)), SVector{N,T}(w))
+    V = SVector{1, T}
+    return GaussLegendre(SVector{N, V}(V.(x)), SVector{N, T}(w))
 end
 
-GaussLegendre(n::Int) = GaussLegendre{n,Float64}()
+GaussLegendre(n::Int) = GaussLegendre{n, Float64}()
 
 GaussLegendre(; order::Int) = GaussLegendre(ceil(Int, (order + 1) / 2))
 
@@ -162,7 +162,7 @@ end
 
 Tabulated `N`-point symmetric Gauss quadrature rule for integration over `D`.
 """
-struct Gauss{D,N} <: ReferenceQuadrature{D}
+struct Gauss{D, N} <: ReferenceQuadrature{D}
     # gauss quadrature should be constructed using the order, and not the number
     # of nodes. This ensures you don't instantiate quadratures which are not
     # tabulated.
@@ -189,19 +189,19 @@ struct Gauss{D,N} <: ReferenceQuadrature{D}
                 "Tabulated Gauss quadratures only available for `ReferenceTriangle` or `ReferenceTetrahedron`",
             )
         end
-        return new{typeof(domain),n}()
+        return new{typeof(domain), n}()
     end
 end
 
-function order(q::Gauss{ReferenceTriangle,N}) where {N}
+function order(q::Gauss{ReferenceTriangle, N}) where {N}
     return TRIANGLE_GAUSS_NPTS_TO_ORDER[N]
 end
 
-function order(q::Gauss{ReferenceTetrahedron,N}) where {N}
+function order(q::Gauss{ReferenceTetrahedron, N}) where {N}
     return TETRAHEDRON_GAUSS_NPTS_TO_ORDER[N]
 end
 
-@generated function (q::Gauss{D,N})() where {D,N}
+@generated function (q::Gauss{D, N})() where {D, N}
     x, w = _get_gauss_qcoords_and_qweights(D, N)
     return :($x, $w)
 end
@@ -221,10 +221,10 @@ function _get_gauss_qcoords_and_qweights(R::Type{<:ReferenceShape}, N)
     qrule = GAUSS_QRULES[R][N]
     @assert length(qrule) == N
     # qnodes
-    qnodestype = SVector{N,SVector{D,Float64}}
+    qnodestype = SVector{N, SVector{D, Float64}}
     x = qnodestype([q[1] for q in qrule])
     # qweights
-    qweightstype = SVector{N,Float64}
+    qweightstype = SVector{N, Float64}
     w = qweightstype([q[2] for q in qrule])
     return x, w
 end
@@ -241,14 +241,14 @@ qy = Inti.Fejer(15)
 q  = Inti.TensorProductQuadrature(qx,qy)
 ```
 """
-struct TensorProductQuadrature{N,Q} <: ReferenceQuadrature{ReferenceHyperCube{N}}
+struct TensorProductQuadrature{N, Q} <: ReferenceQuadrature{ReferenceHyperCube{N}}
     quads1d::Q
 end
 
 function TensorProductQuadrature(q...)
     N = length(q)
     Q = typeof(q)
-    return TensorProductQuadrature{N,Q}(q)
+    return TensorProductQuadrature{N, Q}(q)
 end
 
 function (q::TensorProductQuadrature{N})() where {N}
@@ -267,7 +267,7 @@ end
 
 Tabulated `N`-point Vioreanu-Rokhlin quadrature rule for integration over `D`.
 """
-struct VioreanuRokhlin{D,N} <: ReferenceQuadrature{D}
+struct VioreanuRokhlin{D, N} <: ReferenceQuadrature{D}
     # VR quadrature should be constructed using the order, and not the number
     # of nodes. This ensures you don't instantiate quadratures which are not
     # tabulated.
@@ -293,23 +293,23 @@ struct VioreanuRokhlin{D,N} <: ReferenceQuadrature{D}
                 "Tabulated Vioreanu-Rokhlin quadratures only available for `ReferenceTriangle` or `ReferenceTetrahedron`",
             )
         end
-        return new{typeof(domain),n}()
+        return new{typeof(domain), n}()
     end
 end
 
-function order(q::VioreanuRokhlin{ReferenceTriangle,N}) where {N}
+function order(q::VioreanuRokhlin{ReferenceTriangle, N}) where {N}
     return TRIANGLE_VR_NPTS_TO_ORDER[N]
 end
 
-function order(q::VioreanuRokhlin{ReferenceTetrahedron,N}) where {N}
+function order(q::VioreanuRokhlin{ReferenceTetrahedron, N}) where {N}
     return TETRAHEDRON_VR_NPTS_TO_ORDER[N]
 end
 
-function interpolation_order(q::VioreanuRokhlin{ReferenceTriangle,N}) where {N}
+function interpolation_order(q::VioreanuRokhlin{ReferenceTriangle, N}) where {N}
     return TRIANGLE_VR_QORDER_TO_IORDER[order(q)]
 end
 
-function interpolation_order(q::VioreanuRokhlin{ReferenceTetrahedron,N}) where {N}
+function interpolation_order(q::VioreanuRokhlin{ReferenceTetrahedron, N}) where {N}
     return TETRAHEDRON_VR_QORDER_TO_IORDER[order(q)]
 end
 
@@ -321,7 +321,7 @@ function Tetrahedron_VR_interpolation_order_to_quadrature_order(i::Integer)
     return TETRAHEDRON_VR_IORDER_TO_QORDER[i]
 end
 
-@generated function (q::VioreanuRokhlin{D,N})() where {D,N}
+@generated function (q::VioreanuRokhlin{D, N})() where {D, N}
     x, w = _get_vioreanurokhlin_qcoords_and_qweights(D, N)
     return :($x, $w)
 end
@@ -341,10 +341,10 @@ function _get_vioreanurokhlin_qcoords_and_qweights(R::Type{<:ReferenceShape}, N)
     qrule = VR_QRULES[R][N]
     @assert length(qrule) == N
     # qnodes
-    qnodestype = SVector{N,SVector{D,Float64}}
+    qnodestype = SVector{N, SVector{D, Float64}}
     x = qnodestype([q[1] for q in qrule])
     # qweights
-    qweightstype = SVector{N,Float64}
+    qweightstype = SVector{N, Float64}
     w = qweightstype([q[2] for q in qrule])
     return x, w
 end
@@ -357,7 +357,7 @@ of type `H` and a low-order quadrature of type `L`. The low-order quadrature
 rule is *embedded* in the sense that its `n` nodes are exactly the first `n`
 nodes of the high-order quadrature rule.
 """
-struct EmbeddedQuadrature{L,H,D} <: ReferenceQuadrature{D}
+struct EmbeddedQuadrature{L, H, D} <: ReferenceQuadrature{D}
     low::L
     high::H
     function EmbeddedQuadrature(lquad, hquad)
@@ -367,7 +367,7 @@ struct EmbeddedQuadrature{L,H,D} <: ReferenceQuadrature{D}
         xhigh = qcoords(hquad)
         @assert length(xhigh) > length(xlow) "high-order quadrature must have more nodes than low-order"
         @assert xlow == xhigh[1:length(xlow)] "low-order nodes must exactly match the first high-order nodes. Got $(xlow) and $(xhigh)"
-        return new{typeof(lquad),typeof(hquad),typeof(d)}(lquad, hquad)
+        return new{typeof(lquad), typeof(hquad), typeof(d)}(lquad, hquad)
     end
 end
 
@@ -382,26 +382,26 @@ the `norm` of the difference between the high and low-order quadratures in
 `quad`.
 """
 function integrate_with_error_estimate(
-    f,
-    quad::EmbeddedQuadrature,
-    norm = LinearAlgebra.norm,
-)
+        f,
+        quad::EmbeddedQuadrature,
+        norm = LinearAlgebra.norm,
+    )
     x, w_high = quad.high()
     w_low = qweights(quad.low)
     nhigh, nlow = length(w_high), length(w_low)
     # assuming that nodes in quad_high are ordered so that the overlapping nodes
     # come first, add them up
-    x1     = first(x)
-    v1     = f(x1)
+    x1 = first(x)
+    v1 = f(x1)
     I_high = v1 * first(w_high)
-    I_low  = v1 * first(w_low)
+    I_low = v1 * first(w_low)
     for i in 2:nlow
         v = f(x[i])
         I_high += v * w_high[i]
         I_low += v * w_low[i]
     end
     # now compute the rest of the high order quadrature
-    for i in (nlow+1):nhigh
+    for i in (nlow + 1):nhigh
         v = f(x[i])
         I_high += v * w_high[i]
     end
@@ -418,7 +418,7 @@ Lagrange basis).
 """
 function lagrange_basis(qrule::ReferenceQuadrature{D}) where {D}
     k = interpolation_order(qrule)
-    sp = PolynomialSpace{D,k}()
+    sp = PolynomialSpace{D, k}()
     nodes = qcoords(qrule)
     return lagrange_basis(nodes, sp)
 end
@@ -431,7 +431,7 @@ Return a [`PolynomialSpace`](@ref) associated with the
 """
 function polynomial_space(qrule::ReferenceQuadrature{D}) where {D}
     k = interpolation_order(qrule)
-    return PolynomialSpace{D,k}()
+    return PolynomialSpace{D, k}()
 end
 
 """

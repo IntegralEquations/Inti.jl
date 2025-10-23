@@ -22,12 +22,12 @@ and returns its `key`.
 
 """
 function GeometricEntity(
-    shape::String;
-    translation = SVector(0, 0, 0),
-    rotation = SVector(0, 0, 0),
-    scaling = SVector(1, 1, 1),
-    kwargs...,
-)
+        shape::String;
+        translation = SVector(0, 0, 0),
+        rotation = SVector(0, 0, 0),
+        scaling = SVector(1, 1, 1),
+        kwargs...,
+    )
     shape ∈ PREDEFINED_SHAPES ||
         throw(ArgumentError("shape must be one of $PREDEFINED_SHAPES"))
     f = getfield(Inti, Symbol(shape))
@@ -41,11 +41,11 @@ Create an ellipsoid entity in 3D, and apply optional transformations. Returns th
 of the created entity.
 """
 function ellipsoid(;
-    translation = SVector(0, 0, 0),
-    rotation = SVector(0, 0, 0),
-    scaling = SVector(1, 1, 1),
-    labels = String[],
-)
+        translation = SVector(0, 0, 0),
+        rotation = SVector(0, 0, 0),
+        scaling = SVector(1, 1, 1),
+        labels = String[],
+    )
     lc = SVector(-1.0, -1.0)
     hc = SVector(1.0, 1.0)
     bnd = EntityKey[]
@@ -95,13 +95,13 @@ Create a torus entity in 3D, and apply optional transformations. Returns the
 key. The parameters `r` and `R` are the minor and major radii of the torus.
 """
 function torus(;
-    r = 0.5,
-    R = 1,
-    translation = SVector(0, 0, 0),
-    rotation = SVector(0, 0, 0),
-    scaling = SVector(1, 1, 1),
-    labels = String[],
-)
+        r = 0.5,
+        R = 1,
+        translation = SVector(0, 0, 0),
+        rotation = SVector(0, 0, 0),
+        scaling = SVector(1, 1, 1),
+        labels = String[],
+    )
     lc = π * SVector(-1.0, -1.0)
     hc = π * SVector(1.0, 1.0)
     bnd = EntityKey[]
@@ -124,11 +124,11 @@ end
 Create a bean entity in 3D, and apply optional transformations. Returns the key.
 """
 function bean(;
-    translation = SVector(0, 0, 0),
-    rotation = SVector(0, 0, 0),
-    scaling = SVector(1, 1, 1),
-    labels = String[],
-)
+        translation = SVector(0, 0, 0),
+        rotation = SVector(0, 0, 0),
+        scaling = SVector(1, 1, 1),
+        labels = String[],
+    )
     lc = SVector(-1.0, -1.0)
     hc = SVector(1.0, 1.0)
     bnd = EntityKey[]
@@ -169,11 +169,11 @@ Create an acorn entity in 3D, and apply optional transformations. Returns the
 key.
 """
 function acorn(;
-    translation = SVector(0, 0, 0),
-    rotation = SVector(0, 0, 0),
-    scaling = SVector(1, 1, 1),
-    labels = String[],
-)
+        translation = SVector(0, 0, 0),
+        rotation = SVector(0, 0, 0),
+        scaling = SVector(1, 1, 1),
+        labels = String[],
+    )
     lc = SVector(-1.0, -1.0)
     hc = SVector(1.0, 1.0)
     bnd = EntityKey[]

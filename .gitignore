@@ -11,6 +11,7 @@
 /docs/src/pluto-examples/*.md
 /sandbox/*
 /talks/*
+/test/vtk_output/*
 
 .markdownlint.json
 Inti.code-workspace
