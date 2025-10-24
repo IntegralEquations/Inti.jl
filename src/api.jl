@@ -11,7 +11,7 @@ const COMPRESSION_METHODS = [:none, :hmatrix, :fmm]
 Available correction methods for the singular and nearly-singular integrals in
 [`Inti`](@ref).
 """
-const CORRECTION_METHODS = [:none, :dim, :adaptive]
+const CORRECTION_METHODS = [:none, :dim, :adaptive, :ksplit, :ksplit_adaptive]
 
 """
     single_double_layer(; op, target, source::Quadrature, compression,
@@ -163,6 +163,108 @@ function single_double_layer(;
         correction_kw = Base.structdiff(correction, NamedTuple{(:method,)})
         δS = adaptive_correction(Sop; correction_kw...)
         δD = adaptive_correction(Dop; correction_kw...)
+    elseif correction.method == :ksplit
+        # Extract the required geometric args from the correction tuple
+        geo_args = (
+            source_quad_connectivity = correction.connectivity,
+            source_el = correction.elements,
+            velocity_fn = correction.velocity_fn,
+            curvature_fn = correction.curvature_fn,
+            boundary_inv = correction.boundary_inv,
+        )
+
+        # Extract the ksplit-specific optional keywords
+        ksplit_kw_names =
+            (:n_panel_corr, :maxdist, :target_location, :parametric_length)
+        ksplit_kwargs = filter(kv -> kv[1] in ksplit_kw_names, pairs(correction))
+
+        if target === source
+            if !haskey(ksplit_kwargs, :n_panel_corr)
+                error(
+                    "For :ksplit correction with `target === source`, you must provide `n_panel_corr` (e.g., `correction = (method=:ksplit, n_panel_corr=3, ...)`).",
+                )
+            end
+        else # target !== source
+            if !haskey(ksplit_kwargs, :maxdist)
+                error(
+                    "For :ksplit correction with `target !== source`, you must provide `maxdist` (e.g., `correction = (method=:ksplit, maxdist=0.1, ...)`).",
+                )
+            end
+        end
+
+        δS = kernel_split_correction(
+            op,
+            source,
+            geo_args...,
+            Sop,
+            target;
+            layer_type = :single,
+            ksplit_kwargs...,
+        )
+        δD = kernel_split_correction(
+            op,
+            source,
+            geo_args...,
+            Dop,
+            target;
+            layer_type = :double,
+            ksplit_kwargs...,
+        )
+    elseif correction.method == :ksplit_adaptive
+        # Extract the required geometric args
+        geo_args = (
+            source_quad_connectivity = correction.connectivity,
+            source_el = correction.elements,
+            velocity_fn = correction.velocity_fn,
+            curvature_fn = correction.curvature_fn,
+            boundary_inv = correction.boundary_inv,
+        )
+
+        # Extract the adaptive ksplit-specific keywords
+        ksplit_adaptive_kw_names = (
+            :n_panel_corr,
+            :maxdist,
+            :target_location,
+            :Cε,
+            :Rε,
+            :parametric_length,
+            :affine_preimage,
+        )
+        ksplit_adaptive_kwargs = filter(kv -> kv[1] in ksplit_adaptive_kw_names, pairs(correction))
+
+        if target === source
+            if !haskey(ksplit_adaptive_kwargs, :n_panel_corr)
+                error(
+                    "For :ksplit correction with `target === source`, you must provide `n_panel_corr` (e.g., `correction = (method=:ksplit_adaptive, n_panel_corr=3, ...)`).",
+                )
+            end
+        else # target !== source
+            if !haskey(ksplit_adaptive_kwargs, :maxdist)
+                error(
+                    "For :ksplit correction with `target !== source`, you must provide `maxdist` (e.g., `correction = (method=:ksplit_adaptive, maxdist=0.1, ...)`).",
+                )
+            end
+        end
+
+        # Call your adaptive_kernel_split_correction function
+        δS = adaptive_kernel_split_correction(
+            op,
+            source,
+            geo_args...,
+            Sop,
+            target;
+            layer_type = :single,
+            ksplit_adaptive_kwargs...
+        )
+        δD = adaptive_kernel_split_correction(
+            op,
+            source,
+            geo_args...,
+            Dop,
+            target;
+            layer_type = :double,
+            ksplit_adaptive_kwargs...
+        )
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end
