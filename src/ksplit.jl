@@ -69,21 +69,21 @@ a circle of radius 1. For more complicated geometries, a finer mesh may be neede
 """
 
 function kernel_split_correction(
-    op,
-    source_quad::Quadrature,
-    source_quad_connectivity,
-    source_el,
-    velocity_fn,
-    curvature_fn,
-    boundary_inv,
-    Lop,
-    target=nothing;
-    n_panel_corr=3,
-    maxdist=0.1,
-    target_location=nothing,
-    layer_type=:single,
-    parametric_length=1.0,
-)
+        op,
+        source_quad::Quadrature,
+        source_quad_connectivity,
+        source_el,
+        velocity_fn,
+        curvature_fn,
+        boundary_inv,
+        Lop,
+        target = nothing;
+        n_panel_corr = 3,
+        maxdist = 0.1,
+        target_location = nothing,
+        layer_type = :single,
+        parametric_length = 1.0,
+    )
     if isnothing(target)
         target = source_quad
     end
@@ -113,7 +113,7 @@ function kernel_split_correction(
         n_panel_corr_dist = round(Int, (n_panel_corr - 1) / 2)
 
         # Pre-compute parametric intervals and sizes for all panels
-        panel_intervals = Vector{Tuple{Float64,Float64}}(undef, n_el)
+        panel_intervals = Vector{Tuple{Float64, Float64}}(undef, n_el)
         for i in 1:n_el
             node_a = source_el[i](0)
             node_b = source_el[i](1)
@@ -190,7 +190,7 @@ function kernel_split_correction(
 
             # Add extra singular correction for diagonal elements
             for i in 1:n_quad_pt
-                quad_i = source_quad[idx_global_corr_vec[0]+i]
+                quad_i = source_quad[idx_global_corr_vec[0] + i]
                 t_i = boundary_inv(Inti.coords(quad_i))
                 W_L_c_corr[i, i] += log(H_j * speed_fn(t_i))
                 push!(Is, idx_global_corr_vec[0] + i)
@@ -240,9 +240,9 @@ function kernel_split_correction(
 
                 # Apply the correction using the dynamically computed W_L_matrix
                 for i in 1:n_quad_pt
-                    quad_i = source_quad[idx_global_corr_vec[k]+i]
+                    quad_i = source_quad[idx_global_corr_vec[k] + i]
                     for j in 1:n_quad_pt
-                        quad_j = source_quad[idx_global_corr_vec[0]+j]
+                        quad_j = source_quad[idx_global_corr_vec[0] + j]
                         quad_weight_j = Inti.weight(quad_j)
 
                         correction_term =
@@ -263,7 +263,7 @@ function kernel_split_correction(
         n_target = length(target)
         n_source = length(source_quad)
 
-        dict_near = near_points_vec(target, source_quad; maxdist=maxdist)
+        dict_near = near_points_vec(target, source_quad; maxdist = maxdist)
         near_idx = first(dict_near)[2]
 
         for j_el in 1:n_el
@@ -279,7 +279,7 @@ function kernel_split_correction(
                 t_a = boundary_inv(node_a)
                 t_b = boundary_inv(node_b)
 
-                quad_j_el = source_quad[idx_global_corr+1:idx_global_corr+n_quad_pt]
+                quad_j_el = source_quad[(idx_global_corr + 1):(idx_global_corr + n_quad_pt)]
 
                 quad_node_j_el = Inti.coords.(quad_j_el)
                 quad_node_j_el_complex =
@@ -287,7 +287,7 @@ function kernel_split_correction(
                 quad_normal_j_el = Inti.normal.(quad_j_el)
                 quad_normal_j_el_complex = [
                     quad_normal_j[1] + im * quad_normal_j[2] for
-                    quad_normal_j in quad_normal_j_el
+                        quad_normal_j in quad_normal_j_el
                 ]
                 quad_weight_j_el = Inti.weight.(quad_j_el)
 
@@ -309,16 +309,16 @@ function kernel_split_correction(
                     quad_normal_j_el_complex,
                     quad_velocity_weight_j_el,
                     n_quad_pt;
-                    target_location=target_location,
+                    target_location = target_location,
                 )
 
                 ra, rb, r, rj, nuj, rpwj, npt = node_a_complex,
-                node_b_complex,
-                target_node_i_complex,
-                quad_node_j_el_complex,
-                quad_normal_j_el_complex,
-                quad_velocity_weight_j_el,
-                n_quad_pt
+                    node_b_complex,
+                    target_node_i_complex,
+                    quad_node_j_el_complex,
+                    quad_normal_j_el_complex,
+                    quad_velocity_weight_j_el,
+                    n_quad_pt
 
                 # loop over each quadrature point to compute the correction δL
                 for j in 1:n_quad_pt
@@ -327,7 +327,7 @@ function kernel_split_correction(
                     push!(
                         Ls,
                         G_L(target[i], quad_j_el[j]) * quad_weight_j_el[j] * wcorrL[j] +
-                        G_C(target[i], quad_j_el[j]) * wcmpC[j],
+                            G_C(target[i], quad_j_el[j]) * wcmpC[j],
                     )
                 end
             end
@@ -408,24 +408,24 @@ See also [`fryklund2022adaptive`](@ref).
 """
 
 function adaptive_kernel_split_correction(
-    op,
-    source_quad,
-    source_quad_connectivity,
-    source_el,
-    velocity_fn,
-    curvature_fn,
-    boundary_inv,
-    Lop,
-    target=nothing;
-    n_panel_corr=3,
-    maxdist=0.1,
-    target_location=nothing,
-    layer_type=:single,
-    Cε=3.5,
-    Rε=3.7,
-    parametric_length=1.0,
-    affine_preimage::Bool=true,
-)
+        op,
+        source_quad,
+        source_quad_connectivity,
+        source_el,
+        velocity_fn,
+        curvature_fn,
+        boundary_inv,
+        Lop,
+        target = nothing;
+        n_panel_corr = 3,
+        maxdist = 0.1,
+        target_location = nothing,
+        layer_type = :single,
+        Cε = 3.5,
+        Rε = 3.7,
+        parametric_length = 1.0,
+        affine_preimage::Bool = true,
+    )
     if isnothing(target)
         target = source_quad
     end
@@ -461,12 +461,12 @@ function adaptive_kernel_split_correction(
         @warn(
             "Using placeholder value α = 5π for Laplace operator in adaptive kernel split",
         )
-    elseif op isa Inti.Helmholtz{2,Float64}
+    elseif op isa Inti.Helmholtz{2, Float64}
         α = op.k
         @warn("Adaptive kernel split does not provide computational advantages for Helmholtz 
         operators. Consider using the standard kernel split with fixed number of points 
         per wavelength instead.")
-    elseif op isa Inti.Yukawa{2,Float64}
+    elseif op isa Inti.Yukawa{2, Float64}
         α = op.λ
     else
         throw("Operator type not supported for adaptive kernel split")
@@ -481,7 +481,7 @@ function adaptive_kernel_split_correction(
         # Build connectivity maps and pre-compute panel intervals
         panel_to_nodes_map, node_to_panel_map = build_neighbor_information(source_el, n_el)
 
-        panel_intervals = Vector{Tuple{Float64,Float64}}(undef, n_el)
+        panel_intervals = Vector{Tuple{Float64, Float64}}(undef, n_el)
         for i in 1:n_el
             t_a = boundary_inv(source_el[i](0))
             t_b = boundary_inv(source_el[i](1))
@@ -558,14 +558,14 @@ function adaptive_kernel_split_correction(
 
             for k in -n_panel_corr_dist:n_panel_corr_dist
                 panel_subdivision_vec[k], ksplit_bool_vec[k] = adaptive_refinement(
-                    source_quad[idx_global_corr_vec[0]+1:idx_global_corr_vec[0]+n_quad_pt],
+                    source_quad[(idx_global_corr_vec[0] + 1):(idx_global_corr_vec[0] + n_quad_pt)],
                     source_el[j_el],
                     L_Leg,
                     α,
                     Cε,
                     Rε,
-                    target[idx_global_corr_vec[k]+1:idx_global_corr_vec[k]+n_quad_pt],
-                    affine_preimage=affine_preimage,
+                    target[(idx_global_corr_vec[k] + 1):(idx_global_corr_vec[k] + n_quad_pt)],
+                    affine_preimage = affine_preimage,
                 )
             end
 
@@ -593,7 +593,7 @@ function adaptive_kernel_split_correction(
 
                 for i in 1:n_quad_pt
 
-                    quad_i = target[idx_global_corr_vec[k]+i]
+                    quad_i = target[idx_global_corr_vec[k] + i]
                     t_i = boundary_inv(Inti.coords(quad_i))
                     M_sub = length(panel_subdivision_vec[k][i])
 
@@ -639,13 +639,13 @@ function adaptive_kernel_split_correction(
                             push!(
                                 Ls,
                                 G_C(quad_i, quad_i) *
-                                Inti.weight(quad_i) *
-                                (-curvature_fn(t_i) / 2),
+                                    Inti.weight(quad_i) *
+                                    (-curvature_fn(t_i) / 2),
                             )
                         end
 
                         for j in 1:n_quad_pt
-                            quad_j = source_quad[idx_global_corr_vec[0]+j]
+                            quad_j = source_quad[idx_global_corr_vec[0] + j]
                             correction_term =
                                 G_L(quad_i, quad_j) * Inti.weight(quad_j) * W_L_matrix[i, j]
                             if k == 0 && i == j
@@ -659,7 +659,7 @@ function adaptive_kernel_split_correction(
                     else # subdivision needed
                         # subtract regular coarse quadrature
                         for j in 1:n_quad_pt
-                            quad_j = source_quad[idx_global_corr_vec[0]+j]
+                            quad_j = source_quad[idx_global_corr_vec[0] + j]
                             push!(Is, idx_global_corr_vec[k] + i)
                             push!(Js, idx_global_corr_vec[0] + j)
                             push!(Ls, -G(quad_i, quad_j) * Inti.weight(quad_j))
@@ -679,7 +679,7 @@ function adaptive_kernel_split_correction(
 
                             panel_msh = Inti.meshgen(
                                 panel_curve;
-                                meshsize=(subpanel_node2 - subpanel_node1),
+                                meshsize = (subpanel_node2 - subpanel_node1),
                             )
                             panel_quad =
                                 Inti.Quadrature(panel_msh, Inti.GaussLegendre(n_quad_pt))
@@ -690,9 +690,9 @@ function adaptive_kernel_split_correction(
                                 quad_weight_ĵ = Inti.weight(quad_ĵ)
                                 bary_coef = Barycentric_coef(
                                     t_Leg_sub[ĵ];
-                                    n=n_quad_pt,
-                                    t_interp=t_Leg_ref,
-                                    w=w_bary,
+                                    n = n_quad_pt,
+                                    t_interp = t_Leg_ref,
+                                    w = w_bary,
                                 )
                                 for j in 1:n_quad_pt
                                     push!(Is, idx_global_corr_vec[k] + i)
@@ -734,9 +734,9 @@ function adaptive_kernel_split_correction(
                                     quad_weight_ĵ = Inti.weight(quad_ĵ)
                                     bary_coef = Barycentric_coef(
                                         t_Leg_sub[ĵ];
-                                        n=n_quad_pt,
-                                        t_interp=t_Leg_ref,
-                                        w=w_bary,
+                                        n = n_quad_pt,
+                                        t_interp = t_Leg_ref,
+                                        w = w_bary,
                                     )
                                     correction_term =
                                         G_L(quad_i, quad_ĵ) * quad_weight_ĵ * W_L_vec[ĵ]
@@ -757,7 +757,7 @@ function adaptive_kernel_split_correction(
         n_source = length(source_quad)
 
         # Pre-compute parametric intervals for all source panels
-        panel_intervals = Vector{Tuple{Float64,Float64}}(undef, n_el)
+        panel_intervals = Vector{Tuple{Float64, Float64}}(undef, n_el)
         for i in 1:n_el
             t_a_i = boundary_inv(source_el[i](0))
             t_b_i = boundary_inv(source_el[i](1))
@@ -767,20 +767,20 @@ function adaptive_kernel_split_correction(
             panel_intervals[i] = (t_a_i, t_b_i)
         end
 
-        dict_near = near_points_vec(target, source_quad; maxdist=maxdist)
+        dict_near = near_points_vec(target, source_quad; maxdist = maxdist)
         near_idx = first(dict_near)[2]
 
         for j_el in 1:n_el
             idx_global_corr = (j_el - 1) * n_quad_pt
             panel_subdivision_vec, ksplit_bool_vec = adaptive_refinement(
-                source_quad[idx_global_corr+1:idx_global_corr+n_quad_pt],
+                source_quad[(idx_global_corr + 1):(idx_global_corr + n_quad_pt)],
                 source_el[j_el],
                 L_Leg,
                 α,
                 Cε,
                 Rε,
                 target[near_idx[j_el]],
-                affine_preimage=affine_preimage,
+                affine_preimage = affine_preimage,
             )
 
             # Get pre-computed, corrected panel information
@@ -801,7 +801,7 @@ function adaptive_kernel_split_correction(
                 M_sub = length(panel_subdivision_vec[i])
 
                 if M_sub == 1 && ksplit_bool_vec[i][1] == true # No subdivision, but kernel split
-                    quad_j_el = source_quad[idx_global_corr+1:idx_global_corr+n_quad_pt]
+                    quad_j_el = source_quad[(idx_global_corr + 1):(idx_global_corr + n_quad_pt)]
                     quad_node_j_el = Inti.coords.(quad_j_el)
                     quad_node_j_el_complex = [q[1] + im * q[2] for q in quad_node_j_el]
                     quad_normal_j_el_complex =
@@ -819,7 +819,7 @@ function adaptive_kernel_split_correction(
                         quad_normal_j_el_complex,
                         quad_velocity_weight_j_el,
                         n_quad_pt;
-                        target_location=target_location,
+                        target_location = target_location,
                     )
 
                     for j in 1:n_quad_pt
@@ -828,15 +828,15 @@ function adaptive_kernel_split_correction(
                         push!(
                             Ls,
                             G_L(target_i, quad_j_el[j]) *
-                            Inti.weight(quad_j_el[j]) *
-                            wcorrL[j] + G_C(target_i, quad_j_el[j]) * wcmpC[j],
+                                Inti.weight(quad_j_el[j]) *
+                                wcorrL[j] + G_C(target_i, quad_j_el[j]) * wcmpC[j],
                         )
                     end
 
                 elseif M_sub > 1 # Subdivision needed
                     # Subtract original coarse quadrature
                     for j in 1:n_quad_pt
-                        quad_j = source_quad[idx_global_corr+j]
+                        quad_j = source_quad[idx_global_corr + j]
                         push!(Is, near_idx_i)
                         push!(Js, idx_global_corr + j)
                         push!(Ls, -G(target_i, quad_j) * Inti.weight(quad_j))
@@ -854,7 +854,7 @@ function adaptive_kernel_split_correction(
                         )
                         panel_msh = Inti.meshgen(
                             panel_curve;
-                            meshsize=(subpanel_node2 - subpanel_node1),
+                            meshsize = (subpanel_node2 - subpanel_node1),
                         )
                         panel_quad =
                             Inti.Quadrature(panel_msh, Inti.GaussLegendre(n_quad_pt))
@@ -865,9 +865,9 @@ function adaptive_kernel_split_correction(
                             quad_weight_ĵ = Inti.weight(quad_ĵ)
                             bary_coef = Barycentric_coef(
                                 t_Leg_sub[ĵ];
-                                n=n_quad_pt,
-                                t_interp=t_Leg_ref,
-                                w=w_bary,
+                                n = n_quad_pt,
+                                t_interp = t_Leg_ref,
+                                w = w_bary,
                             )
 
                             for j in 1:n_quad_pt
@@ -891,11 +891,11 @@ function adaptive_kernel_split_correction(
 
                             panel_node_complex = [
                                 Inti.coords(q)[1] + im * Inti.coords(q)[2] for
-                                q in panel_quad
+                                    q in panel_quad
                             ]
                             panel_normal_complex = [
                                 Inti.normal(q)[1] + im * Inti.normal(q)[2] for
-                                q in panel_quad
+                                    q in panel_quad
                             ]
                             tj_sub = boundary_inv.(Inti.coords.(panel_quad))
                             quad_velocity_weight =
@@ -910,7 +910,7 @@ function adaptive_kernel_split_correction(
                                 panel_normal_complex,
                                 quad_velocity_weight,
                                 n_quad_pt;
-                                target_location=target_location,
+                                target_location = target_location,
                             )
 
                             for ĵ in 1:n_quad_pt
@@ -918,9 +918,9 @@ function adaptive_kernel_split_correction(
                                 quad_weight_ĵ = Inti.weight(quad_ĵ)
                                 bary_coef = Barycentric_coef(
                                     t_Leg_sub[ĵ];
-                                    n=n_quad_pt,
-                                    t_interp=t_Leg_ref,
-                                    w=w_bary,
+                                    n = n_quad_pt,
+                                    t_interp = t_Leg_ref,
+                                    w = w_bary,
                                 )
                                 correction_term =
                                     G_L(target_i, quad_ĵ) * quad_weight_ĵ * wcorrL[ĵ] +

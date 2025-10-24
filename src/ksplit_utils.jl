@@ -51,11 +51,11 @@ function WfrakLinit(trans, scale, tfrak, npt)
         p1 = log(abs(1 - tt[m]^2))
 
         for k in 1:npt
-            p[k+1] = tt[m] * p[k] + c[k]
+            p[k + 1] = tt[m] * p[k] + c[k]
         end
 
-        Q[m, 1:2:npt-1] = p1 .- p[2:2:npt]
-        Q[m, 2:2:npt] = p[1] .- p[3:2:npt+1]
+        Q[m, 1:2:(npt - 1)] = p1 .- p[2:2:npt]
+        Q[m, 2:2:npt] = p[1] .- p[3:2:(npt + 1)]
         Q[m, :] ./= (1:npt)
     end
 
@@ -95,11 +95,11 @@ function WfrakLinit(tt, tfrak, npt)
     p1 = log(abs(1 - tt^2))
 
     for k in 1:npt
-        p[k+1] = tt * p[k] + c[k]
+        p[k + 1] = tt * p[k] + c[k]
     end
 
-    q[1:2:npt-1] = p1 .- p[2:2:npt]
-    q[2:2:npt] = p[1] .- p[3:2:npt+1]
+    q[1:2:(npt - 1)] = p1 .- p[2:2:npt]
+    q[2:2:npt] = p[1] .- p[3:2:(npt + 1)]
     q ./= (1:npt)
 
     return A' \ q
@@ -157,7 +157,7 @@ function wLCinit(ra, rb, r, rj, nuj, rpwj, npt; target_location)
     p[1] = log(Complex(1 - rtr)) - log(Complex(-1 - rtr))
     p1 = log(Complex(1 - rtr) * (-1 - rtr))
 
-    # Apply logarithmic branch cut correction 
+    # Apply logarithmic branch cut correction
     if target_location == :inside
         if imag(rtr) < 0 && abs(real(rtr)) < 1
             p[1] += 2im * π
@@ -172,12 +172,12 @@ function wLCinit(ra, rb, r, rj, nuj, rpwj, npt; target_location)
 
     # Compute recurrence relation for expansion terms
     for k in 1:npt
-        p[k+1] = rtr * p[k] + c[k]
+        p[k + 1] = rtr * p[k] + c[k]
     end
 
     # Construct weight correction vector q (Helsing's code)
-    q[1:2:npt-1] = p1 .- p[2:2:npt]
-    q[2:2:npt] = p[1] .- p[3:2:npt+1]
+    q[1:2:(npt - 1)] = p1 .- p[2:2:npt]
+    q[2:2:npt] = p[1] .- p[3:2:(npt + 1)]
 
     q ./= (1:npt)
 
@@ -191,13 +191,13 @@ function wLCinit(ra, rb, r, rj, nuj, rpwj, npt; target_location)
     return wcorrL, wcmpC
 end
 
-# Constant matrix associated with interpolation using Legendre polynomials 
+# Constant matrix associated with interpolation using Legendre polynomials
 function L_Legendre_matrix(n)
     L_Leg = Matrix{Float64}(undef, n, n)
     t_Leg_ref, w_Leg_ref = gausslegendre(n)
-    for l in 0:n-1
+    for l in 0:(n - 1)
         for m in 1:n
-            L_Leg[l+1, m] = (2 * l + 1) / 2 * legendrep(l, t_Leg_ref[m]) * w_Leg_ref[m]
+            L_Leg[l + 1, m] = (2 * l + 1) / 2 * legendrep(l, t_Leg_ref[m]) * w_Leg_ref[m]
         end
     end
     return L_Leg
@@ -219,7 +219,7 @@ end
 function curve_interpolate(x_vec, L_leg)
     n = length(x_vec)
     γ_coef = L_leg * x_vec
-    Pₙ_vec = [t -> γ_coef[l+1] * legendrep(l, t) for l in 0:n-1]
+    Pₙ_vec = [t -> γ_coef[l + 1] * legendrep(l, t) for l in 0:(n - 1)]
     Pₙ = t -> mapreduce(f -> f(t), +, Pₙ_vec)
     return Pₙ
 end
@@ -228,12 +228,12 @@ end
 function curve_interpolate_derivative(x_vec, L_leg)
     n = length(x_vec)
     γ_coef = L_leg * x_vec
-    Pₙ_deriv_vec = [t -> γ_coef[l+1] * Legendre_derivative(l, t) for l in 0:n-1]
+    Pₙ_deriv_vec = [t -> γ_coef[l + 1] * Legendre_derivative(l, t) for l in 0:(n - 1)]
     Pₙ_deriv = t -> mapreduce(f -> f(t), +, Pₙ_deriv_vec)
     return Pₙ_deriv
 end
 
-function NewtonRaphson(f, fp, x0; tol=1e-8, maxIter=1000)
+function NewtonRaphson(f, fp, x0; tol = 1.0e-8, maxIter = 1000)
     x = x0
     fx = f(x0)
     iter = 0
@@ -281,7 +281,7 @@ function InterpolationBaryWeights(xnodes, n)
 end
 
 # Compute the barycentric interpolation coefficients for a single target point.
-function Barycentric_coef(t_target; n=16, t_interp=nothing, w=nothing)
+function Barycentric_coef(t_target; n = 16, t_interp = nothing, w = nothing)
     if t_interp === nothing
         t_interp = LegendreNodes(n)
     end
@@ -296,7 +296,7 @@ function Barycentric_coef(t_target; n=16, t_interp=nothing, w=nothing)
     coef = Vector{Float64}(undef, n)
 
     for j in 1:n
-        if abs(t_target - t_interp[j]) < 1e-15
+        if abs(t_target - t_interp[j]) < 1.0e-15
             coef .= 0
             coef[j] = 1
             return coef
@@ -311,7 +311,7 @@ function Barycentric_coef(t_target; n=16, t_interp=nothing, w=nothing)
 end
 
 # scale function (from [-1,1] to [t_a,t_b])
-function scale_fn(t_a, t_b, vec_ref; node=true)
+function scale_fn(t_a, t_b, vec_ref; node = true)
     return if node == true
         (t_b - t_a) / 2 .* vec_ref .+ (t_b + t_a) / 2
     else
@@ -336,7 +336,7 @@ end
 
 # kernel split for the Helmholtz equation
 # single layer kernel splitting
-function hankelh1_0_smooth(z; tol=1e-15, n_term=10000)
+function hankelh1_0_smooth(z; tol = 1.0e-15, n_term = 10000)
     term = ComplexF64[]
     push!(term, (1 + 2 * im / π * (γ - log(2))) * besselj0(z))
     push!(term, 2 * im / π * 1 / 4 * z^2)
@@ -352,13 +352,13 @@ function hankelh1_0_smooth(z; tol=1e-15, n_term=10000)
 
     term_real = real(term)
     term_imag = imag(term)
-    term_sum = sum(sort(term_real; by=abs)) + im * sum(sort(term_imag; by=abs))
+    term_sum = sum(sort(term_real; by = abs)) + im * sum(sort(term_imag; by = abs))
 
     return term_sum
 end
 
 # double layer kernel splittings
-function hankelh1_1_smooth(z; tol=1e-15, n_term=10000)
+function hankelh1_1_smooth(z; tol = 1.0e-15, n_term = 10000)
     term = ComplexF64[]
     push!(term, (1 - 2 * im / π * log(2)) * besselj1(z))
     push!(term, -im / (2π) * z * (digamma(1) + digamma(2)))
@@ -374,14 +374,14 @@ function hankelh1_1_smooth(z; tol=1e-15, n_term=10000)
 
     term_real = real(term)
     term_imag = imag(term)
-    term_sum = sum(sort(term_real; by=abs)) + im * sum(sort(term_imag; by=abs))
+    term_sum = sum(sort(term_real; by = abs)) + im * sum(sort(term_imag; by = abs))
 
     return term_sum
 end
 
 # kernel split for the modified Helmholtz equation
 # single layer kernel splitting
-function besselk0_smooth(z; tol=1e-15, n_term=10000)
+function besselk0_smooth(z; tol = 1.0e-15, n_term = 10000)
     term = ComplexF64[]
     push!(term, (log(2) - γ) * besseli(0, z))
     push!(term, 1 / 4 * z^2)
@@ -390,20 +390,20 @@ function besselk0_smooth(z; tol=1e-15, n_term=10000)
     while maximum([abs(term[idx]) / abs(term[1]), abs(term[idx])]) > tol && idx <= n_term
         push!(term, harmonic_sum(idx))
         for i in range(1, idx)
-            term[idx+1] *= (1 / 4 * z^2) / i^2
+            term[idx + 1] *= (1 / 4 * z^2) / i^2
         end
         idx += 1
     end
 
     term_real = real(term)
     term_imag = imag(term)
-    term_sum = sum(sort(term_real; by=abs)) + im * sum(sort(term_imag; by=abs))
+    term_sum = sum(sort(term_real; by = abs)) + im * sum(sort(term_imag; by = abs))
 
     return term_sum
 end
 
 # double layer kernel splitting
-function besselk1_smooth(z; tol=1e-15, n_term=10000)
+function besselk1_smooth(z; tol = 1.0e-15, n_term = 10000)
     term = ComplexF64[]
     push!(term, -log(2) * besseli(1, z))
     push!(term, -1 / 4 * z * (digamma(1) + digamma(2)))
@@ -412,20 +412,20 @@ function besselk1_smooth(z; tol=1e-15, n_term=10000)
     while maximum([abs(term[idx]) / abs(term[1]), abs(term[idx])]) > tol && idx <= n_term
         push!(term, -1 / 4 * z * (digamma(idx) + digamma(idx + 1)))
         for i in range(1, idx - 1)
-            term[idx+1] *= (1 / 4 * z^2) / (i * (i + 1))
+            term[idx + 1] *= (1 / 4 * z^2) / (i * (i + 1))
         end
         idx += 1
     end
 
     term_real = real(term)
     term_imag = imag(term)
-    term_sum = sum(sort(term_real; by=abs)) + im * sum(sort(term_imag; by=abs))
+    term_sum = sum(sort(term_real; by = abs)) + im * sum(sort(term_imag; by = abs))
 
     return term_sum
 end
 
 # Find target points `X` near source elements in `Y` within `maxdist`.
-function near_points_vec(X, Y::Inti.Quadrature; maxdist=0.1)
+function near_points_vec(X, Y::Inti.Quadrature; maxdist = 0.1)
     x = [Inti.coords(q) for q in X]
     y = [Inti.coords(q) for q in Y]
 
@@ -439,7 +439,7 @@ function near_points_vec(X, Y::Inti.Quadrature; maxdist=0.1)
         end
     end
 
-    etype2nearlist = Dict{DataType,Vector{Vector{Int}}}()
+    etype2nearlist = Dict{DataType, Vector{Vector{Int}}}()
     for (E, tags) in Y.etype2qtags
         nq, ne = size(tags)
         nearlist = [Set{Int}() for _ in 1:ne]
@@ -504,7 +504,7 @@ end
 
 # Recursive bisection helper function
 function recursive_bisection!(t1, t2, Rε, Δt_max, z, result, ksplit_bool, stack_val)
-    if t1 < t2
+    return if t1 < t2
         Δt_sub = t2 - t1
         z_sub = 2 * (z - t1) / Δt_sub - 1  # Transformation for preimage
 
@@ -525,7 +525,7 @@ function recursive_bisection!(t1, t2, Rε, Δt_max, z, result, ksplit_bool, stac
     end
 end
 
-# Compute the radius of Bernstein ellipse for a given complex number z 
+# Compute the radius of Bernstein ellipse for a given complex number z
 # relative to the interval [-1, 1].
 function ellip_rad(z)
     return abs(z + sqrt(complex(z + 1)) * sqrt(complex(z - 1)))
@@ -546,7 +546,7 @@ function panel_parametrization_fn(el)
     _body = t -> SVector(el(scale_fn(0, 1, t)))
 
     # multiple dispatch to handle different input types
-    function panel_parametrization(t::Float64)::SVector{2,Float64}
+    function panel_parametrization(t::Float64)::SVector{2, Float64}
         return _body(t)
     end
 
@@ -625,15 +625,15 @@ See also [`fryklund2022adaptive`](@ref).
   if the `k`-th subinterval for `target[j]` requires kernel-split quadrature.
 """
 function adaptive_refinement(
-    source_panel,
-    source_el,
-    L_Leg,
-    α,
-    Cε,
-    Rε,
-    target;
-    affine_preimage::Bool=true,
-)
+        source_panel,
+        source_el,
+        L_Leg,
+        α,
+        Cε,
+        Rε,
+        target;
+        affine_preimage::Bool = true,
+    )
     # Convert target points to complex numbers
     nᵢ = length(target)
     target_complex = Vector{ComplexF64}(undef, nᵢ)
@@ -681,7 +681,7 @@ function adaptive_refinement(
                 newton_nonlinear_fn,
                 panel_interpolant_deriv,
                 initial_guess;
-                tol=1e-14,
+                tol = 1.0e-14,
             )
         else
             # Default: Use Affine Inverse Directly
@@ -714,10 +714,10 @@ Builds connectivity maps for a set of panels (elements).
 - `panel_to_nodes_map`: A vector where the `i`-th element is a tuple `(start_node_id, end_node_id)` for the `i`-th panel.
 - `node_to_panel_map`: A vector of vectors where the `j`-th element is a list of panel indices connected to the `j`-th unique node.
 """
-function build_neighbor_information(source_el, n_el; tol=1e-12)
+function build_neighbor_information(source_el, n_el; tol = 1.0e-12)
     # Collect all unique nodes and map panel endpoints to unique node IDs
     all_nodes = Vector{typeof(source_el[1](0))}()
-    panel_to_nodes_map = Vector{Tuple{Int,Int}}(undef, n_el)
+    panel_to_nodes_map = Vector{Tuple{Int, Int}}(undef, n_el)
 
     for i in 1:n_el
         start_node = source_el[i](0)
@@ -781,16 +781,16 @@ function _get_ksplit_kernels(op, layer_type, T)
         else
             error("Unsupported layer type for Laplace operator")
         end
-    elseif op isa Inti.Helmholtz{2,Float64}
+    elseif op isa Inti.Helmholtz{2, Float64}
         k = op.k
         if layer_type == :single
             G_S =
                 (x, y) -> begin
-                    x_coor = Inti.coords(x)
-                    y_coor = Inti.coords(y)
-                    r = norm(x_coor - y_coor)
-                    im / 4 * hankelh1_0_smooth(k * r) - 1 / (2π) * besselj0(k * r) * log(k)
-                end
+                x_coor = Inti.coords(x)
+                y_coor = Inti.coords(y)
+                r = norm(x_coor - y_coor)
+                im / 4 * hankelh1_0_smooth(k * r) - 1 / (2π) * besselj0(k * r) * log(k)
+            end
             G_L = (x, y) -> begin
                 x_coor = Inti.coords(x)
                 y_coor = Inti.coords(y)
@@ -801,15 +801,15 @@ function _get_ksplit_kernels(op, layer_type, T)
         elseif layer_type == :double
             G_S =
                 (x, y) -> begin
-                    x_coor = Inti.coords(x)
-                    y_coor = Inti.coords(y)
-                    r = norm(x_coor - y_coor)
-                    ny = Inti.normal(y)
-                    (r ≤ Inti.SAME_POINT_TOLERANCE) && return zero(T)
-                    im * k / 4 *
+                x_coor = Inti.coords(x)
+                y_coor = Inti.coords(y)
+                r = norm(x_coor - y_coor)
+                ny = Inti.normal(y)
+                (r ≤ Inti.SAME_POINT_TOLERANCE) && return zero(T)
+                im * k / 4 *
                     (hankelh1_1_smooth(k * r) + 2 * im / π * besselj1(k * r) * log(k)) *
                     dot(x_coor - y_coor, ny) / r
-                end
+            end
             G_L = (x, y) -> begin
                 x_coor = Inti.coords(x)
                 y_coor = Inti.coords(y)
@@ -822,17 +822,17 @@ function _get_ksplit_kernels(op, layer_type, T)
         else
             error("Unsupported layer type for Helmholtz operator")
         end
-    elseif op isa Inti.Yukawa{2,Float64}
+    elseif op isa Inti.Yukawa{2, Float64}
         λ = op.λ
         if layer_type == :single
             G_S =
                 (x, y) -> begin
-                    x_coor = Inti.coords(x)
-                    y_coor = Inti.coords(y)
-                    r = norm(x_coor - y_coor)
-                    1 / (2π) * besselk0_smooth(λ * r) -
+                x_coor = Inti.coords(x)
+                y_coor = Inti.coords(y)
+                r = norm(x_coor - y_coor)
+                1 / (2π) * besselk0_smooth(λ * r) -
                     1 / (2π) * besseli(0, λ * r) * log(λ)
-                end
+            end
             G_L = (x, y) -> begin
                 x_coor = Inti.coords(x)
                 y_coor = Inti.coords(y)
@@ -843,15 +843,15 @@ function _get_ksplit_kernels(op, layer_type, T)
         elseif layer_type == :double
             G_S =
                 (x, y) -> begin
-                    x_coor = Inti.coords(x)
-                    y_coor = Inti.coords(y)
-                    r = norm(x_coor - y_coor)
-                    ny = Inti.normal(y)
-                    (r ≤ Inti.SAME_POINT_TOLERANCE) && return zero(T)
-                    λ / (2π) *
+                x_coor = Inti.coords(x)
+                y_coor = Inti.coords(y)
+                r = norm(x_coor - y_coor)
+                ny = Inti.normal(y)
+                (r ≤ Inti.SAME_POINT_TOLERANCE) && return zero(T)
+                λ / (2π) *
                     (besselk1_smooth(λ * r) + besseli(1, λ * r) * log(λ)) *
                     dot(x_coor - y_coor, ny) / r
-                end
+            end
             G_L = (x, y) -> begin
                 x_coor = Inti.coords(x)
                 y_coor = Inti.coords(y)
@@ -868,5 +868,5 @@ function _get_ksplit_kernels(op, layer_type, T)
         error("Operator type not supported")
     end
 
-    return (G_S=G_S, G_L=G_L, G_C=G_C)
+    return (G_S = G_S, G_L = G_L, G_C = G_C)
 end
