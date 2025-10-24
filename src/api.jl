@@ -358,6 +358,25 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
             correction.maxdist,
             interpolation_order,
         )
+    elseif correction.method == :ldim
+        loc = target === source ? :inside : correction.target_location
+        μ = _green_multiplier(loc)
+        green_multiplier = fill(μ, length(target))
+        shift = Val(true)
+        δV = local_vdim_correction(
+            op,
+            eltype(V),
+            target,
+            source,
+            correction.mesh,
+            correction.bdry_nodes;
+            green_multiplier,
+            correction.maxdist,
+            correction.interpolation_order,
+            correction.quadrature_order,
+            correction.meshsize,
+            shift,
+        )
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end
