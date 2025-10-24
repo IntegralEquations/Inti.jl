@@ -118,7 +118,7 @@ end
 Given a an `M` by `N` matrix representing the jacobian of a codimension one object, compute
 the normal vector. If `s=-1`, the normal vector is flipped.
 """
-function _normal(jac::SMatrix{N, M}, s = 1) where {N, M}
+function _normal(jac::SMatrix{N,M}, s=1) where {N,M}
     (N - M == 1) || (return nothing) # not a codimension one object
     if M == 1 # a line in 2d
         t = jac[:, 1] # tangent vector
@@ -140,8 +140,8 @@ end
 Return `N` points uniformly distributed on a circle of radius `r` centered at `c`.
 """
 function uniform_points_circle(N, r, c)
-    pts = SVector{2, Float64}[]
-    for i in 0:(N - 1)
+    pts = SVector{2,Float64}[]
+    for i in 0:(N-1)
         x = r * SVector(cos(2π * i / N), sin(2π * i / N)) + c
         push!(pts, x)
     end
@@ -156,7 +156,7 @@ Return `N` points distributed (roughly) in a uniform manner on the sphere of
 radius `r` centered at `c`.
 """
 function fibonnaci_points_sphere(N, r, center)
-    pts = Vector{SVector{3, Float64}}(undef, N)
+    pts = Vector{SVector{3,Float64}}(undef, N)
     phi = π * (3 - sqrt(5)) # golden angle in radians
     for i in 1:N
         ytmp = 1 - ((i - 1) / (N - 1)) * 2
@@ -183,8 +183,8 @@ macro usethreads(multithreaded, expr::Expr)
 end
 
 # some useful type aliases
-const Point2D = SVector{2, Float64}
-const Point3D = SVector{3, Float64}
+const Point2D = SVector{2,Float64}
+const Point3D = SVector{3,Float64}
 
 function _normalize_compression(compression, target, source)
     methods = (:hmatrix, :fmm, :none)
@@ -193,12 +193,12 @@ function _normalize_compression(compression, target, source)
         "Unknown compression.method $(compression.method). Available options: $methods",
     )
     # set default tolerance if not provided
-    compression = merge((tol = 1.0e-8,), compression)
+    compression = merge((tol=1.0e-8,), compression)
     return compression
 end
 
 function _normalize_correction(correction, target, source)
-    methods = (:dim, :adaptive, :none)
+    methods = (:dim, :adaptive, :none, :ksplit, :ksplit_adaptive)
     # check that method is valid
     correction.method ∈ methods ||
         error("Unknown correction.method $(correction.method). Available options: $methods")
@@ -220,7 +220,7 @@ function _normalize_correction(correction, target, source)
             target === source ||
             @warn("missing maxdist field in correction: setting to Inf")
         correction = merge(
-            (maxdist = Inf, interpolation_order = nothing, center = nothing),
+            (maxdist=Inf, interpolation_order=nothing, center=nothing),
             correction,
         )
     end
@@ -249,7 +249,7 @@ end
 Wrapper around `NTuple{N,Int}` mimicking a multi-index in `ℤ₀ᴺ`.
 """
 struct MultiIndex{N}
-    indices::NTuple{N, Int}
+    indices::NTuple{N,Int}
 end
 
 Base.:+(a::MultiIndex, b::MultiIndex) = MultiIndex(a.indices .+ b.indices)
@@ -269,7 +269,7 @@ Base.:<=(a::MultiIndex, b::MultiIndex) = all(a.indices .<= b.indices)
 
 const WEAKDEPS_PROJ = let
     deps = TOML.parse(read(joinpath(PROJECT_ROOT, "Project.toml"), String))["weakdeps"]
-    compat = Dict{String, Any}()
+    compat = Dict{String,Any}()
     for (pkg, bound) in
         TOML.parse(read(joinpath(PROJECT_ROOT, "Project.toml"), String))["compat"]
         haskey(deps, pkg) || continue
@@ -300,7 +300,7 @@ Inti.stack_weakdeps_env!()
 using HMatrices
 ```
 """
-function stack_weakdeps_env!(; verbose = false, update = false)
+function stack_weakdeps_env!(; verbose=false, update=false)
     weakdeps_env = Scratch.@get_scratch!("weakdeps-$(VERSION.major).$(VERSION.minor)")
     open(joinpath(weakdeps_env, "Project.toml"), "w") do f
         return TOML.print(f, WEAKDEPS_PROJ)
@@ -356,10 +356,10 @@ function rotation_matrix(rot)
     dim == 1 ||
         dim == 3 ||
         throw(
-        ArgumentError(
-            "rot must have 1 or 3 elements for a 2D or 3D rotation, respectively.",
-        ),
-    )
+            ArgumentError(
+                "rot must have 1 or 3 elements for a 2D or 3D rotation, respectively.",
+            ),
+        )
     return dim == 1 ? _rotation_matrix_2d(rot) : _rotation_matrix_3d(rot)
 end
 function _rotation_matrix_2d(rot)

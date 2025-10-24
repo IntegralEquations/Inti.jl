@@ -11,7 +11,7 @@ const COMPRESSION_METHODS = [:none, :hmatrix, :fmm]
 Available correction methods for the singular and nearly-singular integrals in
 [`Inti`](@ref).
 """
-const CORRECTION_METHODS = [:none, :dim, :adaptive]
+const CORRECTION_METHODS = [:none, :dim, :adaptive, :ksplit, :ksplit_adaptive]
 
 """
     single_double_layer(; op, target, source::Quadrature, compression,
@@ -63,13 +63,13 @@ integrals should be computed. The available options are:
     [`bdim_correction`](@ref) and [`vdim_correction`](@ref) for more details.
 """
 function single_double_layer(;
-        op,
-        target,
-        source,
-        compression = (method = :none,),
-        correction = (method = :adaptive,),
-        derivative = false,
-    )
+    op,
+    target,
+    source,
+    compression=(method=:none,),
+    correction=(method=:adaptive,),
+    derivative=false,
+)
     compression = _normalize_compression(compression, target, source)
     correction = _normalize_correction(correction, target, source)
     G = derivative ? AdjointDoubleLayerKernel(op) : SingleLayerKernel(op)
@@ -78,14 +78,14 @@ function single_double_layer(;
     Dop = IntegralOperator(dG, target, source)
     # handle compression
     if compression.method == :hmatrix
-        Smat = assemble_hmatrix(Sop; rtol = compression.tol)
-        Dmat = assemble_hmatrix(Dop; rtol = compression.tol)
+        Smat = assemble_hmatrix(Sop; rtol=compression.tol)
+        Dmat = assemble_hmatrix(Dop; rtol=compression.tol)
     elseif compression.method == :none
         Smat = assemble_matrix(Sop)
         Dmat = assemble_matrix(Dop)
     elseif compression.method == :fmm
-        Smat = assemble_fmm(Sop; rtol = compression.tol)::LinearMap
-        Dmat = assemble_fmm(Dop; rtol = compression.tol)::LinearMap
+        Smat = assemble_fmm(Sop; rtol=compression.tol)::LinearMap
+        Dmat = assemble_fmm(Dop; rtol=compression.tol)::LinearMap
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
@@ -118,22 +118,22 @@ function single_double_layer(;
             Dop_dim = IntegralOperator(dG, target[glob_near_trgs], source)
             # compress 'em
             if compression.method == :hmatrix
-                Sop_dim_mat = assemble_hmatrix(Sop_dim; rtol = compression.tol)
-                Dop_dim_mat = assemble_hmatrix(Dop_dim; rtol = compression.tol)
+                Sop_dim_mat = assemble_hmatrix(Sop_dim; rtol=compression.tol)
+                Dop_dim_mat = assemble_hmatrix(Dop_dim; rtol=compression.tol)
             elseif compression.method == :none
                 Sop_dim_mat = assemble_matrix(Sop_dim)
                 Dop_dim_mat = assemble_matrix(Dop_dim)
             elseif compression.method == :fmm
-                Sop_dim_mat = assemble_fmm(Sop_dim; rtol = compression.tol)::LinearMap
-                Dop_dim_mat = assemble_fmm(Dop_dim; rtol = compression.tol)::LinearMap
+                Sop_dim_mat = assemble_fmm(Sop_dim; rtol=compression.tol)::LinearMap
+                Dop_dim_mat = assemble_fmm(Dop_dim; rtol=compression.tol)::LinearMap
             else
                 error("Unknown compression method. Available options: $COMPRESSION_METHODS")
             end
 
             filter_target_params = (
-                dict_near = dict_near,
-                num_trgs = length(target),
-                glob_loc_near_trgs = glob_loc_near_trgs,
+                dict_near=dict_near,
+                num_trgs=length(target),
+                glob_loc_near_trgs=glob_loc_near_trgs,
             )
             δS, δD = bdim_correction(
                 op,
@@ -163,6 +163,108 @@ function single_double_layer(;
         correction_kw = Base.structdiff(correction, NamedTuple{(:method,)})
         δS = adaptive_correction(Sop; correction_kw...)
         δD = adaptive_correction(Dop; correction_kw...)
+    elseif correction.method == :ksplit
+        # Extract the required geometric args from the correction tuple
+        geo_args = (
+            source_quad_connectivity=correction.connectivity,
+            source_el=correction.elements,
+            velocity_fn=correction.velocity_fn,
+            curvature_fn=correction.curvature_fn,
+            boundary_inv=correction.boundary_inv,
+        )
+
+        # Extract the ksplit-specific optional keywords
+        ksplit_kw_names =
+            (:n_panel_corr, :maxdist, :target_location, :parametric_length)
+        ksplit_kwargs = filter(kv -> kv[1] in ksplit_kw_names, pairs(correction))
+
+        if target === source
+            if !haskey(ksplit_kwargs, :n_panel_corr)
+                error(
+                    "For :ksplit correction with `target === source`, you must provide `n_panel_corr` (e.g., `correction = (method=:ksplit, n_panel_corr=3, ...)`).",
+                )
+            end
+        else # target !== source
+            if !haskey(ksplit_kwargs, :maxdist)
+                error(
+                    "For :ksplit correction with `target !== source`, you must provide `maxdist` (e.g., `correction = (method=:ksplit, maxdist=0.1, ...)`).",
+                )
+            end
+        end
+
+        δS = kernel_split_correction(
+            op,
+            source,
+            geo_args...,
+            Sop,
+            target;
+            layer_type=:single,
+            ksplit_kwargs...,
+        )
+        δD = kernel_split_correction(
+            op,
+            source,
+            geo_args...,
+            Dop,
+            target;
+            layer_type=:double,
+            ksplit_kwargs...,
+        )
+    elseif correction.method == :ksplit_adaptive
+        # Extract the required geometric args
+        geo_args = (
+            source_quad_connectivity=correction.connectivity,
+            source_el=correction.elements,
+            velocity_fn=correction.velocity_fn,
+            curvature_fn=correction.curvature_fn,
+            boundary_inv=correction.boundary_inv
+        )
+
+        # Extract the adaptive ksplit-specific keywords
+        ksplit_adaptive_kw_names = (
+            :n_panel_corr,
+            :maxdist,
+            :target_location,
+            :Cε,
+            :Rε,
+            :parametric_length,
+            :affine_preimage,
+        )
+        ksplit_adaptive_kwargs = filter(kv -> kv[1] in ksplit_adaptive_kw_names, pairs(correction))
+
+        if target === source
+            if !haskey(ksplit_adaptive_kwargs, :n_panel_corr)
+                error(
+                    "For :ksplit correction with `target === source`, you must provide `n_panel_corr` (e.g., `correction = (method=:ksplit_adaptive, n_panel_corr=3, ...)`).",
+                )
+            end
+        else # target !== source
+            if !haskey(ksplit_adaptive_kwargs, :maxdist)
+                error(
+                    "For :ksplit correction with `target !== source`, you must provide `maxdist` (e.g., `correction = (method=:ksplit_adaptive, maxdist=0.1, ...)`).",
+                )
+            end
+        end
+
+        # Call your adaptive_kernel_split_correction function
+        δS = adaptive_kernel_split_correction(
+            op,
+            source,
+            geo_args...,
+            Sop,
+            target;
+            layer_type=:single,
+            ksplit_adaptive_kwargs...
+        )
+        δD = adaptive_kernel_split_correction(
+            op,
+            source,
+            geo_args...,
+            Dop,
+            target;
+            layer_type=:double,
+            ksplit_adaptive_kwargs...
+        )
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end
@@ -195,19 +297,19 @@ hypersingular operators. See the documentation of [`single_double_layer`] for a
 description of the arguments.
 """
 function adj_double_layer_hypersingular(;
-        op,
-        target,
-        source = target,
-        compression = (method = :none,),
-        correction = (method = :adaptive,),
-    )
+    op,
+    target,
+    source=target,
+    compression=(method=:none,),
+    correction=(method=:adaptive,),
+)
     return single_double_layer(;
         op,
         target,
         source,
         compression,
         correction,
-        derivative = true,
+        derivative=true,
     )
 end
 
@@ -288,9 +390,9 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
     if compression.method == :none
         Vmat = assemble_matrix(V)
     elseif compression.method == :hmatrix
-        Vmat = assemble_hmatrix(V; rtol = compression.tol)
+        Vmat = assemble_hmatrix(V; rtol=compression.tol)
     elseif compression.method == :fmm
-        Vmat = assemble_fmm(V; rtol = compression.tol)
+        Vmat = assemble_fmm(V; rtol=compression.tol)
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
@@ -318,7 +420,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
             all(ent -> ent ∈ entities(par_msh), keys(Γ)) ||
                 error("Boundary not found in parent mesh")
             qmax = maximum(order, values(source.etype2qrule))
-            boundary = Quadrature(view(par_msh, Γ); qorder = 2 * qmax)
+            boundary = Quadrature(view(par_msh, Γ); qorder=2 * qmax)
         else
             error("Missing correction.boundary field for :dim method on a volume potential")
         end
@@ -328,7 +430,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
                 S, D = single_double_layer(;
                     op,
                     target,
-                    source = boundary,
+                    source=boundary,
                     compression,
                     correction,
                 )
@@ -336,9 +438,9 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
                 S, D = single_double_layer(;
                     op,
                     target,
-                    source = boundary,
+                    source=boundary,
                     compression,
-                    correction = (correction..., target_location = loc),
+                    correction=(correction..., target_location=loc),
                 )
             end
         else
