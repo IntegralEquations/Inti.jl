@@ -18,7 +18,7 @@ VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(4)
 bdry_qorder = 2 * VR_qorder
 
 function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
-    try
+    return try
         gmsh.initialize()
         gmsh.option.setNumber("General.Terminal", 0)
         gmsh.model.add("circle-mesh")
@@ -60,13 +60,13 @@ end
 @info "Quadrature generation time: $tquad"
 
 k0 = 1
-k  = 0
-θ  = (cos(π / 3), sin(π / 3))
+k = 0
+θ = (cos(π / 3), sin(π / 3))
 #u  = (x) -> exp(im * k0 * dot(x, θ))
 #du = (x,n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
-u  = (x) -> cos(k0 * dot(x, θ))
+u = (x) -> cos(k0 * dot(x, θ))
 du = (x, n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
-f  = (x) -> (k^2 - k0^2) * u(x)
+f = (x) -> (k^2 - k0^2) * u(x)
 
 #s  = 4
 #u  = (x) -> 1 / (k^2 - k0^2) * exp(im * k0 * dot(x, θ)) + 1 / (k^2 - 4 * s) * exp(-s * norm(x)^2)
@@ -86,7 +86,7 @@ tbnd = @elapsed begin
         op,
         target = Ωₕ_quad,
         source = Γₕ_quad,
-        compression = (method = :fmm, tol = 1e-14),
+        compression = (method = :fmm, tol = 1.0e-14),
         correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
     )
 end
@@ -98,7 +98,7 @@ V_d2d = Inti.volume_potential(;
     op,
     target = Ωₕ_quad,
     source = Ωₕ_quad,
-    compression = (method = :fmm, tol = 1e-14),
+    compression = (method = :fmm, tol = 1.0e-14),
     correction = (
         method = :ldim,
         mesh = Ωₕ,
@@ -112,9 +112,9 @@ V_d2d = Inti.volume_potential(;
 #end
 #@info "Volume potential time: $tvol"
 
-vref    = -u_d - D_b2d * u_b + S_b2d * du_b
+vref = -u_d - D_b2d * u_b + S_b2d * du_b
 vapprox = V_d2d * f_d
-er      = vref - vapprox
+er = vref - vapprox
 
 ndofs = length(er)
 

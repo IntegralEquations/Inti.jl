@@ -55,7 +55,7 @@ function elements end
 
 Return an iterator for all elements of type `E` on a mesh `msh`.
 """
-elements(msh::AbstractMesh, E::DataType) = ElementIterator{E,typeof(msh)}(msh)
+elements(msh::AbstractMesh, E::DataType) = ElementIterator{E, typeof(msh)}(msh)
 
 """
     struct Mesh{N,T} <: AbstractMesh{N,T}
@@ -629,8 +629,8 @@ the element `i` of type `E` in the mesh, and the value is a set of tuples
 function topological_neighbors(msh::AbstractMesh, k = 1)
     # dictionary mapping a node index to all elements containing it. Note
     # that the elements are stored as a tuple (type, index)
-    T = Tuple{DataType,Int}
-    node2els = Dict{Int,Vector{T}}()
+    T = Tuple{DataType, Int}
+    node2els = Dict{Int, Vector{T}}()
     for E in element_types(msh)
         mat = connectivity(msh, E)::Matrix{Int} # connectivity matrix
         np, Nel = size(mat)
@@ -643,7 +643,7 @@ function topological_neighbors(msh::AbstractMesh, k = 1)
         end
     end
     # now revert the map to get the neighbors
-    one_neighbors = Dict{T,Set{T}}()
+    one_neighbors = Dict{T, Set{T}}()
     for (_, els) in node2els
         for el in els
             nei = get!(one_neighbors, el, Set{T}())

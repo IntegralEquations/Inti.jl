@@ -56,7 +56,7 @@ function Base.show(io::IO, q::QuadratureNode)
     return print(io, "-- weight: $(q.weight)")
 end
 
-const Maybe{T} = Union{T,Nothing}
+const Maybe{T} = Union{T, Nothing}
 
 """
     struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
@@ -64,11 +64,11 @@ const Maybe{T} = Union{T,Nothing}
 A collection of [`QuadratureNode`](@ref)s used to integrate over an
 [`AbstractMesh`](@ref).
 """
-struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
-    mesh::Maybe{AbstractMesh{N,T}}
-    etype2qrule::Dict{DataType,ReferenceQuadrature}
-    qnodes::Vector{QuadratureNode{N,T}}
-    etype2qtags::Dict{DataType,Matrix{Int}}
+struct Quadrature{N, T} <: AbstractVector{QuadratureNode{N, T}}
+    mesh::Maybe{AbstractMesh{N, T}}
+    etype2qrule::Dict{DataType, ReferenceQuadrature}
+    qnodes::Vector{QuadratureNode{N, T}}
+    etype2qtags::Dict{DataType, Matrix{Int}}
 end
 
 # AbstractArray interface
@@ -126,19 +126,19 @@ end
 
 # Quadrature constructor for list of volume elements for local vdim
 function Quadrature(
-    ::Type{T},
-    elementlist::AbstractVector{E},
-    etype2qrule::Dict{DataType,Q},
-    qrule::Q;
-    center::SVector{N,Float64} = zero(SVector{N,Float64}),
-    scale::Float64 = 1.0,
-) where {N,T,E,Q}
+        ::Type{T},
+        elementlist::AbstractVector{E},
+        etype2qrule::Dict{DataType, Q},
+        qrule::Q;
+        center::SVector{N, Float64} = zero(SVector{N, Float64}),
+        scale::Float64 = 1.0,
+    ) where {N, T, E, Q}
     # initialize mesh with empty fields
-    quad = Quadrature{N,T}(
+    quad = Quadrature{N, T}(
         nothing,
         etype2qrule,
-        QuadratureNode{N,T}[],
-        Dict{DataType,Matrix{Int}}(),
+        QuadratureNode{N, T}[],
+        Dict{DataType, Matrix{Int}}(),
     )
     ori = ones(Int64, length(elementlist))
     # loop element types and generate quadrature for each
@@ -170,13 +170,13 @@ function Quadrature(msh::AbstractMesh; qorder)
 end
 
 @noinline function _build_quadrature!(
-    quad::Quadrature{N,T},
-    els::AbstractVector{E},
-    orientation::Vector{Int},
-    qrule::ReferenceQuadrature;
-    center::SVector{N,Float64} = zero(SVector{N,Float64}),
-    scale::Float64 = 1.0,
-) where {E,N,T}
+        quad::Quadrature{N, T},
+        els::AbstractVector{E},
+        orientation::Vector{Int},
+        qrule::ReferenceQuadrature;
+        center::SVector{N, Float64} = zero(SVector{N, Float64}),
+        scale::Float64 = 1.0,
+    ) where {E, N, T}
     x̂, ŵ = qrule() # nodes and weights on reference element
     x̂ = map(x̂ -> T.(x̂), qcoords(qrule))
     ŵ = map(ŵ -> T.(ŵ), qweights(qrule))

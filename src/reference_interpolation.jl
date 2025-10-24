@@ -568,11 +568,11 @@ end
 function boundarynd(::Type{T}, els, msh) where {T}
     bdi = Inti.boundary_idxs(T)
     nedges = length(els) * length(bdi)
-    edgelist = Vector{SVector{length(bdi[1]),Int64}}(undef, nedges)
-    edgelist_unsrt = Vector{SVector{length(bdi[1]),Int64}}(undef, nedges)
-    bords = Vector{MVector{length(bdi[1]),Int64}}(undef, length(bdi))
+    edgelist = Vector{SVector{length(bdi[1]), Int64}}(undef, nedges)
+    edgelist_unsrt = Vector{SVector{length(bdi[1]), Int64}}(undef, nedges)
+    bords = Vector{MVector{length(bdi[1]), Int64}}(undef, length(bdi))
     for i in 1:length(bdi)
-        bords[i] = MVector{length(bdi[1]),Int64}(undef)
+        bords[i] = MVector{length(bdi[1]), Int64}(undef)
     end
     j = 1
     for ii in els
@@ -592,14 +592,14 @@ function boundarynd(::Type{T}, els, msh) where {T}
     sizehint!(uniqlist, length(els))
     i = 1
     while i <= length(edgelist) - 1
-        if isequal(edgelist[I[i]], edgelist[I[i+1]])
+        if isequal(edgelist[I[i]], edgelist[I[i + 1]])
             i += 1
         else
             push!(uniqlist, I[i])
         end
         i += 1
     end
-    if !isequal(edgelist[I[end-1]], edgelist[I[end]])
+    if !isequal(edgelist[I[end - 1]], edgelist[I[end]])
         push!(uniqlist, I[end])
     end
     return edgelist_unsrt[uniqlist]

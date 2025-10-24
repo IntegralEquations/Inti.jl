@@ -88,7 +88,7 @@ function IntegralOperator(k, X, Y = X)
     # FIXME This cripples performance for local VDIM
     #msg = """IntegralOperator of nonbits being created: $T"""
     #isbitstype(T) || (@warn msg)
-    return IntegralOperator{T,typeof(k),typeof(X),typeof(Y)}(k, X, Y)
+    return IntegralOperator{T, typeof(k), typeof(X), typeof(Y)}(k, X, Y)
 end
 
 Base.size(iop::IntegralOperator) = (length(iop.target), length(iop.source))

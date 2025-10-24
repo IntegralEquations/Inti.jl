@@ -42,7 +42,7 @@ function poly_test(npts)
     cfg = JacobianConfig(PolSystem, pts[1])
     res1 = Matrix{Float64}(undef, length(PolArray), length(pts))
     res2 = Matrix{Float64}(undef, length(PolArray), length(pts))
-    res3 = Vector{MVector{length(PolArray),Float64}}(undef, npts)
+    res3 = Vector{MVector{length(PolArray), Float64}}(undef, npts)
 
     cfg = JacobianConfig(PolSystem, pts[1])
     u = Vector{Float64}(undef, length(PolArray))

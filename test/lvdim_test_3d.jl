@@ -17,7 +17,7 @@ VR_qorder = Inti.Tetrahedron_VR_interpolation_order_to_quadrature_order(interpol
 bdry_qorder = 2 * VR_qorder
 
 function gmsh_sphere(; order = 1, name, meshsize)
-    try
+    return try
         gmsh.initialize()
         gmsh.option.setNumber("General.Terminal", 0)
         gmsh.model.add("sphere-mesh")
@@ -57,13 +57,13 @@ end
 @info "Quadrature generation time: $tquad"
 
 k0 = π
-k  = 0
-θ  = (sin(π / 3) * cos(π / 3), sin(π / 3) * sin(π / 3), cos(π / 3))
+k = 0
+θ = (sin(π / 3) * cos(π / 3), sin(π / 3) * sin(π / 3), cos(π / 3))
 #u  = (x) -> exp(im * k0 * dot(x, θ))
 #du = (x,n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
-u  = (x) -> cos(k0 * dot(x, θ))
+u = (x) -> cos(k0 * dot(x, θ))
 du = (x, n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
-f  = (x) -> (k^2 - k0^2) * u(x)
+f = (x) -> (k^2 - k0^2) * u(x)
 
 u_d = map(q -> u(q.coords), Ωₕ_quad)
 u_b = map(q -> u(q.coords), Γₕ_quad)
@@ -78,7 +78,7 @@ tbnd = @elapsed begin
         pde,
         target = Ωₕ_quad,
         source = Γₕ_quad,
-        compression = (method = :fmm, tol = 1e-8),
+        compression = (method = :fmm, tol = 1.0e-8),
         correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
     )
 end
@@ -90,7 +90,7 @@ tvol = @elapsed begin
         pde,
         target = Ωₕ_quad,
         source = Ωₕ_quad,
-        compression = (method = :fmm, tol = 1e-8),
+        compression = (method = :fmm, tol = 1.0e-8),
         correction = (
             method = :ldim,
             interpolation_order,
@@ -103,9 +103,9 @@ tvol = @elapsed begin
 end
 @info "Volume potential time: $tvol"
 
-vref    = -u_d - D_b2d * u_b + S_b2d * du_b
+vref = -u_d - D_b2d * u_b + S_b2d * du_b
 vapprox = V_d2d * f_d
-er      = vref - vapprox
+er = vref - vapprox
 
 ndofs = length(er)
 
