@@ -35,15 +35,14 @@ tmsh = @elapsed begin
     crvmsh = Inti.curve_mesh(
         msh,
         ψ,
-        θ,
-        50 * round(Int, 1 / meshsize);
+        θ;
         face_element_on_curved_surface = face_element_on_curved_surface,
     )
 
     Ωₕ = view(crvmsh, Ω)
     Γₕ = view(crvmsh, Γ)
 end
-@info "Mesh generation time: $tmesh"
+@info "Mesh generation time: $tmsh"
 
 interpolation_order = 2
 VR_qorder = Inti.Tetrahedron_VR_interpolation_order_to_quadrature_order(interpolation_order)
@@ -55,7 +54,9 @@ tquad = @elapsed begin
     dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
     Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
     # Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorders[1])
-    Γₕ_quad = Inti.Quadrature(Γₕ; qorder = bdry_qorder)
+    Qbdry = Inti.Gauss(; domain = :triangle, order = bdry_qorder)
+    dictbdry = Dict(E => Qbdry for E in Inti.element_types(Γₕ))
+    Γₕ_quad = Inti.Quadrature(Γₕ, dictbdry)
 end
 @info "Quadrature generation time: $tquad"
 
@@ -98,6 +99,7 @@ tvol = @elapsed begin
             method = :dim,
             interpolation_order,
             maxdist = 5 * meshsize,
+            boundary = Γₕ_quad,
             S_b2d = S_b2d,
             D_b2d = D_b2d,
         ),
