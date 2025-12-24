@@ -141,7 +141,7 @@ function single_double_layer(;
                 source,
                 Sop_dim_mat,
                 Dop_dim_mat;
-                green_multiplier,
+                green_multiplier = green_multiplier[glob_near_trgs],
                 correction.maxdist,
                 derivative,
                 filter_target_params,

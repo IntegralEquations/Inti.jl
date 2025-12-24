@@ -38,3 +38,54 @@ using Test
     @test Shmat * x ≈ S * x
     @test Dhmat * x ≈ D * x
 end
+
+@testset "Issue 136 - mixed targets" begin
+    Γ = Inti.parametric_curve(0, 2π) do t
+        SVector(cos(t), sin(t))
+    end |> Inti.Domain
+
+    op = Inti.Laplace(; dim = 2)
+    source = Inti.Quadrature(Γ; meshsize = 0.2, qorder = 3)
+    target = [SVector(x, y) for x in -1.5:0.1:1.5, y in -1.5:0.1:1.5] |> vec
+    idx_in = filter(i -> norm(target[i]) < 1.0, eachindex(target))
+    idx_out = filter(i -> norm(target[i]) ≥ 1.0, eachindex(target))
+    green_multiplier = zeros(length(target))
+    green_multiplier[idx_in] .= -1.0
+    green_multiplier[idx_out] .= 0.0
+
+    # assemble the whole thing at one
+    S, D = Inti.single_double_layer(;
+        op,
+        target,
+        source,
+        correction = (method = :dim, green_multiplier, maxdist = Inf)
+    )
+    # or do it separately for inside and outside
+    S⁺, D⁺ = Inti.single_double_layer(;
+        op,
+        target = target[idx_out],
+        source,
+        correction = (method = :dim, target_location = :outside, maxdist = Inf)
+    )
+    S⁻, D⁻ = Inti.single_double_layer(;
+        op,
+        target = target[idx_in],
+        source,
+        correction = (method = :dim, target_location = :inside, maxdist = Inf)
+    )
+
+    # now test
+    u = ones(length(source))
+    @test norm(D⁺ * u, Inf) < 1.0e-3
+    @test norm((D⁻ * u .+ 1), Inf) < 1.0e-3
+
+    v = D * u
+    @show norm(v[idx_out], Inf) # should be zero (not OK)
+    @show norm(v[idx_in] .+ 1, Inf) # close to -1 (not OK)
+
+    # the SL also does not match the one computed separately
+    v = S * u
+    @test norm(v[idx_in] - S⁻ * u, Inf) < 1.0e-3
+    @test norm(v[idx_out] - S⁺ * u, Inf) < 1.0e-3
+
+end
