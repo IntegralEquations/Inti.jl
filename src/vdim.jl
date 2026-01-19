@@ -208,6 +208,16 @@ function neumann_trace(::Laplace{N}, p::Polynomial{N, T}) where {N, T}
     return γ₁P
 end
 
+function monomial_solution(op::Helmholtz{N}, p::Polynomial{N}) where {N}
+    return ElementaryPDESolutions.solve_helmholtz(p, op.k^2)
+end
+
+function neumann_trace(::Helmholtz{N}, p::Polynomial{N, T}) where {N, T}
+    ∇P = ElementaryPDESolutions.gradient(p)
+    γ₁P = (q) -> dot(normal(q), ∇P(coords(q)))
+    return γ₁P
+end
+
 function monomial_solution(op::Elastostatic{N}, p::Polynomial{N, T}) where {N, T}
     @assert T <: StaticMatrix
     @assert size(T) == (N, N)
@@ -250,7 +260,6 @@ function neumann_trace(
     end
     return γ₁P
 end
-
 
 function flatten_polynomial_ntuple(P::NTuple{N, NTuple{N, <:Polynomial{DIM, T}}}) where {N, DIM, T <: Number}
     V = SMatrix{N, N, T, N * N}
