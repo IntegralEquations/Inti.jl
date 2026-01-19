@@ -261,7 +261,7 @@ function neumann_trace(
     return γ₁P
 end
 
-function flatten_polynomial_ntuple(P::NTuple{N, NTuple{N, <:Polynomial{DIM, T}}}) where {N, DIM, T <: Number}
+function flatten_polynomial_ntuple(P::NTuple{N, NTuple{N, Polynomial{DIM, T}}}) where {N, DIM, T <: Number}
     V = SMatrix{N, N, T, N * N}
     # collect all multi-indices
     idxs = Set{NTuple{DIM, Int}}()

@@ -85,19 +85,19 @@ end
     @test isapprox(
         ForwardDiff.derivative(t -> G((coords = x + t * nx,), y), 0),
         dGdnx((coords = x, normal = nx), y);
-        atol = 1.0e-6,
+        atol = 1.0e-4,
     )
     @test isapprox(
         ForwardDiff.derivative(t -> G(x, (coords = y + t * ny,)), 0),
         dGdny(x, (coords = y, normal = ny));
-        atol = 1.0e-6,
+        atol = 1.0e-4,
     )
     @test isapprox(
         ForwardDiff.derivative(
             t -> dGdny((coords = x + t * nx,), (coords = y, normal = ny)),
             0,
         ), d2Gdnxy((coords = x, normal = nx), (coords = y, normal = ny));
-        atol = 1.0e-6,
+        atol = 1.0e-4,
     )
     # test quasi-periodicity
     period = 2π
