@@ -25,9 +25,9 @@ Random.seed!(1)
 
 ## Test parameters
 rtol = 1.0e-2  # relative tolerance for volume potential tests
-meshsize = 0.2
+meshsize = 0.4
 meshorder = 1
-bdry_qorder = 8
+bdry_qorder = 5
 interpolation_order = 2
 
 """
@@ -37,13 +37,20 @@ Test the volume potential operator for a given PDE operator `op` on domain `Ω` 
 Verifies the identity: S*γ₁u - D*γ₀u + V*f - σ*γ₀u ≈ 0 for polynomial solutions.
 """
 function test_volume_potential(op, Ω, Γ, msh; interpolation_order = 2, bdry_qorder = 8)
-    # TODO: make it work for 3D as well
     Ωₕ = view(msh, Ω)
     Γₕ = view(msh, Γ)
 
-    # Setup quadrature
-    VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
-    Q = Inti.VioreanuRokhlin(; domain = :triangle, order = VR_qorder)
+    # Setup quadrature based on dimension
+    dim = Inti.geometric_dimension(Ω)
+    if dim == 2
+        VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
+        Q = Inti.VioreanuRokhlin(; domain = :triangle, order = VR_qorder)
+    elseif dim == 3
+        VR_qorder = Inti.Tetrahedron_VR_interpolation_order_to_quadrature_order(interpolation_order)
+        Q = Inti.VioreanuRokhlin(; domain = :tetrahedron, order = VR_qorder)
+    else
+        error("Unsupported dimension: $dim")
+    end
     dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
     Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
     Γₕ_quad = Inti.Quadrature(Γₕ; qorder = bdry_qorder)
@@ -121,10 +128,11 @@ function test_volume_potential(op, Ω, Γ, msh; interpolation_order = 2, bdry_qo
     return errors_uncorrected, errors_corrected
 end
 
-@testset "Volume potential operators" begin
+@testset "Volume potential operators 2D" begin
     # Create 2D geometry once
     Inti.clear_entities!()
     gmsh.initialize()
+    gmsh.option.setNumber("General.Verbosity", 0)
     gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
     gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
     gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
@@ -139,8 +147,40 @@ end
     # Define operators to test
     operators = [
         ("2D Laplace", Inti.Laplace(; dim = 2)),
-        ("2D Helmholtz", Inti.Helmholtz(; k = 1.0, dim = 2)),
-        ("2D Elastostatic", Inti.Elastostatic(; μ = 1.0, λ = 1.0, dim = 2)),
+        ("2D Helmholtz", Inti.Helmholtz(; k = 0.7, dim = 2)),
+        ("2D Elastostatic", Inti.Elastostatic(; μ = 0.8, λ = 1.3, dim = 2)),
+    ]
+
+    for (name, op) in operators
+        @testset "$name" begin
+            err_uncorr, err_corr = test_volume_potential(op, Ω, Γ, msh; interpolation_order, bdry_qorder)
+            @test maximum(err_corr) < rtol
+            @test maximum(err_corr) < maximum(err_uncorr)  # Correction should improve accuracy
+        end
+    end
+end
+
+@testset "Volume potential operators 3D" begin
+    # Create 3D geometry once
+    Inti.clear_entities!()
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Verbosity", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+    gmsh.model.occ.addSphere(0, 0, 0, 1)
+    gmsh.model.occ.synchronize()
+    gmsh.model.mesh.generate(3)
+    gmsh.model.mesh.setOrder(meshorder)
+    msh = Inti.import_mesh(; dim = 3)
+    Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 3, Inti.entities(msh))
+    gmsh.finalize()
+    Γ = Inti.external_boundary(Ω)
+
+    # Define operators to test
+    operators = [
+        ("3D Laplace", Inti.Laplace(; dim = 3)),
+        ("3D Helmholtz", Inti.Helmholtz(; k = 1.2, dim = 3)),
+        ("3D Elastostatic", Inti.Elastostatic(; μ = 1.1, λ = 0.9, dim = 3)),
     ]
 
     for (name, op) in operators
