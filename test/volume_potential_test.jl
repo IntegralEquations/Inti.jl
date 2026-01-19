@@ -122,68 +122,32 @@ function test_volume_potential(op, Ω, Γ, msh; interpolation_order = 2, bdry_qo
 end
 
 @testset "Volume potential operators" begin
-    @testset "2D Laplace" begin
-        Inti.clear_entities!()
-        gmsh.initialize()
-        gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-        gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
-        gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
-        gmsh.model.occ.synchronize()
-        gmsh.model.mesh.generate(2)
-        gmsh.model.mesh.setOrder(meshorder)
-        msh = Inti.import_mesh(; dim = 2)
-        Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
-        gmsh.finalize()
+    # Create 2D geometry once
+    Inti.clear_entities!()
+    gmsh.initialize()
+    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+    gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
+    gmsh.model.occ.synchronize()
+    gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(meshorder)
+    msh = Inti.import_mesh(; dim = 2)
+    Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
+    gmsh.finalize()
+    Γ = Inti.external_boundary(Ω)
 
-        Γ = Inti.external_boundary(Ω)
-        op = Inti.Laplace(; dim = 2)
+    # Define operators to test
+    operators = [
+        ("2D Laplace", Inti.Laplace(; dim = 2)),
+        ("2D Helmholtz", Inti.Helmholtz(; k = 1.0, dim = 2)),
+        ("2D Elastostatic", Inti.Elastostatic(; μ = 1.0, λ = 1.0, dim = 2)),
+    ]
 
-        err_uncorr, err_corr = test_volume_potential(op, Ω, Γ, msh; interpolation_order, bdry_qorder)
-
-        @test maximum(err_corr) < rtol
-        @test maximum(err_corr) < maximum(err_uncorr)  # Correction should improve accuracy
-    end
-
-    @testset "2D Helmholtz" begin
-        Inti.clear_entities!()
-        gmsh.initialize()
-        gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-        gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
-        gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
-        gmsh.model.occ.synchronize()
-        gmsh.model.mesh.generate(2)
-        gmsh.model.mesh.setOrder(meshorder)
-        msh = Inti.import_mesh(; dim = 2)
-        Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
-        gmsh.finalize()
-
-        Γ = Inti.external_boundary(Ω)
-        op = Inti.Helmholtz(; k = 1.0, dim = 2)
-
-        err_uncorr, err_corr = test_volume_potential(op, Ω, Γ, msh; interpolation_order, bdry_qorder)
-
-        @test maximum(err_corr) < rtol
-        @test maximum(err_corr) < maximum(err_uncorr)
-    end
-
-    @testset "2D Elastostatic" begin
-        Inti.clear_entities!()
-        gmsh.initialize()
-        gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
-        gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
-        gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
-        gmsh.model.occ.synchronize()
-        gmsh.model.mesh.generate(2)
-        gmsh.model.mesh.setOrder(meshorder)
-        msh = Inti.import_mesh(; dim = 2)
-        Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
-        gmsh.finalize()
-
-        Γ = Inti.external_boundary(Ω)
-        op = Inti.Elastostatic(; μ = 1.0, λ = 1.0, dim = 2)
-
-        err_uncorr, err_corr = test_volume_potential(op, Ω, Γ, msh; interpolation_order, bdry_qorder)
-        @test maximum(err_corr) < rtol
-        @test maximum(err_corr) < maximum(err_uncorr)
+    for (name, op) in operators
+        @testset "$name" begin
+            err_uncorr, err_corr = test_volume_potential(op, Ω, Γ, msh; interpolation_order, bdry_qorder)
+            @test maximum(err_corr) < rtol
+            @test maximum(err_corr) < maximum(err_uncorr)  # Correction should improve accuracy
+        end
     end
 end
