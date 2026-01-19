@@ -82,25 +82,25 @@ function test_volume_potential(op, Ω, Γ, msh; interpolation_order = 2, bdry_qo
     )
 
     # Get polynomial solutions for this operator
-    monomials, dir_traces, neumann_traces = Inti.polynomial_solutions_vdim(op, interpolation_order)
+    basis = Inti.polynomial_solutions_vdim(op, interpolation_order)
 
     # Test with each polynomial basis function
     errors_uncorrected = Float64[]
     errors_corrected = Float64[]
 
-    for idx in 1:length(monomials)
+    for idx in 1:length(basis)
         # For vector-valued operators, multiply by a constant vector
         if Inti.default_density_eltype(op) <: SVector
             N = Inti.ambient_dimension(Ωₕ)
             c = SVector(ntuple(i -> rand(), N)...)
-            f = (q) -> monomials[idx](q) * c
-            u = (q) -> dir_traces[idx](q) * c
-            t = (q) -> neumann_traces[idx](q) * c
+            f = (q) -> basis[idx].source(q) * c
+            u = (q) -> basis[idx].solution(q) * c
+            t = (q) -> basis[idx].neumann_trace(q) * c
         else
             # Scalar case
-            f = (q) -> monomials[idx](q)
-            u = (q) -> dir_traces[idx](q)
-            t = (q) -> neumann_traces[idx](q)
+            f = (q) -> basis[idx].source(q)
+            u = (q) -> basis[idx].solution(q)
+            t = (q) -> basis[idx].neumann_trace(q)
         end
 
         # Evaluate on quadrature nodes
@@ -149,6 +149,7 @@ end
         ("2D Laplace", Inti.Laplace(; dim = 2)),
         ("2D Helmholtz", Inti.Helmholtz(; k = 0.7, dim = 2)),
         ("2D Elastostatic", Inti.Elastostatic(; μ = 0.8, λ = 1.3, dim = 2)),
+        ("2D Stokes", Inti.Stokes(; μ = 1.0, dim = 2)),
     ]
 
     for (name, op) in operators
@@ -181,6 +182,7 @@ end
         ("3D Laplace", Inti.Laplace(; dim = 3)),
         ("3D Helmholtz", Inti.Helmholtz(; k = 1.2, dim = 3)),
         ("3D Elastostatic", Inti.Elastostatic(; μ = 1.1, λ = 0.9, dim = 3)),
+        ("3D Stokes", Inti.Stokes(; μ = 1.0, dim = 3)),
     ]
 
     for (name, op) in operators

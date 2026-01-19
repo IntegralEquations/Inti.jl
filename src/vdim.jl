@@ -51,16 +51,16 @@ function vdim_correction(
     isnothing(interpolation_order) &&
         (interpolation_order = maximum(order, values(source.etype2qrule)))
     # by default basis centered at origin
-    p, P, γ₁P = polynomial_solutions_vdim(op, interpolation_order, T)
+    basis = polynomial_solutions_vdim(op, interpolation_order, T)
     dict_near = etype_to_nearest_points(target, source; maxdist)
-    num_basis = length(p)
+    num_basis = length(basis)
     b = Dense{T}(undef, length(source), num_basis)
     γ₀B = Dense{T}(undef, length(boundary), num_basis)
     γ₁B = Dense{T}(undef, length(boundary), num_basis)
-    b = [f(q) for q in source, f in p]
+    b = [basis[m].source(q) for q in source, m in eachindex(basis)]
     for k in 1:num_basis, j in 1:length(boundary)
-        γ₀B[j, k] = P[k](boundary[j])
-        γ₁B[j, k] = γ₁P[k](boundary[j])
+        γ₀B[j, k] = basis[k].solution(boundary[j])
+        γ₁B[j, k] = basis[k].neumann_trace(boundary[j])
     end
     T = eltype(γ₀B)
     Θ = zeros(T, num_target, num_basis)
@@ -70,7 +70,7 @@ function vdim_correction(
         @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
         @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
         for i in 1:num_target
-            Θ[i, n] += green_multiplier[i] * P[n](target[i])
+            Θ[i, n] += green_multiplier[i] * basis[n].solution(target[i])
         end
     end
     # compute sparse correction
@@ -95,7 +95,7 @@ function vdim_correction(
             jglob = @view qtags[:, n]
             # Fill the interpolation matrix
             for k in 1:nq, m in 1:num_basis
-                L_arr[m, k] = p[m](view(source, jglob)[k])
+                L_arr[m, k] = basis[m].source(view(source, jglob)[k])
             end
             F = svd(Ldata)
             @debug (vander_cond = max(vander_cond, cond(Ldata))) maxlog = 0
@@ -127,9 +127,7 @@ function vdim_correction(
 end
 
 function _vdim_auxiliary_quantities(
-        p,
-        P,
-        γ₁P,
+        basis,
         X,
         Y::Quadrature,
         Γ::Quadrature,
@@ -138,11 +136,11 @@ function _vdim_auxiliary_quantities(
         Dop,
         Vop,
     )
-    num_basis = length(p)
+    num_basis = length(basis)
     num_targets = length(X)
-    b = [f(q) for q in Y, f in p]
-    γ₀B = [f(q) for q in Γ, f in P]
-    γ₁B = [f(q) for q in Γ, f in γ₁P]
+    b = [basis[m].source(q) for q in Y, m in eachindex(basis)]
+    γ₀B = [basis[m].solution(q) for q in Γ, m in eachindex(basis)]
+    γ₁B = [basis[m].neumann_trace(q) for q in Γ, m in eachindex(basis)]
     T = eltype(γ₀B)
     Θ = zeros(T, num_targets, num_basis)
     # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
@@ -151,114 +149,134 @@ function _vdim_auxiliary_quantities(
         @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
         @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
         for i in 1:num_targets
-            Θ[i, n] += μ[i] * P[n](X[i])
+            Θ[i, n] += μ[i] * basis[n].solution(X[i])
         end
     end
     return Θ
 end
 
 """
-    polynomial_solutions_vdim(op, order)
+    polynomial_solutions_vdim(op, order, [T])
 
-For every monomial term `pₙ` of degree at most `order`, compute a polynomial `Pₙ` such that
-`ℒ[Pₙ] = pₙ`, where `ℒ` is the differential operator associated with `op`. This function
-returns `{pₙ,Pₙ,γ₁Pₙ}`, where `γ₁Pₙ` is the generalized Neumann trace of `Pₙ`, and `Iₙ`
-is the multi-index associated with `pₙ`.
+Build a basis of polynomial solutions for the VDIM method.
+
+For every monomial `pₙ` of degree at most `order`, computes a polynomial solution `Pₙ`
+satisfying `ℒ[Pₙ] = pₙ`, where `ℒ` is the differential operator of `op`.
+
+Returns a vector of named tuples `(source = pₙ, solution = Pₙ, neumann_trace = γ₁Pₙ)`.
 """
 function polynomial_solutions_vdim(
         op::AbstractDifferentialOperator{N},
         order::Integer,
         ::Type{T} = default_kernel_eltype(op),
     ) where {N, T}
-    # create empty arrays to store the monomials, solutions, and traces.
-    monomials = Vector{Polynomial{N, T}}()
-    solutions = Vector{Polynomial{N, T}}()
-    for I in Iterators.product(ntuple(i -> 0:order, N)...)
-        sum(I) > order && continue
+    indices = [I for I in Iterators.product(ntuple(i -> 0:order, N)...) if sum(I) <= order]
+    return map(indices) do I
         monomial = Polynomial(I => one(T))
-        sol = monomial_solution(op, monomial)
-        push!(monomials, monomial)
-        push!(solutions, sol)
+        P, γ₁P = basis_from_monomial(op, monomial)
+        (source = monomial, solution = P, neumann_trace = γ₁P)
     end
-    neumann_traces = map(solutions) do sol
-        neumann_trace(op, sol)
-    end
-    return monomials, solutions, neumann_traces
 end
 
 """
-    monomial_solution(op::AbstractDifferentialOperator{N}, p::Polynomial{N})
+    basis_from_monomial(op, monomial) -> (solution, neumann_trace)
 
-Compute a polynomial solution `P` to the equation `ℒ[P] = p`, where
+Compute a polynomial solution `P` to `ℒ[P] = monomial` and its Neumann trace `γ₁P`.
 
-- `ℒ` is the differential operator associated with `op`,
-- `p(x) = x₁^α₁ * x₂^α₂ * ... * x_N^α_N * I` is the monomial of multi-index `α`,
-- `I` is the `σ × σ` identity tensor, with `σ` the range dimension of `op` (i.e., number of
-  components of the solution).
-
-Returns `(p, P, γ₁P)`, where `γ₁P` is the generalized Neumann trace of `P`.
-
-Both `p` and `P` are given as `ElementaryPDESolutions.Polynomial` objects, while
+Each operator implements this to handle its specific PDE structure, including any
+auxiliary fields (e.g., pressure for Stokes) needed to compute the Neumann trace.
 """
-monomial_solution(::Laplace{N}, p::Polynomial{N}) where {N} = ElementaryPDESolutions.solve_laplace(p)
+function basis_from_monomial end
 
-function neumann_trace(::Laplace{N}, p::Polynomial{N, T}) where {N, T}
-    ∇P = ElementaryPDESolutions.gradient(p)
-    γ₁P = (q) -> dot(normal(q), ∇P(coords(q)))
-    return γ₁P
-end
+# Laplace
 
-function monomial_solution(op::Helmholtz{N}, p::Polynomial{N}) where {N}
-    return ElementaryPDESolutions.solve_helmholtz(p, op.k^2)
-end
-
-function neumann_trace(::Helmholtz{N}, p::Polynomial{N, T}) where {N, T}
-    ∇P = ElementaryPDESolutions.gradient(p)
-    γ₁P = (q) -> dot(normal(q), ∇P(coords(q)))
-    return γ₁P
-end
-
-function monomial_solution(op::Elastostatic{N}, p::Polynomial{N, T}) where {N, T}
-    @assert T <: StaticMatrix
-    @assert size(T) == (N, N)
-    # extract exponent of p, and make sure it is a monomial
-    ord2coef = p.order2coeff
-    @assert length(ord2coef) == 1 "Input polynomial must be a monomial"
-    coef = first(values(ord2coef))
-    val = first(keys(ord2coef))
-    # extract material parameters
-    μ = op.μ
-    λ = op.λ
-    ν = λ / (2 * (λ + μ))
-    # compute solution for each columns of the tensor
-    ptuple = ntuple(N) do n
-        p = ntuple(d -> Polynomial(val => coef[d, n]), N)
-        ElementaryPDESolutions.solve_elastostatic(p; μ, ν)
-    end
-    p = flatten_polynomial_ntuple(ptuple)
-    return p
-end
-
-function neumann_trace(
-        op::Elastostatic{N},
-        P::Polynomial{N, T},
-    ) where {N, T}
-    μ = op.μ
-    λ = op.λ
+function basis_from_monomial(::Laplace{N}, monomial::Polynomial{N, T}) where {N, T}
+    P = ElementaryPDESolutions.solve_laplace(monomial)
     ∇P = ElementaryPDESolutions.gradient(P)
-    γ₁P = (q) -> begin
-        ν = normal(q)
+    γ₁P = q -> dot(normal(q), ∇P(coords(q)))
+    return P, γ₁P
+end
+
+# Helmholtz
+
+function basis_from_monomial(op::Helmholtz{N}, monomial::Polynomial{N, T}) where {N, T}
+    P = ElementaryPDESolutions.solve_helmholtz(monomial, op.k^2)
+    ∇P = ElementaryPDESolutions.gradient(P)
+    γ₁P = q -> dot(normal(q), ∇P(coords(q)))
+    return P, γ₁P
+end
+
+# Elastostatic
+
+function basis_from_monomial(op::Elastostatic{N}, monomial::Polynomial{N, T}) where {N, T}
+    @assert T <: StaticMatrix && size(T) == (N, N)
+    S = eltype(T)
+    ord2coef = monomial.order2coeff
+    @assert length(ord2coef) == 1 "Input must be a monomial"
+    coef = first(values(ord2coef))
+    idx = first(keys(ord2coef))
+    μ, λ = op.μ, op.λ
+    ν = λ / (2 * (λ + μ))
+    # Solve for each column of the tensor
+    sol_tuple = ntuple(N) do n
+        p = ntuple(d -> Polynomial(idx => coef[d, n]), N)
+        u = ElementaryPDESolutions.solve_elastostatic(p; μ, ν)
+        ntuple(d -> convert(Polynomial{N, S}, u[d]), N)
+    end
+    P = flatten_polynomial_ntuple(sol_tuple)
+    ∇P = ElementaryPDESolutions.gradient(P)
+    # Neumann trace: traction vector
+    γ₁P = q -> begin
+        n = normal(q)
         x = coords(q)
         M = ∇P(x)  # M[j] = ∂P/∂xⱼ
         cols = svector(N) do m
-            # Build gradient of m-th column: (∇uₘ)[:, j] = M[j][:, m]
             gradu = hcat(ntuple(j -> M[j][:, m], N)...)
             divu = tr(gradu)
-            return λ * divu * ν + μ * (gradu + gradu') * ν
+            λ * divu * n + μ * (gradu + gradu') * n
         end
         reduce(hcat, cols)
     end
-    return γ₁P
+    return P, γ₁P
+end
+
+# Stokes
+
+function basis_from_monomial(op::Stokes{N}, monomial::Polynomial{N, T}) where {N, T}
+    @assert T <: StaticMatrix && size(T) == (N, N)
+    S = eltype(T)
+    ord2coef = monomial.order2coeff
+    @assert length(ord2coef) == 1 "Input must be a monomial"
+    coef = first(values(ord2coef))
+    idx = first(keys(ord2coef))
+    μ = op.μ
+    # Solve for each column: velocity and pressure
+    # Note: ElementaryPDESolutions uses μΔu - ∇p = f, while Inti uses -μΔu + ∇p = f,
+    # so we negate the source term
+    solutions = ntuple(N) do n
+        f = ntuple(d -> Polynomial(idx => -coef[d, n]), N)
+        u, p = ElementaryPDESolutions.solve_stokes(f; μ)
+        vel = ntuple(d -> convert(Polynomial{N, S}, u[d]), N)
+        pres = convert(Polynomial{N, S}, p)
+        (velocity = vel, pressure = pres)
+    end
+    velocities = ntuple(n -> solutions[n].velocity, N)
+    pressures = ntuple(n -> solutions[n].pressure, N)
+    U = flatten_polynomial_ntuple(velocities)
+    ∇U = ElementaryPDESolutions.gradient(U)
+    # Neumann trace: traction using velocity gradient and pressure
+    γ₁U = q -> begin
+        n = normal(q)
+        x = coords(q)
+        M = ∇U(x)  # M[j] = ∂U/∂xⱼ
+        cols = svector(N) do m
+            gradu = hcat(ntuple(j -> M[j][:, m], N)...)
+            p_val = pressures[m](x)
+            -p_val * n + μ * (gradu + gradu') * n
+        end
+        reduce(hcat, cols)
+    end
+    return U, γ₁U
 end
 
 function flatten_polynomial_ntuple(P::NTuple{N, NTuple{N, Polynomial{DIM, T}}}) where {N, DIM, T <: Number}
