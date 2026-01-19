@@ -162,7 +162,7 @@ end
 
 For every monomial term `pₙ` of degree at most `order`, compute a polynomial `Pₙ` such that
 `ℒ[Pₙ] = pₙ`, where `ℒ` is the differential operator associated with `op`. This function
-returns `{pₙ,Pₙ,γ₁Pₙ, Iₙ}`, where `γ₁Pₙ` is the generalized Neumann trace of `Pₙ`, and `Iₙ`
+returns `{pₙ,Pₙ,γ₁Pₙ}`, where `γ₁Pₙ` is the generalized Neumann trace of `Pₙ`, and `Iₙ`
 is the multi-index associated with `pₙ`.
 """
 function polynomial_solutions_vdim(
