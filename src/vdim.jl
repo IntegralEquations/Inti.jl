@@ -95,7 +95,7 @@ function vdim_correction(
             jglob = @view qtags[:, n]
             # Fill the interpolation matrix
             for k in 1:nq, m in 1:num_basis
-                L_arr[m, k] = p[m](view(source, jglob)[k].coords)
+                L_arr[m, k] = p[m](view(source, jglob)[k])
             end
             F = svd(Ldata)
             @debug (vander_cond = max(vander_cond, cond(Ldata))) maxlog = 0
@@ -239,10 +239,12 @@ function neumann_trace(
     γ₁P = (q) -> begin
         ν = normal(q)
         x = coords(q)
-        M = ∇P(x)
-        cols = svector(N) do i
-            divu = tr(M[i])
-            return λ * divu * ν + μ * (M[i] + M[i]') * ν
+        M = ∇P(x)  # M[j] = ∂P/∂xⱼ
+        cols = svector(N) do m
+            # Build gradient of m-th column: (∇uₘ)[:, j] = M[j][:, m]
+            gradu = hcat(ntuple(j -> M[j][:, m], N)...)
+            divu = tr(gradu)
+            return λ * divu * ν + μ * (gradu + gradu') * ν
         end
         reduce(hcat, cols)
     end
