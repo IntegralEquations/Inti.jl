@@ -198,7 +198,7 @@ function _normalize_compression(compression, target, source)
 end
 
 function _normalize_correction(correction, target, source)
-    methods = (:dim, :adaptive, :none)
+    methods = (:dim, :adaptive, :none, :ksplit, :ksplit_adaptive)
     # check that method is valid
     correction.method ∈ methods ||
         error("Unknown correction.method $(correction.method). Available options: $methods")
