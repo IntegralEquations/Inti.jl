@@ -51,11 +51,11 @@ for a given mesh).
 function elements end
 
 """
-    element_types(msh::AbstractMesh)
+    elements(msh::AbstractMesh,E::DataType)
 
-Return the element types present in the `msh`.
+Return an iterator for all elements of type `E` on a mesh `msh`.
 """
-function element_types end
+elements(msh::AbstractMesh, E::DataType) = ElementIterator{E, typeof(msh)}(msh)
 
 """
     struct Mesh{N,T} <: AbstractMesh{N,T}
@@ -609,6 +609,69 @@ function connectivity(msh::SubMesh, E::DataType)
 end
 
 """
+    Domain(f::Function, msh::AbstractMesh)
+
+Call `Domain(f, ents)` on `ents = entities(msh).`
+"""
+Domain(f::Function, msh::AbstractMesh) = Domain(f, entities(msh))
+
+"""
+    topological_neighbors(msh::LagrangeMesh, k=1)
+
+Return the `k` neighbors of each element in `msh`. The one-neighbors are the
+elements that share a common vertex with the element, `k` neighbors are the
+one-neighbors of the `k-1` neighbors.
+
+This function returns a dictionary where the key is an `(Eᵢ,i)` tuple denoting
+the element `i` of type `E` in the mesh, and the value is a set of tuples
+`(Eⱼ,j)` where `Eⱼ` is the type of the element and `j` its index.
+"""
+function topological_neighbors(msh::AbstractMesh, k = 1)
+    # dictionary mapping a node index to all elements containing it. Note
+    # that the elements are stored as a tuple (type, index)
+    T = Tuple{DataType, Int}
+    node2els = Dict{Int, Vector{T}}()
+    for E in element_types(msh)
+        mat = connectivity(msh, E)::Matrix{Int} # connectivity matrix
+        np, Nel = size(mat)
+        for n in 1:Nel
+            for i in 1:np
+                idx = mat[i, n]
+                els = get!(node2els, idx, Vector{T}())
+                push!(els, (E, n))
+            end
+        end
+    end
+    # now revert the map to get the neighbors
+    one_neighbors = Dict{T, Set{T}}()
+    for (_, els) in node2els
+        for el in els
+            nei = get!(one_neighbors, el, Set{T}())
+            for el′ in els
+                push!(nei, el′)
+            end
+        end
+    end
+    # Recursively compute the neighbors from the one-neighbors
+    if k > 1
+        k_neighbors = deepcopy(one_neighbors)
+    else
+        k_neighbors = one_neighbors
+    end
+    while k > 1
+        # update neighborhood of each element
+        for el in keys(one_neighbors)
+            knn = k_neighbors[el]
+            for el′ in copy(knn)
+                union!(knn, one_neighbors[el′])
+            end
+        end
+        k -= 1
+    end
+    return k_neighbors
+end
+
+"""
     near_interaction_list(X,Y::AbstractMesh; tol)
 
 For each element `el` of type `E` in `Y`, return the indices of the points in
@@ -643,12 +706,9 @@ end
     return inrange(balltree, centers, tol)
 end
 
-"""
-    Domain(f::Function, msh::AbstractMesh)
+function viz_elements(args...; kwargs...) end
 
-Call `Domain(f, ents)` on `ents = entities(msh).`
-"""
-Domain(f::Function, msh::AbstractMesh) = Domain(f, entities(msh))
+function viz_elements_bords(args...; kwargs...) end
 
 function node2etags(msh)
     # dictionary mapping a node index to all elements containing it. Note

@@ -76,10 +76,10 @@ function Meshes.viz!(el::Inti.ReferenceInterpolant, args...; kwargs...)
 end
 
 function Meshes.viz(els::AbstractVector{<:Inti.ReferenceInterpolant}, args...; kwargs...)
-    return viz([to_meshes(el) for el in els])
+    return viz([to_meshes(el) for el in els], args...; kwargs...)
 end
 function Meshes.viz!(els::AbstractVector{<:Inti.ReferenceInterpolant}, args...; kwargs...)
-    return viz!([to_meshes(el) for el in els])
+    return viz!([to_meshes(el) for el in els], args...; kwargs...)
 end
 
 function Meshes.viz(msh::Inti.AbstractMesh, args...; kwargs...)
@@ -87,6 +87,47 @@ function Meshes.viz(msh::Inti.AbstractMesh, args...; kwargs...)
 end
 function Meshes.viz!(msh::Inti.AbstractMesh, args...; kwargs...)
     return viz!(to_meshes(msh), args...; kwargs...)
+end
+
+function Inti.viz_elements(els, msh)
+    E = first(Inti.element_types(msh))
+    Els = [Inti.elements(msh, E)[i] for (E, i) in els]
+    fig, _, _ = viz(Els)
+    viz!(msh; color = 0, showsegments = true, alpha = 0.3)
+    return display(fig)
+end
+
+function Inti.viz_elements_bords(Ei, els, ell, bords, msh; quad = nothing)
+    E = first(Inti.element_types(msh))
+    #ell = collect(Ei[(E, 1)])[1]
+    el = Inti.elements(msh, ell[1])[ell[2]]
+    fig, _, _ = viz(msh; color = 0, showsegments = true, alpha = 0.3)
+    viz!(el; color = 0, showsegments = true, alpha = 0.5)
+    for (E, i) in els
+        el = Inti.elements(msh, E)[i]
+        viz!(el; showsegments = true, alpha = 0.7)
+    end
+    viz!(bords; color = 4, showsegments = false, segmentsize = 5, segmentcolor = 4)
+    # if !isnothing(quad)
+    #     xs = [qnode.coords[1] for qnode in quad.qnodes]
+    #     ys = [qnode.coords[2] for qnode in quad.qnodes]
+    #     zs = [qnode.coords[3] for qnode in quad.qnodes]
+    #     nx = [Inti.normal(qnode)[1] for qnode in quad.qnodes]
+    #     ny = [Inti.normal(qnode)[2] for qnode in quad.qnodes]
+    #     nz = [Inti.normal(qnode)[3] for qnode in quad.qnodes]
+    #     Mke.arrows!(
+    #         xs,
+    #         ys,
+    #         zs,
+    #         nx,
+    #         ny,
+    #         nz;
+    #         lengthscale = 0.05,
+    #         linewidth = 0.01,
+    #         arrowsize = 0.01,
+    #     )
+    # end
+    return display(fig)
 end
 
 end # module
