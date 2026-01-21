@@ -103,14 +103,14 @@ function vdim_correction(
             @debug (vander_norm = max(vander_norm, norm(Ldata))) maxlog = 0
             # correct each target near the current element
             for i in near_list[n]
-                b_arr .= @views Θ[i:i, :]'
+                b_arr .= @views transpose(Θ[i:i, :])
                 @debug (rhs_norm = max(rhs_norm, norm(bdata))) maxlog = 0
                 ldiv!(weidata, F, bdata)
                 @debug (res_norm = max(res_norm, norm(Ldata * weidata - bdata))) maxlog = 0
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
-                    push!(Vs, wei_arr[k, 1])
+                    push!(Vs, transpose(wei_arr[k]))
                 end
             end
         end

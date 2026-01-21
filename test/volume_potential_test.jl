@@ -24,7 +24,7 @@ using Gmsh
 Random.seed!(1)
 
 ## Test parameters
-rtol = 1.0e-2  # relative tolerance for volume potential tests
+rtol = 1.0e-10  # relative tolerance for volume potential tests
 meshsize = 0.4
 meshorder = 1
 bdry_qorder = 5
