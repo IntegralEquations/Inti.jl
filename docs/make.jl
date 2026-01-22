@@ -143,9 +143,9 @@ makedocs(;
         mathengine = Documenter.KaTeX(
             Dict(
                 :delimiters => [
-                    Dict(:left => raw"$", :right => raw"$", display => false),
-                    Dict(:left => raw"$$", :right => raw"$$", display => true),
-                    Dict(:left => raw"\[", :right => raw"\]", display => true),
+                    Dict(:left => raw"$", :right => raw"$", :display => false),
+                    Dict(:left => raw"$$", :right => raw"$$", :display => true),
+                    Dict(:left => raw"\[", :right => raw"\]", :display => true),
                 ],
                 :macros => Dict(
                     "\\RR" => "\\mathbb{R}",
