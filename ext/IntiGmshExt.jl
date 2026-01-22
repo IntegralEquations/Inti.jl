@@ -2,6 +2,7 @@ module IntiGmshExt
 
 using Gmsh
 import Inti
+using DataStructures: OrderedDict
 using LinearAlgebra
 using StaticArrays
 
@@ -120,7 +121,7 @@ where:
 function _ent_to_mesh!(etype2mat, ent2etags, key, shift, gmsh2loc_node_tags, tgmsh)
     d, t = key.dim, key.tag
     haskey(ent2etags, key) && error("entity $key already in ent2etags")
-    etype2etags = ent2etags[key] = Dict{DataType, Vector{Int}}()
+    etype2etags = ent2etags[key] = OrderedDict{DataType, Vector{Int}}()
     # Loop on GMSH element types (integer)
     type_tags, _, ntagss = gmsh.model.mesh.getElements(d, tgmsh)
     for (type_tag, ntags) in zip(type_tags, ntagss)
