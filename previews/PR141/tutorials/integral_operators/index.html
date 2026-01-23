@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Integral operators · Inti.jl</title><meta name="title" content="Integral operators · Inti.jl"/><meta property="og:title" content="Integral operators · Inti.jl"/><meta property="twitter:title" content="Integral operators · Inti.jl"/><meta name="description" content="Documentation for Inti.jl."/><meta property="og:description" content="Documentation for Inti.jl."/><meta property="twitter:description" content="Documentation for Inti.jl."/><meta property="og:url" content="https://IntegralEquations.github.io/Inti.jl/tutorials/integral_operators/"/><meta property="twitter:url" content="https://IntegralEquations.github.io/Inti.jl/tutorials/integral_operators/"/><link rel="canonical" href="https://IntegralEquations.github.io/Inti.jl/tutorials/integral_operators/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.png" alt="Inti.jl logo"/></a><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../getting_started/">Getting started</a></li><li><a class="tocitem" href="../geo_and_meshes/">Geometry and meshes</a></li><li class="is-active"><a class="tocitem" href>Integral operators</a><ul class="internal"><li><a class="tocitem" href="#Predefined-kernels-and-integral-operators"><span>Predefined kernels and integral operators</span></a></li><li><a class="tocitem" href="#Operator-composition"><span>Operator composition</span></a></li><li><a class="tocitem" href="#Custom-kernels"><span>Custom kernels</span></a></li></ul></li><li><a class="tocitem" href="../layer_potentials/">Layer potentials</a></li><li><a class="tocitem" href="../compression_methods/">Compression methods</a></li><li><a class="tocitem" href="../correction_methods/">Correction methods</a></li><li><a class="tocitem" href="../solvers/">Linear solvers</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../../pluto-examples/toy_example/">Toy example</a></li><li><a class="tocitem" href="../../pluto-examples/helmholtz_scattering/">Helmholtz scattering</a></li><li><a class="tocitem" href="../../pluto-examples/poisson/">Poisson problem</a></li><li><a class="tocitem" href="../../examples/heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../../examples/stokes_drag/">Stokes drag</a></li><li><a class="tocitem" href="../../examples/crack_elasticity/">Elastic crack</a></li><li><a class="tocitem" href="../../examples/pep/">Plasmonic eigenvalues</a></li></ul></li><li><a class="tocitem" href="../../references/">References</a></li><li><a class="tocitem" href="../../docstrings/">Docstrings</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Integral operators</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Integral operators</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl/blob/main/docs/src/tutorials/integral_operators.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Integral-operators"><a class="docs-heading-anchor" href="#Integral-operators">Integral operators</a><a id="Integral-operators-1"></a><a class="docs-heading-anchor-permalink" href="#Integral-operators" title="Permalink"></a></h1><div class="admonition is-info" id="Important-points-covered-in-this-tutorial-8e215085ab1a4d5c"><header class="admonition-header">Important points covered in this tutorial<a class="admonition-anchor" href="#Important-points-covered-in-this-tutorial-8e215085ab1a4d5c" title="Permalink"></a></header><div class="admonition-body"><ul><li>Define layer potentials and the four integral operators of Calderón calculus</li><li>Construct block operators</li><li>Set up a custom kernel</li></ul></div></div><p>A central piece of integral equation methods is the efficient and accurate computation of integral operators. In the first part of this tutorial we will cover how to assemble and manipulate the four integral operators of Calderón calculus, namely the single-layer, double-layer, hypersingular, and adjoint operators [<a href="../../references/#nedelec2001acoustic">2</a>, <a href="../../references/#colton2013integral">3</a>], for some predefined kernels in Inti.jl. In the second part we will show how to extend the package to handle custom kernels.</p><h2 id="Predefined-kernels-and-integral-operators"><a class="docs-heading-anchor" href="#Predefined-kernels-and-integral-operators">Predefined kernels and integral operators</a><a id="Predefined-kernels-and-integral-operators-1"></a><a class="docs-heading-anchor-permalink" href="#Predefined-kernels-and-integral-operators" title="Permalink"></a></h2><p>To simplify the construction of integral operators for some commonly used PDEs, Inti.jl defines a few <a href="../../docstrings/#Inti.AbstractDifferentialOperator"><code>AbstractDifferentialOperator</code></a>s types. For each of these PDEs, the package provides a <a href="../../docstrings/#Inti.SingleLayerKernel"><code>SingleLayerKernel</code></a>, <a href="../../docstrings/#Inti.DoubleLayerKernel"><code>DoubleLayerKernel</code></a>, <a href="../../docstrings/#Inti.HyperSingularKernel"><code>HyperSingularKernel</code></a>, and <a href="../../docstrings/#Inti.AdjointDoubleLayerKernel"><code>AdjointDoubleLayerKernel</code></a> that can be used to construct the corresponding kernel functions, e.g.:</p><pre><code class="language-julia hljs">using Inti, StaticArrays, LinearAlgebra
+op = Inti.Helmholtz(; dim = 2, k = 2π)
+G   = Inti.SingleLayerKernel(op)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Inti.SingleLayerKernel{ComplexF64, Inti.Helmholtz{2, Float64}}(Helmholtz operator in 2 dimensions: -Δu - k²u)</code></pre><p>Typically, we are not interested in the kernels themselves, but in the integral operators they define. Two functions, <a href="../../docstrings/#Inti.single_double_layer-Tuple{}"><code>single_double_layer</code></a> and <a href="../../docstrings/#Inti.adj_double_layer_hypersingular-Tuple{}"><code>adj_double_layer_hypersingular</code></a>, are provided as a high-level syntax to construct the four integral operators of Calderón calculus:</p><pre><code class="language-julia hljs">Γ = Inti.parametric_curve(s -&gt; SVector(cos(s), sin(s)), 0, 2π) |&gt; Inti.Domain
+Q = Inti.Quadrature(Γ; meshsize = 0.1, qorder = 7)
+S, D = Inti.single_double_layer(;
+    op,
+    target = Q,
+    source = Q,
+    compression = (method = :none,),
+    correction = (method = :dim,)
+)
+K, N = Inti.adj_double_layer_hypersingular(;
+    op,
+    target = Q,
+    source = Q,
+    compression = (method = :none,),
+    correction = (method = :dim,)
+)</code></pre><p>Much goes on under the hood in the function above, and the sections on <a href="../correction_methods/#Correction-methods">correction</a> and <a href="../compression_methods/#Compression-methods">compression</a> methods will provide more details on the options available. The important thing to keep in mind is that <code>S</code>, <code>D</code>, <code>K</code>, and <code>N</code> are discrete approximations of the following (linear) operators:</p><p class="math-container">\[\begin{aligned}
+    S[\sigma](\boldsymbol{x}) &amp;:= \int_{\Gamma} G(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}}, \quad 
+    &amp;&amp;D[\sigma](\boldsymbol{x}) := \mathrm{p.v.} \int_{\Gamma} \frac{\partial G}{\partial \nu_{\boldsymbol{y}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}} \\
+    K[\sigma](\boldsymbol{x}) &amp;:=  \mathrm{p.v.} \int_{\Gamma} \frac{\partial G}{\partial \nu_{\boldsymbol{x}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}}, \quad
+    &amp;&amp;N[\sigma](\boldsymbol{x}) := \mathrm{f.p.} \int_{\Gamma} \frac{\partial^2 G}{\partial \nu_{\boldsymbol{x}} \partial \nu_{\boldsymbol{y}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}}
+\end{aligned}\]</p><p>The actual type of <code>S</code>, <code>D</code>, <code>K</code>, and <code>N</code> depends on the <code>compression</code> and <code>correction</code> methods. In the simple case above, these are simply matrices:</p><pre><code class="language-julia hljs">map(typeof, (S, D, K, N))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(Matrix{ComplexF64}, Matrix{ComplexF64}, Matrix{ComplexF64}, Matrix{ComplexF64})</code></pre><p>If we turn on a compression method, such as <code>:fmm</code>, the types may change into something different:</p><pre><code class="language-julia hljs">using FMM2D # will load the extension
+Sfmm, Dfmm = Inti.single_double_layer(;
+    op,
+    target = Q,
+    source = Q,
+    compression = (method = :fmm, tol = 1e-10),
+    correction = (method = :dim,)
+)
+Kfmm, Nfmm = Inti.adj_double_layer_hypersingular(;
+    op,
+    target = Q,
+    source = Q,
+    compression = (method = :fmm, tol = 1e-10),
+    correction = (method = :dim, )
+)
+typeof(Sfmm)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LinearMaps.LinearCombination{ComplexF64, Tuple{LinearMaps.FunctionMap{ComplexF64, IntiFMM2DExt.var&quot;#21#22&quot;{Float64, Bool, Vector{Float64}, Matrix{Float64}, Matrix{Float64}}, Nothing, true}, LinearMaps.WrappedMap{ComplexF64, SparseArrays.SparseMatrixCSC{ComplexF64, Int64}}}}</code></pre><p>This is because the FMM method is used to approximate the matrix-vector in a matrix-free way: the only thing <em>guaranteed</em> is that <code>S</code> and <code>D</code> can be applied to a vector:</p><pre><code class="language-julia hljs">x = map(q -&gt; cos(q.coords[1] + q.coords[2]), Q)
+norm(Sfmm*x - S*x, Inf)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2.6036830744478453e-14</code></pre><p>The <code>Sfmm</code> object above in fact combines two linear maps:</p><pre><code class="language-julia hljs">Sfmm</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">252×252 LinearMaps.LinearCombination{ComplexF64} with 2 maps:
+  252×252 LinearMaps.FunctionMap{ComplexF64,true}(#21; issymmetric=false, ishermitian=false, isposdef=false)
+  252×252 LinearMaps.WrappedMap{ComplexF64} of
+    252×252 SparseArrays.SparseMatrixCSC{ComplexF64, Int64} with 1008 stored entries</code></pre><p>The <code>FunctionMap</code> computes a matrix-vector by performing a function call to the <code>FMM2D</code> library. The <code>WrappedMap</code> accounts for a sparse matrix used to correct for singular and nearly singular interactions. These two objects are added lazily using <a href="https://github.com/JuliaLinearAlgebra/LinearMaps.jl">LinearMaps</a>.</p><h2 id="Operator-composition"><a class="docs-heading-anchor" href="#Operator-composition">Operator composition</a><a id="Operator-composition-1"></a><a class="docs-heading-anchor-permalink" href="#Operator-composition" title="Permalink"></a></h2><p>Effortlessly and efficiently composing operators is a powerful abstraction for integral equations, as it allows for the construction of complex systems from simple building blocks. To show this, let us show how to construct the Calderón projectors:</p><p class="math-container">\[\begin{aligned}
+H = \begin{bmatrix}
+    -D &amp; S \\
+    -N &amp; K
+\end{bmatrix} 
+\end{aligned}\]</p><p>As is well-known [<a href="../../references/#nedelec2001acoustic">2</a>, Theorem 3.1.3], the operators <span>$C_\pm = I/2 \pm H$</span> are the projectors (i.e. <span>$C_{\pm}^2 = C_{\pm}$</span>):</p><pre><code class="language-julia hljs">using LinearMaps
+# create the block operator
+H = [-Dfmm Sfmm; -Nfmm Kfmm]
+C₊ = I / 2 + H
+C₋ = I / 2 - H
+# define two density functions on Γ
+u = map(q -&gt; cos(q.coords[1] + q.coords[2]), Q)
+v = map(q-&gt; q.coords[1], Q)
+x = [u; v]
+# compute the error in the projector identity
+e₊ = norm(C₊*(C₊*x) - C₊*x, Inf)
+e₋ = norm(C₋*(C₋*x) - C₋*x, Inf)
+println(&quot;projection error for C₊: $e₊&quot;)
+println(&quot;projection error for C₋: $e₋&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">projection error for C₊: 6.482671248944146e-5
+projection error for C₋: 6.482671248257194e-5</code></pre><p>We see that the error in the projector identity is small, as expected. Note that such compositions are not limited to the Calderón projectors, and can be used e.g. to construct the combined field integral equation (CFIE), or to compose a formulation with an operator preconditioner.</p><h2 id="Custom-kernels"><a class="docs-heading-anchor" href="#Custom-kernels">Custom kernels</a><a id="Custom-kernels-1"></a><a class="docs-heading-anchor-permalink" href="#Custom-kernels" title="Permalink"></a></h2><p>So far we have focused on problems for which Inti.jl provides predefined kernels, and used the high-level syntax of e.g. <code>single_double_layer</code> to construct the integral operators. We will now dig into the details of how to set up a custom kernel function, and how to build an integral operator from it.</p><div class="admonition is-info" id="Integral-operators-coming-from-PDEs-4b51b89ac4d1bf99"><header class="admonition-header">Integral operators coming from PDEs<a class="admonition-anchor" href="#Integral-operators-coming-from-PDEs-4b51b89ac4d1bf99" title="Permalink"></a></header><div class="admonition-body"><p>If the integral operator of interest arises from a PDE, it is recommended to define a new <a href="../../docstrings/#Inti.AbstractDifferentialOperator"><code>AbstractDifferentialOperator</code></a> type, and implement the required methods for <a href="../../docstrings/#Inti.SingleLayerKernel"><code>SingleLayerKernel</code></a>, <a href="../../docstrings/#Inti.DoubleLayerKernel"><code>DoubleLayerKernel</code></a>, <a href="../../docstrings/#Inti.AdjointDoubleLayerKernel"><code>AdjointDoubleLayerKernel</code></a>, and <a href="../../docstrings/#Inti.HyperSingularKernel"><code>HyperSingularKernel</code></a>. This will enable the use of the high-level syntax for constructing boundary integral operators, as well as the use of the compression and correction methods specific to integral operators arising from PDEs.</p></div></div><p>For the sake of simplicity, let us consider the following kernel representing the half-space Dirichlet Green function for Helmholtz&#39;s equation in 2D:</p><p class="math-container">\[    G_D(\boldsymbol{x}, \boldsymbol{y}) = \frac{i}{4} H^{(1)}_0(k |\boldsymbol{x} - \boldsymbol{y}|) - \frac{i}{4} H^{(1)}_0(k |\boldsymbol{x} - \boldsymbol{y}^*|),\]</p><p>where <span>$\boldsymbol{y}^* = (y_1, -y_2)$</span>. We can define this kernel as a</p><pre><code class="language-julia hljs">using SpecialFunctions # for hankelh1
+function helmholtz_kernel(target, source, k)
+    x, y  = Inti.coords(target), Inti.coords(source)
+    yc = SVector(y[1], -y[2])
+    d, dc  = norm(x-y), norm(x-yc)
+    # the singularity at x = y needs to be handled separately, so just put a zero to avoid division by zero
+    d == 0 ? zero(ComplexF64) : im / 4 * ( hankelh1(0, k * d) - hankelh1(0, k * dc))
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">helmholtz_kernel (generic function with 1 method)</code></pre><p>Let us now consider the integral operator <span>$S$</span> defined by:</p><p class="math-container">\[    S[\sigma](\boldsymbol{x}) = \int_{\Gamma} G_D(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \mathrm{d} s_{\boldsymbol{y}}, \quad \boldsymbol{x} \in \Gamma.\]</p><p>We can represent <code>S</code> by an <code>IntegralOperator</code> type:</p><pre><code class="language-julia hljs">k = 50π
+λ = 2π/k
+meshsize = λ / 10
+geo = Inti.parametric_curve(s -&gt; SVector(cos(s), 2 + sin(s)), 0, 2π)
+Γ = Inti.Domain(geo)
+msh = Inti.meshgen(Γ; meshsize)
+Q = Inti.Quadrature(msh; qorder = 5)
+# create a local scope to capture `k`
+K = let k = k
+    (t,q) -&gt; helmholtz_kernel(t,q,k)
+end
+Sop = Inti.IntegralOperator(K, Q, Q)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4713×4713 Inti.IntegralOperator{ComplexF64, Main.var&quot;#20#21&quot;{Float64}, Inti.Quadrature{2, Float64}, Inti.Quadrature{2, Float64}}:
+          0.0+0.0im          …    0.00035715+0.000270101im
+  0.000260373+0.000265508im      0.000171339+0.000259978im
+  0.000127604+0.000252813im       7.33917e-5+0.00024256im
+   7.58554e-5+0.000242171im       3.10627e-5+0.000229363im
+   7.43968e-6+0.000218844im      -2.65882e-5+0.000202109im
+  -4.38907e-5+0.000190045im  …   -6.99075e-5+0.000170118im
+  -6.76868e-5+0.00017125im       -8.95846e-5+0.000149858im
+  -9.95305e-5+0.000136401im     -0.000114831+0.000113238im
+ -0.000120932+9.95966e-5im      -0.000130051+7.56615e-5im
+  -0.00012892+7.78819e-5im      -0.000134617+5.39655e-5im
+             ⋮               ⋱  
+ -0.000142363+8.79846e-5im      -0.000132816+0.000111497im
+ -0.000127301+0.000125711im  …  -0.000111999+0.000148876im
+ -0.000101476+0.000161747im      -8.00035e-5+0.000183567im
+  -8.11358e-5+0.00018134im       -5.57824e-5+0.000201934im
+  -3.61606e-5+0.000211674im      -3.17221e-6+0.00022945im
+    2.3711e-5+0.000236707im       6.71495e-5+0.00025087im
+   6.75417e-5+0.000248404im  …   0.000120252+0.000260158im
+  0.000168325+0.000262988im      0.000255675+0.0002702im
+   0.00035715+0.000270101im              0.0+0.0im</code></pre><div class="admonition is-info" id="Signature-of-custom-kernels-1d028ed659ae9bf7"><header class="admonition-header">Signature of custom kernels<a class="admonition-anchor" href="#Signature-of-custom-kernels-1d028ed659ae9bf7" title="Permalink"></a></header><div class="admonition-body"><p>Kernel functions passed to <code>IntegralOperator</code> should always take two arguments, <code>target</code> and <code>source</code>, which are both of <a href="../../docstrings/#Inti.QuadratureNode"><code>QuadratureNode</code></a>. This allows for extracting not only the <a href="../../docstrings/#Inti.coords-Tuple{T} where T"><code>coords</code></a> of the nodes, but also the <a href="../../docstrings/#Inti.normal-Tuple{Any, Any}"><code>normal</code></a> vector if needed (e.g. for double-layer or hypersingular kernels).</p></div></div><p>The approximation of <code>Sop</code> now involves two steps:</p><ul><li>build a dense operator <code>S₀</code> that efficiently computes the matrix-vector product <code>Sop * x</code> for any vector <code>x</code></li><li>correct for the inaccuracies of <code>S₀</code> due to singular/nearly-singular interactions by adding to it a correction matrix <code>δS</code></li></ul><p>For the first step, we will use a hierarchical matrix:</p><pre><code class="language-julia hljs">using HMatrices
+S₀ = Inti.assemble_hmatrix(Sop; rtol = 1e-4)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">HMatrix of ComplexF64 with range 1:4713 × 1:4713
+	 number of nodes in tree: 1421
+	 number of leaves: 1066 (318 admissible + 748 full)
+	 min rank of sparse blocks : 4
+	 max rank of sparse blocks : 30
+	 min length of dense blocks : 625
+	 max length of dense blocks : 3936
+	 min number of elements per leaf: 625
+	 max number of elements per leaf: 617010
+	 depth of tree: 8
+	 compression ratio: 7.839964
+</code></pre><p>The correction matrix <code>δS</code> will be constructed using <a href="../../docstrings/#Inti.adaptive_correction-Tuple{Inti.IntegralOperator}"><code>adaptive_correction</code></a>:</p><pre><code class="language-julia hljs">δS = Inti.adaptive_correction(Sop; rtol = 1e-4, maxdist = 3*meshsize)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4713×4713 SparseArrays.SparseMatrixCSC{ComplexF64, Int64} with 89547 stored entries:
+⎡⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⎤
+⎢⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⎥
+⎢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⡀⠀⎥
+⎣⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣦⎦</code></pre><p>How exactly one adds <code>S₀</code> and <code>δS</code> to get the final operator depends on the intended usage. For instance, one can use the <code>LinearMap</code> type to simply add them lazily:</p><pre><code class="language-julia hljs">using LinearMaps
+S = LinearMap(S₀) + LinearMap(δS)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4713×4713 LinearMaps.LinearCombination{ComplexF64} with 2 maps:
+  4713×4713 LinearMaps.WrappedMap{ComplexF64} of
+    4713×4713 HMatrix{ClusterTree{2, Float64}, ComplexF64}
+  4713×4713 LinearMaps.WrappedMap{ComplexF64} of
+    4713×4713 SparseArrays.SparseMatrixCSC{ComplexF64, Int64} with 89547 stored entries</code></pre><p>Or, one can add <code>δS</code> to <code>S₀</code> to create a new object:</p><pre><code class="language-julia hljs">S = S₀ + δS</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">HMatrix of ComplexF64 with range 1:4713 × 1:4713
+	 number of nodes in tree: 1421
+	 number of leaves: 1066 (318 admissible + 748 full)
+	 min rank of sparse blocks : 4
+	 max rank of sparse blocks : 30
+	 min length of dense blocks : 625
+	 max length of dense blocks : 3936
+	 min number of elements per leaf: 625
+	 max number of elements per leaf: 617010
+	 depth of tree: 8
+	 compression ratio: 7.839964
+</code></pre><p>or if performance/memory is a concern, one may want to directly add <code>δS</code> to <code>S₀</code> in-place:</p><pre><code class="language-julia hljs">axpy!(1.0, δS, S₀)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">HMatrix of ComplexF64 with range 1:4713 × 1:4713
+	 number of nodes in tree: 1421
+	 number of leaves: 1066 (318 admissible + 748 full)
+	 min rank of sparse blocks : 4
+	 max rank of sparse blocks : 30
+	 min length of dense blocks : 625
+	 max length of dense blocks : 3936
+	 min number of elements per leaf: 625
+	 max number of elements per leaf: 617010
+	 depth of tree: 8
+	 compression ratio: 7.839964
+</code></pre><p>All of these should give an identical matrix-vector product, but the latter two allow e.g. for the use of direct solvers though an LU factorization.</p><div class="admonition is-warning" id="Limitations-4722e02c336a7527"><header class="admonition-header">Limitations<a class="admonition-anchor" href="#Limitations-4722e02c336a7527" title="Permalink"></a></header><div class="admonition-body"><p>Integral operators defined from custom kernel functions do not support all the features of the predefined ones. In particular, some singular integration methods (e.g. the Density Interpolation Method) and acceleration routines (e.g. Fast Multipole Method) used to correct for singular and nearly singular integral operators, and to accelerate the matrix vector products, are only available for specific kernels. Check the <a href="../correction_methods/#Correction-methods">corrections</a> and <a href="../compression_methods/#Compression-methods">compression</a> for more details concerning which methods are compatible with custom kernels.</p></div></div></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../geo_and_meshes/">« Geometry and meshes</a><a class="docs-footer-nextpage" href="../layer_potentials/">Layer potentials »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Wednesday 21 January 2026 18:00">Wednesday 21 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

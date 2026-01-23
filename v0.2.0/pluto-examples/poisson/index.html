@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Poisson problem · Inti.jl</title><meta name="title" content="Poisson problem · Inti.jl"/><meta property="og:title" content="Poisson problem · Inti.jl"/><meta property="twitter:title" content="Poisson problem · Inti.jl"/><meta name="description" content="Documentation for Inti.jl."/><meta property="og:description" content="Documentation for Inti.jl."/><meta property="twitter:description" content="Documentation for Inti.jl."/><meta property="og:url" content="https://IntegralEquations.github.io/Inti.jl/pluto-examples/poisson/"/><meta property="twitter:url" content="https://IntegralEquations.github.io/Inti.jl/pluto-examples/poisson/"/><link rel="canonical" href="https://IntegralEquations.github.io/Inti.jl/pluto-examples/poisson/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.png" alt="Inti.jl logo"/></a><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../../tutorials/getting_started/">Getting started</a></li><li><a class="tocitem" href="../../tutorials/geo_and_meshes/">Geometry and meshes</a></li><li><a class="tocitem" href="../../tutorials/integral_operators/">Integral operators</a></li><li><a class="tocitem" href="../../tutorials/layer_potentials/">Layer potentials</a></li><li><a class="tocitem" href="../../tutorials/compression_methods/">Compression methods</a></li><li><a class="tocitem" href="../../tutorials/correction_methods/">Correction methods</a></li><li><a class="tocitem" href="../../tutorials/solvers/">Linear solvers</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../toy_example/">Toy example</a></li><li><a class="tocitem" href="../helmholtz_scattering/">Helmholtz scattering</a></li><li class="is-active"><a class="tocitem" href>Poisson problem</a><ul class="internal"><li><a class="tocitem" href="#Problem-definition"><span>Problem definition</span></a></li><li><a class="tocitem" href="#Geometry-and-mesh"><span>Geometry and mesh</span></a></li><li><a class="tocitem" href="#Integral-operators"><span>Integral operators</span></a></li><li><a class="tocitem" href="#Solving-the-linear-system"><span>Solving the linear system</span></a></li><li><a class="tocitem" href="#Solution-evaluation-and-visualization"><span>Solution evaluation and visualization</span></a></li></ul></li><li><a class="tocitem" href="../../examples/heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../../examples/stokes_drag/">Stokes drag</a></li><li><a class="tocitem" href="../../examples/crack_elasticity/">Elastic crack</a></li><li><a class="tocitem" href="../../examples/pep/">Plasmonic eigenvalues</a></li></ul></li><li><a class="tocitem" href="../../references/">References</a></li><li><a class="tocitem" href="../../docstrings/">Docstrings</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Poisson problem</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Poisson problem</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl/blob/main/docs/src/pluto-examples/poisson.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><p><a href="../poisson.jl"><img src="https://img.shields.io/badge/download-Pluto_notebook-blue" alt="Pluto notebook"/></a></p><h1 id="Poisson-Problem"><a class="docs-heading-anchor" href="#Poisson-Problem">Poisson Problem</a><a id="Poisson-Problem-1"></a><a class="docs-heading-anchor-permalink" href="#Poisson-Problem" title="Permalink"></a></h1><div class="admonition is-info" id="Important-points-covered-in-this-example-3460cbc00afc92e4"><header class="admonition-header">Important points covered in this example<a class="admonition-anchor" href="#Important-points-covered-in-this-example-3460cbc00afc92e4" title="Permalink"></a></header><div class="admonition-body"><ul><li>Reformulating Poisson-like problems using integral equations</li><li>Using volume potentials</li><li>Creating interior meshes using Gmsh</li></ul></div></div><h2 id="Problem-definition"><a class="docs-heading-anchor" href="#Problem-definition">Problem definition</a><a id="Problem-definition-1"></a><a class="docs-heading-anchor-permalink" href="#Problem-definition" title="Permalink"></a></h2><p>In this example we will solve the Poisson equation in a domain <span>$\Omega$</span> with Dirichlet boundary conditions on <span>$\Gamma := \partial \Omega$</span>:</p><p class="math-container">\[  \begin{align*}
+      -\Delta u &amp;= f  \quad \text{in } \quad \Omega\\
+      u &amp;= g  \quad \text{on } \quad \Gamma
+  \end{align*}\]</p><p>where <span>$f : \Omega \to \mathbb{R}$</span> and <span>$g : \Gamma \to \mathbb{R}$</span> are given functions. To solve this problem using integral equations, we split the solution <span>$u$</span> into a particular solution <span>$u_p$</span> and a homogeneous solution <span>$u_h$</span>:</p><p class="math-container">\[  u = u_p + u_h.\]</p><p>The function <span>$u_p$</span> is given by</p><p class="math-container">\[u_p(\boldsymbol{r}) = \int_{\Omega} G(\boldsymbol{r}, \boldsymbol{r&#39;}) f(\boldsymbol{r&#39;}) d\boldsymbol{r&#39;}.\]</p><p>with <span>$G$</span> the fundamental solution of <span>$-\Delta$</span>.</p><p>The function <span>$u_h$</span> satisfies the homogeneous problem</p><p class="math-container">\[  \begin{align*}
+      \Delta u_h &amp;= 0,  \quad &amp;&amp;\text{in } \quad \Omega, \\
+      u_h &amp;= g - u_p,  \quad &amp;&amp;\text{on }  \quad \Gamma,
+  \end{align*}\]</p><p>which can be solved using the integral equation method. In particular, for this example, we employ a double-layer formulation:</p><p class="math-container">\[u_h(\boldsymbol{r}) = \int_{\Gamma} G(\boldsymbol{r}, \boldsymbol{r&#39;}) \sigma(\boldsymbol{r}&#39;) d\boldsymbol{r&#39;},\]</p><p>where the density function <span>$\sigma$</span> solves the integral equation</p><p class="math-container">\[  -\frac{\sigma(\boldsymbol{x})}{2} + \int_{\Gamma} \partial_{\nu_{\boldsymbol{y}}}G(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d} s_{\boldsymbol{y}} = g(\boldsymbol{x}) - u_p(\boldsymbol{x}).\]</p><p>In what follows we illustrate how to solve the problem in this manner.</p><h2 id="Geometry-and-mesh"><a class="docs-heading-anchor" href="#Geometry-and-mesh">Geometry and mesh</a><a id="Geometry-and-mesh-1"></a><a class="docs-heading-anchor-permalink" href="#Geometry-and-mesh" title="Permalink"></a></h2><p>We use the <em>Gmsh API</em> to create a jellyfish-shaped domain and to generate a second order mesh of its interior and boundary:</p><pre><code class="language-julia hljs">using Inti, Gmsh
+meshsize = 0.1
+gmsh.initialize()
+jellyfish = Inti.gmsh_curve(0, 2π; meshsize) do s
+    r = 1 + 0.3 * cos(4 * s + 2 * sin(s))
+    return r * Inti.Point2D(cos(s), sin(s))
+end
+cl = gmsh.model.occ.addCurveLoop([jellyfish])
+surf = gmsh.model.occ.addPlaneSurface([cl])
+gmsh.model.occ.synchronize()
+gmsh.option.setNumber(&quot;Mesh.MeshSizeMax&quot;, meshsize)
+gmsh.model.mesh.generate(2)
+gmsh.model.mesh.setOrder(2)
+msh = Inti.import_mesh(; dim = 2)
+gmsh.finalize()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
+Info    : Meshing curve 1 (BSpline)
+Info    : Done meshing 1D (Wall 0.0264635s, CPU 0.02646s)
+Info    : Meshing 2D...
+Info    : Meshing surface 1 (Plane, Frontal-Delaunay)
+Info    : Done meshing 2D (Wall 0.0769891s, CPU 0.076961s)
+Info    : 566 nodes 1033 elements
+Info    : Meshing order 2 (curvilinear on)...
+Info    : [  0%] Meshing curve 1 order 2
+Info    : [ 60%] Meshing surface 1 order 2
+Info    : Surface mesh: worst distortion = 0.451559 (0 elements in ]0, 0.2]); worst gamma = 0.758919
+Info    : Done meshing order 2 (Wall 0.00787988s, CPU 0.00788s)</code></pre><p>We can now extract components of the mesh corresponding to the <span>$\Omega$</span> and <span>$\Gamma$</span> domains:</p><pre><code class="language-julia hljs">Ω = Inti.Domain(e -&gt; Inti.geometric_dimension(e) == 2, msh)
+Γ = Inti.boundary(Ω)
+Ω_msh = view(msh, Ω)
+Γ_msh = view(msh, Γ)</code></pre><p>and visualize them:</p><pre><code class="language-julia hljs">using Meshes, GLMakie
+viz(Ω_msh; showsegments = true)
+viz!(Γ_msh; color = :red)</code></pre><img src="f3c1a39a.png" alt="Example block output"/><p>To conclude the geometric setup, we need a quadrature for the volume and boundary:</p><pre><code class="language-julia hljs">Ω_quad = Inti.Quadrature(Ω_msh; qorder = 4)
+Γ_quad = Inti.Quadrature(Γ_msh; qorder = 6)</code></pre><h2 id="Integral-operators"><a class="docs-heading-anchor" href="#Integral-operators">Integral operators</a><a id="Integral-operators-1"></a><a class="docs-heading-anchor-permalink" href="#Integral-operators" title="Permalink"></a></h2><p>We can now assemble the required volume potential. To obtain the value of the particular solution <span>$u_p$</span> on the boundary for the modified integral equation above we will need the volume integral operator mapping to points on the boundary, i.e. operator:</p><pre><code class="language-julia hljs">using FMM2D #to accelerate the maps
+op = Inti.Laplace(; dim = 2)
+# Newtonian potential mapping domain to boundary
+V_d2b = Inti.volume_potential(;
+    op,
+    target = Γ_quad,
+    source = Ω_quad,
+    compression = (method = :fmm, tol = 1e-12),
+    correction = (method = :dim, maxdist = 5 * meshsize, target_location = :on),
+)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">336×5100 LinearMaps.LinearCombination{Float64} with 2 maps:
+  336×5100 LinearMaps.FunctionMap{Float64,true}(#3; issymmetric=false, ishermitian=false, isposdef=false)
+  336×5100 LinearMaps.WrappedMap{Float64} of
+    336×5100 SparseArrays.SparseMatrixCSC{Float64, Int64} with 2016 stored entries</code></pre><p>We require also the boundary integral operators for the ensuing integral equation:</p><pre><code class="language-julia hljs"># Single and double layer operators on Γ
+S_b2b, D_b2b = Inti.single_double_layer(;
+    op,
+    target = Γ_quad,
+    source = Γ_quad,
+    compression = (method = :fmm, tol = 1e-12),
+    correction = (method = :dim,),
+)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(336×336 LinearMaps.LinearCombination{Float64} with 2 maps:
+  336×336 LinearMaps.FunctionMap{Float64,true}(#3; issymmetric=false, ishermitian=false, isposdef=false)
+  336×336 LinearMaps.WrappedMap{Float64} of
+    336×336 SparseArrays.SparseMatrixCSC{Float64, Int64} with 1344 stored entries, 336×336 LinearMaps.LinearCombination{Float64} with 2 maps:
+  336×336 LinearMaps.FunctionMap{Float64,true}(#4; issymmetric=false, ishermitian=false, isposdef=false)
+  336×336 LinearMaps.WrappedMap{Float64} of
+    336×336 SparseArrays.SparseMatrixCSC{Float64, Int64} with 1344 stored entries)</code></pre><div class="admonition is-info" id="Note-beb6fa017b4001bf"><header class="admonition-header">Note<a class="admonition-anchor" href="#Note-beb6fa017b4001bf" title="Permalink"></a></header><div class="admonition-body"><p>In this example we used the Fast Multipole Method (<code>:fmm</code>) to accelerate the operators, and the Density Interpolation Method (<code>:dim</code>) to correct singular and nearly-singular integral.</p></div></div><h2 id="Solving-the-linear-system"><a class="docs-heading-anchor" href="#Solving-the-linear-system">Solving the linear system</a><a id="Solving-the-linear-system-1"></a><a class="docs-heading-anchor-permalink" href="#Solving-the-linear-system" title="Permalink"></a></h2><p>We are now in a position to solve the original Poisson problem, but for that we need to specify the functions <span>$f$</span> and <span>$g$</span>. In order to verify that our numerical approximation is correct, however, we will play a different game and specify instead a manufactured solution <span>$u_e$</span> from which we will derive the functions <span>$f$</span> and <span>$g$</span>:</p><pre><code class="language-julia hljs"># Create a manufactured solution
+uₑ = (x) -&gt; cos(2 * x[1]) * sin(2 * x[2])
+fₑ = (x) -&gt; 8 * cos(2 * x[1]) * sin(2 * x[2]) # -Δuₑ
+g = map(q -&gt; uₑ(q.coords), Γ_quad)
+f = map(q -&gt; fₑ(q.coords), Ω_quad)</code></pre><p>With these, we can compute the right-hand-side of the integral equation for the homogeneous part of the solution:</p><pre><code class="language-julia hljs">rhs = g - V_d2b * f</code></pre><p>and solve the integral equation for the integral density function <span>$σ$</span>:</p><pre><code class="language-julia hljs">using IterativeSolvers, LinearAlgebra
+σ = gmres(-I / 2 + D_b2b, rhs; abstol = 1e-8, verbose = true, restart = 1000)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">=== gmres ===
+rest	iter	resnorm
+  1	  1	1.58e+00
+  1	  2	9.57e-01
+  1	  3	1.33e-01
+  1	  4	1.54e-02
+  1	  5	9.43e-04
+  1	  6	3.63e-04
+  1	  7	1.28e-04
+  1	  8	6.69e-06
+  1	  9	1.05e-06
+  1	 10	1.31e-07
+  1	 11	1.73e-08</code></pre><p>With the density function at hand, we can now reconstruct our approximate solution:</p><pre><code class="language-julia hljs">G = Inti.SingleLayerKernel(op)
+dG = Inti.DoubleLayerKernel(op)
+𝒱 = Inti.IntegralPotential(G, Ω_quad)
+𝒟 = Inti.IntegralPotential(dG, Γ_quad)
+u = (x) -&gt; 𝒱[f](x) + 𝒟[σ](x)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">#13 (generic function with 1 method)</code></pre><p>and evaluate it at any point in the domain:</p><pre><code class="language-julia hljs">x = Inti.Point2D(0.1, 0.4)
+println(&quot;error at $x: &quot;, u(x) - uₑ(x))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">error at [0.1, 0.4]: 0.00010441436005637073</code></pre><h2 id="Solution-evaluation-and-visualization"><a class="docs-heading-anchor" href="#Solution-evaluation-and-visualization">Solution evaluation and visualization</a><a id="Solution-evaluation-and-visualization-1"></a><a class="docs-heading-anchor-permalink" href="#Solution-evaluation-and-visualization" title="Permalink"></a></h2><p>Although we have &quot;solved&quot; the problem in the previous section, using the anonymous function <code>u</code> to evaluate the field is neither efficient nor accurate when there are either many points to evaluate, or when they lie close to the domain <span>$\Omega$</span>. The fundamental reason for this is the usual: the integral operators in the function <code>u</code> are dense matrices, and their evaluation inside or near to <span>$\Omega$</span> suffers from inaccurate singular and near-singular quadrature.</p><p>To address this issue, we need to assemble <em>accelerated</em> and <em>corrected</em> versions of the integral operators. Let us suppose we wish to evaluate the solution <span>$u$</span> at all the quadrature nodes of <span>$\Omega$</span>:</p><pre><code class="language-julia hljs">V_d2d = Inti.volume_potential(;
+    op,
+    target = Ω_quad,
+    source = Ω_quad,
+    compression = (method = :fmm, tol = 1e-8),
+    correction = (method = :dim,),
+)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">5100×5100 LinearMaps.LinearCombination{Float64} with 2 maps:
+  5100×5100 LinearMaps.FunctionMap{Float64,true}(#3; issymmetric=false, ishermitian=false, isposdef=false)
+  5100×5100 LinearMaps.WrappedMap{Float64} of
+    5100×5100 SparseArrays.SparseMatrixCSC{Float64, Int64} with 30600 stored entries</code></pre><p>Likewise, we need operators mapping densities from our boundary quadrature to our mesh nodes:</p><p>We now evaluate the solution at all quadrature nodes and compare it to the manufactured:</p><pre><code class="language-julia hljs">u_quad = V_d2d * f + D_b2d * σ
+er_quad = u_quad - map(q -&gt; uₑ(q.coords), Ω_quad)
+println(&quot;maximum error at all quadrature nodes: &quot;, norm(er_quad, Inf))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">maximum error at all quadrature nodes: 3.2375261400235944e-5</code></pre><p>Lastly, let us visualize the solution and the error on the mesh nodes using <a href="../../docstrings/#Inti.quadrature_to_node_vals-Tuple{Inti.Quadrature, AbstractVector}"><code>quadrature_to_node_vals</code></a>:</p><pre><code class="language-julia hljs">nodes = Inti.nodes(Ω_msh)
+u_nodes = Inti.quadrature_to_node_vals(Ω_quad, u_quad)
+er = u_nodes - map(uₑ, nodes)
+colorrange = extrema(u_nodes)
+fig = Figure(; size = (800, 300))
+ax = Axis(fig[1, 1]; aspect = DataAspect())
+viz!(Ω_msh; colorrange, color = u_nodes, interpolate = true)
+cb = Colorbar(fig[1, 2]; label = &quot;u&quot;, colorrange)
+# plot error
+log_er = log10.(abs.(er))
+colorrange = extrema(log_er)
+colormap = :inferno
+ax = Axis(fig[1, 3]; aspect = DataAspect())
+viz!(Ω_msh; colorrange, colormap, color = log_er, interpolate = true)
+cb = Colorbar(fig[1, 4]; label = &quot;log₁₀|u - uₑ|&quot;, colormap, colorrange)</code></pre><img src="12f29213.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../helmholtz_scattering/">« Helmholtz scattering</a><a class="docs-footer-nextpage" href="../../examples/heat_equation/">Heat equation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Wednesday 3 September 2025 19:55">Wednesday 3 September 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
