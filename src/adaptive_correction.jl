@@ -43,7 +43,7 @@ The dictionary `quads_dict` must adhere to the following structure:
 Here is an example of how to implement a custom `quads_dict` given an `iop`:
 
 ```julia
-quads_dict = Dict()
+quads_dict = OrderedDict()
 msh = Inti.mesh(source(iop))
 for E in Inti.element_types(msh)
     ref_domain = Inti.reference_domain(E)
@@ -80,7 +80,7 @@ function adaptive_correction(
     atol = isnothing(atol) ? (hastol ? 0.0 : atol_) : atol
     # go on and compute the correction
     msh = mesh(source(iop))
-    quads_dict = Dict()
+    quads_dict = OrderedDict()
     for E in element_types(msh)
         ref_domain = reference_domain(E)
         quads = (
@@ -93,7 +93,7 @@ function adaptive_correction(
     return adaptive_correction(iop, maxdist, quads_dict, threads)
 end
 
-function adaptive_correction(iop, maxdist, quads_dict::Dict, threads = true)
+function adaptive_correction(iop, maxdist, quads_dict::OrderedDict, threads = true)
     # unpack type-unstable fields in iop, allocate output, and dispatch
     X, Y, K = target(iop), source(iop), kernel(iop)
     dict_near = near_interaction_list([coords(x) for x in X], mesh(Y); tol = maxdist)

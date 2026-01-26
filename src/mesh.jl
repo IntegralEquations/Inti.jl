@@ -75,23 +75,23 @@ See [`elements`](@ref) for a way to iterate over the elements of a mesh.
 struct Mesh{N, T} <: AbstractMesh{N, T}
     nodes::Vector{SVector{N, T}}
     # for each element type (key), return the connectivity matrix
-    etype2mat::Dict{DataType, Matrix{Int}}
+    etype2mat::OrderedDict{DataType, Matrix{Int}}
     # store abstract vector of elements
-    etype2els::Dict{DataType, AbstractVector}
+    etype2els::OrderedDict{DataType, AbstractVector}
     # mapping from entity to a dict containing (etype=>tags)
-    ent2etags::Dict{EntityKey, Dict{DataType, Vector{Int}}}
+    ent2etags::OrderedDict{EntityKey, OrderedDict{DataType, Vector{Int}}}
     # keep track if the element orientation should be inverted
-    etype2orientation::Dict{DataType, Vector{Int}}
+    etype2orientation::OrderedDict{DataType, Vector{Int}}
 end
 
 # empty constructor
 function Mesh{N, T}() where {N, T}
     return Mesh{N, T}(
         SVector{N, T}[],
-        Dict{DataType, Matrix{Int}}(),
-        Dict{DataType, AbstractVector{<:ReferenceInterpolant}}(),
-        Dict{EntityKey, Dict{DataType, Vector{Int}}}(),
-        Dict{DataType, Vector{Int}}(),
+        OrderedDict{DataType, Matrix{Int}}(),
+        OrderedDict{DataType, AbstractVector{<:ReferenceInterpolant}}(),
+        OrderedDict{EntityKey, OrderedDict{DataType, Vector{Int}}}(),
+        OrderedDict{DataType, Vector{Int}}(),
     )
 end
 
@@ -187,7 +187,7 @@ end
 function Base.getindex(msh::Mesh{N, T}, Ω::Domain) where {N, T}
     new_msh = Mesh{N, T}()
     (; nodes, etype2mat, etype2els, ent2etags) = new_msh
-    foreach(k -> ent2etags[k] = Dict{DataType, Vector{Int}}(), keys(Ω))
+    foreach(k -> ent2etags[k] = OrderedDict{DataType, Vector{Int}}(), keys(Ω))
     glob2loc = Dict{Int, Int}()
     for E in element_types(msh)
         E <: Union{LagrangeElement, SVector, ParametricElement} || error()
@@ -365,7 +365,7 @@ function _meshgen!(mesh::Mesh, key::EntityKey, sz)
     append!(vals, els)
     iend = length(vals)
     haskey(mesh.ent2etags, key) && @warn "$key already present in mesh"
-    mesh.ent2etags[key] = Dict(E => collect(istart:iend)) # add key
+    mesh.ent2etags[key] = OrderedDict(E => collect(istart:iend)) # add key
     return mesh
 end
 
@@ -516,16 +516,16 @@ struct SubMesh{N, T} <: AbstractMesh{N, T}
     domain::Domain
     # etype2etags maps E => indices of elements in parent mesh contained in the
     # submesh
-    etype2etags::Dict{DataType, Vector{Int}}
-    etype2orientation::Dict{DataType, Vector{Int}}
+    etype2etags::OrderedDict{DataType, Vector{Int}}
+    etype2orientation::OrderedDict{DataType, Vector{Int}}
     function SubMesh(mesh::Mesh{N, T}, Ω::Domain) where {N, T}
-        etype2etags = Dict{DataType, Vector{Int}}()
+        etype2etags = OrderedDict{DataType, Vector{Int}}()
         for E in element_types(mesh)
             # add the indices of the elements of type E in the submesh. Skip if empty
             idxs = dom2elt(mesh, Ω, E)
             isempty(idxs) || (etype2etags[E] = idxs)
         end
-        etype2orientation = Dict{DataType, Vector{Bool}}()
+        etype2orientation = OrderedDict{DataType, Vector{Bool}}()
         submsh = new{N, T}(mesh, Ω, etype2etags, etype2orientation)
         build_orientation!(submsh)
         return submsh
@@ -750,7 +750,7 @@ function curve_mesh(
 
     crvmsh = Mesh{2, Float64}()
     (; nodes, etype2mat, etype2els, ent2etags) = crvmsh
-    foreach(k -> ent2etags[k] = Dict{DataType, Vector{Int}}(), entities(msh))
+    foreach(k -> ent2etags[k] = OrderedDict{DataType, Vector{Int}}(), entities(msh))
     append!(nodes, msh.nodes)
 
     nbdry_els = size(msh.etype2mat[E_straight_bdry])[2]
@@ -1184,7 +1184,7 @@ function curve_mesh(
 
     crvmsh = Mesh{3, Float64}()
     (; nodes, etype2mat, etype2els, ent2etags) = crvmsh
-    foreach(k -> ent2etags[k] = Dict{DataType, Vector{Int}}(), entities(msh))
+    foreach(k -> ent2etags[k] = OrderedDict{DataType, Vector{Int}}(), entities(msh))
     append!(nodes, msh.nodes)
 
     # Set up chart <-> node Dict

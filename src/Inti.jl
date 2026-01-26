@@ -27,6 +27,13 @@ using Scratch
 using SparseArrays
 using StaticArrays
 using TOML
+using OrderedCollections
+
+import ElementaryPDESolutions
+import SpecialFunctions
+import Bessels # faster than SpecialFunctions for Bessel functions with real args
+import HAdaptiveIntegration
+
 
 # helper functions
 include("utils.jl")
