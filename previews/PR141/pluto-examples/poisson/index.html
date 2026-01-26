@@ -21,16 +21,16 @@ gmsh.model.mesh.setOrder(2)
 msh = Inti.import_mesh(; dim = 2)
 gmsh.finalize()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : Meshing curve 1 (BSpline)
-Info    : Done meshing 1D (Wall 0.0241818s, CPU 0.024158s)
+Info    : Done meshing 1D (Wall 0.0247747s, CPU 0.024774s)
 Info    : Meshing 2D...
 Info    : Meshing surface 1 (Plane, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.0735348s, CPU 0.073533s)
+Info    : Done meshing 2D (Wall 0.0710072s, CPU 0.070955s)
 Info    : 566 nodes 1033 elements
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
 Info    : [ 60%] Meshing surface 1 order 2
 Info    : Surface mesh: worst distortion = 0.451559 (0 elements in ]0, 0.2]); worst gamma = 0.758919
-Info    : Done meshing order 2 (Wall 0.00830907s, CPU 0.007316s)</code></pre><p>We can now extract components of the mesh corresponding to the <span>$\Omega$</span> and <span>$\Gamma$</span> domains:</p><pre><code class="language-julia hljs">Ω = Inti.Domain(e -&gt; Inti.geometric_dimension(e) == 2, msh)
+Info    : Done meshing order 2 (Wall 0.00744231s, CPU 0.007442s)</code></pre><p>We can now extract components of the mesh corresponding to the <span>$\Omega$</span> and <span>$\Gamma$</span> domains:</p><pre><code class="language-julia hljs">Ω = Inti.Domain(e -&gt; Inti.geometric_dimension(e) == 2, msh)
 Γ = Inti.boundary(Ω)
 Ω_msh = view(msh, Ω)
 Γ_msh = view(msh, Γ)</code></pre><p>and visualize them:</p><pre><code class="language-julia hljs">using Meshes, GLMakie
@@ -108,4 +108,4 @@ colorrange = extrema(log_er)
 colormap = :inferno
 ax = Axis(fig[1, 3]; aspect = DataAspect())
 viz!(Ω_msh; colorrange, colormap, color = log_er, interpolate = true)
-cb = Colorbar(fig[1, 4]; label = &quot;log₁₀|u - uₑ|&quot;, colormap, colorrange)</code></pre><img src="4590ebbb.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../helmholtz_scattering/">« Helmholtz scattering</a><a class="docs-footer-nextpage" href="../../examples/heat_equation/">Heat equation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Wednesday 21 January 2026 18:00">Wednesday 21 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+cb = Colorbar(fig[1, 4]; label = &quot;log₁₀|u - uₑ|&quot;, colormap, colorrange)</code></pre><img src="4590ebbb.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../helmholtz_scattering/">« Helmholtz scattering</a><a class="docs-footer-nextpage" href="../../examples/heat_equation/">Heat equation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Monday 26 January 2026 21:11">Monday 26 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
