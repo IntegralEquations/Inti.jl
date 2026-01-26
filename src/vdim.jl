@@ -57,18 +57,45 @@ function vdim_correction(
     b = Dense{T}(undef, length(source), num_basis)
     γ₀B = Dense{T}(undef, length(boundary), num_basis)
     γ₁B = Dense{T}(undef, length(boundary), num_basis)
-    b = [basis[m].source(q) for q in source, m in eachindex(basis)]
+    for k in 1:num_basis, j in 1:length(source)
+        b[j, k] = basis[k].source(source[j])
+    end
     for k in 1:num_basis, j in 1:length(boundary)
         γ₀B[j, k] = basis[k].solution(boundary[j])
         γ₁B[j, k] = basis[k].neumann_trace(boundary[j])
     end
     T = eltype(γ₀B)
-    Θ = zeros(T, num_target, num_basis)
+    Θ = Dense{T}(undef, num_target, num_basis)
+    fill!(Θ, zero(T))
     # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
+    if Dense <: Array || (Sop isa BlockArray && Dop isa BlockArray && Vop isa BlockArray)
+        for n in 1:num_basis
+            @views mul!(Θ[:, n], Sop, γ₁B[:, n])
+            @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
+            @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
+        end
+    else
+        # For vector-valued problems with FMM (LinearMap operators), we need to
+        # perform multiplication column-by-column since FMM expects vector densities
+        # (SVector) not matrix densities (SMatrix). See bdim.jl for similar handling.
+        P, Q = size(T)
+        S = eltype(T)
+        Θ_data = parent(Θ)::Matrix
+        γ₀B_data = parent(γ₀B)::Matrix
+        γ₁B_data = parent(γ₁B)::Matrix
+        b_data = parent(b)::Matrix
+        for k in 1:size(Θ_data, 2)
+            y = reinterpret(SVector{P, S}, @view Θ_data[:, k])
+            x = reinterpret(SVector{Q, S}, @view γ₁B_data[:, k])
+            mul!(y, Sop, x)
+            x = reinterpret(SVector{Q, S}, @view γ₀B_data[:, k])
+            mul!(y, Dop, x, -1, 1)
+            x = reinterpret(SVector{Q, S}, @view b_data[:, k])
+            mul!(y, Vop, x, -1, 1)
+        end
+    end
+    # Add σ * B(x) term
     for n in 1:num_basis
-        @views mul!(Θ[:, n], Sop, γ₁B[:, n])
-        @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
-        @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
         for i in 1:num_target
             Θ[i, n] += green_multiplier[i] * basis[n].solution(target[i])
         end
