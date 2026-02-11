@@ -96,10 +96,10 @@ viz(msh[Ω], showsegments=true)
 area = Inti.integrate(x-&gt;1.0, Ω_quad)
 println(&quot;Error in area computation using P1 mesh: &quot;, abs(area - π))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : Meshing curve 1 (BSpline)
-Info    : Done meshing 1D (Wall 0.00103524s, CPU 0.001037s)
+Info    : Done meshing 1D (Wall 0.00105453s, CPU 0.001056s)
 Info    : Meshing 2D...
 Info    : Meshing surface 1 (Plane, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.0260798s, CPU 0.026079s)
+Info    : Done meshing 2D (Wall 0.0258901s, CPU 0.025889s)
 Info    : 221 nodes 343 elements
 Error in area computation using P1 mesh: 0.020147642180619485</code></pre><p>As can be seen, despite the large quadrature order employed, the approximation error is still significant. To improve the accuracy, we can use the <code>curve_mesh</code> function to create a curved mesh based on the boundary of the domain:</p><pre><code class="language-julia hljs">θ = 5 # smoothness order of curved elements
 crvmsh = Inti.curve_mesh(msh, f, θ)
@@ -161,12 +161,12 @@ qorder = 5
 Info    : [  0%] Meshing curve 1 (Ellipse)
 Info    : [ 40%] Meshing curve 2 (Ellipse)
 Info    : [ 70%] Meshing curve 3 (Ellipse)
-Info    : Done meshing 1D (Wall 0.000391593s, CPU 0.000391s)
+Info    : Done meshing 1D (Wall 0.000349131s, CPU 0.00035s)
 Info    : Meshing 2D...
 Info    : [  0%] Meshing surface 1 (Plane, Frontal-Delaunay)
 Info    : [ 40%] Meshing surface 2 (Plane, Frontal-Delaunay)
 Info    : [ 70%] Meshing surface 3 (Plane, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.166719s, CPU 0.166706s)
+Info    : Done meshing 2D (Wall 0.158446s, CPU 0.158443s)
 Info    : 4143 nodes 8283 elements</code></pre><p>We can verify once again that the correct area of the region is obtained.</p><pre><code class="language-julia hljs">area = Inti.integrate(x -&gt; 1, Ωₕ_quad)
 println(&quot;Error in computing area of three circles: &quot;, abs(area - 6π))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Error in computing area of three circles: 1.7763568394002505e-14</code></pre><p>One can extract a subcomponent of the curved (volumetric) domain as usual:</p><pre><code class="language-julia hljs">Ω_sub = Inti.Domain(e -&gt; &quot;c3&quot; in Inti.labels(e), Inti.entities(Ω))
 Ωₕ_sub = crvmsh[Ω_sub]
@@ -187,4 +187,4 @@ x̂ = SVector(1/3,1/3, 1/3)
 el(x̂)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3-element StaticArraysCore.SVector{3, Float64} with indices SOneTo(3):
  0.41172958308427027
  0.39152798515716003
- 0.13290053704846747</code></pre><p>Likewise, we can compute the <a href="../../docstrings/#Inti.jacobian-Tuple{Any, Any}"><code>jacobian</code></a> of the element, or its <a href="../../docstrings/#Inti.normal-Tuple{Any, Any}"><code>normal</code></a> at a given parametric coordinate.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../getting_started/">« Getting started</a><a class="docs-footer-nextpage" href="../integral_operators/">Integral operators »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Friday 23 January 2026 08:36">Friday 23 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+ 0.13290053704846747</code></pre><p>Likewise, we can compute the <a href="../../docstrings/#Inti.jacobian-Tuple{Any, Any}"><code>jacobian</code></a> of the element, or its <a href="../../docstrings/#Inti.normal-Tuple{Any, Any}"><code>normal</code></a> at a given parametric coordinate.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../getting_started/">« Getting started</a><a class="docs-footer-nextpage" href="../integral_operators/">Integral operators »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Wednesday 11 February 2026 09:18">Wednesday 11 February 2026</span>. Using Julia version 1.12.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
