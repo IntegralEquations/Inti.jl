@@ -6,7 +6,7 @@ import LinearMaps
 using StaticArrays # For Stokes types
 
 function __init__()
-    return @info "Loading Inti.jl FMM3D extension"
+    return @debug "Loading Inti.jl FMM3D extension"
 end
 
 function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))

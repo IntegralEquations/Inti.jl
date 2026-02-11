@@ -5,7 +5,7 @@ import FMM2D
 import LinearMaps
 
 function __init__()
-    return @info "Loading Inti.jl FMM2D extension"
+    return @debug "Loading Inti.jl FMM2D extension"
 end
 
 function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))

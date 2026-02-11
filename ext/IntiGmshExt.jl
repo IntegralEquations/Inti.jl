@@ -7,7 +7,7 @@ using LinearAlgebra
 using StaticArrays
 
 function __init__()
-    return @info "Loading Inti.jl Gmsh extension"
+    return @debug "Loading Inti.jl Gmsh extension"
 end
 
 function Inti.import_mesh(filename = nothing; dim = 3)
