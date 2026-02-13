@@ -28,9 +28,9 @@ See [anderson2024fast](@cite) for more details on the method.
   and rescaled to each element.
 """
 function vdim_correction(
-        op,
+        op::AbstractDifferentialOperator{N},
         target,
-        source::Quadrature,
+        source::Quadrature{N},
         boundary::Quadrature,
         Sop,
         Dop,
@@ -38,81 +38,106 @@ function vdim_correction(
         green_multiplier::Vector{<:Real},
         interpolation_order = nothing,
         maxdist = Inf,
-        center = nothing,
-        shift::Val{SHIFT} = Val(false),
-    ) where {SHIFT}
+    ) where {N}
     # variables for debugging the condition properties of the method
     vander_cond = vander_norm = rhs_norm = res_norm = shift_norm = -Inf
     T = eltype(Vop)
+    # determine type for dense matrices
+    Dense = T <: SMatrix ? BlockArray : Array
     @assert eltype(Dop) == eltype(Sop) == T "eltype of Sop, Dop, and Vop must match"
     # figure out if we are dealing with a scalar or vector PDE
-    m, n = length(target), length(source)
-    N = ambient_dimension(op)
-    @assert ambient_dimension(source) == N "vdim only works for volume potentials"
-    m, n = length(target), length(source)
+    num_target, num_source = length(target), length(source)
     # a reasonable interpolation_order if not provided
     isnothing(interpolation_order) &&
         (interpolation_order = maximum(order, values(source.etype2qrule)))
     # by default basis centered at origin
-    center = isnothing(center) ? zero(SVector{N, Float64}) : center
-    p, P, γ₁P, multiindices = polynomial_solutions_vdim(op, interpolation_order, center)
+    basis = polynomial_solutions_vdim(op, interpolation_order, T)
     dict_near = etype_to_nearest_points(target, source; maxdist)
-    R = _vdim_auxiliary_quantities(
-        p,
-        P,
-        γ₁P,
-        target,
-        source,
-        boundary,
-        green_multiplier,
-        Sop,
-        Dop,
-        Vop,
-    )
+    num_basis = length(basis)
+    b = Dense{T}(undef, length(source), num_basis)
+    γ₀B = Dense{T}(undef, length(boundary), num_basis)
+    γ₁B = Dense{T}(undef, length(boundary), num_basis)
+    for k in 1:num_basis, j in 1:length(source)
+        b[j, k] = basis[k].source(source[j])
+    end
+    for k in 1:num_basis, j in 1:length(boundary)
+        γ₀B[j, k] = basis[k].solution(boundary[j])
+        γ₁B[j, k] = basis[k].neumann_trace(boundary[j])
+    end
+    T = eltype(γ₀B)
+    Θ = Dense{T}(undef, num_target, num_basis)
+    fill!(Θ, zero(T))
+    # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
+    if Dense <: Array || (Sop isa BlockArray && Dop isa BlockArray && Vop isa BlockArray)
+        for n in 1:num_basis
+            @views mul!(Θ[:, n], Sop, γ₁B[:, n])
+            @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
+            @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
+        end
+    else
+        # For vector-valued problems with FMM (LinearMap operators), we need to
+        # perform multiplication column-by-column since FMM expects vector densities
+        # (SVector) not matrix densities (SMatrix). See bdim.jl for similar handling.
+        P, Q = size(T)
+        S = eltype(T)
+        Θ_data = parent(Θ)::Matrix
+        γ₀B_data = parent(γ₀B)::Matrix
+        γ₁B_data = parent(γ₁B)::Matrix
+        b_data = parent(b)::Matrix
+        for k in 1:size(Θ_data, 2)
+            y = reinterpret(SVector{P, S}, @view Θ_data[:, k])
+            x = reinterpret(SVector{Q, S}, @view γ₁B_data[:, k])
+            mul!(y, Sop, x)
+            x = reinterpret(SVector{Q, S}, @view γ₀B_data[:, k])
+            mul!(y, Dop, x, -1, 1)
+            x = reinterpret(SVector{Q, S}, @view b_data[:, k])
+            mul!(y, Vop, x, -1, 1)
+        end
+    end
+    # Add σ * B(x) term
+    for n in 1:num_basis
+        for i in 1:num_target
+            Θ[i, n] += green_multiplier[i] * basis[n].solution(target[i])
+        end
+    end
     # compute sparse correction
     Is = Int[]
     Js = Int[]
     Vs = eltype(Vop)[]
     for (E, qtags) in source.etype2qtags
-        els = elements(source.mesh, E)
+        # els = elements(source.mesh, E)
         near_list = dict_near[E]
         nq, ne = size(qtags)
         @assert length(near_list) == ne
+        # preallocate local arrays to store interpolant values and weights
+        # Similar to bdim, we need to handle the case where T is an SMatrix
+        # by converting between Matrix{<:SMatrix} and Matrix{<:Number} formats
+        L_arr = Dense{T}(undef, num_basis, nq)
+        b_arr = Dense{T}(undef, num_basis, 1)
+        wei_arr = Dense{T}(undef, nq, 1)
+        Ldata, bdata, weidata = parent(L_arr)::Matrix, parent(b_arr)::Matrix, parent(wei_arr)::Matrix
         for n in 1:ne
             # indices of nodes in element `n`
             isempty(near_list[n]) && continue
             jglob = @view qtags[:, n]
-            # compute translation and scaling
-            c, r = translation_and_scaling(els[n])
-            if SHIFT
-                iszero(center) || error("SHIFT is not implemented for non-zero center")
-                L̃ = [f((q.coords - c) / r) for f in p, q in view(source, jglob)]
-                S = change_of_basis(multiindices, p, c, r)
-                F = svd(L̃)
-                @debug (vander_cond = max(vander_cond, cond(L̃))) maxlog = 0
-                @debug (shift_norm = max(shift_norm, norm(S))) maxlog = 0
-                @debug (vander_norm = max(vander_norm, norm(L̃))) maxlog = 0
-            else
-                L = [f(q.coords) for f in p, q in view(source, jglob)]
-                F = svd(L)
-                @debug (vander_cond = max(vander_cond, cond(L))) maxlog = 0
-                @debug (shift_norm = max(shift_norm, 1)) maxlog = 0
-                @debug (vander_norm = max(vander_norm, norm(L))) maxlog = 0
+            # Fill the interpolation matrix
+            for k in 1:nq, m in 1:num_basis
+                L_arr[m, k] = basis[m].source(view(source, jglob)[k])
             end
+            F = svd(Ldata)
+            @debug (vander_cond = max(vander_cond, cond(Ldata))) maxlog = 0
+            @debug (shift_norm = max(shift_norm, 1)) maxlog = 0
+            @debug (vander_norm = max(vander_norm, norm(Ldata))) maxlog = 0
             # correct each target near the current element
             for i in near_list[n]
-                b = @views R[i, :]
-                wei = SHIFT ? F \ (S * b) : F \ b # weights for the current element and target i
-                rhs_norm = max(rhs_norm, norm(b))
-                res_norm = if SHIFT
-                    max(res_norm, norm(L̃ * wei - S * b))
-                else
-                    max(res_norm, norm(L * wei - b))
-                end
+                b_arr .= @views transpose(Θ[i:i, :])
+                @debug (rhs_norm = max(rhs_norm, norm(bdata))) maxlog = 0
+                ldiv!(weidata, F, bdata)
+                @debug (res_norm = max(res_norm, norm(Ldata * weidata - bdata))) maxlog = 0
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
-                    push!(Vs, wei[k])
+                    push!(Vs, transpose(wei_arr[k]))
                 end
             end
         end
@@ -124,143 +149,12 @@ function vdim_correction(
     |-- max interp. matrix norm :     $vander_norm
     |-- max shift norm :              $shift_norm
     """
-    δV = sparse(Is, Js, Vs, m, n)
+    δV = sparse(Is, Js, Vs, num_target, num_source)
     return δV
 end
 
-function change_of_basis(multiindices, p, c, r)
-    nbasis = length(multiindices)
-    P = zeros(nbasis, nbasis)
-    for i in 1:nbasis
-        α = multiindices[i]
-        for j in 1:nbasis
-            β = multiindices[j]
-            β ≤ α || continue
-            # P[i, j] = prod((-c) .^ ((α - β).indices)) / r^abs(α) / factorial(α
-            # - β)
-            γ = α - β
-            p_γ = p[findfirst(x -> x == γ, multiindices)] # p_{\alpha - \beta}
-            P[i, j] = p_γ(-c) / r^abs(α)
-        end
-    end
-    return P
-end
-
-function translation_and_scaling(el::LagrangeTriangle)
-    vertices = el.vals[1:3]
-    l1 = norm(vertices[1] - vertices[2])
-    l2 = norm(vertices[2] - vertices[3])
-    l3 = norm(vertices[3] - vertices[1])
-    if ((l1^2 + l2^2 >= l3^2) && (l2^2 + l3^2 >= l1^2) && (l3^2 + l1^2 > l2^2))
-        acuteright = true
-    else
-        acuteright = false
-    end
-
-    if acuteright
-        # Compute the circumcenter and circumradius
-        Bp = vertices[2] - vertices[1]
-        Cp = vertices[3] - vertices[1]
-        Dp = 2 * (Bp[1] * Cp[2] - Bp[2] * Cp[1])
-        Upx = 1 / Dp * (Cp[2] * (Bp[1]^2 + Bp[2]^2) - Bp[2] * (Cp[1]^2 + Cp[2]^2))
-        Upy = 1 / Dp * (Bp[1] * (Cp[1]^2 + Cp[2]^2) - Cp[2] * (Bp[1]^2 + Bp[2]^2))
-        Up = SVector{2}(Upx, Upy)
-        r = norm(Up)
-        c = Up + vertices[1]
-    else
-        if (l1 >= l2) && (l1 >= l3)
-            c = (vertices[1] + vertices[2]) / 2
-            r = l1 / 2
-        elseif (l2 >= l1) && (l2 >= l3)
-            c = (vertices[2] + vertices[3]) / 2
-            r = l2 / 2
-        else
-            c = (vertices[1] + vertices[3]) / 2
-            r = l3 / 2
-        end
-    end
-    return c, r
-end
-
-function translation_and_scaling(el::ParametricElement{ReferenceSimplex{3}})
-    straight_nodes =
-        [el([0.0, 0.0, 0.0]), el([1.0, 0.0, 0.0]), el([0.0, 1.0, 0.0]), el([0.0, 0.0, 1.0])]
-    return translation_and_scaling(
-        LagrangeElement{ReferenceSimplex{3}, 4, SVector{3, Float64}}(straight_nodes),
-    )
-end
-
-function translation_and_scaling(el::ParametricElement{ReferenceSimplex{2}})
-    straight_nodes = [el([1.0e-18, 1.0e-18]), el([1.0, 0.0]), el([0.0, 1.0])]
-    return translation_and_scaling(
-        LagrangeElement{ReferenceSimplex{2}, 3, SVector{2, Float64}}(straight_nodes),
-    )
-end
-
-function translation_and_scaling(el::LagrangeTetrahedron)
-    vertices = el.vals[1:4]
-    # Compute the circumcenter in barycentric coordinates
-    # formulas here are due to: https://math.stackexchange.com/questions/2863613/tetrahedron-centers
-    a = norm(vertices[4] - vertices[1])
-    b = norm(vertices[2] - vertices[4])
-    c = norm(vertices[3] - vertices[4])
-    d = norm(vertices[3] - vertices[2])
-    e = norm(vertices[3] - vertices[1])
-    f = norm(vertices[2] - vertices[1])
-    f² = f^2
-    a² = a^2
-    b² = b^2
-    c² = c^2
-    d² = d^2
-    e² = e^2
-
-    ρ =
-        a² * d² * (-d² + e² + f²) + b² * e² * (d² - e² + f²) + c² * f² * (d² + e² - f²) -
-        2 * d² * e² * f²
-    α =
-        a² * d² * (b² + c² - d²) + e² * b² * (-b² + c² + d²) + f² * c² * (b² - c² + d²) -
-        2 * b² * c² * d²
-    β =
-        b² * e² * (a² + c² - e²) + d² * a² * (-a² + c² + e²) + f² * c² * (a² - c² + e²) -
-        2 * a² * c² * e²
-    γ =
-        c² * f² * (a² + b² - f²) + d² * a² * (-a² + b² + f²) + e² * b² * (a² - b² + f²) -
-        2 * a² * b² * f²
-    if (ρ >= 0 && α >= 0 && β >= 0 + γ >= 0)
-        # circumcenter lays inside `el`
-        center =
-            (α * vertices[1] + β * vertices[2] + γ * vertices[3] + ρ * vertices[4]) /
-            (ρ + α + β + γ)
-        # ref: https://math.stackexchange.com/questions/1087011/calculating-the-radius-of-the-circumscribed-sphere-of-an-arbitrary-tetrahedron
-        R = sqrt(1 / 2 * (β * f² + γ * e² + ρ * a²) / (ρ + α + β + γ))
-    else
-        if (a >= b && a >= c && a >= d && a >= e && a >= f)
-            center = (vertices[1] + vertices[4]) / 2
-            R = a / 2
-        elseif (b >= a && b >= c && b >= d && b >= e && b >= f)
-            center = (vertices[2] + vertices[4]) / 2
-            R = b / 2
-        elseif (c >= a && c >= b && c >= d && c >= e && c >= f)
-            center = (vertices[3] + vertices[4]) / 2
-            R = c / 2
-        elseif (d >= a && d >= b && d >= c && d >= e && d >= f)
-            center = (vertices[3] + vertices[2]) / 2
-            R = d / 2
-        elseif (e >= a && e >= b && e >= c && e >= d && e >= f)
-            center = (vertices[3] + vertices[1]) / 2
-            R = e / 2
-        else
-            center = (vertices[2] + vertices[1]) / 2
-            R = f / 2
-        end
-    end
-    return center, R
-end
-
 function _vdim_auxiliary_quantities(
-        p,
-        P,
-        γ₁P,
+        basis,
         X,
         Y::Quadrature,
         Γ::Quadrature,
@@ -269,132 +163,178 @@ function _vdim_auxiliary_quantities(
         Dop,
         Vop,
     )
-    num_basis = length(p)
+    num_basis = length(basis)
     num_targets = length(X)
-    b = [f(q) for q in Y, f in p]
-    γ₀B = [f(q) for q in Γ, f in P]
-    γ₁B = [f(q) for q in Γ, f in γ₁P]
-    Θ = zeros(eltype(Vop), num_targets, num_basis)
+    b = [basis[m].source(q) for q in Y, m in eachindex(basis)]
+    γ₀B = [basis[m].solution(q) for q in Γ, m in eachindex(basis)]
+    γ₁B = [basis[m].neumann_trace(q) for q in Γ, m in eachindex(basis)]
+    T = eltype(γ₀B)
+    Θ = zeros(T, num_targets, num_basis)
     # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
     for n in 1:num_basis
         @views mul!(Θ[:, n], Sop, γ₁B[:, n])
         @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
         @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
         for i in 1:num_targets
-            Θ[i, n] += μ[i] * P[n](X[i])
+            Θ[i, n] += μ[i] * basis[n].solution(X[i])
         end
     end
     return Θ
 end
 
 """
-    vdim_mesh_center(msh)
+    polynomial_solutions_vdim(op, order, [T])
 
-Point `x` which minimizes ∑ (x-xⱼ)²/r²ⱼ, where xⱼ and rⱼ are the circumcenter
-and circumradius of the elements of `msh`, respectively.
-"""
-function vdim_mesh_center(msh::AbstractMesh)
-    N = ambient_dimension(msh)
-    M = 0.0
-    xc = zero(SVector{N, Float64})
-    for E in element_types(msh)
-        for el in elements(msh, E)
-            c, r = translation_and_scaling(el)
-            # w = 1/r^2
-            w = 1
-            M += w
-            xc += c * w
-        end
-    end
-    return xc / M
-end
+Build a basis of polynomial solutions for the VDIM method.
 
-"""
-    polynomial_solutions_vdim(op, order[, center])
+For every monomial `pₙ` of degree at most `order`, computes a polynomial solution `Pₙ`
+satisfying `ℒ[Pₙ] = pₙ`, where `ℒ` is the differential operator of `op`.
 
-For every monomial term `pₙ` of degree `order`, compute a polynomial `Pₙ` such
-that `ℒ[Pₙ] = pₙ`, where `ℒ` is the differential operator associated with `op`.
-This function returns `{pₙ,Pₙ,γ₁Pₙ}`, where `γ₁Pₙ` is the generalized Neumann
-trace of `Pₙ`.
-
-Passing a point `center` will shift the monomials and solutions accordingly.
+Returns a vector of named tuples `(source = pₙ, solution = Pₙ, neumann_trace = γ₁Pₙ)`.
 """
 function polynomial_solutions_vdim(
-        op::AbstractDifferentialOperator,
+        op::AbstractDifferentialOperator{N},
         order::Integer,
-        center = nothing,
-    )
-    N = ambient_dimension(op)
-    center = isnothing(center) ? zero(SVector{N, Float64}) : center
-    # create empty arrays to store the monomials, solutions, and traces. For the
-    # neumann trace, we try to infer the concrete return type instead of simply
-    # having a vector of `Function`.
-    monomials = Vector{ElementaryPDESolutions.Polynomial{N, Float64}}()
-    dirchlet_traces = Vector{ElementaryPDESolutions.Polynomial{N, Float64}}()
-    T = return_type(neumann_trace, typeof(op), eltype(dirchlet_traces))
-    neumann_traces = Vector{T}()
-    multiindices = Vector{MultiIndex{N}}()
-    # iterate over N-tuples going from 0 to order
-    for I in Iterators.product(ntuple(i -> 0:order, N)...)
-        sum(I) > order && continue
-        # define the monomial basis functions, and the corresponding solutions.
-        # TODO: adapt this to vectorial case
-        p = ElementaryPDESolutions.Polynomial(I => 1 / factorial(MultiIndex(I)))
-        P = polynomial_solution(op, p)
-        γ₁P = neumann_trace(op, P)
-        push!(multiindices, MultiIndex(I))
-        push!(monomials, p)
-        push!(dirchlet_traces, P)
-        push!(neumann_traces, γ₁P)
-    end
-    monomial_shift = map(monomials) do f
-        return (q) -> f(coords(q) - center)
-    end
-    dirchlet_shift = map(dirchlet_traces) do f
-        return (q) -> f(coords(q) - center)
-    end
-    neumann_shift = map(neumann_traces) do f
-        return (q) -> f((coords = q.coords - center, normal = q.normal))
-    end
-    return monomial_shift, dirchlet_shift, neumann_shift, multiindices
-    # return monomials, dirchlet_traces, neumann_traces, multiindices
-end
-
-# dispatch to the correct solver in ElementaryPDESolutions
-function polynomial_solution(::Laplace, p::ElementaryPDESolutions.Polynomial)
-    P = ElementaryPDESolutions.solve_laplace(p)
-    return ElementaryPDESolutions.convert_coefs(P, Float64)
-end
-
-function polynomial_solution(op::Helmholtz, p::ElementaryPDESolutions.Polynomial)
-    k = op.k
-    P = ElementaryPDESolutions.solve_helmholtz(p; k)
-    return ElementaryPDESolutions.convert_coefs(P, Float64)
-end
-
-function polynomial_solution(op::Yukawa, p::ElementaryPDESolutions.Polynomial)
-    k = im * op.λ
-    P = ElementaryPDESolutions.solve_helmholtz(p; k)
-    return ElementaryPDESolutions.convert_coefs(P, Float64)
-end
-
-function neumann_trace(
-        ::Union{Laplace, Helmholtz, Yukawa},
-        P::ElementaryPDESolutions.Polynomial{N, T},
+        ::Type{T} = default_kernel_eltype(op),
     ) where {N, T}
-    return _normal_derivative(P)
+    indices = [I for I in Iterators.product(ntuple(i -> 0:order, N)...) if sum(I) <= order]
+    return map(indices) do I
+        monomial = Polynomial(I => one(T))
+        P, γ₁P = basis_from_monomial(op, monomial)
+        (source = monomial, solution = P, neumann_trace = γ₁P)
+    end
 end
 
-function _normal_derivative(P::ElementaryPDESolutions.Polynomial{N, T}) where {N, T}
+"""
+    basis_from_monomial(op, monomial) -> (solution, neumann_trace)
+
+Compute a polynomial solution `P` to `ℒ[P] = monomial` and its Neumann trace `γ₁P`.
+
+Each operator implements this to handle its specific PDE structure, including any
+auxiliary fields (e.g., pressure for Stokes) needed to compute the Neumann trace.
+"""
+function basis_from_monomial end
+
+# Laplace
+
+function basis_from_monomial(::Laplace{N}, monomial::Polynomial{N, T}) where {N, T}
+    P = ElementaryPDESolutions.solve_laplace(monomial)
     ∇P = ElementaryPDESolutions.gradient(P)
-    return (q) -> dot(normal(q), ∇P(coords(q)))
+    γ₁P = q -> dot(normal(q), ∇P(coords(q)))
+    return P, γ₁P
 end
 
-function (∇P::NTuple{N, <:ElementaryPDESolutions.Polynomial})(x) where {N}
-    return ntuple(n -> ∇P[n](x), N)
+# Helmholtz
+
+function basis_from_monomial(op::Helmholtz{N}, monomial::Polynomial{N, T}) where {N, T}
+    P = ElementaryPDESolutions.solve_helmholtz(monomial, op.k^2)
+    ∇P = ElementaryPDESolutions.gradient(P)
+    γ₁P = q -> dot(normal(q), ∇P(coords(q)))
+    return P, γ₁P
 end
 
-function (P::ElementaryPDESolutions.Polynomial)(q::QuadratureNode)
-    x = q.coords.data
+# Elastostatic
+
+function basis_from_monomial(op::Elastostatic{N}, monomial::Polynomial{N, T}) where {N, T}
+    @assert T <: StaticMatrix && size(T) == (N, N)
+    S = eltype(T)
+    ord2coef = monomial.order2coeff
+    @assert length(ord2coef) == 1 "Input must be a monomial"
+    coef = first(values(ord2coef))
+    idx = first(keys(ord2coef))
+    μ, λ = op.μ, op.λ
+    ν = λ / (2 * (λ + μ))
+    # Solve for each column of the tensor
+    sol_tuple = ntuple(N) do n
+        p = ntuple(d -> Polynomial(idx => coef[d, n]), N)
+        u = ElementaryPDESolutions.solve_elastostatic(p; μ, ν)
+        ntuple(d -> convert(Polynomial{N, S}, u[d]), N)
+    end
+    P = flatten_polynomial_ntuple(sol_tuple)
+    ∇P = ElementaryPDESolutions.gradient(P)
+    # Neumann trace: traction vector
+    γ₁P = q -> begin
+        n = normal(q)
+        x = coords(q)
+        M = ∇P(x)  # M[j] = ∂P/∂xⱼ
+        cols = svector(N) do m
+            gradu = hcat(ntuple(j -> M[j][:, m], N)...)
+            divu = tr(gradu)
+            λ * divu * n + μ * (gradu + gradu') * n
+        end
+        reduce(hcat, cols)
+    end
+    return P, γ₁P
+end
+
+# Stokes
+
+function basis_from_monomial(op::Stokes{N}, monomial::Polynomial{N, T}) where {N, T}
+    @assert T <: StaticMatrix && size(T) == (N, N)
+    S = eltype(T)
+    ord2coef = monomial.order2coeff
+    @assert length(ord2coef) == 1 "Input must be a monomial"
+    coef = first(values(ord2coef))
+    idx = first(keys(ord2coef))
+    μ = op.μ
+    # Solve for each column: velocity and pressure
+    # Note: ElementaryPDESolutions uses μΔu - ∇p = f, while Inti uses -μΔu + ∇p = f,
+    # so we negate the source term
+    solutions = ntuple(N) do n
+        f = ntuple(d -> Polynomial(idx => -coef[d, n]), N)
+        u, p = ElementaryPDESolutions.solve_stokes(f; μ)
+        vel = ntuple(d -> convert(Polynomial{N, S}, u[d]), N)
+        pres = convert(Polynomial{N, S}, p)
+        (velocity = vel, pressure = pres)
+    end
+    velocities = ntuple(n -> solutions[n].velocity, N)
+    pressures = ntuple(n -> solutions[n].pressure, N)
+    U = flatten_polynomial_ntuple(velocities)
+    ∇U = ElementaryPDESolutions.gradient(U)
+    # Neumann trace: traction using velocity gradient and pressure
+    γ₁U = q -> begin
+        n = normal(q)
+        x = coords(q)
+        M = ∇U(x)  # M[j] = ∂U/∂xⱼ
+        cols = svector(N) do m
+            gradu = hcat(ntuple(j -> M[j][:, m], N)...)
+            p_val = pressures[m](x)
+            -p_val * n + μ * (gradu + gradu') * n
+        end
+        reduce(hcat, cols)
+    end
+    return U, γ₁U
+end
+
+function flatten_polynomial_ntuple(P::NTuple{N, NTuple{N, Polynomial{DIM, T}}}) where {N, DIM, T <: Number}
+    V = SMatrix{N, N, T, N * N}
+    # collect all multi-indices
+    idxs = Set{NTuple{DIM, Int}}()
+    foreach(p -> union!(idxs, keys(p.order2coeff)), Iterators.flatten(P))
+    # now loop over keys and build flattened coefficients
+    idx2coef = Dict{NTuple{DIM, Int}, V}()
+    for idx in idxs
+        coef_tuple = ntuple(N^2) do n
+            m = div(n - 1, N) + 1
+            l = mod(n - 1, N) + 1
+            p = P[m][l]
+            get(p.order2coeff, idx, zero(T))
+        end
+        idx2coef[idx] = V(coef_tuple)
+    end
+    return Polynomial{DIM, V}(idx2coef)
+end
+
+function (P::NTuple{N, <:Polynomial})(x) where {N}
+    return svector(n -> P[n](x), N)
+end
+
+function (P::Polynomial)(q::QuadratureNode)
+    x = coords(q)
+    return P(x)
+end
+
+function (P::NTuple{N, <:Polynomial})(q::QuadratureNode) where {N}
+    x = coords(q)
     return P(x)
 end

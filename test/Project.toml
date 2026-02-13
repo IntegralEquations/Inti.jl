@@ -1,5 +1,6 @@
 [deps]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+ElementaryPDESolutions = "88a69b33-da0f-4502-8c8c-d680cf4d883b"
 FMM2D = "2d63477d-9690-4b75-bcc1-c3461d43fecc"
 FMM3D = "1e13804c-f9b7-11ea-0ef0-29f3b1745df8"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
@@ -16,3 +17,6 @@ SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
+
+[sources]
+Inti = {path = ".."}

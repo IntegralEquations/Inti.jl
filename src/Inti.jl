@@ -7,19 +7,26 @@ module Inti
 
 const PROJECT_ROOT = pkgdir(Inti)
 
+import Bessels
+import ElementaryPDESolutions
+import HAdaptiveIntegration
+import SpecialFunctions
+
+import ElementaryPDESolutions: Polynomial
+
 using DataStructures
 using ForwardDiff
 using LinearAlgebra
 using LinearMaps
 using NearestNeighbors
 using Pkg
+using Printf
 using QuadGK
+using Richardson
 using Scratch
 using SparseArrays
 using StaticArrays
-using Printf
 using TOML
-using Richardson
 using OrderedCollections
 
 import ElementaryPDESolutions
@@ -27,12 +34,14 @@ import SpecialFunctions
 import Bessels # faster than SpecialFunctions for Bessel functions with real args
 import HAdaptiveIntegration
 
+
 # helper functions
 include("utils.jl")
 include("blockarray.jl")
 
 # basic interpolation and integration
 include("reference_shapes.jl")
+
 include("polynomials.jl")
 include("reference_interpolation.jl")
 include("quad_rules_tables.jl")
