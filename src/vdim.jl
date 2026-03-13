@@ -50,6 +50,8 @@ function vdim_correction(
     # a reasonable interpolation_order if not provided
     isnothing(interpolation_order) &&
         (interpolation_order = maximum(order, values(source.etype2qrule)))
+    # check if we are in debug mode to avoid expensive computations
+    do_debug = debug_mode()
     # by default basis centered at origin
     basis = polynomial_solutions_vdim(op, interpolation_order, T)
     dict_near = etype_to_nearest_points(target, source; maxdist)
@@ -125,15 +127,19 @@ function vdim_correction(
                 L_arr[m, k] = basis[m].source(view(source, jglob)[k])
             end
             F = svd(Ldata)
-            @debug (vander_cond = max(vander_cond, cond(Ldata))) maxlog = 0
-            @debug (shift_norm = max(shift_norm, 1)) maxlog = 0
-            @debug (vander_norm = max(vander_norm, norm(Ldata))) maxlog = 0
+            if do_debug
+                vander_cond = max(vander_cond, cond(Ldata))
+                shift_norm = max(shift_norm, 1)
+                vander_norm = max(vander_norm, norm(Ldata))
+            end
             # correct each target near the current element
             for i in near_list[n]
                 b_arr .= @views transpose(Θ[i:i, :])
-                @debug (rhs_norm = max(rhs_norm, norm(bdata))) maxlog = 0
                 ldiv!(weidata, F, bdata)
-                @debug (res_norm = max(res_norm, norm(Ldata * weidata - bdata))) maxlog = 0
+                if do_debug
+                    rhs_norm = max(rhs_norm, norm(bdata))
+                    res_norm = max(res_norm, norm(Ldata * weidata - bdata))
+                end
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])

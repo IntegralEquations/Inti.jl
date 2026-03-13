@@ -18,6 +18,7 @@ using DataStructures
 using ForwardDiff
 using LinearAlgebra
 using LinearMaps
+using Logging
 using NearestNeighbors
 using Pkg
 using Printf

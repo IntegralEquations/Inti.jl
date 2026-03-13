@@ -244,6 +244,15 @@ function notimplemented()
 end
 
 """
+    debug_mode()
+
+Return `true` if the current logger's minimum enabled level is `Debug` or lower.
+"""
+function debug_mode()
+    return Logging.min_enabled_level(Logging.current_logger()) <= Logging.Debug
+end
+
+"""
     MultiIndex{N}
 
 Wrapper around `NTuple{N,Int}` mimicking a multi-index in `ℤ₀ᴺ`.
