@@ -278,10 +278,8 @@ function basis_from_monomial(op::Stokes{N}, monomial::Polynomial{N, T}) where {N
     idx = first(keys(ord2coef))
     μ = op.μ
     # Solve for each column: velocity and pressure
-    # Note: ElementaryPDESolutions uses μΔu - ∇p = f, while Inti uses -μΔu + ∇p = f,
-    # so we negate the source term
     solutions = ntuple(N) do n
-        f = ntuple(d -> Polynomial(idx => -coef[d, n]), N)
+        f = ntuple(d -> Polynomial(idx => coef[d, n]), N)
         u, p = ElementaryPDESolutions.solve_stokes(f; μ)
         vel = ntuple(d -> convert(Polynomial{N, S}, u[d]), N)
         pres = convert(Polynomial{N, S}, p)

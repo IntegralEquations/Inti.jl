@@ -51,8 +51,7 @@ function test_volume_potential(op, Ω, Γ, msh; interpolation_order = 2, bdry_qo
     else
         error("Unsupported dimension: $dim")
     end
-    dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
-    Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
+    Ωₕ_quad = Inti.Quadrature(Ωₕ, Q)
     Γₕ_quad = Inti.Quadrature(Γₕ; qorder = bdry_qorder)
 
     # Build boundary operators
