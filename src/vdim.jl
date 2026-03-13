@@ -67,12 +67,12 @@ function vdim_correction(
     T = eltype(γ₀B)
     Θ = Dense{T}(undef, num_target, num_basis)
     fill!(Θ, zero(T))
-    # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
+    # Compute Θ <-- S * γ₁B - D * γ₀B + V * b + σ * B(x) using in-place matvec
     if Dense <: Array || (Sop isa BlockArray && Dop isa BlockArray && Vop isa BlockArray)
         for n in 1:num_basis
             @views mul!(Θ[:, n], Sop, γ₁B[:, n])
             @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
-            @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
+            @views mul!(Θ[:, n], Vop, b[:, n], 1, 1)
         end
     else
         # For vector-valued problems with FMM (LinearMap operators), we need to
@@ -91,7 +91,7 @@ function vdim_correction(
             x = reinterpret(SVector{Q, S}, @view γ₀B_data[:, k])
             mul!(y, Dop, x, -1, 1)
             x = reinterpret(SVector{Q, S}, @view b_data[:, k])
-            mul!(y, Vop, x, -1, 1)
+            mul!(y, Vop, x, 1, 1)
         end
     end
     # Add σ * B(x) term
@@ -137,7 +137,7 @@ function vdim_correction(
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
-                    push!(Vs, transpose(wei_arr[k]))
+                    push!(Vs, -transpose(wei_arr[k]))
                 end
             end
         end
@@ -151,35 +151,6 @@ function vdim_correction(
     """
     δV = sparse(Is, Js, Vs, num_target, num_source)
     return δV
-end
-
-function _vdim_auxiliary_quantities(
-        basis,
-        X,
-        Y::Quadrature,
-        Γ::Quadrature,
-        μ,
-        Sop,
-        Dop,
-        Vop,
-    )
-    num_basis = length(basis)
-    num_targets = length(X)
-    b = [basis[m].source(q) for q in Y, m in eachindex(basis)]
-    γ₀B = [basis[m].solution(q) for q in Γ, m in eachindex(basis)]
-    γ₁B = [basis[m].neumann_trace(q) for q in Γ, m in eachindex(basis)]
-    T = eltype(γ₀B)
-    Θ = zeros(T, num_targets, num_basis)
-    # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
-    for n in 1:num_basis
-        @views mul!(Θ[:, n], Sop, γ₁B[:, n])
-        @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
-        @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
-        for i in 1:num_targets
-            Θ[i, n] += μ[i] * basis[n].solution(X[i])
-        end
-    end
-    return Θ
 end
 
 """
@@ -215,10 +186,10 @@ auxiliary fields (e.g., pressure for Stokes) needed to compute the Neumann trace
 """
 function basis_from_monomial end
 
-# Laplace
 
+# Laplace
 function basis_from_monomial(::Laplace{N}, monomial::Polynomial{N, T}) where {N, T}
-    P = ElementaryPDESolutions.solve_laplace(monomial)
+    P = ElementaryPDESolutions.solve_laplace(-monomial)
     ∇P = ElementaryPDESolutions.gradient(P)
     γ₁P = q -> dot(normal(q), ∇P(coords(q)))
     return P, γ₁P
@@ -227,7 +198,7 @@ end
 # Helmholtz
 
 function basis_from_monomial(op::Helmholtz{N}, monomial::Polynomial{N, T}) where {N, T}
-    P = ElementaryPDESolutions.solve_helmholtz(monomial, op.k^2)
+    P = ElementaryPDESolutions.solve_helmholtz(-monomial, op.k^2)
     ∇P = ElementaryPDESolutions.gradient(P)
     γ₁P = q -> dot(normal(q), ∇P(coords(q)))
     return P, γ₁P
@@ -236,6 +207,7 @@ end
 # Elastostatic
 
 function basis_from_monomial(op::Elastostatic{N}, monomial::Polynomial{N, T}) where {N, T}
+    monomial = -monomial
     @assert T <: StaticMatrix && size(T) == (N, N)
     S = eltype(T)
     ord2coef = monomial.order2coeff
@@ -270,6 +242,7 @@ end
 # Stokes
 
 function basis_from_monomial(op::Stokes{N}, monomial::Polynomial{N, T}) where {N, T}
+    monomial = -monomial
     @assert T <: StaticMatrix && size(T) == (N, N)
     S = eltype(T)
     ord2coef = monomial.order2coeff

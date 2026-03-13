@@ -111,7 +111,7 @@ function test_volume_potential(op, Ω, Γ, msh; interpolation_order = 2, bdry_qo
         # Compute reference solution: -u - D*u_b + S*du_b
         # This comes from Green's representation: u = S*t - D*u + V*f
         # So V*f = u - S*t + D*u, and we test -V*f = S*t - D*u - u
-        vref = -u_d - D_b2d * u_b + S_b2d * du_b
+        vref = u_d + D_b2d * u_b - S_b2d * du_b
 
         # Compute uncorrected approximation
         vapprox = V_d2d * f_d
