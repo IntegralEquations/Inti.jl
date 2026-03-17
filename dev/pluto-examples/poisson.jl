@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.22
+# v0.20.24
 
 using Markdown
 using InteractiveUtils
