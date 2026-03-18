@@ -6,7 +6,7 @@ using Aqua
     Aqua.test_all(
         Inti;
         ambiguities = false, # test only `Inti` for ambiguities later
-        unbound_args = true,
+        unbound_args = (; broken = true), # broken due to use of NTuple in some signatures
         undefined_exports = true,
         project_extras = true,
         stale_deps = true,

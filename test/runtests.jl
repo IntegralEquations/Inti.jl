@@ -31,6 +31,7 @@ using Aqua
 
 @testset verbose = true "Corrections (Green identities)" begin
     include("green_identities_test.jl")
+    include("volume_potential_test.jl")
 end
 
 @testset "Accelerated density interpolation" include("dim_test.jl")

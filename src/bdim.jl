@@ -66,6 +66,8 @@ function bdim_correction(
     N = ambient_dimension(source)
     @assert eltype(Dop) == T "eltype of S and D must match"
     m, n = length(target), length(source)
+    # check if we are in debug mode to avoid expensive computations
+    do_debug = debug_mode()
     if isnothing(filter_target_params)
         dict_near = etype_to_nearest_points(target, source; maxdist)
         num_trgs = m
@@ -161,17 +163,21 @@ function bdim_correction(
             # TODO: get ride of all this transposing mumble jumble by assembling
             # the matrix in the correct orientation in the first place
             F = qr!(transpose(Mdata))
-            @debug (imat_cond = max(cond(Mdata), imat_cond)) maxlog = 0
-            @debug (imat_norm = max(norm(Mdata), imat_norm)) maxlog = 0
+            if do_debug
+                imat_cond = max(cond(Mdata), imat_cond)
+                imat_norm = max(norm(Mdata), imat_norm)
+            end
             for i in near_list[n]
                 j = glob_loc_near_trgs[i]
                 Θi .= Θ[j:j, :]
-                @debug (rhs_norm = max(rhs_norm, norm(Θidata))) maxlog = 0
+                if do_debug
+                    rhs_norm = max(rhs_norm, norm(Θidata))
+                end
                 ldiv!(Wdata, F, transpose(Θidata))
-                @debug (
+                if do_debug
                     res_norm = max(norm(Matrix(F) * Wdata - transpose(Θidata)), res_norm)
-                ) maxlog = 0
-                @debug (theta_norm = max(theta_norm, norm(Wdata))) maxlog = 0
+                    theta_norm = max(theta_norm, norm(Wdata))
+                end
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
