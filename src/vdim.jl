@@ -44,7 +44,12 @@ function vdim_correction(
     T = eltype(Vop)
     # determine type for dense matrices
     Dense = T <: SMatrix ? BlockArray : Array
-    @assert eltype(Dop) == eltype(Sop) == T "eltype of Sop, Dop, and Vop must match"
+    # FIXME? In order to wrap HMatrices for vector-valued layer *potentials* we
+    # use LinearMap{default_density_eltype(op)} for the layer potential maps.
+    # However, this breaks the following line, as e.g. instead of
+    # SMatrix{3,3,Float64} the eltype will be SVector{3,Float64}. Is there a way
+    # to keep this assert working?
+    #@assert eltype(Dop) == eltype(Sop) == T "eltype of Sop, Dop, and Vop must match"
     # figure out if we are dealing with a scalar or vector PDE
     num_target, num_source = length(target), length(source)
     # a reasonable interpolation_order if not provided
