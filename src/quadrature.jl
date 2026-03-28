@@ -372,3 +372,89 @@ function _curvature(f, Q)
     end
     return curv
 end
+
+"""
+    tangential_gradient_matrix(Q::Quadrature{N,T})
+
+Return a sparse matrix `G` of size `(length(Q), length(Q))` with `SVector{N,T}`
+entries such that `G * u` computes the surface gradient `∇_Γ u` at each
+quadrature node for scalar values `u`.
+
+The surface gradient is computed by locally interpolating `u` in parameter space
+using the Lagrange basis on quadrature nodes, differentiating, and applying the
+chain rule through the element parametrization:
+
+```math
+∇_Γ u = J (Jᵀ J)^{-1} ∇_{\\hat{x}} \\tilde{u}
+```
+
+where `J` is the Jacobian of the element map and `∇_{\\hat{x}} \\tilde{u}` is
+the gradient of the interpolant in reference coordinates.
+"""
+function tangential_gradient_matrix(Q::Quadrature{N, T}) where {N, T}
+    msh = mesh(Q)
+    Is = Int[]
+    Js = Int[]
+    Vs = SVector{N, T}[]
+    ntotal = sum(
+        E -> length(qcoords(quadrature_rule(Q, E)))^2 * size(Q.etype2qtags[E], 2),
+        element_types(msh)
+    )
+    sizehint!(Is, ntotal)
+    sizehint!(Js, ntotal)
+    sizehint!(Vs, ntotal)
+    for (E, qtags_mat) in Q.etype2qtags
+        _tangential_gradient_kernel!(Is, Js, Vs, Q, elements(msh, E), qtags_mat)
+    end
+    return sparse(Is, Js, Vs, length(Q), length(Q))
+end
+
+"""
+    surface_gradient(u::AbstractVector, Q::Quadrature)
+
+Compute the surface gradient `∇_Γ u` at each quadrature node, returning a
+`Vector{SVector{N,T}}`.
+
+See also: [`tangential_gradient_matrix`](@ref)
+"""
+function surface_gradient(u::AbstractVector, Q::Quadrature)
+    return tangential_gradient_matrix(Q) * u
+end
+
+@noinline function _tangential_gradient_kernel!(
+        Is,
+        Js,
+        Vs,
+        Q::Quadrature{N, T},
+        els::AbstractVector{E},
+        qtags_mat::Matrix{Int},
+    ) where {N, T, E}
+    M = geometric_dimension(domain(E))
+    qrule = quadrature_rule(Q, E)
+    x̂_nodes = qcoords(qrule)
+    nq = length(x̂_nodes)
+    L = lagrange_basis(qrule)
+    # precompute derivative of Lagrange basis at each reference node (shared across elements)
+    # dL_rows[q][j] is the SVector{M,T} gradient of Lⱼ at x̂_q
+    dL_rows = map(x̂_nodes) do x̂
+        dL = ForwardDiff.jacobian(L, x̂)
+        ntuple(j -> SVector{M, T}(ntuple(k -> T(dL[j, k]), M)), nq)
+    end
+    for n in 1:size(qtags_mat, 2)
+        el = els[n]
+        qtags = view(qtags_mat, :, n)
+        for q in 1:nq
+            J_q = SMatrix{N, M, T}(jacobian(el, x̂_nodes[q]))
+            invA_q = inv(J_q' * J_q)
+            B_q = J_q * invA_q
+            i_global = qtags[q]
+            for j in 1:nq
+                coeff = B_q * dL_rows[q][j]
+                push!(Is, i_global)
+                push!(Js, qtags[j])
+                push!(Vs, coeff)
+            end
+        end
+    end
+    return nothing
+end
