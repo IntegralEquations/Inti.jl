@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Plasmonic eigenvalues · Inti.jl</title><meta name="title" content="Plasmonic eigenvalues · Inti.jl"/><meta property="og:title" content="Plasmonic eigenvalues · Inti.jl"/><meta property="twitter:title" content="Plasmonic eigenvalues · Inti.jl"/><meta name="description" content="Documentation for Inti.jl."/><meta property="og:description" content="Documentation for Inti.jl."/><meta property="twitter:description" content="Documentation for Inti.jl."/><meta property="og:url" content="https://IntegralEquations.github.io/Inti.jl/examples/pep/"/><meta property="twitter:url" content="https://IntegralEquations.github.io/Inti.jl/examples/pep/"/><link rel="canonical" href="https://IntegralEquations.github.io/Inti.jl/examples/pep/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.png" alt="Inti.jl logo"/></a><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../../tutorials/getting_started/">Getting started</a></li><li><a class="tocitem" href="../../tutorials/geo_and_meshes/">Geometry and meshes</a></li><li><a class="tocitem" href="../../tutorials/integral_operators/">Integral operators</a></li><li><a class="tocitem" href="../../tutorials/layer_potentials/">Layer potentials</a></li><li><a class="tocitem" href="../../tutorials/compression_methods/">Compression methods</a></li><li><a class="tocitem" href="../../tutorials/correction_methods/">Correction methods</a></li><li><a class="tocitem" href="../../tutorials/solvers/">Linear solvers</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../../pluto-examples/toy_example/">Toy example</a></li><li><a class="tocitem" href="../../pluto-examples/helmholtz_scattering/">Helmholtz scattering</a></li><li><a class="tocitem" href="../../pluto-examples/poisson/">Poisson problem</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../stokes_drag/">Stokes drag</a></li><li><a class="tocitem" href="../crack_elasticity/">Elastic crack</a></li><li class="is-active"><a class="tocitem" href>Plasmonic eigenvalues</a><ul class="internal"><li><a class="tocitem" href="#Problem-Definition"><span>Problem Definition</span></a></li><li><a class="tocitem" href="#Numerical-Implementation"><span>Numerical Implementation</span></a></li><li><a class="tocitem" href="#Validation:-Elliptical-Domain"><span>Validation: Elliptical Domain</span></a></li><li><a class="tocitem" href="#Exploring-Different-Geometries"><span>Exploring Different Geometries</span></a></li><li><a class="tocitem" href="#Periodic-Structures"><span>Periodic Structures</span></a></li><li><a class="tocitem" href="#Three-dimensional-Problems"><span>Three-dimensional Problems</span></a></li><li><a class="tocitem" href="#Further-generalizations"><span>Further generalizations</span></a></li><li><a class="tocitem" href="#Conclusion"><span>Conclusion</span></a></li></ul></li></ul></li><li><a class="tocitem" href="../../references/">References</a></li><li><a class="tocitem" href="../../docstrings/">Docstrings</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Plasmonic eigenvalues</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Plasmonic eigenvalues</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl/blob/main/docs/src/examples/pep.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Plasmonic-Eigenvalue-Problem"><a class="docs-heading-anchor" href="#Plasmonic-Eigenvalue-Problem">Plasmonic Eigenvalue Problem</a><a id="Plasmonic-Eigenvalue-Problem-1"></a><a class="docs-heading-anchor-permalink" href="#Plasmonic-Eigenvalue-Problem" title="Permalink"></a></h1><div class="admonition is-info" id="Important-points-covered-in-this-example-c7265610c1c7d18a"><header class="admonition-header">Important points covered in this example<a class="admonition-anchor" href="#Important-points-covered-in-this-example-c7265610c1c7d18a" title="Permalink"></a></header><div class="admonition-body"><ul><li>Reformulate a transmission eigenvalue problem using integral equations</li><li>Implement and solve the Neumann-Poincaré eigenvalue problem</li><li>Use a periodic Green&#39;s function to solve problems with periodic structures</li><li>Visualize plasmonic eigenfunctions for different geometries</li></ul></div></div><h2 id="Problem-Definition"><a class="docs-heading-anchor" href="#Problem-Definition">Problem Definition</a><a id="Problem-Definition-1"></a><a class="docs-heading-anchor-permalink" href="#Problem-Definition" title="Permalink"></a></h2><p>Plasmonic resonances play a crucial role in nanophotonics, metamaterials, and sensing applications. At these resonances, the electromagnetic field becomes highly concentrated near material interfaces, leading to enhanced optical effects like extraordinary transmission, surface-enhanced Raman scattering, and localized heating. This tutorial demonstrates how to compute these resonances (in a much simplified context!) by solving the plasmonic eigenvalue problem using boundary integral methods. To keep things simple, we provide a brief and non-rigorous overview of the plasmonic eigenvalue problem; see e.g. [<a href="../../references/#grieser2014plasmonic">12</a>] for a more detailed mathematical discussion and e.g. [<a href="../../references/#maier2007plasmonics">13</a>] for a detailed discussion on plasmonic resonances and their physical relevance.</p><p>In what follows we let <span>$\Omega \subset \RR^2$</span> be a bounded domain with smooth (e.g. <span>$C^2$</span>) boundary <span>$\Gamma := \partial\Omega$</span>. We are interested in finding a non-zero function <span>$u : \RR^2 \to \RR$</span> and a scalar <span>$\kappa \in (-\infty, 0)$</span> solving the following eigenvalue problem:</p><p class="math-container">\[\begin{aligned}
+    \nabla \cdot \left(a(\bx) \nabla u \right) &amp;= 0, \quad a(\bx) = \begin{cases}
+        1 &amp; \text{if } \bx \in \Omega \\
+        \kappa &amp; \text{if } \bx \in \Omega^c
+    \end{cases}, \quad u(\bx) \underset{|\bx|\to \infty}{=} \mathcal{O}(|\bx|^{-1}).
+    
+\end{aligned}\]</p><p>Since the coefficient <span>$a(\boldsymbol{x})$</span> is piecewise constant, we can reformulate the problem in terms of the jump conditions across the boundary <span>$\Gamma$</span>. More precisely, denoting by <span>$\Omega^\pm$</span> the exterior and interior of <span>$\Omega$</span>, respectively, and <span>$u^\pm$</span> the restriction of <span>$u$</span> to <span>$\Omega^\pm$</span>, we can rewrite the problem as:</p><p class="math-container">\[\begin{aligned}
+\Delta u^\pm &amp;= 0 \quad &amp;&amp;\text{in } \Omega^\pm, \\
+u^+ &amp;= u^- \quad &amp;&amp;\text{on } \Gamma,\\
+\kappa \partial_\nu u^{+} &amp;= \partial_\nu u^{-} \quad &amp;&amp;\text{on } \Gamma, \\
+\end{aligned}\]</p><p>where <span>$\partial_\nu$</span> denotes the normal derivative with respect to the outward normal on the boundary <span>$\Gamma$</span>.</p><p>To solve this problem efficiently, we reformulate it as an integral equation using a single-layer potential ansatz:</p><p class="math-container">\[\begin{aligned}
+ u(\boldsymbol{x}) = \int_{\Gamma} G(\boldsymbol{x},\boldsymbol{y}) \sigma(\boldsymbol{y}) \, \textup{d} s({\boldsymbol{y}})
+\end{aligned}\]</p><p>where:</p><ul><li><span>$G(\boldsymbol{x},\boldsymbol{y})$</span> is the Green&#39;s function for the Laplace equation</li><li><span>$\sigma(\boldsymbol{y})$</span> is an unknown density function defined on <span>$\Gamma$</span></li></ul><p>Note that this ansatz automatically satisfies Laplace&#39;s equation (<span>$\Delta u = 0$</span>) in both <span>$\Omega^+$</span> and <span>$\Omega^-$</span> by construction, so we only need to enforce the jump conditions on the boundary <span>$\Gamma$</span> and possibly at <span>$\infty$</span>. Using some properties of the single-layer potential (in particular, its continuity across the boundary and the jump in the normal derivative), we can derive the following boundary integral equation:</p><p class="math-container">\[\begin{aligned}
+    \left( K^{\star} \sigma \right)(\boldsymbol{x}) = \lambda \sigma(\boldsymbol{x}) \quad &amp;&amp;\text{for } \boldsymbol{x} \in \Gamma
+\end{aligned}\]</p><p>where <span>$K^{\star}$</span> is the adjoint single-layer operator defined as:</p><p class="math-container">\[\begin{aligned}
+    K^{\star} \sigma(\boldsymbol{x}) = \int_{\Gamma} \partial_{\nu({\bx})} G(\boldsymbol{x},\boldsymbol{y})  \sigma(\boldsymbol{y}) \, \textup{d} s({\boldsymbol{y}})
+\end{aligned}\]</p><p>For the condition at infinity, it can be shown that the single-layer representation satisfies the decay condition at infinity if the density <span>$\sigma$</span> has zero mean over the boundary <span>$\Gamma$</span>, which is the case if <span>$\lambda \neq -1/2$</span> [<a href="../../references/#faria2024complex">14</a>, Lemma 29]. We thus have an equivalence between the original plasmonic eigenvalue problem and the Neumann-Poincaré eigenvalue problem (PEP), where <span>$\lambda$</span> is related to the original parameter <span>$\kappa$</span> by the transformation:</p><p class="math-container">\[\kappa = \frac{2 \lambda + 1}{2 \lambda - 1}\]</p><p>Next, we focus on the numerical discretization of the Neumann-Poincaré operator <span>$K^{\star}$</span> using <code>Inti</code>&#39;s boundary integral methods.</p><div class="admonition is-info" id="Rigorous-formulation-98d79b131f29a9e1"><header class="admonition-header">Rigorous formulation<a class="admonition-anchor" href="#Rigorous-formulation-98d79b131f29a9e1" title="Permalink"></a></header><div class="admonition-body"><p>To keep the discussion simple, we have chosen to avoid the details of the appropriate function spaces and precise regularity conditions. A rigorous treatment is beyond the scope of this tutorial, but details can be found in the literature. Note that the two-dimensional case is somewhat special [<a href="../../references/#grieser2014plasmonic">12</a>, <span>$\S 2.4$</span>].</p></div></div><h2 id="Numerical-Implementation"><a class="docs-heading-anchor" href="#Numerical-Implementation">Numerical Implementation</a><a id="Numerical-Implementation-1"></a><a class="docs-heading-anchor-permalink" href="#Numerical-Implementation" title="Permalink"></a></h2><p>Now, let&#39;s implement a numerical solution to this problem. We&#39;ll create a function that:</p><ol><li>Takes a curve <span>$\Gamma$</span> and discretization parameters</li><li>Assembles a matrix representation of the <span>$K^{\star}$</span> operator</li><li>Computes its eigenvalues and eigenfunctions</li><li>Returns the results as eigenvalue-eigenfunction pairs</li></ol><p>Because later we will also consider periodic structures, we will allow the user to specify a period for the Green&#39;s function. If no period is specified, we will use the free-space Green&#39;s function.</p><pre><code class="language-julia hljs">using Inti
+using StaticArrays
+using LinearAlgebra
+using GLMakie
+
+function npep(Γ; meshsize, qorder, period = Inf)
+    # Step 1: Discretize the curve Γ with a composite quadrature rule
+    Q = Inti.Quadrature(Γ; meshsize, qorder)
+
+    # Step 2: Choose the appropriate Green&#39;s function (periodic or standard)
+    op = if isfinite(period)
+        Inti.LaplacePeriodic1D(; dim=2, period) # Periodic Green&#39;s function
+    else
+        Inti.Laplace(; dim=2)                   # Standard Green&#39;s function
+    end
+
+    # Step 3: Create the Neumann-Poincaré integral operator
+    kernel = Inti.AdjointDoubleLayerKernel(op)
+    Kop    = Inti.IntegralOperator(kernel, Q, Q)
+
+    # Step 4: Assemble the matrix and correct for singular/nearly-singular entries
+    K₀ = Inti.assemble_matrix(Kop)         # Basic assembly
+    δK = Inti.adaptive_correction(Kop)     # Correction for singular integrals
+    K  = K₀ + δK                           # Final operator matrix
+
+    # Step 5: Compute eigendecomposition
+    F  = eigen(K)
+    λᵢ = F.values # Eigenvalues
+
+    # Step 6: Construct eigenfunction evaluators from eigenvectors
+    uᵢ = map(eachcol(F.vectors)) do v
+        # Create a function that evaluates the single-layer potential with density v
+        return Inti.SingleLayerPotential(op, Q)[real(v) / norm(v, Inf)]
+    end
+
+    return λᵢ, uᵢ
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">npep (generic function with 1 method)</code></pre><p>Let&#39;s break down what&#39;s happening here:</p><ol><li>We first create a quadrature rule on our curve <span>$\Gamma$</span> with specified mesh size and quadrature order</li><li>We select the appropriate Green&#39;s function (standard or periodic)</li><li>We create the adjoint double-layer kernel and the corresponding integral operator</li><li>We assemble a matrix representation of the operator and apply necessary corrections for singular integrals</li><li>We compute the eigendecomposition of this matrix</li><li>For each eigenvector, we create a function that evaluates the corresponding eigenfunction at any point</li></ol><p>Next, we can test our implementation on a simple case of an ellipse, where we know the analytical eigenvalues and eigenfunctions. This will allow us to validate our numerical results.</p><h2 id="Validation:-Elliptical-Domain"><a class="docs-heading-anchor" href="#Validation:-Elliptical-Domain">Validation: Elliptical Domain</a><a id="Validation:-Elliptical-Domain-1"></a><a class="docs-heading-anchor-permalink" href="#Validation:-Elliptical-Domain" title="Permalink"></a></h2><p>For an elliptical domain, we can compare our numerical results with the analytical solution. The eigenvalues of the Neumann-Poincaré operator for an ellipse are known explicitly.</p><pre><code class="language-julia hljs"># Define an ellipse with semi-axes 2.5 and 1
+χ = (s) -&gt; SVector(2.5 * cos(s), sin(s))
+Γ = Inti.parametric_curve(χ, 0, 2π) |&gt; Inti.Domain
+
+# Compute exact eigenvalues
+r = 1 / 2.5  # Ratio of semi-minor to semi-major axis
+nmax = 10
+λ = [sign(n) / 2 * exp(-2 * abs(n) * atanh(r)) for n in -nmax:nmax]
+
+# Compute numerical eigenvalues and eigenfunctions
+λᵢ, uᵢ = npep(Γ; meshsize = 0.1, qorder = 4)
+
+# Visualize the eigenvalues
+fig = Figure(size = (600, 250))
+ax = Axis(
+    fig[1, 1];
+    title = &quot;Eigenvalues of the Neumann-Poincaré Operator for an Ellipse&quot;,
+    xlabel = &quot;Re(λ)&quot;,
+    ylabel = &quot;Im(λ)&quot;,
+    limits = (-0.5, 0.5, -0.1, 0.1),
+)
+scatter!(
+    ax,
+    real(λ),
+    imag(λ);
+    label = &quot;Analytical&quot;,
+    color = :gray,
+    markersize = 20,
+    marker = :rect,
+    alpha = 0.6,
+)
+scatter!(
+    ax,
+    real(λᵢ),
+    imag(λᵢ);
+    label = &quot;Numerical&quot;,
+    color = :blue,
+    markersize = 14,
+    marker = :cross,
+)
+axislegend(ax)</code></pre><img src="fcadfda5.png" alt="Example block output"/><p>The excellent agreement between the analytical and numerical eigenvalues confirms the accuracy of our implementation. The eigenvalue at <span>$\lambda = -1/2$</span> corresponds to constant functions, which are not plasmonic modes since they do not satisfy the decay condition at infinity, but are still part of the spectrum of the Neumann-Poincaré operator.</p><p>Let&#39;s visualize an eigenfunction to better understand the physical nature of these resonances. Each eigenfunction corresponds to a specific plasmonic mode.</p><pre><code class="language-julia hljs">fig = Figure(size = (500, 400))
+n = 8 # Choose which eigenvalue/eigenfunction to visualize
+ax = Axis(
+    fig[1, 1];
+    title = &quot;Eigenfunction with λ ≈ $(trunc(real(λᵢ[n]), sigdigits = 2))&quot;,
+    xlabel = &quot;x&quot;,
+    ylabel = &quot;y&quot;,
+    aspect = DataAspect(),
+)
+
+# Define a function to evaluate the eigenfunction on a grid
+fun = (x, y) -&gt; real(uᵢ[n](SVector(x, y)))
+
+# Create a grid for visualization
+l = 4
+xx = yy = range(-l, l, 100)
+
+# Plot the eigenfunction as a heatmap
+hm = heatmap!(ax, xx, yy, fun; colormap = :viridis, interpolate = true)
+
+# Draw the boundary curve
+s = range(0, 2π, 100)
+lines!(ax, getindex.(χ.(s), 1), getindex.(χ.(s), 2); color = :black, linewidth = 2, label = &quot;Γ&quot;)
+
+# Add a colorbar
+Colorbar(fig[1, 2], hm)</code></pre><img src="dae3dada.png" alt="Example block output"/><p>As can be seen in the plot, the eigenfunctions are localized near the boundary, which is a typical feature of plasmonic modes. Changing the eigenvalue index <code>n</code> will show different modes.</p><h2 id="Exploring-Different-Geometries"><a class="docs-heading-anchor" href="#Exploring-Different-Geometries">Exploring Different Geometries</a><a id="Exploring-Different-Geometries-1"></a><a class="docs-heading-anchor-permalink" href="#Exploring-Different-Geometries" title="Permalink"></a></h2><p>Having validated our implementation on a simple elliptical domain, we can now explore more complex geometries. The boundary integral approach is particularly powerful because it allows us to complex domains without needing to mesh the interior/exterior. In the next example we consider a kite-shaped domain.</p><pre><code class="language-julia hljs"># Define a kite-shaped curve
+χ = (s) -&gt; SVector(cos(s[1]) + 0.65 * cos(2 * s[1]) - 0.65, 1.5 * sin(s[1]))
+Γ = Inti.parametric_curve(χ, 0, 2π) |&gt; Inti.Domain
+
+# Compute eigenvalues and eigenfunctions
+λᵢ, uᵢ = npep(Γ; meshsize = 0.1, qorder = 4)
+
+# Visualize an eigenfunction
+fig = Figure(size = (500, 400))
+n = 8 # Choose which eigenfunction to visualize
+ax = Axis(
+    fig[1, 1];
+    title = &quot;Eigenfunction with λ ≈ $(trunc(real(λᵢ[n]), sigdigits = 2))&quot;,
+    xlabel = &quot;x&quot;,
+    ylabel = &quot;y&quot;,
+    aspect = DataAspect(),
+)
+
+# Define a function to evaluate the eigenfunction on a grid
+fun = (x, y) -&gt; real(uᵢ[n](SVector(x, y)))
+
+# Create a grid for visualization
+l = 4
+xx = yy = range(-l, l, 100)
+
+# Plot the eigenfunction as a heatmap
+hm = heatmap!(ax, xx, yy, fun; colormap = :viridis, interpolate = true)
+
+# Draw the boundary curve
+s = range(0, 2π, 100)
+lines!(ax, getindex.(χ.(s), 1), getindex.(χ.(s), 2); color = :black, linewidth = 2, label = &quot;Γ&quot;)
+
+# Add a colorbar
+Colorbar(fig[1, 2], hm)
+
+fig</code></pre><img src="06545791.png" alt="Example block output"/><p>Notice how the eigenfunction adapts to the geometry of the domain, and as before we observe a strong localization of the field near the interface <span>$\Gamma$</span>.</p><h2 id="Periodic-Structures"><a class="docs-heading-anchor" href="#Periodic-Structures">Periodic Structures</a><a id="Periodic-Structures-1"></a><a class="docs-heading-anchor-permalink" href="#Periodic-Structures" title="Permalink"></a></h2><p>Many applications in nanophotonics involve periodic structures, such as diffraction gratings or metamaterials. We can extend our approach to handle periodic problems by using a periodic Green&#39;s function. In the periodic case, the problem is posed on <span>$[-\ell/2, \ell/2] \times \mathbb{R}$</span> instead of <span>$\mathbb{R}^2$</span>, where <span>$\ell$</span> is the period, and <span>$u$</span> must satisfy periodic boundary conditions in the first coordinate.</p><p>Almost everything we have done so far can be adapted to this case, provided a periodic Green&#39;s function is used. The periodic Green&#39;s function for the Laplace equation in 2D is given by (see <a href="https://people.math.ethz.ch/~grsam/HS17/MaCMiPaP/Lecture%20Notes/Lecture%204.pdf">these lecture notes</a>):</p><p class="math-container">\[G_p(\bx, \by) = \frac{-1}{4\pi} \log\left(\sin^2\left( \frac{\pi(x_1 - y_1)}{\ell}\right) + \sinh^2\left( \frac{\pi(x_2 - y_2)}{\ell}\right)\right)\]</p><p>where <span>$\ell$</span> is the period in the x-direction.</p><p>Our implementation already supports this case—we just need to specify a finite period:</p><pre><code class="language-julia hljs"># Specify the period
+period = 4
+
+# Compute eigenvalues and eigenfunctions for the periodic problem
+λᵢ, uᵢ = npep(Γ; meshsize = 0.1, qorder = 4, period)
+
+# Visualize an eigenfunction
+fig = Figure(size = (500, 400))
+n = 7 # Choose an eigenvalue to visualize
+ax = Axis(
+    fig[1, 1];
+    title = &quot;Periodic Eigenfunction with λ ≈ $(trunc(real(λᵢ[n]), sigdigits = 2))&quot;,
+    xlabel = &quot;x&quot;,
+    ylabel = &quot;y&quot;,
+    aspect = DataAspect(),
+)
+
+# Define a function to evaluate the eigenfunction on a grid
+fun = (x, y) -&gt; real(uᵢ[n](SVector(x, y)))
+
+# Create a larger grid to show periodicity
+l = 1.5*period
+xx = yy = range(-l, l, 100)
+
+# Plot the eigenfunction as a heatmap
+hm = heatmap!(ax, xx, yy, fun; colormap = :viridis, interpolate = true)
+
+# Draw the boundary curves for the central and neighboring cells
+s = range(0, 2π, 100)
+lines!(ax, getindex.(χ.(s), 1), getindex.(χ.(s), 2); color = :black, linewidth = 2)
+lines!(ax, getindex.(χ.(s), 1) .+ period, getindex.(χ.(s), 2); color = :black, linewidth = 2)
+lines!(ax, getindex.(χ.(s), 1) .- period, getindex.(χ.(s), 2); color = :black, linewidth = 2)
+
+# Draw the cell boundaries
+vlines!(ax, [-period/2, period/2], color = :black, linewidth = 2, linestyle = :dash)
+
+# Add a colorbar
+Colorbar(fig[1, 2], hm)
+
+fig</code></pre><img src="96b38f21.png" alt="Example block output"/><p>This plot shows the eigenfunction for a periodic array of kite-shaped inclusions (only three cells are shown). Notice how the solution repeats with period <span>$\ell$</span> in the x-direction. The dashed lines indicate the boundaries of the unit cell.</p><h2 id="Three-dimensional-Problems"><a class="docs-heading-anchor" href="#Three-dimensional-Problems">Three-dimensional Problems</a><a id="Three-dimensional-Problems-1"></a><a class="docs-heading-anchor-permalink" href="#Three-dimensional-Problems" title="Permalink"></a></h2><p>Plasmonic eigenvalue problems are not limited to two dimensions. In three dimensions, many of the physical and mathematical principles are similar, but the computational complexity increase. The boundary integral approach remains highly effective, as it avoids volumetric meshing and naturally incorporates the radiation condition at infinity.</p><p>The following example demonstrates how to compute and visualize plasmonic eigenmodes for a toroidal inclusion. Unlike the two-dimensional case, we avoid assembling the full (dense) matrix, and use instead a fast multipole method (FMM) to compute the action of the operator on a vector. We then use a Krylov based eigensolver to compute a few of the eigenvalues, instead of the full eigendecomposition. This is particularly important as the size of the problem grows.</p><pre><code class="language-julia hljs">using FMM3D, KrylovKit
+Ω = Inti.torus() |&gt; Inti.Domain
+Γ = Inti.boundary(Ω)
+Q = Inti.Quadrature(Γ; meshsize = 0.1, qorder = 4)
+op = Inti.Laplace(; dim = 3)
+kernel = Inti.AdjointDoubleLayerKernel(op)
+Kop = Inti.IntegralOperator(kernel, Q, Q)
+K₀ = Inti.assemble_fmm(Kop; rtol = 1e-4)
+δK = Inti.adaptive_correction(Kop) # Correction for singular integrals
+K = K₀ + δK # Final operator matrix
+λᵢ, vᵢ, info = eigsolve(K, rand(size(K, 1)), 10)
+info</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">ConvergenceInfo: 10 converged values after 4 iterations and 62 applications of the linear map;
+norms of residuals are given by (2.30e-56, 6.02e-43, 2.54e-42, 1.83e-33, 6.34e-33, 1.82e-22, 5.16e-22, 4.22e-17, 5.74e-16, 1.49e-35).</code></pre><p>Notice that only the matrix-vector product is required by <code>eigsolve</code>, and the <code>info</code> object above displays the convergence information. Here is what the few computed eigenvalues look like:</p><pre><code class="language-julia hljs">scatter(
+    real(λᵢ),
+    imag(λᵢ);
+    markersize = 10,
+    marker = :cross,
+    color = :blue,
+    label = &quot;Eigenvalues&quot;,
+)</code></pre><img src="32761fd1.png" alt="Example block output"/><p>Finally, we can visualize one of the eigenfunctions by evaluating our single-layer ansatz on a points inside the volume. Since there are many target points, we will again use the fast multipole method to compute the action of the operator on the eigenfunction. The visualization will be done on a 3D volume slices using <code>Makie</code>.</p><pre><code class="language-julia hljs">using Meshes # to visualize the mesh using `viz!`
+vₙ = vᵢ[8]
+pts_per_dim = 100
+xx = yy = zz = range(-2,2,pts_per_dim)
+targets = [SVector(x, y, z) for x in xx, y in yy, z in zz] |&gt; vec
+Kpot = Inti.IntegralOperator(Inti.SingleLayerKernel(op), targets, Q)
+Kpot_fmm = Inti.assemble_fmm(Kpot; rtol = 1e-4)
+uₙ = Kpot_fmm * real(vₙ)
+fig = Figure()
+ax = Axis3(fig[1, 1]; aspect = :data, elevation = π/6, azimuth = π/3,
+           title = &quot;Eigenfunction with λ ≈ $(trunc(real(λᵢ[n]), sigdigits = 2))&quot;)
+hidedecorations!(ax)
+plt = volumeslices!(ax, xx, yy, zz, reshape(uₙ,pts_per_dim,pts_per_dim,pts_per_dim); interpolate = true)
+plt[:update_yz][](pts_per_dim ÷ 2)
+plt[:update_xz][](pts_per_dim ÷ 2)
+plt[:update_xy][](length(zz) ÷ 2)
+viz!(Inti.mesh(Q); showsegments = true, color = :lightgray, alpha = 0.5)</code></pre><img src="cabc5285.png" alt="Example block output"/><p>As before, the eigenfunction is localized near the boundary of the toroidal inclusion, which is a characteristic feature of plasmonic modes.</p><h2 id="Further-generalizations"><a class="docs-heading-anchor" href="#Further-generalizations">Further generalizations</a><a id="Further-generalizations-1"></a><a class="docs-heading-anchor-permalink" href="#Further-generalizations" title="Permalink"></a></h2><p>Some interesting generalizations are described next. If you are interested in any of these, feel free to open a draft PR to discuss the implementation details!</p><h3 id="Multiple-inclusions"><a class="docs-heading-anchor" href="#Multiple-inclusions">Multiple inclusions</a><a id="Multiple-inclusions-1"></a><a class="docs-heading-anchor-permalink" href="#Multiple-inclusions" title="Permalink"></a></h3><p>The approach can be extended to handle multiple inclusions (disconnected domains). In this case, the boundary <span>$\Gamma$</span> would consist of multiple closed curves, and the quadrature would need to be defined on each component. This presents no fundamental challenges, and is simply a matter of defining a more complex domain. As long as the inclusions are smooth, everything should work as expected.</p><h3 id="Helmholtz-equation"><a class="docs-heading-anchor" href="#Helmholtz-equation">Helmholtz equation</a><a id="Helmholtz-equation-1"></a><a class="docs-heading-anchor-permalink" href="#Helmholtz-equation" title="Permalink"></a></h3><p>The eigenvalue problem can be stated for the Helmholtz equation as well, where a different wavenumber is used in the exterior and interior domains (and their dependency on the spectral parameter must be specified through a model). Reformulating the problem in terms of boundary integral equations is still possible, but becomes more involved. </p><p>Furthermore, when the domain is composed of periodic structures, the solution <span>$u$</span> is usually quasi-periodic, and the computation of quasi-periodic Green&#39;s functions requires more involved techniques.</p><h3 id="Domains-with-Corners"><a class="docs-heading-anchor" href="#Domains-with-Corners">Domains with Corners</a><a id="Domains-with-Corners-1"></a><a class="docs-heading-anchor-permalink" href="#Domains-with-Corners" title="Permalink"></a></h3><p>For domains with corners, the solutions can exhibit singular behavior near the corners, and the Neumann-Poincaré operator loses its compactness, introducing a continuous spectrum. Although there are ways to handle this situation, they all require a somewhat intricate analysis of the corners. See <a href="https://github.com/fmonteghetti/neumann-poincare-complex-scaling">this repository</a> for one possible method, based on complex scaling, implemented using <code>Inti</code>.</p><h2 id="Conclusion"><a class="docs-heading-anchor" href="#Conclusion">Conclusion</a><a id="Conclusion-1"></a><a class="docs-heading-anchor-permalink" href="#Conclusion" title="Permalink"></a></h2><p>In this tutorial, we&#39;ve demonstrated how to:</p><ol><li>Formulate the plasmonic eigenvalue problem in terms of boundary integral equations</li><li>Implement a numerical solver using the Neumann-Poincaré operator</li><li>Compute and visualize eigenfunctions for different geometries</li><li>Extend the approach to periodic structures</li></ol><p>The boundary integral approach offers good accuracy and efficiency, especially for problems with smooth boundaries. It naturally handles the unbounded domain and radiation conditions, making it ideal for scattering and resonance problems.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../crack_elasticity/">« Elastic crack</a><a class="docs-footer-nextpage" href="../../references/">References »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Friday 3 October 2025 00:39">Friday 3 October 2025</span>. Using Julia version 1.11.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
