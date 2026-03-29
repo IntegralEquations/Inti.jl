@@ -29,12 +29,12 @@ end</code></pre><p>Let us now use <code>gmsh_circle</code> to create a <code>cir
 meshsize = λ / 5
 gmsh_circle(; meshsize, order = gorder, name)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : Meshing curve 1 (Ellipse)
-Info    : Done meshing 1D (Wall 0.000107989s, CPU 0.000109s)
+Info    : Done meshing 1D (Wall 0.000101798s, CPU 0.000103s)
 Info    : 63 nodes 64 elements
 Info    : Meshing order 2 (curvilinear on)...
 Info    : [  0%] Meshing curve 1 order 2
 Info    : [ 60%] Meshing surface 1 order 2
-Info    : Done meshing order 2 (Wall 0.000390449s, CPU 0.00039s)
+Info    : Done meshing order 2 (Wall 0.000314793s, CPU 0.000313s)
 Info    : Writing &#39;/home/runner/work/Inti.jl/Inti.jl/docs/build/pluto-examples/circle.msh&#39;...
 Info    : Done writing &#39;/home/runner/work/Inti.jl/Inti.jl/docs/build/pluto-examples/circle.msh&#39;</code></pre><p>We can now import the file and parse the mesh and domain information into <code>Inti.jl</code> using the <a href="../../docstrings/#Inti.import_mesh-Tuple"><code>import_mesh</code></a> function:</p><pre><code class="language-julia hljs">Inti.clear_entities!() # empty the entity cache
 msh = Inti.import_mesh(name; dim = 2)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Inti.Mesh{2, Float64} containing:
@@ -77,7 +77,7 @@ er = maximum(0:0.01:2π) do θ
     x = (R * cos(θ), R * sin(θ))
     return abs(uₛ(x) - uₑ(x))
 end
-@info &quot;maximum error = $er&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: maximum error = 2.5494712466402184e-6</code></pre><p>As we can see, the error is quite small! Let&#39;s use <code>Makie</code> to visualize the solution in this simple (2d) example:</p><pre><code class="language-julia hljs">xx = yy = range(-4; stop = 4, length = 200)
+@info &quot;maximum error = $er&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: maximum error = 2.549471246663243e-6</code></pre><p>As we can see, the error is quite small! Let&#39;s use <code>Makie</code> to visualize the solution in this simple (2d) example:</p><pre><code class="language-julia hljs">xx = yy = range(-4; stop = 4, length = 200)
 vals = map(
     pt -&gt; Inti.isinside(pt, Q) ? NaN : real(uₛ(pt) + uᵢ(pt)),
     Iterators.product(xx, yy),
@@ -215,7 +215,7 @@ er_3d = maximum(1:100) do _
     x = 2 * x̂
     return abs(uₛ_3d(x) - uₑ_3d(x))
 end
-@info &quot;error with correction = $er_3d&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: error with correction = 3.820033578266803e-5</code></pre><p>We see that, once again, the approximation is quite accurate. Let us now visualize the solution on the punctured plane (which we labeled as &quot;sigma&quot;). Since evaluating the integral representation of the solution at many points is expensive, we will use again use a method to accelerate the evaluation:</p><pre><code class="language-julia hljs">Σ_msh = view(msh_3d, Σ_3d)
+@info &quot;error with correction = $er_3d&quot;</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: error with correction = 3.27934859126788e-5</code></pre><p>We see that, once again, the approximation is quite accurate. Let us now visualize the solution on the punctured plane (which we labeled as &quot;sigma&quot;). Since evaluating the integral representation of the solution at many points is expensive, we will use again use a method to accelerate the evaluation:</p><pre><code class="language-julia hljs">Σ_msh = view(msh_3d, Σ_3d)
 target = Inti.nodes(Σ_msh)
 
 S_viz, D_viz = Inti.single_double_layer(;
@@ -236,4 +236,4 @@ fig_3d = Figure(; size = (800, 500))
 ax_3d = Axis3(fig_3d[1, 1]; aspect = :data)
 viz!(Γ_msh_3d; colorrange, colormap, color = zeros(nv), interpolate = true)
 viz!(Σ_msh; colorrange, colormap, color = real(u_eval_msh))
-cb = Colorbar(fig_3d[1, 2]; label = &quot;real(u)&quot;, colormap, colorrange)</code></pre><img src="03f76f0a.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../toy_example/">« Toy example</a><a class="docs-footer-nextpage" href="../poisson/">Poisson problem »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Tuesday 17 March 2026 15:27">Tuesday 17 March 2026</span>. Using Julia version 1.12.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+cb = Colorbar(fig_3d[1, 2]; label = &quot;real(u)&quot;, colormap, colorrange)</code></pre><img src="03f76f0a.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../toy_example/">« Toy example</a><a class="docs-footer-nextpage" href="../poisson/">Poisson problem »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Sunday 29 March 2026 09:02">Sunday 29 March 2026</span>. Using Julia version 1.12.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
