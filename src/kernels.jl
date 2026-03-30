@@ -33,6 +33,17 @@ abstract type AbstractDifferentialOperator{N} end
 
 ambient_dimension(::AbstractDifferentialOperator{N}) where {N} = N
 
+function range_dimension(op::AbstractDifferentialOperator)
+    T = default_density_eltype(op)
+    if T <: Number
+        return 1
+    elseif hasmethod(length, Tuple{Type{T}})
+        return length(T)
+    else
+        error("default_density_eltype($(typeof(op))) = $T does not define length(::Type{$T}); cannot determine range dimension")
+    end
+end
+
 # convenient constructor for e.g. SingleLayerKernel(op,Float64) or DoubleLayerKernel(op,ComplexF64)
 function (::Type{K})(
         op::Op,

@@ -176,8 +176,9 @@ function single_double_layer(;
             S = axpy!(true, δS, Smat)
             D = axpy!(true, δD, Dmat)
         else
-            S = LinearMap(Smat) + LinearMap(δS)
-            D = LinearMap(Dmat) + LinearMap(δD)
+            T = default_density_eltype(op)
+            S = LinearMap{T}(Smat) + LinearMap{T}(δS)
+            D = LinearMap{T}(Dmat) + LinearMap{T}(δD)
         end
     elseif compression.method == :fmm
         S = Smat + LinearMap(δS)
@@ -365,7 +366,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
     if compression.method ∈ (:hmatrix, :none)
         # TODO: in the hmatrix case, we may want to add the correction directly
         # to the HMatrix so that a direct solver can be later used
-        V = LinearMap(Vmat) + LinearMap(δV)
+        V = LinearMap{default_density_eltype(op)}(Vmat) + LinearMap{default_density_eltype(op)}(δV)
         # if target === source
         #     V = axpy!(true, δV, Vmat)
         # else
