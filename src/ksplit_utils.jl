@@ -191,6 +191,75 @@ function wLCinit(ra, rb, r, rj, nuj, rpwj, npt; target_location)
     return wcorrL, wcmpC
 end
 
+"""
+    wLCHinit(ra, rb, r, rj, nuj, rpwj, npt; target_location) -> Tuple
+
+Extends [`wLCinit`](@ref) with the additional complex Cauchy compensation and
+second-order compensation required for off-surface gradient evaluation of a
+double-layer potential.
+
+The return tuple is `(wcorrL, wcmpC, wcmpC_complex, wcmpH)`, where:
+- `wcorrL` is the logarithmic correction weight,
+- `wcmpC` is the scalar Cauchy compensation,
+- `wcmpC_complex` is the full complex Cauchy compensation, and
+- `wcmpH` is the compensation for the canonical second-order singular moment.
+"""
+function wLCHinit(ra, rb, r, rj, nuj, rpwj, npt; target_location)
+    dr = (rb - ra) / 2
+    ctr = (rb + ra) / 2
+    rtr = (r - ctr) / dr
+    rjtr = (rj .- ctr) ./ dr
+
+    A = transpose(Vandermonde(rjtr))
+    p = zeros(ComplexF64, npt + 1)
+    q = zeros(ComplexF64, npt)
+    c = (1 .- (-1) .^ (1:npt)) ./ (1:npt)
+
+    # Canonical Cauchy moments.
+    p[1] = log(Complex(1 - rtr)) - log(Complex(-1 - rtr))
+    psum = log(Complex(1 - rtr) * Complex(-1 - rtr))
+
+    if target_location == :inside
+        if imag(rtr) < 0 && abs(real(rtr)) < 1
+            p[1] += 2im * π
+            psum -= 2im * π
+        end
+    elseif target_location == :outside
+        if imag(rtr) > 0 && abs(real(rtr)) < 1
+            p[1] -= 2im * π
+            psum += 2im * π
+        end
+    else
+        throw(ArgumentError("target_location must be either :inside or :outside"))
+    end
+
+    for k in 1:npt
+        p[k + 1] = rtr * p[k] + c[k]
+    end
+
+    # Canonical logarithmic moments.
+    q[1:2:(npt - 1)] = psum .- p[2:2:npt]
+    q[2:2:npt] = p[1] .- p[3:2:(npt + 1)]
+    q ./= (1:npt)
+
+    wcorrL =
+        real((A \ q) * dr .* conj(im * nuj)) ./ abs.(rpwj) .+
+        (log(abs(dr)) .- log.(abs.(rj .- r)))
+
+    wcmpC_complex = (A \ (-p[1:npt])) .- rpwj ./ (r .- rj)
+    wcmpC = imag.(wcmpC_complex)
+
+    rvec = zeros(ComplexF64, npt)
+    rvec[1] = -inv(1 - rtr) - inv(1 + rtr)
+    for k in 1:(npt - 1)
+        rvec[k + 1] = rtr * rvec[k] + p[k]
+    end
+
+    wcmpH = (A \ rvec) / dr .- rpwj ./ (r .- rj) .^ 2
+
+    return wcorrL, wcmpC, wcmpC_complex, wcmpH
+end
+
 # Constant matrix associated with interpolation using Legendre polynomials
 function L_Legendre_matrix(n)
     L_Leg = Matrix{Float64}(undef, n, n)

@@ -51,9 +51,8 @@ include("nystrom.jl")
 include("adaptive_correction.jl")
 include("bdim.jl")
 include("vdim.jl")
-# include("kernel_split.jl")
-# include("adaptive_kernel_split.jl")
 include("ksplit.jl")
+include("ksplit_grad.jl")
 
 # some zero-argument methods for the Inti's gmsh extension
 include("gmsh_api.jl")
