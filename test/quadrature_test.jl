@@ -101,6 +101,13 @@ using Inti
             gauss_curv = Inti.gauss_curvature(quad)
             κ = 1 / r^2
             @test all(x -> norm(x - κ) < 0.05, gauss_curv)
+            κs = Inti.principal_curvatures(quad)
+            @test all(κs) do (κ₁, κ₂)
+                abs(κ₁ + 1 / r) < 0.05 && abs(κ₂ + 1 / r) < 0.05
+            end
+            @test all(x -> abs(x + 2 / r) < 0.05, Inti.curvature(quad))
+            @test Inti.mean_curvature(quad) ≈ Inti.curvature(quad) ./ 2
+            @test Inti.gauss_curvature(quad) ≈ prod.(Inti.principal_curvatures(quad))
             @test isapprox(area, 4 * π * r^2, atol = 1.0e-3)
             exact = map(f, M[Γ].nodes)
             approx = Inti.quadrature_to_node_vals(quad, map(q -> f(q.coords), quad))
@@ -159,6 +166,34 @@ using Inti
             Q = Inti.Quadrature(Γ; qorder = 2, meshsize = 0.1)
             @test Inti.integrate(x -> 1, Q) ≈ 2π
         end
+    end
+end
+
+@testset "Curvature" begin
+    @testset "1D curve, extrusion" begin
+        # Unit circle with outward normal: κ_meridian ≈ -1, κ_azimuthal = 0 exactly
+        geo = Inti.parametric_curve(θ -> SVector(cos(θ), sin(θ)), 0, 2π)
+        Q = Inti.Quadrature(Inti.Domain(geo); qorder = 4, meshsize = 0.1)
+        κs = Inti.principal_curvatures(Q)
+        @test all(κ -> iszero(last(κ)), κs)
+        @test all(κ -> abs(first(κ) + 1) < 1e-10, κs)
+        @test all(iszero, Inti.gauss_curvature(Q))
+        @test Inti.mean_curvature(Q) ≈ Inti.curvature(Q) ./ 2
+        @test Inti.gauss_curvature(Q) ≈ prod.(Inti.principal_curvatures(Q))
+    end
+    @testset "1D curve, revolution → sphere" begin
+        # Meridian (r_cyl, z) = (sin θ, cos θ) revolved around z-axis gives unit sphere.
+        # Poles excluded to avoid the r_cyl = 0 singularity.
+        geo = Inti.parametric_curve(θ -> SVector(sin(θ), cos(θ)), 0.1, π - 0.1)
+        Q = Inti.Quadrature(Inti.Domain(geo); qorder = 4, meshsize = 0.1)
+        κs = Inti.principal_curvatures(Q; surface_type = :revolution)
+        @test all(κ -> abs(first(κ) - last(κ)) < 1e-10, κs)   # equal curvatures for sphere
+        @test all(K -> abs(K - 1) < 1e-10, Inti.gauss_curvature(Q; surface_type = :revolution))
+        @test all(K -> abs(K - 1) < 1e-10, Inti.mean_curvature(Q; surface_type = :revolution))
+        @test Inti.mean_curvature(Q; surface_type = :revolution) ≈
+              Inti.curvature(Q; surface_type = :revolution) ./ 2
+        @test Inti.gauss_curvature(Q; surface_type = :revolution) ≈
+              prod.(Inti.principal_curvatures(Q; surface_type = :revolution))
     end
 end
 

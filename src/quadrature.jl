@@ -339,33 +339,48 @@ function node_vals_to_quadrature(Q::Quadrature, ivals::AbstractVector)
 end
 
 """
-    mean_curvature(Q::Quadrature)
+    principal_curvatures(Q::Quadrature; kwargs...)
+
+Compute the `principal_curvatures` at each quadrature node in `Q`.
+"""
+principal_curvatures(Q::Quadrature; kwargs...) = _curvature((el, x̂) -> principal_curvatures(el, x̂; kwargs...), Q)
+
+"""
+    curvature(Q::Quadrature; kwargs...)
+
+Compute the `curvature` at each quadrature node in `Q`.
+"""
+curvature(Q::Quadrature; kwargs...) = _curvature((el, x̂) -> curvature(el, x̂; kwargs...), Q)
+
+"""
+    mean_curvature(Q::Quadrature; kwargs...)
 
 Compute the `mean_curvature` at each quadrature node in `Q`.
 """
-mean_curvature(Q::Quadrature) = _curvature(mean_curvature, Q)
+mean_curvature(Q::Quadrature; kwargs...) = _curvature((el, x̂) -> mean_curvature(el, x̂; kwargs...), Q)
 
 """
-    gauss_curvature(Q::Quadrature)
+    gauss_curvature(Q::Quadrature; kwargs...)
 
 Compute the `gauss_curvature` at each quadrature node in `Q`.
 """
-gauss_curvature(Q::Quadrature) = _curvature(gauss_curvature, Q)
+gauss_curvature(Q::Quadrature; kwargs...) = _curvature((el, x̂) -> gauss_curvature(el, x̂; kwargs...), Q)
 
 # helper function for computing curvature
 function _curvature(f, Q)
     msh = mesh(Q)
-    curv = zeros(length(Q))
+    isempty(Q.etype2qtags) && return []
+    E1 = first(keys(Q.etype2qtags))
+    q̂1, _ = quadrature_rule(Q, E1)()
+    el1 = elements(msh, E1)[1]
+    T = Base.promote_op(f, typeof(el1), eltype(q̂1))
+    curv = Vector{T}(undef, length(Q))
     for (E, tags) in Q.etype2qtags
         qrule = quadrature_rule(Q, E)
-        q̂, _ = qrule()
+        X̂ = vec(qcoords(qrule))
         els = elements(msh, E)
         for n in 1:size(tags, 2)
-            el = els[n]
-            for i in 1:size(tags, 1)
-                qtag = tags[i, n]
-                curv[qtag] = f(el, q̂[i])
-            end
+            curv[tags[:, n]] .= map(x̂ -> f(els[n], x̂), X̂)
         end
     end
     return curv
@@ -451,6 +466,179 @@ end
                 push!(Is, i_global)
                 push!(Js, qtags[j])
                 push!(Vs, coeff)
+            end
+        end
+    end
+    return nothing
+end
+
+"""
+    surface_divergence_matrix(Q::Quadrature{N,T})
+
+Return a sparse matrix `D` of size `(length(Q), length(Q))` with `Adjoint{T, SVector{N,T}}`
+entries such that `D * v` computes the surface divergence `∇_Γ ⋅ v` at each
+quadrature node for vector fields `v`.
+"""
+function surface_divergence_matrix(Q::Quadrature{N, T}) where {N, T}
+    msh = mesh(Q)
+    Is = Int[]
+    Js = Int[]
+    Vs = Adjoint{T, SVector{N, T}}[]
+    ntotal = sum(
+        E -> length(qcoords(quadrature_rule(Q, E)))^2 * size(Q.etype2qtags[E], 2),
+        element_types(msh)
+    )
+    sizehint!(Is, ntotal)
+    sizehint!(Js, ntotal)
+    sizehint!(Vs, ntotal)
+    for (E, qtags_mat) in Q.etype2qtags
+        _surface_divergence_kernel!(Is, Js, Vs, Q, elements(msh, E), qtags_mat)
+    end
+    return sparse(Is, Js, Vs, length(Q), length(Q))
+end
+
+"""
+    surface_divergence(v::AbstractVector, Q::Quadrature)
+
+Compute the surface divergence `∇_Γ ⋅ v` at each quadrature node, returning a
+`Vector{T}`.
+"""
+function surface_divergence(v::AbstractVector, Q::Quadrature)
+    return surface_divergence_matrix(Q) * v
+end
+
+@noinline function _surface_divergence_kernel!(
+        Is, Js, Vs,
+        Q::Quadrature{N, T},
+        els::AbstractVector{E},
+        qtags_mat::Matrix{Int},
+    ) where {N, T, E}
+    M = geometric_dimension(domain(E))
+    qrule = quadrature_rule(Q, E)
+    x̂_nodes = qcoords(qrule)
+    nq = length(x̂_nodes)
+    L = lagrange_basis(qrule)
+    dL_rows = map(x̂_nodes) do x̂
+        dL = ForwardDiff.jacobian(L, x̂)
+        ntuple(j -> SVector{M, T}(ntuple(k -> T(dL[j, k]), M)), nq)
+    end
+    for n in 1:size(qtags_mat, 2)
+        el = els[n]
+        qtags = view(qtags_mat, :, n)
+        for q in 1:nq
+            J_q = SMatrix{N, M, T}(jacobian(el, x̂_nodes[q]))
+            invA_q = inv(J_q' * J_q)
+            B_q = J_q * invA_q
+            i_global = qtags[q]
+            for j in 1:nq
+                coeff = B_q * dL_rows[q][j]
+                push!(Is, i_global)
+                push!(Js, qtags[j])
+                push!(Vs, coeff')
+            end
+        end
+    end
+    return nothing
+end
+
+"""
+    surface_laplacian_matrix(Q::Quadrature{N,T})
+
+Return a sparse matrix `L` of size `(length(Q), length(Q))` with `T`
+entries such that `L * u` computes the surface Laplacian `Δ_Γ u` at each
+quadrature node for scalar fields `u`.
+"""
+function surface_laplacian_matrix(Q::Quadrature{N, T}) where {N, T}
+    msh = mesh(Q)
+    Is = Int[]
+    Js = Int[]
+    Vs = T[]
+    ntotal = sum(
+        E -> length(qcoords(quadrature_rule(Q, E)))^2 * size(Q.etype2qtags[E], 2),
+        element_types(msh)
+    )
+    sizehint!(Is, ntotal)
+    sizehint!(Js, ntotal)
+    sizehint!(Vs, ntotal)
+    for (E, qtags_mat) in Q.etype2qtags
+        _surface_laplacian_kernel!(Is, Js, Vs, Q, elements(msh, E), qtags_mat)
+    end
+    return sparse(Is, Js, Vs, length(Q), length(Q))
+end
+
+"""
+    surface_laplacian(u::AbstractVector, Q::Quadrature)
+
+Compute the surface Laplacian `Δ_Γ u` at each quadrature node, returning a
+`Vector{T}`.
+"""
+function surface_laplacian(u::AbstractVector, Q::Quadrature)
+    return surface_laplacian_matrix(Q) * u
+end
+
+@noinline function _surface_laplacian_kernel!(
+        Is, Js, Vs,
+        Q::Quadrature{N, T},
+        els::AbstractVector{E},
+        qtags_mat::Matrix{Int},
+    ) where {N, T, E}
+    M = geometric_dimension(domain(E))
+    qrule = quadrature_rule(Q, E)
+    x̂_nodes = qcoords(qrule)
+    nq = length(x̂_nodes)
+    L = lagrange_basis(qrule)
+    
+    # Precompute gradients and hessians of Lagrange basis
+    dL_rows = map(x̂_nodes) do x̂
+        dL = ForwardDiff.jacobian(L, x̂)
+        ntuple(j -> SVector{M, T}(ntuple(k -> T(dL[j, k]), M)), nq)
+    end
+    
+    HL_rows = map(x̂_nodes) do x̂
+        jac_func(x) = vec(ForwardDiff.jacobian(L, x))
+        H_flat = ForwardDiff.jacobian(jac_func, x̂)
+        ntuple(nq) do q_basis
+            SMatrix{M, M, T}(ntuple(i -> H_flat[q_basis + ((i-1)%M)*nq, div(i-1, M)+1], Val(M*M)))
+        end
+    end
+
+    for n in 1:size(qtags_mat, 2)
+        el = els[n]
+        qtags = view(qtags_mat, :, n)
+        for q in 1:nq
+            x̂ = x̂_nodes[q]
+            J_q = SMatrix{N, M, T}(jacobian(el, x̂))
+            g = J_q' * J_q
+            g_inv = inv(g)
+            
+            H_x = hessian(el, x̂)
+            
+            # Christoffel symbols Gamma^k = \sum_m g^{km} \sum_n H^x_n J_{nm}
+            Gamma = ntuple(Val(M)) do k
+                sum(1:M) do m
+                    g_inv[k, m] * sum(1:N) do d
+                        H_x[d, :, :][:, :] * J_q[d, m] 
+                    end
+                end
+            end
+            
+            i_global = qtags[q]
+            for j in 1:nq
+                grad_u_j = dL_rows[q][j]
+                H_u_j = HL_rows[q][j]
+                
+                # \Delta_\Gamma L_j = g^{ab} ( H_u_j[a,b] - \sum_k \Gamma^k[a,b] grad_u_j[k] )
+                val = sum(1:M) do a
+                    sum(1:M) do b
+                        g_inv[a, b] * ( H_u_j[a, b] - sum(1:M) do k
+                            Gamma[k][a, b] * grad_u_j[k]
+                        end )
+                    end
+                end
+                
+                push!(Is, i_global)
+                push!(Js, qtags[j])
+                push!(Vs, val)
             end
         end
     end
