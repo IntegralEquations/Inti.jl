@@ -292,7 +292,7 @@ end
 Dictionary mapping [`EntityKey`](@ref) to [`GeometricEntity`](@ref). Contains
 all entities created in a given session.
 """
-const ENTITIES = Dict{EntityKey, GeometricEntity}()
+const ENTITIES = OrderedDict{EntityKey, GeometricEntity}()
 
 clear_entities!() = empty!(ENTITIES)
 

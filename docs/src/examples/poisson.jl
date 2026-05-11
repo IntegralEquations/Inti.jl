@@ -73,11 +73,12 @@ msh = Inti.import_mesh(name; dim = 2)
 Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
 Γ = Inti.boundary(Ω)
 
+using OrderedCollections
 Ωₕ = view(msh, Ω)
 Γₕ = view(msh, Γ)
 # Use VDIM with the Vioreanu-Rokhlin quadrature rule
 Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder);
-dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
+dict = OrderedDict(E => Q for E in Inti.element_types(Ωₕ))
 Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
 Γₕ_quad = Inti.Quadrature(Γₕ; qorder)
 

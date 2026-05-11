@@ -9,12 +9,13 @@ using LinearAlgebra
 using HMatrices
 using FMMLIB2D
 using Meshes
+using DataStructures
 
 #meshsize = 0.001/8
 #meshsize = 0.125/8
 meshsize = 0.000125
-interpolation_order = 4
-VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(4)
+interpolation_order = 2
+VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
 bdry_qorder = 2 * VR_qorder
 
 function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
@@ -50,7 +51,7 @@ msh = Inti.import_mesh(name; dim = 2)
 tquad = @elapsed begin
     # Use VDIM with the Vioreanu-Rokhlin quadrature rule for Ωₕ
     Q = Inti.VioreanuRokhlin(; domain = :triangle, order = VR_qorder)
-    dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
+    dict = OrderedDict(E => Q for E in Inti.element_types(Ωₕ))
     Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
     Ωₕ_Sub_quad = Inti.Quadrature(Ωₕ_Sub, dict)
     # Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorders[1])

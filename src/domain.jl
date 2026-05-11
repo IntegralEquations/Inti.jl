@@ -10,16 +10,16 @@ domain; given a key, the underlying entities can be accessed with
 [`global_get_entity(key)`](@ref).
 """
 struct Domain
-    keys::Set{EntityKey}
-    function Domain(ents::Set{EntityKey})
+    keys::OrderedSet{EntityKey}
+    function Domain(ents::OrderedSet{EntityKey})
         @assert allequal(geometric_dimension(ent) for ent in ents) "entities in a domain have different dimensions"
         return new(ents)
     end
 end
 
-Domain() = Domain(Set{EntityKey}())
-Domain(ents::Vararg{EntityKey}) = Domain(Set(ents))
-Domain(ents) = Domain(Set(ents))
+Domain() = Domain(OrderedSet{EntityKey}())
+Domain(ents::Vararg{EntityKey}) = Domain(OrderedSet(ents))
+Domain(ents) = Domain(OrderedSet(ents))
 
 """
     Domain([f::Function,] keys)
@@ -33,7 +33,7 @@ function Domain(f::Function, ents)
     return Domain(filter(f, ents))
 end
 Domain(f::Function, Ω::Domain) = Domain(f, keys(Ω))
-Domain(ents::AbstractVector{EntityKey}) = Domain(Set(ents))
+Domain(ents::AbstractVector{EntityKey}) = Domain(OrderedSet(ents))
 
 """
     entities(Ω::Domain)
@@ -46,7 +46,7 @@ Base.keys(Ω::Domain) = Ω.keys
 
 # helper function to get all keys in a domain recursively
 function all_keys(Ω::Domain)
-    k = Set{EntityKey}()
+    k = OrderedSet{EntityKey}()
     return _all_keys!(k, Ω)
 end
 function _all_keys!(k, Ω::Domain)
@@ -74,7 +74,7 @@ end
 Return all the boundaries of the domain, i.e. the domain's skeleton.
 """
 function skeleton(Ω::Domain)
-    ents = Set{EntityKey}()
+    ents = OrderedSet{EntityKey}()
     for ent in entities(Ω)
         union!(ents, boundary(ent))
     end
@@ -88,8 +88,8 @@ Return the internal boundaries of a `Domain`. These are entities in
 `skeleton(Ω)` which appear at least twice as a boundary of entities in `Ω`.
 """
 function internal_boundary(Ω::Domain)
-    seen = Set{EntityKey}()
-    repeated = Set{EntityKey}()
+    seen = OrderedSet{EntityKey}()
+    repeated = OrderedSet{EntityKey}()
     for ω in entities(Ω)
         for γ in boundary(ω)
             in(γ, seen) ? push!(repeated, γ) : push!(seen, γ)

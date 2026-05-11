@@ -84,7 +84,7 @@ function BlockArray(src::AbstractArray{T}) where {T <: SArray}
     return dest
 end
 
-function Array(src::BlockArray{T, N}) where {T, N}
+function Base.Array(src::BlockArray{T, N}) where {T, N}
     dest = Array{T, N}(undef, size(src))
     dest .= src
     return dest

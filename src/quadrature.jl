@@ -66,9 +66,9 @@ A collection of [`QuadratureNode`](@ref)s used to integrate over an
 """
 struct Quadrature{N, T} <: AbstractVector{QuadratureNode{N, T}}
     mesh::Maybe{AbstractMesh{N, T}}
-    etype2qrule::Dict{DataType, ReferenceQuadrature}
+    etype2qrule::OrderedDict{DataType, ReferenceQuadrature}
     qnodes::Vector{QuadratureNode{N, T}}
-    etype2qtags::Dict{DataType, Matrix{Int}}
+    etype2qtags::OrderedDict{DataType, Matrix{Int}}
 end
 
 # AbstractArray interface
@@ -105,13 +105,13 @@ used for each element type using [`_qrule_for_reference_shape`](@ref).
 For co-dimension one elements, the normal vector is also computed and stored in
 the [`QuadratureNode`](@ref)s.
 """
-function Quadrature(msh::AbstractMesh{N, T}, etype2qrule::Dict) where {N, T}
+function Quadrature(msh::AbstractMesh{N, T}, etype2qrule::OrderedDict) where {N, T}
     # initialize mesh with empty fields
     quad = Quadrature{N, T}(
         msh,
         etype2qrule,
         QuadratureNode{N, T}[],
-        Dict{DataType, Matrix{Int}}(),
+        OrderedDict{DataType, Matrix{Int}}(),
     )
     # loop element types and generate quadrature for each
     for E in element_types(msh)
@@ -159,13 +159,13 @@ function Quadrature(
 end
 
 function Quadrature(msh::AbstractMesh{N, T}, qrule::ReferenceQuadrature) where {N, T}
-    etype2qrule = Dict(E => qrule for E in element_types(msh))
+    etype2qrule = OrderedDict(E => qrule for E in element_types(msh))
     return Quadrature(msh, etype2qrule)
 end
 
 function Quadrature(msh::AbstractMesh; qorder)
     etype2qrule =
-        Dict(E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(msh))
+        OrderedDict(E => _qrule_for_reference_shape(domain(E), qorder) for E in element_types(msh))
     return Quadrature(msh, etype2qrule)
 end
 
@@ -293,7 +293,7 @@ function etype_to_nearest_points(X, Y::Quadrature; maxdist = Inf)
     if X === Y
         # when both surfaces are the same, the "near points" of an element are
         # simply its own quadrature points
-        dict = Dict{DataType, Vector{Vector{Int}}}()
+        dict = OrderedDict{DataType, Vector{Vector{Int}}}()
         for (E, idx_dofs) in Y.etype2qtags
             dict[E] = map(i -> collect(i), eachcol(idx_dofs))
         end
@@ -314,7 +314,7 @@ function _etype_to_nearest_points(X, Y::Quadrature, maxdist)
     end
     # dict[j] now contains indices in X for which the j quadrature node in Y is
     # the closest. Next we reverse the map
-    etype2nearlist = Dict{DataType, Vector{Vector{Int}}}()
+    etype2nearlist = OrderedDict{DataType, Vector{Vector{Int}}}()
     for (E, tags) in Y.etype2qtags
         nq, ne = size(tags)
         etype2nearlist[E] = nearlist = [Int[] for _ in 1:ne]
@@ -358,22 +358,20 @@ function quadrature_to_node_vals(Q::Quadrature, qvals::AbstractVector)
 end
 
 """
-    node_vals_to_quadrature(Q::Quadrature, vals::AbstractVector)
+    node_vals_to_quadrature(Q::Quadrature, ivals::AbstractVector)
 
-Given a vector of `vals` at the interpolation nodes of `Q.mesh`, return a vector of values
+Given a vector of `ivals` at the interpolation nodes of `Q.mesh`, return a vector of values
 at the quadrature nodes of `Q`.
 """
 function node_vals_to_quadrature(Q::Quadrature, ivals::AbstractVector)
     msh = Q.mesh isa SubMesh ? collect(Q.mesh) : Q.mesh
-    qnodes = Q.qnodes
-    qvals = zeros(eltype(ivals), length(qnodes))
+    qvals = zeros(eltype(ivals), length(Q.qnodes))
     for (E, mat) in etype2mat(msh)
         qrule = Q.etype2qrule[E]
         L = lagrange_basis(E)
         coords = qcoords(qrule)
-        # precompute value of lagrange basis at the quadrature nodes
         I2Q = mapreduce(L, hcat, coords) |> transpose
-        ni, nel = size(mat) # number of interpolation nodes by number of elements
+        _, nel = size(mat)
         for n in 1:nel
             qtags = Q.etype2qtags[E][:, n]
             itags = mat[:, n]
@@ -414,4 +412,90 @@ function _curvature(f, Q)
         end
     end
     return curv
+end
+
+"""
+    tangential_gradient_matrix(Q::Quadrature{N,T})
+
+Return a sparse matrix `G` of size `(length(Q), length(Q))` with `SVector{N,T}`
+entries such that `G * u` computes the surface gradient `∇_Γ u` at each
+quadrature node for scalar values `u`.
+
+The surface gradient is computed by locally interpolating `u` in parameter space
+using the Lagrange basis on quadrature nodes, differentiating, and applying the
+chain rule through the element parametrization:
+
+```math
+∇_Γ u = J (Jᵀ J)^{-1} ∇_{\\hat{x}} \\tilde{u}
+```
+
+where `J` is the Jacobian of the element map and `∇_{\\hat{x}} \\tilde{u}` is
+the gradient of the interpolant in reference coordinates.
+"""
+function tangential_gradient_matrix(Q::Quadrature{N, T}) where {N, T}
+    msh = mesh(Q)
+    Is = Int[]
+    Js = Int[]
+    Vs = SVector{N, T}[]
+    ntotal = sum(
+        E -> length(qcoords(quadrature_rule(Q, E)))^2 * size(Q.etype2qtags[E], 2),
+        element_types(msh)
+    )
+    sizehint!(Is, ntotal)
+    sizehint!(Js, ntotal)
+    sizehint!(Vs, ntotal)
+    for (E, qtags_mat) in Q.etype2qtags
+        _tangential_gradient_kernel!(Is, Js, Vs, Q, elements(msh, E), qtags_mat)
+    end
+    return sparse(Is, Js, Vs, length(Q), length(Q))
+end
+
+"""
+    surface_gradient(u::AbstractVector, Q::Quadrature)
+
+Compute the surface gradient `∇_Γ u` at each quadrature node, returning a
+`Vector{SVector{N,T}}`.
+
+See also: [`tangential_gradient_matrix`](@ref)
+"""
+function surface_gradient(u::AbstractVector, Q::Quadrature)
+    return tangential_gradient_matrix(Q) * u
+end
+
+@noinline function _tangential_gradient_kernel!(
+        Is,
+        Js,
+        Vs,
+        Q::Quadrature{N, T},
+        els::AbstractVector{E},
+        qtags_mat::Matrix{Int},
+    ) where {N, T, E}
+    M = geometric_dimension(domain(E))
+    qrule = quadrature_rule(Q, E)
+    x̂_nodes = qcoords(qrule)
+    nq = length(x̂_nodes)
+    L = lagrange_basis(qrule)
+    # precompute derivative of Lagrange basis at each reference node (shared across elements)
+    # dL_rows[q][j] is the SVector{M,T} gradient of Lⱼ at x̂_q
+    dL_rows = map(x̂_nodes) do x̂
+        dL = ForwardDiff.jacobian(L, x̂)
+        ntuple(j -> SVector{M, T}(ntuple(k -> T(dL[j, k]), M)), nq)
+    end
+    for n in 1:size(qtags_mat, 2)
+        el = els[n]
+        qtags = view(qtags_mat, :, n)
+        for q in 1:nq
+            J_q = SMatrix{N, M, T}(jacobian(el, x̂_nodes[q]))
+            invA_q = inv(J_q' * J_q)
+            B_q = J_q * invA_q
+            i_global = qtags[q]
+            for j in 1:nq
+                coeff = B_q * dL_rows[q][j]
+                push!(Is, i_global)
+                push!(Js, qtags[j])
+                push!(Vs, coeff)
+            end
+        end
+    end
+    return nothing
 end

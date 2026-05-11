@@ -7,7 +7,7 @@ import ForwardDiff
 import StaticArrays: SMatrix
 
 function __init__()
-    return @info "Loading Inti.jl QPGreen extension"
+    return @debug "Loading Inti.jl QPGreen extension"
 end
 
 struct HelmholtzPeriodic1D{

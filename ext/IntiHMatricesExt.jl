@@ -4,7 +4,7 @@ import Inti
 import HMatrices
 
 function __init__()
-    return @info "Loading Inti.jl HMatrices extension"
+    return @debug "Loading Inti.jl HMatrices extension"
 end
 
 # HMatrices interface

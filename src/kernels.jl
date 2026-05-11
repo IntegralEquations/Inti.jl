@@ -191,10 +191,15 @@ function (HS::HyperSingularKernel{T, Laplace{N}})(
     ny = normal(source)
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
+    id2 = inv(d * d)
+    # nxᵀ(I - N*rrᵀ/d²)ny = nxdny - N*rdnx*rdny/d²
+    nxdny = dot(nx, ny)
+    rdnx = dot(r, nx)
+    rdny = dot(r, ny)
     if N == 2
-        return 1 / (2π) / (d^2) * transpose(nx) * ((I - 2 * r * transpose(r) / d^2) * ny)
+        return id2 / (2π) * (nxdny - 2 * rdnx * rdny * id2)
     elseif N == 3
-        return 1 / (4π) / (d^3) * transpose(nx) * ((I - 3 * r * transpose(r) / d^2) * ny)
+        return id2 / (4π * d) * (nxdny - 3 * rdnx * rdny * id2)
     end
 end
 
@@ -254,9 +259,9 @@ function (DL::DoubleLayerKernel{T, Yukawa{N, K}})(target, source)::T where {N, T
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        return λ / (2 * π * d) * Bessels.besselk(1, λ * d) .* dot(r, ny)
+        return λ / (2π * d) * Bessels.besselk(1, λ * d) * dot(r, ny)
     elseif N == 3
-        return 1 / (4π) / d^2 * exp(-λ * d) * (λ + 1 / d) * dot(r, ny)
+        return inv(4π * d^2) * exp(-λ * d) * (λ + inv(d)) * dot(r, ny)
     end
 end
 
@@ -267,38 +272,34 @@ function (ADL::AdjointDoubleLayerKernel{T, <:Yukawa{N, K}})(target, source)::T w
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        k = im * λ
-        return -λ / (2 * π * d) * Bessels.besselk(1, λ * d) .* dot(r, nx)
+        return -λ / (2 * π * d) * Bessels.besselk(1, λ * d) * dot(r, nx)
     elseif N == 3
         return -1 / (4π) / d^2 * exp(-λ * d) * (λ + 1 / d) * dot(r, nx)
     end
 end
 
 function (HS::HyperSingularKernel{T, <:Yukawa{N, K}})(target, source)::T where {N, T, K}
-    x, y, nx, ny = coords(target), coords(source), normal(target), normal(source)
+    nx, ny = normal(target), normal(source)
     λ = HS.op.λ
-    r = x - y
+    r = coords(target) - coords(source)
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
-    k = im * λ
+    # nxᵀ(a*rrᵀ + b*I)ny = a*rdnx*rdny + b*nxdny
+    rdnx = dot(r, nx)
+    rdny = dot(r, ny)
+    nxdny = dot(nx, ny)
     if N == 2
-        RRT = r * transpose(r) # r ⊗ rᵗ
-        # TODO: rewrite the operation below in a more clear/efficient way
-        val =
-            transpose(nx) * (
-            (
-                -λ^2 / (2π) / d^2 * Bessels.besselk(2, λ * d) * RRT +
-                    λ / (2 * π * d) * Bessels.besselk(1, λ * d) * I
-            ) * ny
-        )
-        return val
+        k1 = Bessels.besselk(1, λ * d)
+        k2 = Bessels.besselk(2, λ * d)
+        a = -λ^2 / (2π * d^2) * k2
+        b = λ / (2π * d) * k1
+        return a * rdnx * rdny + b * nxdny
     elseif N == 3
-        term1 = 1 / (4π) / d^2 * exp(-λ * d) * (λ + 1 / d) * I
-        term2 =
-            r * transpose(r) / d * exp(-λ * d) / (4 * π * d^4) *
-            (3 * (-d * λ - 1) - d^2 * λ^2)
-        val = transpose(nx) * (term1 + term2) * ny
-        return val
+        id2 = inv(d * d)
+        emld = exp(-λ * d)
+        b = emld * id2 / (4π) * (λ + inv(d))
+        a = emld * id2 * id2 / (4π * d) * (-3 * (d * λ + 1) - d^2 * λ^2)
+        return a * rdnx * rdny + b * nxdny
     end
 end
 
@@ -365,11 +366,9 @@ function (DL::DoubleLayerKernel{T, <:Helmholtz{N}})(target, source)::T where {N,
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        val = im * k / 4 / d * hankelh1(1, k * d) .* dot(r, ny)
-        return val
+        return im * k / (4d) * hankelh1(1, k * d) * dot(r, ny)
     elseif N == 3
-        val = 1 / (4π) / d^2 * exp(im * k * d) * (-im * k + 1 / d) * dot(r, ny)
-        return val
+        return inv(4π * d^2) * exp(im * k * d) * (-im * k + inv(d)) * dot(r, ny)
     end
 end
 
@@ -381,37 +380,35 @@ function (ADL::AdjointDoubleLayerKernel{T, <:Helmholtz{N}})(target, source)::T w
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
     if N == 2
-        val = -im * k / 4 / d * hankelh1(1, k * d) .* dot(r, nx)
-        return val
+        return -im * k / (4d) * hankelh1(1, k * d) * dot(r, nx)
     elseif N == 3
-        val = -1 / (4π) / d^2 * exp(im * k * d) * (-im * k + 1 / d) * dot(r, nx)
-        return val
+        return -inv(4π * d^2) * exp(im * k * d) * (-im * k + inv(d)) * dot(r, nx)
     end
 end
 
 # Hypersingular kernel
 function (HS::HyperSingularKernel{T, <:Helmholtz{N}})(target, source)::T where {N, T}
-    x, y, nx, ny = coords(target), coords(source), normal(target), normal(source)
+    nx, ny = normal(target), normal(source)
     k = HS.op.k
-    r = x - y
+    r = coords(target) - coords(source)
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
+    # nxᵀ(a*rrᵀ + b*I)ny = a*rdnx*rdny + b*nxdny
+    rdnx = dot(r, nx)
+    rdny = dot(r, ny)
+    nxdny = dot(nx, ny)
     if N == 2
-        val =
-            transpose(nx) * (
-            (
-                -im * k^2 / 4 / d^2 * hankelh1(2, k * d) * r * transpose(r) +
-                    im * k / 4 / d * hankelh1(1, k * d) * I
-            ) * ny
-        )
-        return val
+        h1 = hankelh1(1, k * d)
+        h2 = hankelh1(2, k * d)
+        a = -im * k^2 / (4 * d^2) * h2
+        b = im * k / (4 * d) * h1
+        return a * rdnx * rdny + b * nxdny
     elseif N == 3
-        RRT = r * transpose(r) # r ⊗ rᵗ
-        term1 = 1 / (4π) / d^2 * exp(im * k * d) * (-im * k + 1 / d) * I
-        term2 =
-            RRT / d * exp(im * k * d) / (4 * π * d^4) * (3 * (d * im * k - 1) + d^2 * k^2)
-        val = transpose(nx) * (term1 + term2) * ny
-        return val
+        id2 = inv(d * d)
+        eikd = exp(im * k * d)
+        b = eikd * id2 / (4π) * (-im * k + inv(d))
+        a = eikd * id2 * id2 / (4π * d) * (3 * (d * im * k - 1) + d^2 * k^2)
+        return a * rdnx * rdny + b * nxdny
     end
 end
 
@@ -453,31 +450,31 @@ end
 
 # Double Layer Kernel
 function (DL::DoubleLayerKernel{T, <:Stokes{N}})(target, source)::T where {N, T}
-    x = coords(target)
-    y = coords(source)
     ny = normal(source)
-    r = x - y
+    r = coords(target) - coords(source)
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
+    id2 = inv(d * d)
+    RRT = r * transpose(r)
     if N == 2
-        return 1 / π * dot(r, ny) / d^4 * r * transpose(r)
+        return id2 * id2 / π * dot(r, ny) * RRT
     elseif N == 3
-        return 3 / (4π) * dot(r, ny) / d^5 * r * transpose(r)
+        return 3 * id2 * id2 / (4π * d) * dot(r, ny) * RRT
     end
 end
 
-# Double Layer Kernel
+# Adjoint Double Layer Kernel
 function (ADL::AdjointDoubleLayerKernel{T, <:Stokes{N}})(target, source)::T where {N, T}
-    x = coords(target)
     nx = normal(target)
-    y = coords(source)
-    r = x - y
+    r = coords(target) - coords(source)
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
+    id2 = inv(d * d)
+    RRT = r * transpose(r)
     if N == 2
-        return -1 / π * dot(r, nx) / d^4 * r * transpose(r)
+        return -id2 * id2 / π * dot(r, nx) * RRT
     elseif N == 3
-        return -3 / (4π) * dot(r, nx) / d^5 * r * transpose(r)
+        return -3 * id2 * id2 / (4π * d) * dot(r, nx) * RRT
     end
 end
 
@@ -528,24 +525,23 @@ end
 function (DL::DoubleLayerKernel{T, <:Elastostatic{N}})(target, source)::T where {N, T}
     μ, λ = DL.op.μ, DL.op.λ
     ν = λ / (2 * (μ + λ))
-    x = coords(target)
-    y = coords(source)
     ny = normal(source)
-    ν = λ / (2 * (μ + λ))
-    r = x .- y
+    r = coords(target) .- coords(source)
     d = norm(r)
     d == 0 && return zero(T)
-    RRT = r * transpose(r) # r ⊗ rᵗ
+    id2 = inv(d * d)
+    RRT = r * transpose(r)
     drdn = -dot(r, ny) / d
+    ν1 = 1 - 2ν
     if N == 2
-        return -1 / (4π * (1 - ν) * d) * (
-            drdn * ((1 - 2ν) * I + 2 * RRT / d^2) +
-                (1 - 2ν) / d * (r * transpose(ny) - ny * transpose(r))
+        return -inv(4π * (1 - ν) * d) * (
+            drdn * (ν1 * I + 2 * id2 * RRT) +
+                ν1 / d * (r * transpose(ny) - ny * transpose(r))
         )
     elseif N == 3
-        return -1 / (8π * (1 - ν) * d^2) * (
-            drdn * ((1 - 2 * ν) * I + 3 * RRT / d^2) +
-                (1 - 2 * ν) / d * (r * transpose(ny) - ny * transpose(r))
+        return -id2 / (8π * (1 - ν)) * (
+            drdn * (ν1 * I + 3 * id2 * RRT) +
+                ν1 / d * (r * transpose(ny) - ny * transpose(r))
         )
     end
 end
@@ -553,71 +549,56 @@ end
 function (ADL::AdjointDoubleLayerKernel{T, <:Elastostatic{N}})(target, source)::T where {N, T}
     μ, λ = ADL.op.μ, ADL.op.λ
     ν = λ / (2 * (μ + λ))
-    x = coords(target)
     nx = normal(target)
-    y = coords(source)
-    ν = λ / (2 * (μ + λ))
-    r = x .- y
+    r = coords(target) .- coords(source)
     d = norm(r)
     d == 0 && return zero(T)
-    RRT = r * transpose(r) # r ⊗ rᵗ
+    id2 = inv(d * d)
+    RRT = r * transpose(r)
     drdn = -dot(r, nx) / d
+    ν1 = 1 - 2ν
+    # ADL = -transpose(DL with ny→nx), which flips the sign of the antisymmetric part
     if N == 2
-        out =
-            -1 / (4π * (1 - ν) * d) * (
-            drdn * ((1 - 2ν) * I + 2 * RRT / d^2) +
-                (1 - 2ν) / d * (r * transpose(nx) - nx * transpose(r))
+        return inv(4π * (1 - ν) * d) * (
+            drdn * (ν1 * I + 2 * id2 * RRT) +
+                ν1 / d * (nx * transpose(r) - r * transpose(nx))
         )
-        return -transpose(out)
     elseif N == 3
-        out =
-            -1 / (8π * (1 - ν) * d^2) * (
-            drdn * ((1 - 2 * ν) * I + 3 * RRT / d^2) +
-                (1 - 2 * ν) / d * (r * transpose(nx) - nx * transpose(r))
+        return id2 / (8π * (1 - ν)) * (
+            drdn * (ν1 * I + 3 * id2 * RRT) +
+                ν1 / d * (nx * transpose(r) - r * transpose(nx))
         )
-        return -transpose(out)
     end
 end
 
 function (HS::HyperSingularKernel{T, <:Elastostatic{N}})(target, source) where {N, T}
     μ, λ = HS.op.μ, HS.op.λ
     ν = λ / (2 * (μ + λ))
-    x = coords(target)
     nx = normal(target)
-    y = coords(source)
     ny = normal(source)
-    r = x .- y
+    r = coords(target) .- coords(source)
     d = norm(r)
     d == 0 && return zero(T)
-    RRT = r * transpose(r) # r ⊗ rᵗ
-    drdn = dot(r, ny) / d
+    rdnx = dot(r, nx)
+    rdny = dot(r, ny)
+    nxdny = dot(nx, ny)
     if N == 2
-        return μ / (2π * (1 - ν) * d^2) * (
-            2 * drdn / d * (
-                (1 - 2ν) * nx * transpose(r) + ν * (dot(r, nx) * I + r * transpose(nx)) -
-                    4 * dot(r, nx) * RRT / d^2
-            ) +
-                2 * ν / d^2 * (dot(r, nx) * ny * transpose(r) + dot(nx, ny) * RRT) +
-                (1 - 2 * ν) * (
-                2 / d^2 * dot(r, nx) * r * transpose(ny) +
-                    dot(nx, ny) * I +
-                    ny * transpose(nx)
-            ) - (1 - 4ν) * nx * transpose(ny)
-        )
+        c = μ / (2π * (1 - ν) * d^2)
+        α = 2 * rdny / d^2
+        # Decompose as: c * (r⊗vr + nx⊗vnx + ny⊗vny + a_diag * I)
+        vr = (-4α * rdnx + 2ν * nxdny) / d^2 * r + α * ν * nx + (1 - 2ν) * 2 * rdnx / d^2 * ny
+        vnx = (1 - 2ν) * α * r - (1 - 4ν) * ny
+        vny = 2ν * rdnx / d^2 * r + (1 - 2ν) * nx
+        a_diag = α * ν * rdnx + (1 - 2ν) * nxdny
     elseif N == 3
-        return μ / (4π * (1 - ν) * d^3) * (
-            3 * drdn / d * (
-                (1 - 2ν) * nx * transpose(r) + ν * (dot(r, nx) * I + r * transpose(nx)) -
-                    5 * dot(r, nx) * RRT / d^2
-            ) +
-                3 * ν / d^2 * (dot(r, nx) * ny * transpose(r) + dot(nx, ny) * RRT) +
-                (1 - 2 * ν) * (
-                3 / d^2 * dot(r, nx) * r * transpose(ny) +
-                    dot(nx, ny) * I +
-                    ny * transpose(nx)
-            ) - (1 - 4ν) * nx * transpose(ny)
-        )
+        c = μ / (4π * (1 - ν) * d^3)
+        α = 3 * rdny / d^2
+        vr = (-5α * rdnx + 3ν * nxdny) / d^2 * r + α * ν * nx + (1 - 2ν) * 3 * rdnx / d^2 * ny
+        vnx = (1 - 2ν) * α * r - (1 - 4ν) * ny
+        vny = 3ν * rdnx / d^2 * r + (1 - 2ν) * nx
+        a_diag = α * ν * rdnx + (1 - 2ν) * nxdny
     end
+    return c * (r * transpose(vr) + nx * transpose(vnx) + ny * transpose(vny) + a_diag * I)
 end
 
 ################################################################################
