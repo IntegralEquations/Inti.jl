@@ -10,10 +10,11 @@ using HMatrices
 using FMMLIB2D
 using Meshes
 using DataStructures
+using Plots
 
 #meshsize = 0.001/8
 #meshsize = 0.125/8
-meshsize = 0.000125
+meshsize = 0.125
 interpolation_order = 2
 VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
 bdry_qorder = 2 * VR_qorder
@@ -36,7 +37,8 @@ function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
 end
 
 name = joinpath(@__DIR__, "disk.msh")
-gmsh_disk(; meshsize, order = 2, name, paxis = (meshsize * 20, meshsize * 10))
+gmsh_disk(; meshsize, order = 2, name, paxis = (2, 1))
+#gmsh_disk(; meshsize, order = 2, name, paxis = (meshsize * 20, meshsize * 10))
 
 Inti.clear_entities!() # empty the entity cache
 msh = Inti.import_mesh(name; dim = 2)
@@ -60,25 +62,7 @@ tquad = @elapsed begin
 end
 @info "Quadrature generation time: $tquad"
 
-k0 = 1
 k = 0
-θ = (cos(π / 3), sin(π / 3))
-#u  = (x) -> exp(im * k0 * dot(x, θ))
-#du = (x,n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
-u = (x) -> cos(k0 * dot(x, θ))
-du = (x, n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
-f = (x) -> (k^2 - k0^2) * u(x)
-
-#s  = 4
-#u  = (x) -> 1 / (k^2 - k0^2) * exp(im * k0 * dot(x, θ)) + 1 / (k^2 - 4 * s) * exp(-s * norm(x)^2)
-#du = (x, n) -> im * k0 * dot(θ, n) / (k^2 - k0^2) * exp(im * k0 * dot(x, θ)) - 2 * s / (k^2 - 4 * s) * dot(x, n) * exp(-s * norm(x)^2)
-#f  = (x) -> exp(im * k0 * dot(x, θ)) + 1 / (k^2 - 4 * s) * (4 * s^2 * norm(x)^2 - 4 * s + k^2) * exp(-s * norm(x)^2)
-
-u_d = map(q -> u(q.coords), Ωₕ_quad)
-u_b = map(q -> u(q.coords), Γₕ_quad)
-du_b = map(q -> du(q.coords, q.normal), Γₕ_quad)
-f_d = map(q -> f(q.coords), Ωₕ_quad)
-
 op = k == 0 ? Inti.Laplace(; dim = 2) : Inti.Helmholtz(; dim = 2, k)
 
 ## Boundary operators
@@ -108,12 +92,59 @@ V_d2d = Inti.volume_potential(;
         bdry_nodes = Γₕ.nodes,
         maxdist = 5 * meshsize,
         meshsize = meshsize,
+        boundary = Γₕ_quad,
     ),
 )
 #end
 #@info "Volume potential time: $tvol"
 
-vref = -u_d - D_b2d * u_b + S_b2d * du_b
+using ElementaryPDESolutions
+import ElementaryPDESolutions: Polynomial
+
+k0 = 1.1
+θ = (cos(π / 3), sin(π / 3))
+#u  = (x) -> exp(im * k0 * dot(x, θ))
+#du = (x,n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
+#u = (x) -> cos(k0 * dot(x, θ))
+#du = (x, n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
+#f = (x) -> (k^2 - k0^2) * u(x)
+
+I = (2, 0)
+f = Polynomial(I => one(Float64))
+u = convert_coefs(ElementaryPDESolutions.solve_laplace(-f), Float64)
+gradu = ElementaryPDESolutions.gradient(u)
+#du = (x, n) -> map(zip(gradu, 1:length(n))) do v
+#
+#if isdefined(Main, :Infiltrator)
+#  Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+#end
+#    p = v[1](x)
+#    normal = n[v[2]]
+#    return p[1]*normal[1] + p[2]*normal[2]
+#
+#end
+function du(x, n)
+    accum = 0.0
+    for i in 1:length(n)
+        accum+= gradu[i](x) * n[i]
+    end
+    return accum
+end
+#du = (x, n) -> 
+
+
+#s  = 4
+#u  = (x) -> 1 / (k^2 - k0^2) * exp(im * k0 * dot(x, θ)) + 1 / (k^2 - 4 * s) * exp(-s * norm(x)^2)
+#du = (x, n) -> im * k0 * dot(θ, n) / (k^2 - k0^2) * exp(im * k0 * dot(x, θ)) - 2 * s / (k^2 - 4 * s) * dot(x, n) * exp(-s * norm(x)^2)
+#f  = (x) -> exp(im * k0 * dot(x, θ)) + 1 / (k^2 - 4 * s) * (4 * s^2 * norm(x)^2 - 4 * s + k^2) * exp(-s * norm(x)^2)
+
+u_d = map(q -> u(q.coords), Ωₕ_quad)
+u_b = map(q -> u(q.coords), Γₕ_quad)
+du_b = map(q -> du(q.coords, q.normal), Γₕ_quad)
+f_d = map(q -> f(q.coords), Ωₕ_quad)
+
+vref = u_d + D_b2d * u_b - S_b2d * du_b
+#vref = -u_d - D_b2d * u_b + S_b2d * du_b
 vapprox = V_d2d * f_d
 er = vref - vapprox
 

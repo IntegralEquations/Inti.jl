@@ -113,7 +113,7 @@ function vdim_correction(
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
-                    push!(Vs, wei[k])
+                    push!(Vs, -wei[k])
                 end
             end
         end
@@ -231,7 +231,7 @@ function local_vdim_correction(
             isempty(near_list[n]) && continue
             c, r, diam = translation_and_scaling(els[n])
             s = 1.0
-            if false
+            if true
                 #if r * op.k < 10^(-3)
                 lowfreq = true
                 Yvol, Ybdry, need_layer_corr = _local_vdim_construct_local_quadratures(
@@ -248,7 +248,7 @@ function local_vdim_correction(
                     bdry_qrule,
                     vol_qrule,
                 )
-                R = _lowfreq_vdim_auxiliary_quantities(
+                R, b = _lowfreq_vdim_auxiliary_quantities(
                     op,
                     op_lowfreq,
                     c,
@@ -267,33 +267,33 @@ function local_vdim_correction(
                     diam,
                     need_layer_corr
                 )
-                Yvol_s1, Ybdry_s1, need_layer_corr_s1 = _local_vdim_construct_local_quadratures(
-                    N,
-                    mesh,
-                    neighbors,
-                    n,
-                    c,
-                    1.0,
-                    diam,
-                    bdry_kdtree,
-                    bdry_etype2qrule,
-                    vol_etype2qrule,
-                    bdry_qrule,
-                    vol_qrule,
-                )
-                R_s1, b_s1 = _local_vdim_auxiliary_quantities(
-                    op_hat,
-                    c,
-                    1.0,
-                    PFE_p,
-                    PFE_P,
-                    target[near_list[n]],
-                    green_multiplier,
-                    Yvol_s1,
-                    Ybdry_s1,
-                    diam,
-                    need_layer_corr_s1
-                )
+                #Yvol_s1, Ybdry_s1, need_layer_corr_s1 = _local_vdim_construct_local_quadratures(
+                #    N,
+                #    mesh,
+                #    neighbors,
+                #    n,
+                #    c,
+                #    1.0,
+                #    diam,
+                #    bdry_kdtree,
+                #    bdry_etype2qrule,
+                #    vol_etype2qrule,
+                #    bdry_qrule,
+                #    vol_qrule,
+                #)
+                #R_s1, b_s1 = _local_vdim_auxiliary_quantities(
+                #    op_hat,
+                #    c,
+                #    1.0,
+                #    PFE_p,
+                #    PFE_P,
+                #    target[near_list[n]],
+                #    green_multiplier,
+                #    Yvol_s1,
+                #    Ybdry_s1,
+                #    diam,
+                #    need_layer_corr_s1
+                #)
             else
                 lowfreq = false
                 Yvol, Ybdry, need_layer_corr = _local_vdim_construct_local_quadratures(
@@ -310,9 +310,6 @@ function local_vdim_correction(
                     bdry_qrule,
                     vol_qrule,
                 )
-                #if isdefined(Main, :Infiltrator)
-                #    Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-                #  end
                 R, b = _local_vdim_auxiliary_quantities(
                     op_hat,
                     c,
@@ -402,73 +399,18 @@ function local_vdim_correction(
                     wei = transpose(Linv) * S * transpose(R)
                     #wei_s1 = transpose(Linv) * S_s1 * transpose(R_s1)
 
-                    #area = 0.0
-                    #for i in 1:length(Yvol)
-                    #    area += Yvol[i].weight
-                    #end
-                    #area_s1 = 0.0
-                    #for i in 1:length(Yvol_s1)
-                    #    area_s1 += Yvol_s1[i].weight
-                    #end
-                    #area_contour = 0.0
-                    #for i in 1:length(Ybdry)
-                    #    x = Ybdry[i].coords[1]
-                    #    y = Ybdry[i].coords[2]
-                    #    nx = Ybdry[i].normal[1]
-                    #    ny = Ybdry[i].normal[2]
-                    #    area_contour += (x/2 * nx + y/2*ny) * Ybdry[i].weight
-                    #end
-                    #area_contour_s1 = 0.0
-                    #for i in 1:length(Ybdry_s1)
-                    #    x = Ybdry_s1[i].coords[1]
-                    #    y = Ybdry_s1[i].coords[2]
-                    #    nx = Ybdry_s1[i].normal[1]
-                    #    ny = Ybdry_s1[i].normal[2]
-                    #    area_contour_s1 += (x/2 * nx + y/2*ny) * Ybdry_s1[i].weight
-                    #end
-
-                    #Vint = 0.0
-                    #for i in 1:length(Yvol)
-                    #    x = Yvol[i].coords[1]
-                    #    y = Yvol[i].coords[2]
-                    #    Vint += (3*x^2 + 3*y^2) * Yvol[i].weight
-                    #end
-                    #Vint_s1 = 0.0
-                    #for i in 1:length(Yvol)
-                    #    x = Yvol_s1[i].coords[1]
-                    #    y = Yvol_s1[i].coords[2]
-                    #    Vint_s1 += (3*x^2 + 3*y^2) * Yvol_s1[i].weight
-                    #end
-                    #Vcontour = 0.0
-                    #for i in 1:length(Ybdry)
-                    #    x = Ybdry[i].coords[1]
-                    #    y = Ybdry[i].coords[2]
-                    #    nx = Ybdry[i].normal[1]
-                    #    ny = Ybdry[i].normal[2]
-                    #    Vcontour += (x^3 * nx + y^3*ny) * Ybdry[i].weight
-                    #end
-                    #Vcontour_s1 = 0.0
-                    #for i in 1:length(Ybdry_s1)
-                    #    x = Ybdry_s1[i].coords[1]
-                    #    y = Ybdry_s1[i].coords[2]
-                    #    nx = Ybdry_s1[i].normal[1]
-                    #    ny = Ybdry_s1[i].normal[2]
-                    #    Vcontour_s1 += (x^3 * nx + y^3*ny) * Ybdry_s1[i].weight
-                    #end
                     if isdefined(Main, :Infiltrator)
                         Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
                     end
                 else
-                    D = Vector{Float64}(undef, num_basis)
-                    D .= r^2
-                    D = Diagonal(D)
-                    wei = transpose(Linv) * D * transpose(R)
+                    #D = Vector{Float64}(undef, num_basis)
+                    #D .= r^2
+                    #D = Diagonal(D)
+                    wei = transpose(Linv) * transpose(R)
+                    #wei = transpose(Linv) * D * transpose(R)
 
-                    S_s1 = Diagonal((1 / r) .^ (abs.(multiindices)))
-                    wei_s1 = transpose(Linv) * S_s1 * transpose(R_s1)
-                    if isdefined(Main, :Infiltrator)
-                        Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-                    end
+                    #S_s1 = Diagonal((1 / r) .^ (abs.(multiindices)))
+                    #wei_s1 = transpose(Linv) * S_s1 * transpose(R_s1)
                 end
             else
                 error("unsupported local VDIM without shifting")
@@ -476,7 +418,7 @@ function local_vdim_correction(
             # correct each target near the current element
             append!(Is, repeat(near_list[n]; inner = nq))
             append!(Js, repeat(jglob; outer = length(near_list[n])))
-            append!(Vs, wei)
+            append!(Vs, -wei)
         end
     end
     @debug """Condition properties of vdim correction:
@@ -753,11 +695,11 @@ function _local_vdim_auxiliary_quantities(
     end
 
     Θ = zeros(eltype(Vop), num_targets, num_basis)
-    # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
+    # Compute Θ <-- S * γ₁B - D * γ₀B + V * b + σ * B(x) using in-place matvec
     for n in 1:num_basis
         @views mul!(Θ[:, n], Smat, γ₁B[:, n])
         @views mul!(Θ[:, n], Dmat, γ₀B[:, n], -1, 1)
-        @views mul!(Θ[:, n], Vmat, b[:, n], -1, 1)
+        @views mul!(Θ[:, n], Vmat, b[:, n], 1, 1)
         for i in 1:num_targets
             Θ[i, n] += μ[i] * P[i, n]
         end
@@ -803,19 +745,18 @@ function _lowfreq_vdim_auxiliary_quantities(
     Hmat = Matrix{eltype(θ)}(undef, num_targets, length(Yvol))
     for n in 1:num_targets
         for j in 1:length(Yvol)
-            Hmat[n, j] = Yvol[j].weight
+            Hmat[n, j] = Yvol[j].weight * scale^2
         end
     end
 
     R = Matrix{eltype(θ)}(undef, num_targets, num_basis)
+    R_add = Matrix{eltype(θ)}(undef, num_targets, num_basis)
     for n in 1:num_basis
         β = multiindices[n]
-        R[:, n] = θ[:, monomials_indices_lowfreq[β]]
-        R[:, n] += log(scale) * Hmat * b[:, monomials_indices_lowfreq[β]]
+        R[:, n] = scale^2 * θ[:, monomials_indices_lowfreq[β]]
+        R_add[:, n] = -1/(2π) * log(scale) * Hmat * b[:, monomials_indices_lowfreq[β]]
     end
-    if isdefined(Main, :Infiltrator)
-        Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-    end
+    R += R_add
     return R
 end
 
@@ -860,6 +801,7 @@ function _lowfreq_vdim_auxiliary_quantities(
     G = SingleLayerKernel(op)
     Vop = IntegralOperator(G, Xshift, Yvol)
     R = zeros(eltype(Vop), num_targets, num_basis)
+    R_add = zeros(eltype(Vop), num_targets, num_basis)
     kr2 = (op.k * scale)^2
     γ = 0.5772156649015328606
 
@@ -879,9 +821,9 @@ function _lowfreq_vdim_auxiliary_quantities(
             end
             Hmat[i, j] =
                 (
-                (1 + 2 * im / pi * (γ + 1 / 2 * log(kr2 / 4))) * bessj0 +
-                    2 * im / pi *
-                    (1 / 4 * z2 - 3 / 2 * (1 / 4 * z2)^2 / 4 + 11 / 3456 * z2^3)
+                (im/4 - 1 / (2π) * (γ + 1 / 2 * log(kr2 / 4))) * bessj0 +
+                    1/(2π) *
+                    (1 / 4 * z2 - 3 / 2 * (1 / 4 * z2)^2 / 4 + (1 + 1/2 + 1/3) * (1/4 * z2)^3 / (6)^2)
             ) *
                 Yvol[j].weight *
                 scale^2
@@ -899,15 +841,16 @@ function _lowfreq_vdim_auxiliary_quantities(
             x2t = Xshift[j][2]
             R[j, n] =
                 (1 - 1 / 4 * kr2 * (x1t^2 + x2t^2)) * θ[j, monomials_indices_lowfreq[beta]]
-            +1 / 2 * kr2 * x1t * θ[j, monomials_indices_lowfreq[beta10]]
-            +1 / 2 * kr2 * x2t * θ[j, monomials_indices_lowfreq[beta01]]
-            -1 / 4 * kr2 * θ[j, monomials_indices_lowfreq[beta20]]
-            -1 / 4 * kr2 * θ[j, monomials_indices_lowfreq[beta02]]
+            +1 / 2 * kr2 * x1t * factorial(beta10) / factorial(beta) * θ[j, monomials_indices_lowfreq[beta10]]
+            +1 / 2 * kr2 * x2t * factorial(beta01) / factorial(beta) * θ[j, monomials_indices_lowfreq[beta01]]
+            -1 / 4 * kr2 * factorial(beta20) / factorial(beta) * θ[j, monomials_indices_lowfreq[beta20]]
+            -1 / 4 * kr2 * factorial(beta02) / factorial(beta) * θ[j, monomials_indices_lowfreq[beta02]]
         end
-        R[:, n] .*= 2 * im / pi * scale^2
+        R[:, n] .*= scale^2
         # Commenting this yields more accuracy
-        R[:, n] += Hmat * b[:, monomials_indices_lowfreq[beta]]
+        R_add[:, n] += Hmat * b[:, monomials_indices_lowfreq[beta]]
     end
+    R += R_add
     return R, b
 end
 
@@ -929,11 +872,11 @@ function _vdim_auxiliary_quantities(
     γ₀B = [f(q) for q in Γ, f in P]
     γ₁B = [f(q) for q in Γ, f in γ₁P]
     Θ = zeros(eltype(Vop), num_targets, num_basis)
-    # Compute Θ <-- S * γ₁B - D * γ₀B - V * b + σ * B(x) using in-place matvec
+    # Compute Θ <-- S * γ₁B - D * γ₀B + V * b + σ * B(x) using in-place matvec
     for n in 1:num_basis
         @views mul!(Θ[:, n], Sop, γ₁B[:, n])
         @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
-        @views mul!(Θ[:, n], Vop, b[:, n], -1, 1)
+        @views mul!(Θ[:, n], Vop, b[:, n], 1, 1)
         for i in 1:num_targets
             Θ[i, n] += μ[i] * P[n](X[i])
         end
@@ -1052,7 +995,7 @@ end
 
 # dispatch to the correct solver in ElementaryPDESolutions
 function polynomial_solution(::Laplace, p::ElementaryPDESolutions.Polynomial)
-    P = ElementaryPDESolutions.solve_laplace(p)
+    P = ElementaryPDESolutions.solve_laplace(-p)
     return ElementaryPDESolutions.convert_coefs(P, Float64)
 end
 
