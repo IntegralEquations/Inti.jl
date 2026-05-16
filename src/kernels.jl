@@ -126,6 +126,44 @@ end
 ################################# LAPLACE ######################################
 ################################################################################
 
+"""
+    struct GradientSingleLayerKernel{T,Op} <: AbstractKernel{T}
+
+Given an operator `Op`, construct its free-space gradient single-layer kernel.
+This evaluates the gradient of the fundamental solution with respect to the target variable.
+"""
+struct GradientSingleLayerKernel{T, Op} <: AbstractKernel{T}
+    op::Op
+end
+
+function GradientSingleLayerKernel(op::AbstractDifferentialOperator{N}, ::Type{T} = SVector{N, default_kernel_eltype(op)}) where {N, T}
+    GradientSingleLayerKernel{T, typeof(op)}(op)
+end
+
+function singularity_order(K::GradientSingleLayerKernel)
+    N = ambient_dimension(K.op)
+    return 1 - N
+end
+
+"""
+    struct GradientDoubleLayerKernel{T,Op} <: AbstractKernel{T}
+
+Given an operator `Op`, construct its free-space gradient double-layer kernel.
+This evaluates the gradient of the double-layer kernel with respect to the target variable.
+"""
+struct GradientDoubleLayerKernel{T, Op} <: AbstractKernel{T}
+    op::Op
+end
+
+function GradientDoubleLayerKernel(op::AbstractDifferentialOperator{N}, ::Type{T} = SVector{N, default_kernel_eltype(op)}) where {N, T}
+    GradientDoubleLayerKernel{T, typeof(op)}(op)
+end
+
+function singularity_order(K::GradientDoubleLayerKernel)
+    N = ambient_dimension(K.op)
+    return -N
+end
+
 struct Laplace{N} <: AbstractDifferentialOperator{N} end
 
 """
@@ -149,7 +187,7 @@ function (SL::SingleLayerKernel{T, Laplace{N}})(
         target,
         source,
         r = coords(target) - coords(source),
-    )::T where {N, T}
+    ) where {N, T}
     d = norm(r)
     (d ≤ SAME_POINT_TOLERANCE) && return zero(T)
     if N == 2
@@ -165,7 +203,7 @@ function (DL::DoubleLayerKernel{T, Laplace{N}})(
         target,
         source,
         r = coords(target) - coords(source),
-    )::T where {N, T}
+    ) where {N, T}
     ny = normal(source)
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
@@ -182,7 +220,7 @@ function (ADL::AdjointDoubleLayerKernel{T, Laplace{N}})(
         target,
         source,
         r = coords(target) - coords(source),
-    )::T where {N, T}
+    ) where {N, T}
     nx = normal(target)
     d = norm(r)
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
@@ -206,6 +244,35 @@ function (HS::HyperSingularKernel{T, Laplace{N}})(
         return 1 / (2π) / (d^2) * transpose(nx) * ((I - 2 * r * transpose(r) / d^2) * ny)
     elseif N == 3
         return 1 / (4π) / (d^3) * transpose(nx) * ((I - 3 * r * transpose(r) / d^2) * ny)
+    end
+end
+
+function (GSL::GradientSingleLayerKernel{T, Laplace{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
+    d = norm(r)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
+    if N == 2
+        return -1 / (2π) / (d^2) * r
+    elseif N == 3
+        return -1 / (4π) / (d^3) * r
+    end
+end
+
+function (GDL::GradientDoubleLayerKernel{T, Laplace{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
+    ny = normal(source)
+    d = norm(r)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
+    if N == 2
+        return 1 / (2π) / (d^2) * (ny - 2 * dot(r, ny) / d^2 * r)
+    elseif N == 3
+        return 1 / (4π) / (d^3) * (ny - 3 * dot(r, ny) / d^2 * r)
     end
 end
 
@@ -426,6 +493,40 @@ function (HS::HyperSingularKernel{T, <:Helmholtz{N}})(target, source)::T where {
     end
 end
 
+function (GSL::GradientSingleLayerKernel{T, <:Helmholtz{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
+    k = GSL.op.k
+    d = norm(r)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
+    if N == 2
+        return -im * k / 4 / d * hankelh1(1, k * d) * r
+    elseif N == 3
+        return 1 / (4π) / d^2 * exp(im * k * d) * (im * k - 1 / d) * r
+    end
+end
+
+function (GDL::GradientDoubleLayerKernel{T, <:Helmholtz{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
+    ny = normal(source)
+    k = GDL.op.k
+    d = norm(r)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
+    rdotny = dot(r, ny)
+    if N == 2
+        return im * k / (4 * d) * hankelh1(1, k * d) * ny -
+               im * k^2 / (4 * d^2) * hankelh1(2, k * d) * r * rdotny
+    elseif N == 3
+        pref = 1 / (4π) / d^3 * exp(im * k * d)
+        return pref * ((1 - im * k * d) * ny + (k^2 * d^2 + 3 * im * k * d - 3) / d^2 * r * rdotny)
+    end
+end
+
 ############################ STOKES ############################3
 struct Stokes{N, T} <: AbstractDifferentialOperator{N}
     μ::T
@@ -628,6 +729,164 @@ function (HS::HyperSingularKernel{T, <:Elastostatic{N}})(target, source) where {
                     ny * transpose(nx)
             ) - (1 - 4ν) * nx * transpose(ny)
         )
+    end
+end
+
+################################################################################
+############################ ELASTOSTATIC GRADIENT ############################
+################################################################################
+
+# Algebra needed for SVector{N, <:SMatrix} output type.
+# These products arise when gradient kernels for vector-valued operators (Elastostatic, Stokes)
+# act on matrix-valued densities (DIM method) or vector-valued densities (final application).
+function Base.:*(t::SVector{N, M}, m::SMatrix{P, Q}) where {N, P, Q, M <: SMatrix{P, Q}}
+    return typeof(t)(ntuple(k -> t[k] * m, N))
+end
+function Base.:*(t::SVector{N, M}, v::SVector{P}) where {N, P, M <: SMatrix{P, P}}
+    return SMatrix{P, N}(hcat(ntuple(k -> t[k] * v, N)...))
+end
+
+function GradientSingleLayerKernel(op::Elastostatic{N}) where {N}
+    T = SVector{N, SMatrix{N, N, Float64, N * N}}
+    GradientSingleLayerKernel{T, typeof(op)}(op)
+end
+
+function GradientDoubleLayerKernel(op::Elastostatic{N}) where {N}
+    T = SVector{N, SMatrix{N, N, Float64, N * N}}
+    GradientDoubleLayerKernel{T, typeof(op)}(op)
+end
+
+function (K::GradientSingleLayerKernel{T, <:Elastostatic{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
+    μ, λ = K.op.μ, K.op.λ
+    ν = λ / (2 * (μ + λ))
+    d = norm(r)
+    d == 0 && return zero(T)
+    RRT = r * r'
+    SM = SMatrix{N, N, Float64, N * N}
+    if N == 2
+        C = 1 / (8π * μ * (1 - ν))
+        return SVector{N}(ntuple(N) do k
+            ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+            SM(C * (-(3 - 4ν) * r[k] / d^2 * I + (ek * r' + r * ek') / d^2 - 2 * r[k] * RRT / d^4))
+        end)
+    elseif N == 3
+        C = 1 / (16π * μ * (1 - ν))
+        return SVector{N}(ntuple(N) do k
+            ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+            SM(C * (-(3 - 4ν) * r[k] / d^3 * I + (ek * r' + r * ek') / d^3 - 3 * r[k] * RRT / d^5))
+        end)
+    end
+end
+
+function (K::GradientDoubleLayerKernel{T, <:Elastostatic{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
+    μ, λ = K.op.μ, K.op.λ
+    ν = λ / (2 * (μ + λ))
+    ny = normal(source)
+    d = norm(r)
+    d == 0 && return zero(T)
+    RRT = r * r'
+    qr = dot(ny, r)
+    B = r * ny' - ny * r'
+    SM = SMatrix{N, N, Float64, N * N}
+    if N == 2
+        C = 1 / (4π * (1 - ν))
+        A = (1 - 2ν) * I + 2 * RRT / d^2
+        return SVector{N}(ntuple(N) do k
+            ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+            SM(C * (
+                (ny[k] / d^2 - 2 * qr * r[k] / d^4) * A
+                + 2 * qr / d^4 * (ek * r' + r * ek')
+                - 4 * qr * r[k] * RRT / d^6
+                - (1 - 2ν) / d^2 * (ek * ny' - ny * ek')
+                + 2 * r[k] * (1 - 2ν) / d^4 * B
+            ))
+        end)
+    elseif N == 3
+        C = 1 / (8π * (1 - ν))
+        A = (1 - 2ν) * I + 3 * RRT / d^2
+        return SVector{N}(ntuple(N) do k
+            ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+            SM(C * (
+                (ny[k] / d^3 - 3 * qr * r[k] / d^5) * A
+                + 3 * qr / d^5 * (ek * r' + r * ek')
+                - 6 * qr * r[k] * RRT / d^7
+                - (1 - 2ν) / d^3 * (ek * ny' - ny * ek')
+                + 3 * r[k] * (1 - 2ν) / d^5 * B
+            ))
+        end)
+    end
+end
+
+################################################################################
+################################### STOKES GRADIENT ############################
+################################################################################
+
+function GradientSingleLayerKernel(op::Stokes{N}) where {N}
+    T = SVector{N, SMatrix{N, N, Float64, N * N}}
+    GradientSingleLayerKernel{T, typeof(op)}(op)
+end
+
+function GradientDoubleLayerKernel(op::Stokes{N}) where {N}
+    T = SVector{N, SMatrix{N, N, Float64, N * N}}
+    GradientDoubleLayerKernel{T, typeof(op)}(op)
+end
+
+function (K::GradientSingleLayerKernel{T, <:Stokes{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
+    μ = K.op.μ
+    d = norm(r)
+    d == 0 && return zero(T)
+    RRT = r * r'
+    SM = SMatrix{N, N, Float64, N * N}
+    if N == 2
+        C = 1 / (4π * μ)
+        return SVector{N}(ntuple(N) do k
+            ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+            SM(C * (-r[k] / d^2 * I + (ek * r' + r * ek') / d^2 - 2 * r[k] * RRT / d^4))
+        end)
+    elseif N == 3
+        C = 1 / (8π * μ)
+        return SVector{N}(ntuple(N) do k
+            ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+            SM(C * (-r[k] / d^3 * I + (ek * r' + r * ek') / d^3 - 3 * r[k] * RRT / d^5))
+        end)
+    end
+end
+
+function (K::GradientDoubleLayerKernel{T, <:Stokes{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
+    ny = normal(source)
+    d = norm(r)
+    d == 0 && return zero(T)
+    RRT = r * r'
+    qr = dot(ny, r)
+    SM = SMatrix{N, N, Float64, N * N}
+    if N == 2
+        C = 1 / π
+        return SVector{N}(ntuple(N) do k
+            ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+            SM(C * (ny[k] * RRT / d^4 + qr * (ek * r' + r * ek') / d^4 - 4 * qr * r[k] * RRT / d^6))
+        end)
+    elseif N == 3
+        C = 3 / (4π)
+        return SVector{N}(ntuple(N) do k
+            ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+            SM(C * (ny[k] * RRT / d^5 + qr * (ek * r' + r * ek') / d^5 - 5 * qr * r[k] * RRT / d^7))
+        end)
     end
 end
 
