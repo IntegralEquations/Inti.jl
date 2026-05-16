@@ -587,18 +587,18 @@ end
     x̂_nodes = qcoords(qrule)
     nq = length(x̂_nodes)
     L = lagrange_basis(qrule)
-    
+
     # Precompute gradients and hessians of Lagrange basis
     dL_rows = map(x̂_nodes) do x̂
         dL = ForwardDiff.jacobian(L, x̂)
         ntuple(j -> SVector{M, T}(ntuple(k -> T(dL[j, k]), M)), nq)
     end
-    
+
     HL_rows = map(x̂_nodes) do x̂
         jac_func(x) = vec(ForwardDiff.jacobian(L, x))
         H_flat = ForwardDiff.jacobian(jac_func, x̂)
         ntuple(nq) do q_basis
-            SMatrix{M, M, T}(ntuple(i -> H_flat[q_basis + ((i-1)%M)*nq, div(i-1, M)+1], Val(M*M)))
+            SMatrix{M, M, T}(ntuple(i -> H_flat[q_basis + ((i - 1) % M) * nq, div(i - 1, M) + 1], Val(M * M)))
         end
     end
 
@@ -610,32 +610,34 @@ end
             J_q = SMatrix{N, M, T}(jacobian(el, x̂))
             g = J_q' * J_q
             g_inv = inv(g)
-            
+
             H_x = hessian(el, x̂)
-            
+
             # Christoffel symbols Gamma^k = \sum_m g^{km} \sum_n H^x_n J_{nm}
             Gamma = ntuple(Val(M)) do k
                 sum(1:M) do m
                     g_inv[k, m] * sum(1:N) do d
-                        H_x[d, :, :][:, :] * J_q[d, m] 
+                        H_x[d, :, :][:, :] * J_q[d, m]
                     end
                 end
             end
-            
+
             i_global = qtags[q]
             for j in 1:nq
                 grad_u_j = dL_rows[q][j]
                 H_u_j = HL_rows[q][j]
-                
+
                 # \Delta_\Gamma L_j = g^{ab} ( H_u_j[a,b] - \sum_k \Gamma^k[a,b] grad_u_j[k] )
                 val = sum(1:M) do a
                     sum(1:M) do b
-                        g_inv[a, b] * ( H_u_j[a, b] - sum(1:M) do k
-                            Gamma[k][a, b] * grad_u_j[k]
-                        end )
+                        g_inv[a, b] * (
+                            H_u_j[a, b] - sum(1:M) do k
+                                Gamma[k][a, b] * grad_u_j[k]
+                            end
+                        )
                     end
                 end
-                
+
                 push!(Is, i_global)
                 push!(Js, qtags[j])
                 push!(Vs, val)

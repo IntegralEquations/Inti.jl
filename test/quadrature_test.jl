@@ -176,7 +176,7 @@ end
         Q = Inti.Quadrature(Inti.Domain(geo); qorder = 4, meshsize = 0.1)
         κs = Inti.principal_curvatures(Q)
         @test all(κ -> iszero(last(κ)), κs)
-        @test all(κ -> abs(first(κ) + 1) < 1e-10, κs)
+        @test all(κ -> abs(first(κ) + 1) < 1.0e-10, κs)
         @test all(iszero, Inti.gauss_curvature(Q))
         @test Inti.mean_curvature(Q) ≈ Inti.curvature(Q) ./ 2
         @test Inti.gauss_curvature(Q) ≈ prod.(Inti.principal_curvatures(Q))
@@ -187,13 +187,13 @@ end
         geo = Inti.parametric_curve(θ -> SVector(sin(θ), cos(θ)), 0.1, π - 0.1)
         Q = Inti.Quadrature(Inti.Domain(geo); qorder = 4, meshsize = 0.1)
         κs = Inti.principal_curvatures(Q; surface_type = :revolution)
-        @test all(κ -> abs(first(κ) - last(κ)) < 1e-10, κs)   # equal curvatures for sphere
-        @test all(K -> abs(K - 1) < 1e-10, Inti.gauss_curvature(Q; surface_type = :revolution))
-        @test all(K -> abs(K - 1) < 1e-10, Inti.mean_curvature(Q; surface_type = :revolution))
+        @test all(κ -> abs(first(κ) - last(κ)) < 1.0e-10, κs)   # equal curvatures for sphere
+        @test all(K -> abs(K - 1) < 1.0e-10, Inti.gauss_curvature(Q; surface_type = :revolution))
+        @test all(K -> abs(K - 1) < 1.0e-10, Inti.mean_curvature(Q; surface_type = :revolution))
         @test Inti.mean_curvature(Q; surface_type = :revolution) ≈
-              Inti.curvature(Q; surface_type = :revolution) ./ 2
+            Inti.curvature(Q; surface_type = :revolution) ./ 2
         @test Inti.gauss_curvature(Q; surface_type = :revolution) ≈
-              prod.(Inti.principal_curvatures(Q; surface_type = :revolution))
+            prod.(Inti.principal_curvatures(Q; surface_type = :revolution))
     end
 end
 
