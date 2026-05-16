@@ -131,3 +131,57 @@ for correction in corrections
         end
     end
 end
+
+## Gradient Green's identity: W*γ₁u - GDL*γ₀u = ∇u (interior representation formula)
+@testset "Gradient Green's identity (kernel_variant = :gradient)" begin
+    for N in (2, 3)
+        for op in (Inti.Laplace(; dim = N), Inti.Helmholtz(; k = 1.2, dim = N),
+                   Inti.Elastostatic(; μ = 0.8, λ = 1.3, dim = N),
+                   Inti.Stokes(; μ = 1.2, dim = N))
+            Inti.clear_entities!()
+            if N == 2
+                Γ = Inti.parametric_curve(x -> SVector(cos(x), sin(x)), 0.0, 2π) |> Inti.Domain
+                quad = Inti.Quadrature(Γ; meshsize, qorder = 5)
+                # interior targets, some close to the boundary (to exercise the correction)
+                target = vec([SVector(x, y) for x in -0.9:0.2:0.9, y in -0.9:0.2:0.9
+                              if x^2 + y^2 < 0.85])
+            else
+                Ω = Inti.GeometricEntity("ellipsoid") |> Inti.Domain
+                Γ = Inti.external_boundary(Ω)
+                quad = Inti.Quadrature(Γ; meshsize, qorder = 3)
+                target = vec([SVector(x, y, z) for x in -0.7:0.3:0.7, y in -0.7:0.3:0.7,
+                              z in -0.7:0.3:0.7 if x^2 + y^2 + z^2 < 0.5])
+            end
+            xs = ntuple(i -> 3, N)   # exterior source point
+            T = Inti.default_density_eltype(op)
+            c = rand(T)
+            u      = qnode -> Inti.SingleLayerKernel(op)(qnode, xs) * c
+            dudn   = qnode -> Inti.AdjointDoubleLayerKernel(op)(qnode, xs) * c
+            ∇u_ref = x     -> Inti.GradientSingleLayerKernel(op)(x, xs) * c
+            γ₀u  = map(u, quad)
+            γ₁u  = map(dudn, quad)
+            ∇u   = map(∇u_ref, target)
+            ∇u_norm = norm(norm.(∇u), Inf)
+            # uncorrected operators
+            Wop   = Inti.IntegralOperator(Inti.GradientSingleLayerKernel(op), target, quad)
+            GDLop = Inti.IntegralOperator(Inti.GradientDoubleLayerKernel(op), target, quad)
+            Wmat   = Inti.assemble_matrix(Wop)
+            GDLmat = Inti.assemble_matrix(GDLop)
+            e0 = norm(Wmat * γ₁u - GDLmat * γ₀u - ∇u, Inf) / ∇u_norm
+            # corrected operators
+            W, GDL = Inti.single_double_layer(;
+                op,
+                target,
+                source = quad,
+                compression = (method = :none,),
+                correction = (method = :dim, maxdist = Inf, target_location = :inside),
+                kernel_variant = :gradient,
+            )
+            e1 = norm(W * γ₁u - GDL * γ₀u - ∇u, Inf) / ∇u_norm
+            @testset "Gradient identity $(N)d $(typeof(op).name.name)" begin
+                @test e0 > e1
+                @test e1 < rtol1
+            end
+        end
+    end
+end

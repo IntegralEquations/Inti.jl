@@ -9,6 +9,78 @@ Parameters associated with the density interpolation method used in
     sources_radius_multiplier::Float64 = 1.5
 end
 
+# ---- Internal helpers for bdim_correction ----
+#
+# The per-target linear solve is Mdata' * Wdata ≈ Θi_flat, where Mdata is a
+# plain float matrix whose shape is determined by `Tbase` (the base kernel
+# eltype). The RHS column count and pack/unpack logic depend on `Tout`:
+#   Tout <: Number                     → 1 column
+#   Tout <: SVector{P,<:Number}        → P columns
+#   Tout <: SMatrix{N,N}               → N columns       (one block solve)
+#   Tout <: SVector{K,<:SMatrix{N,N}}  → K*N columns     (K block solves batched)
+#
+# The `transpose` calls in the SMatrix variants reflect BlockArray's column-major
+# block layout: writing an SMatrix through parent() exposes its transpose.
+
+_bdim_num_rhs(::Type{T}) where {T <: Number} = 1
+_bdim_num_rhs(::Type{SV}) where {P, SV <: SVector{P, <:Number}} = P
+_bdim_num_rhs(::Type{SM}) where {N, SM <: SMatrix{N, N}} = N
+_bdim_num_rhs(::Type{SV}) where {K, SM <: SMatrix, SV <: SVector{K, SM}} = K * size(SM, 1)
+
+function _bdim_fill_Θi!(Θi_flat, Θ, j, ::Type{T}) where {T <: Number}
+    @inbounds for m in axes(Θi_flat, 1)
+        Θi_flat[m, 1] = Θ[j, m]
+    end
+end
+function _bdim_fill_Θi!(Θi_flat, Θ, j, ::Type{SV}) where {P, SV <: SVector{P, <:Number}}
+    @inbounds for m in axes(Θi_flat, 1)
+        Θi_flat[m, :] .= Θ[j, m]
+    end
+end
+function _bdim_fill_Θi!(Θi_flat, Θ, j, ::Type{SM}) where {N, SM <: SMatrix{N, N}}
+    ns = size(Θi_flat, 1) ÷ N
+    @inbounds for m in 1:ns
+        Θi_flat[(m - 1) * N + 1:m * N, :] .= transpose(Θ[j, m])
+    end
+end
+function _bdim_fill_Θi!(Θi_flat, Θ, j, ::Type{SV}) where {K, SM <: SMatrix, SV <: SVector{K, SM}}
+    N = size(SM, 1)
+    ns = size(Θi_flat, 1) ÷ N
+    @inbounds for m in 1:ns, kk in 1:K
+        Θi_flat[(m - 1) * N + 1:m * N, (kk - 1) * N + 1:kk * N] .= transpose(Θ[j, m][kk])
+    end
+end
+
+function _bdim_push_weights!(Is, Js, Ss, Ds, Wdata, i, jglob, nq, ::Type{T}) where {T <: Number}
+    @inbounds for k in 1:nq
+        push!(Is, i); push!(Js, jglob[k])
+        push!(Ss, -Wdata[nq + k, 1])
+        push!(Ds,  Wdata[k, 1])
+    end
+end
+function _bdim_push_weights!(Is, Js, Ss, Ds, Wdata, i, jglob, nq, ::Type{SV}) where {P, SV <: SVector{P, <:Number}}
+    @inbounds for k in 1:nq
+        push!(Is, i); push!(Js, jglob[k])
+        push!(Ss, -SV(Wdata[nq + k, :]))
+        push!(Ds,  SV(Wdata[k, :]))
+    end
+end
+function _bdim_push_weights!(Is, Js, Ss, Ds, Wdata, i, jglob, nq, ::Type{SM}) where {N, SM <: SMatrix{N, N}}
+    @inbounds for k in 1:nq
+        push!(Is, i); push!(Js, jglob[k])
+        push!(Ss, -transpose(SM(view(Wdata, N * (nq + k - 1) + 1:N * (nq + k), :))))
+        push!(Ds,  transpose(SM(view(Wdata, N * (k - 1) + 1:k * N, :))))
+    end
+end
+function _bdim_push_weights!(Is, Js, Ss, Ds, Wdata, i, jglob, nq, ::Type{SV}) where {K, SM <: SMatrix, SV <: SVector{K, SM}}
+    N = size(SM, 1)
+    @inbounds for k in 1:nq
+        push!(Is, i); push!(Js, jglob[k])
+        push!(Ss, SV(ntuple(kk -> -transpose(SM(view(Wdata, N * (nq + k - 1) + 1:N * (nq + k), (kk - 1) * N + 1:kk * N))), Val(K))))
+        push!(Ds, SV(ntuple(kk ->  transpose(SM(view(Wdata, N * (k - 1) + 1:k * N,             (kk - 1) * N + 1:kk * N))), Val(K))))
+    end
+end
+
 """
     bdim_correction(op,X,Y,S,D; green_multiplier, kwargs...)
 
@@ -37,10 +109,9 @@ See [faria2021general](@cite) for more details on the method.
 
 - `parameters::DimParameters`: parameters associated with the density
   interpolation method
-- `derivative`: if true, compute the correction to the adjoint double-layer and
-  hypersingular operators instead. In this case, `S` and `D` should be replaced
-  by a (possibly innacurate) discretization of adjoint double-layer and
-  hypersingular operators, respectively.
+- `kernel_variant`: `:default` for the standard single/double-layer, `:neumann` for
+  the adjoint double-layer and hypersingular operators (Neumann trace), or `:gradient`
+  for the gradient kernels. `S` and `D` must be consistent with the chosen variant.
 - `maxdist`: distance beyond which interactions are considered sufficiently far
   so that no correction is needed. This is used to determine a threshold for
   nearly-singular corrections when `X` and `Y` are different surfaces. When `X
@@ -55,16 +126,17 @@ function bdim_correction(
         Dop;
         green_multiplier::Vector{<:Real},
         parameters = DimParameters(),
-        derivative::Bool = false,
+        kernel_variant::Symbol = :default,
         maxdist = Inf,
         filter_target_params = nothing,
     )
     imat_cond = imat_norm = res_norm = rhs_norm = theta_norm = -Inf
-    T = eltype(Sop)
+    Tout = eltype(Sop)
+    Tbase = default_kernel_eltype(op)
     # determine type for dense matrices
-    Dense = T <: SMatrix ? BlockArray : Array
+    DenseBase = Tbase <: SMatrix ? BlockArray : Array
     N = ambient_dimension(source)
-    @assert eltype(Dop) == T "eltype of S and D must match"
+    @assert eltype(Dop) == Tout "eltype of S and D must match"
     m, n = length(target), length(source)
     # check if we are in debug mode to avoid expensive computations
     do_debug = debug_mode()
@@ -93,10 +165,22 @@ function bdim_correction(
         error("only 2D and 3D supported")
     end
     # compute traces of monopoles on the source mesh
-    G = SingleLayerKernel(op, T)
-    γ₁G = AdjointDoubleLayerKernel(op, T)
-    γ₀B = Dense{T}(undef, length(source), ns)
-    γ₁B = Dense{T}(undef, length(source), ns)
+    G = SingleLayerKernel(op, Tbase)
+    γ₁G = AdjointDoubleLayerKernel(op, Tbase)
+
+    if kernel_variant === :gradient
+        G_target = GradientSingleLayerKernel(op, Tout)
+        γ₁G_target = GradientDoubleLayerKernel(op, Tout)
+    elseif kernel_variant === :neumann
+        G_target = AdjointDoubleLayerKernel(op, Tout)
+        γ₁G_target = HyperSingularKernel(op, Tout)
+    else
+        G_target = SingleLayerKernel(op, Tout)
+        γ₁G_target = DoubleLayerKernel(op, Tout)
+    end
+
+    γ₀B = DenseBase{Tbase}(undef, length(source), ns)
+    γ₁B = DenseBase{Tbase}(undef, length(source), ns)
     for k in 1:ns
         for j in 1:length(source)
             γ₀B[j, k] = G(source[j], xs[k])
@@ -105,24 +189,25 @@ function bdim_correction(
     end
     # integrate the monopoles/dipoles over Y with target on X. This is the
     # slowest step, and passing a custom S,D can accelerate this computation.
-    Θ = Dense{T}(undef, m, ns)
-    fill!(Θ, zero(T))
-    # Compute Θ <-- S * γ₁B - D * γ₀B + μ * B(x) usig in-place matvec
+    DenseOut = Tout <: SMatrix ? BlockArray : Array
+    Θ = DenseOut{Tout}(undef, m, ns)
+    fill!(Θ, zero(Tout))
+    # Compute Θ <-- S * γ₁B - D * γ₀B + μ * B(x) using in-place matvec
     for k in 1:ns
         for i in 1:length(target)
             μ = green_multiplier[i]
-            v = derivative ? γ₁G(target[i], xs[k]) : G(target[i], xs[k])
+            v = G_target(target[i], xs[k])
             Θ[i, k] = μ * v
         end
     end
-    if Dense <: Array || (Sop isa BlockArray && Dop isa BlockArray)
+    if DenseOut <: Array || (Sop isa BlockArray && Dop isa BlockArray)
         mul!(Θ, Sop, γ₁B, 1, 1)
         mul!(Θ, Dop, γ₀B, -1, 1)
     else
         # for vector value problems, we only assume that Sop and Dop can be multiplied by
         # Vectors of SVectors, and so we need to perform multiplication column by column
-        P, Q = size(T)
-        S = eltype(T)
+        P, Q = size(Tbase)
+        S = eltype(Tbase)
         Θ_data = parent(Θ)
         γ₀B_data = parent(γ₀B)
         γ₁B_data = parent(γ₁B)
@@ -136,23 +221,22 @@ function bdim_correction(
     end
 
     # finally compute the corrected weights as sparse matrices
-    Is, Js, Ss, Ds = Int[], Int[], T[], T[]
+    Is, Js, Ss, Ds = Int[], Int[], Tout[], Tout[]
     for (E, qtags) in source.etype2qtags
         near_list = dict_near[E]
         nq, ne = size(qtags)
         @assert length(near_list) == ne
-        # preallocate a local matrix to store interpolant values resulting
-        # weights. To benefit from Lapack, we must convert everything to
-        # matrices of scalars, so when `T` is an `SMatrix` we are careful to
-        # convert between the `Matrix{<:SMatrix}` and `Matrix{<:Number}` formats
-        # by viewing the elements of type `T` as `σ × σ` matrices of
-        # `eltype(T)`.
-        M = Dense{T}(undef, 2 * nq, ns)
-        W = Dense{T}(undef, 2 * nq, 1)
-        Θi = Dense{T}(undef, 1, ns)
-        Mdata, Wdata, Θidata = parent(M)::Matrix, parent(W)::Matrix, parent(Θi)::Matrix
-        # for each element, we will solve Mᵀ W = Θiᵀ, where W is a vector of
-        # size 2nq, and Θi is a row vector of length(ns)
+        # M's block structure is fully determined by Tbase; its plain float
+        # parent Mdata is what LAPACK actually factors. The RHS column count
+        # `nc` is the only thing Tout contributes to the solve dimensions.
+        M = DenseBase{Tbase}(undef, 2 * nq, ns)
+        Mdata = parent(M)::Matrix
+        S_scalar = eltype(Mdata)
+        nc = _bdim_num_rhs(Tout)
+        Θi_flat = Matrix{S_scalar}(undef, size(Mdata, 2), nc)
+        Wdata   = Matrix{S_scalar}(undef, size(Mdata, 1), nc)
+        # for each element, we will solve Mᵀ W = Θiᵀ, where W is a matrix of
+        # size (flat_m × nc), and Θiᵀ has size (flat_ns × nc)
         for n in 1:ne
             # if there is nothing near, skip immediately to next element
             isempty(near_list[n]) && continue
@@ -160,7 +244,7 @@ function bdim_correction(
             jglob = @view qtags[:, n]
             M[1:nq, :] .= γ₀B[jglob, :]
             M[(nq + 1):2nq, :] .= γ₁B[jglob, :]
-            # TODO: get ride of all this transposing mumble jumble by assembling
+            # TODO: get rid of all this transposing mumble jumble by assembling
             # the matrix in the correct orientation in the first place
             F = qr!(transpose(Mdata))
             if do_debug
@@ -169,23 +253,9 @@ function bdim_correction(
             end
             for i in near_list[n]
                 j = glob_loc_near_trgs[i]
-                Θi .= Θ[j:j, :]
-                if do_debug
-                    rhs_norm = max(rhs_norm, norm(Θidata))
-                end
-                ldiv!(Wdata, F, transpose(Θidata))
-                if do_debug
-                    res_norm = max(norm(Matrix(F) * Wdata - transpose(Θidata)), res_norm)
-                    theta_norm = max(theta_norm, norm(Wdata))
-                end
-                for k in 1:nq
-                    push!(Is, i)
-                    push!(Js, jglob[k])
-                    # Since we actually computed the tranpose of the weights, we
-                    # need to transpose it again. This matters for e.g. elasticity
-                    push!(Ss, -transpose(W[nq + k])) # single layer corresponds to α=0,β=-1
-                    push!(Ds, transpose(W[k]))     # double layer corresponds to α=1,β=0
-                end
+                _bdim_fill_Θi!(Θi_flat, Θ, j, Tout)
+                ldiv!(Wdata, F, Θi_flat)
+                _bdim_push_weights!(Is, Js, Ss, Ds, Wdata, i, jglob, nq, Tout)
             end
         end
     end
