@@ -22,11 +22,18 @@ See [anderson2024fast](@cite) for more details on the method.
 - `maxdist`: distance beyond which interactions are considered sufficiently far
   so that no correction is needed. This is used to determine a threshold for
   nearly-singular corrections.
-- `center`: the center of the basis functions. By default, the basis functions
-  are centered at the origin.
-- `shift`: a boolean indicating whether the basis functions should be shifted
-  and rescaled to each element.
+- `kernel_variant`: `:default` for the standard volume potential, `:gradient` for
+  the gradient of the volume potential. `S`, `D`, and `V` must be built with the
+  same `kernel_variant`.
 """
+# Helper: fill one row of bdata from Θ[i,m] — dispatches on element type
+_vdim_fill_bdata!(bdata, val, m, ::Type{<:Number}) = (bdata[m, 1] = val)
+_vdim_fill_bdata!(bdata, val, m, ::Type{<:SVector}) = (bdata[m, :] .= val)
+
+# Helper: push the weight at quadrature node k into Vs — dispatches on Tout
+_vdim_push_weight!(Vs, wdata, k, ::Type{T}) where {T<:Number} = push!(Vs, -wdata[k, 1])
+_vdim_push_weight!(Vs, wdata, k, ::Type{SV}) where {SV<:SVector} = push!(Vs, -SV(wdata[k, :]))
+
 function vdim_correction(
         op::AbstractDifferentialOperator{N},
         target,
@@ -37,19 +44,17 @@ function vdim_correction(
         Vop;
         green_multiplier::Vector{<:Real},
         interpolation_order = nothing,
+        kernel_variant::Symbol = :default,
         maxdist = Inf,
     ) where {N}
     # variables for debugging the condition properties of the method
     vander_cond = vander_norm = rhs_norm = res_norm = shift_norm = -Inf
-    T = eltype(Vop)
+    Tout = eltype(Vop)
+    Tbase = default_kernel_eltype(op)
     # determine type for dense matrices
-    Dense = T <: SMatrix ? BlockArray : Array
-    # FIXME? In order to wrap HMatrices for vector-valued layer *potentials* we
-    # use LinearMap{default_density_eltype(op)} for the layer potential maps.
-    # However, this breaks the following line, as e.g. instead of
-    # SMatrix{3,3,Float64} the eltype will be SVector{3,Float64}. Is there a way
-    # to keep this assert working?
-    #@assert eltype(Dop) == eltype(Sop) == T "eltype of Sop, Dop, and Vop must match"
+    DenseOut = Tout <: SMatrix ? BlockArray : Array
+    DenseBase = Tbase <: SMatrix ? BlockArray : Array
+    @assert eltype(Dop) == eltype(Sop) == Tout "eltype of Sop, Dop, and Vop must match"
     # figure out if we are dealing with a scalar or vector PDE
     num_target, num_source = length(target), length(source)
     # a reasonable interpolation_order if not provided
@@ -58,12 +63,12 @@ function vdim_correction(
     # check if we are in debug mode to avoid expensive computations
     do_debug = debug_mode()
     # by default basis centered at origin
-    basis = polynomial_solutions_vdim(op, interpolation_order, T)
+    basis = polynomial_solutions_vdim(op, interpolation_order, Tbase)
     dict_near = etype_to_nearest_points(target, source; maxdist)
     num_basis = length(basis)
-    b = Dense{T}(undef, length(source), num_basis)
-    γ₀B = Dense{T}(undef, length(boundary), num_basis)
-    γ₁B = Dense{T}(undef, length(boundary), num_basis)
+    b = DenseBase{Tbase}(undef, length(source), num_basis)
+    γ₀B = DenseBase{Tbase}(undef, length(boundary), num_basis)
+    γ₁B = DenseBase{Tbase}(undef, length(boundary), num_basis)
     for k in 1:num_basis, j in 1:length(source)
         b[j, k] = basis[k].source(source[j])
     end
@@ -71,11 +76,10 @@ function vdim_correction(
         γ₀B[j, k] = basis[k].solution(boundary[j])
         γ₁B[j, k] = basis[k].neumann_trace(boundary[j])
     end
-    T = eltype(γ₀B)
-    Θ = Dense{T}(undef, num_target, num_basis)
-    fill!(Θ, zero(T))
+    Θ = DenseOut{Tout}(undef, num_target, num_basis)
+    fill!(Θ, zero(Tout))
     # Compute Θ <-- S * γ₁B - D * γ₀B + V * b + σ * B(x) using in-place matvec
-    if Dense <: Array || (Sop isa BlockArray && Dop isa BlockArray && Vop isa BlockArray)
+    if DenseOut <: Array || (Sop isa BlockArray && Dop isa BlockArray && Vop isa BlockArray)
         for n in 1:num_basis
             @views mul!(Θ[:, n], Sop, γ₁B[:, n])
             @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
@@ -85,8 +89,8 @@ function vdim_correction(
         # For vector-valued problems with FMM (LinearMap operators), we need to
         # perform multiplication column-by-column since FMM expects vector densities
         # (SVector) not matrix densities (SMatrix). See bdim.jl for similar handling.
-        P, Q = size(T)
-        S = eltype(T)
+        P, Q = size(Tout)
+        S = eltype(Tout)
         Θ_data = parent(Θ)::Matrix
         γ₀B_data = parent(γ₀B)::Matrix
         γ₁B_data = parent(γ₁B)::Matrix
@@ -104,7 +108,11 @@ function vdim_correction(
     # Add σ * B(x) term
     for n in 1:num_basis
         for i in 1:num_target
-            Θ[i, n] += green_multiplier[i] * basis[n].solution(target[i])
+            if kernel_variant === :gradient
+                Θ[i, n] += green_multiplier[i] * basis[n].gradient_solution(target[i])
+            else
+                Θ[i, n] += green_multiplier[i] * basis[n].solution(target[i])
+            end
         end
     end
     # compute sparse correction
@@ -112,22 +120,39 @@ function vdim_correction(
     Js = Int[]
     Vs = eltype(Vop)[]
     for (E, qtags) in source.etype2qtags
-        # els = elements(source.mesh, E)
         near_list = dict_near[E]
         nq, ne = size(qtags)
         @assert length(near_list) == ne
-        # preallocate local arrays to store interpolant values and weights
-        # Similar to bdim, we need to handle the case where T is an SMatrix
-        # by converting between Matrix{<:SMatrix} and Matrix{<:Number} formats
-        L_arr = Dense{T}(undef, num_basis, nq)
-        b_arr = Dense{T}(undef, num_basis, 1)
-        wei_arr = Dense{T}(undef, nq, 1)
-        Ldata, bdata, weidata = parent(L_arr)::Matrix, parent(b_arr)::Matrix, parent(wei_arr)::Matrix
+        L_arr = DenseBase{Tbase}(undef, num_basis, nq)
+        Ldata = parent(L_arr)::Matrix
+        # Preallocate solve buffers. Vector-valued PDEs (Tout <: SMatrix or
+        # Tout <: SVector{K,<:SMatrix}) need BlockArray so that LAPACK sees a
+        # plain float matrix while we can still index with SMatrix semantics.
+        # Scalar/SVector{P,<:Number} PDEs use a plain float matrix directly.
+        if Tout <: SMatrix
+            b_arr = BlockArray{Tout}(undef, num_basis, 1)
+            wei_arr = BlockArray{Tout}(undef, nq, 1)
+            bdata = parent(b_arr)::Matrix
+            weidata = parent(wei_arr)::Matrix
+        elseif Tout <: SVector && eltype(Tout) <: SMatrix
+            K = length(Tout)
+            SM = eltype(Tout)
+            b_kk = BlockArray{SM}(undef, num_basis, 1)
+            wei_kk = BlockArray{SM}(undef, nq, 1)
+            bdata_kk = parent(b_kk)::Matrix
+            weidata_kk = parent(wei_kk)::Matrix
+            Vs_mat = Matrix{SM}(undef, nq, K)
+        else
+            # Scalar (Tout <: Number) and gradient-scalar (Tout <: SVector{P,<:Number})
+            # cases share the same structure: P columns in the solve, where P=1 for scalar.
+            S = eltype(Tout)
+            P = Tout <: Number ? 1 : length(Tout)
+            bdata = Matrix{S}(undef, num_basis, P)
+            weidata = Matrix{S}(undef, nq, P)
+        end
         for n in 1:ne
-            # indices of nodes in element `n`
             isempty(near_list[n]) && continue
             jglob = @view qtags[:, n]
-            # Fill the interpolation matrix
             for k in 1:nq, m in 1:num_basis
                 L_arr[m, k] = basis[m].source(view(source, jglob)[k])
             end
@@ -137,18 +162,48 @@ function vdim_correction(
                 shift_norm = max(shift_norm, 1)
                 vander_norm = max(vander_norm, norm(Ldata))
             end
-            # correct each target near the current element
             for i in near_list[n]
-                b_arr .= @views transpose(Θ[i:i, :])
-                ldiv!(weidata, F, bdata)
-                if do_debug
-                    rhs_norm = max(rhs_norm, norm(bdata))
-                    res_norm = max(res_norm, norm(Ldata * weidata - bdata))
-                end
-                for k in 1:nq
-                    push!(Is, i)
-                    push!(Js, jglob[k])
-                    push!(Vs, -transpose(wei_arr[k]))
+                if Tout <: SMatrix
+                    b_arr .= @views transpose(Θ[i:i, :])
+                    ldiv!(weidata, F, bdata)
+                    if do_debug
+                        rhs_norm = max(rhs_norm, norm(bdata))
+                        res_norm = max(res_norm, norm(Ldata * weidata - bdata))
+                    end
+                    for k in 1:nq
+                        push!(Is, i)
+                        push!(Js, jglob[k])
+                        push!(Vs, -transpose(wei_arr[k]))
+                    end
+                elseif Tout <: SVector && eltype(Tout) <: SMatrix
+                    for kk in 1:K
+                        for m in 1:num_basis
+                            b_kk[m, 1] = transpose(Θ[i, m][kk])
+                        end
+                        ldiv!(weidata_kk, F, bdata_kk)
+                        for k in 1:nq
+                            Vs_mat[k, kk] = -transpose(wei_kk[k])
+                        end
+                    end
+                    for k in 1:nq
+                        push!(Is, i)
+                        push!(Js, jglob[k])
+                        push!(Vs, Tout(ntuple(kk -> Vs_mat[k, kk], K)))
+                    end
+                else
+                    for m in 1:num_basis
+                        _vdim_fill_bdata!(bdata, Θ[i, m], m, Tout)
+                    end
+                    ldiv!(weidata, F, bdata)
+                    if do_debug
+                        rhs_norm = max(rhs_norm, norm(bdata))
+                        res_norm = max(res_norm, norm(Ldata * weidata - bdata))
+                    end
+                    for k in 1:nq
+                        push!(Is, i)
+                        push!(Js, jglob[k])
+                        _vdim_push_weight!(Vs, weidata, k, Tout)
+                    end
                 end
             end
         end
@@ -172,7 +227,7 @@ Build a basis of polynomial solutions for the VDIM method.
 For every monomial `pₙ` of degree at most `order`, computes a polynomial solution `Pₙ`
 satisfying `ℒ[Pₙ] = pₙ`, where `ℒ` is the differential operator of `op`.
 
-Returns a vector of named tuples `(source = pₙ, solution = Pₙ, neumann_trace = γ₁Pₙ)`.
+Returns a vector of named tuples with fields `source = pₙ`, `solution = Pₙ`, `neumann_trace = γ₁Pₙ`, and `gradient_solution = ∇Pₙ`.
 """
 function polynomial_solutions_vdim(
         op::AbstractDifferentialOperator{N},
@@ -183,7 +238,8 @@ function polynomial_solutions_vdim(
     return map(indices) do I
         monomial = Polynomial(I => one(T))
         P, γ₁P = basis_from_monomial(op, monomial)
-        (source = monomial, solution = P, neumann_trace = γ₁P)
+        ∇P = ElementaryPDESolutions.gradient(P)
+        (source = monomial, solution = P, neumann_trace = γ₁P, gradient_solution = ∇P)
     end
 end
 

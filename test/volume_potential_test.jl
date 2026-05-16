@@ -127,6 +127,66 @@ function test_volume_potential(op, Ω, Γ, msh; interpolation_order = 2, bdry_qo
     return errors_uncorrected, errors_corrected
 end
 
+"""
+    test_gradient_volume_potential(op, Ω, Γ, msh; ...)
+
+Test the gradient volume potential identity for Laplace:
+    ∇P + GDL*γ₀P - W*γ₁P ≈ ∇V*f + δ∇V*f   where f = L[P]
+"""
+function test_gradient_volume_potential(op, Ω, Γ, msh; interpolation_order = 2, bdry_qorder = 8)
+    Ωₕ = view(msh, Ω)
+    Γₕ = view(msh, Γ)
+
+    dim = Inti.geometric_dimension(Ω)
+    if dim == 2
+        VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
+        Q = Inti.VioreanuRokhlin(; domain = :triangle, order = VR_qorder)
+    elseif dim == 3
+        VR_qorder = Inti.Tetrahedron_VR_interpolation_order_to_quadrature_order(interpolation_order)
+        Q = Inti.VioreanuRokhlin(; domain = :tetrahedron, order = VR_qorder)
+    end
+    Ωₕ_quad = Inti.Quadrature(Ωₕ, Q)
+    Γₕ_quad = Inti.Quadrature(Γₕ; qorder = bdry_qorder)
+
+    W, GDL = Inti.single_double_layer(;
+        op,
+        target = Ωₕ_quad,
+        source = Γₕ_quad,
+        compression = (method = :none,),
+        correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
+        kernel_variant = :gradient,
+    )
+    V_grad = Inti.volume_potential(;
+        op,
+        target = Ωₕ_quad,
+        source = Ωₕ_quad,
+        compression = (method = :none,),
+        correction = (method = :none,),
+        kernel_variant = :gradient,
+    )
+    δV_grad = Inti.vdim_correction(
+        op, Ωₕ_quad, Ωₕ_quad, Γₕ_quad, W, GDL, V_grad;
+        green_multiplier = -ones(length(Ωₕ_quad)),
+        interpolation_order,
+        kernel_variant = :gradient,
+    )
+
+    basis = Inti.polynomial_solutions_vdim(op, interpolation_order)
+    errors_corrected = Float64[]
+
+    for idx in 1:length(basis)
+        ∇u_d = [basis[idx].gradient_solution(q) for q in Ωₕ_quad]
+        u_b  = [basis[idx].solution(q) for q in Γₕ_quad]
+        du_b = [basis[idx].neumann_trace(q) for q in Γₕ_quad]
+        f_d  = [basis[idx].source(q) for q in Ωₕ_quad]
+        # gradient representation formula: ∇P = W*γ₁P - GDL*γ₀P + ∇V*f
+        vref    = ∇u_d + GDL * u_b - W * du_b
+        vapprox = V_grad * f_d + δV_grad * f_d
+        push!(errors_corrected, norm(vref - vapprox, Inf))
+    end
+    return errors_corrected
+end
+
 @testset "Volume potential operators 2D" begin
     # Create 2D geometry once
     Inti.clear_entities!()
@@ -191,4 +251,156 @@ end
             @test maximum(err_corr) < maximum(err_uncorr)  # Correction should improve accuracy
         end
     end
+end
+
+@testset "Gradient volume potential 2D Laplace" begin
+    Inti.clear_entities!()
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Verbosity", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+    gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
+    gmsh.model.occ.synchronize()
+    gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(meshorder)
+    msh = Inti.import_mesh(; dim = 2)
+    Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
+    gmsh.finalize()
+    Γ = Inti.external_boundary(Ω)
+    op = Inti.Laplace(; dim = 2)
+    err_corr = test_gradient_volume_potential(op, Ω, Γ, msh; interpolation_order, bdry_qorder)
+    @test maximum(err_corr) < rtol
+end
+
+@testset "Gradient volume potential 3D Laplace" begin
+    Inti.clear_entities!()
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Verbosity", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+    gmsh.model.occ.addSphere(0, 0, 0, 1)
+    gmsh.model.occ.synchronize()
+    gmsh.model.mesh.generate(3)
+    gmsh.model.mesh.setOrder(meshorder)
+    msh = Inti.import_mesh(; dim = 3)
+    Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 3, Inti.entities(msh))
+    gmsh.finalize()
+    Γ = Inti.external_boundary(Ω)
+    op = Inti.Laplace(; dim = 3)
+    err_corr = test_gradient_volume_potential(op, Ω, Γ, msh; interpolation_order, bdry_qorder)
+    @test maximum(err_corr) < rtol
+end
+
+@testset "Gradient volume potential 2D Helmholtz" begin
+    Inti.clear_entities!()
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Verbosity", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+    gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
+    gmsh.model.occ.synchronize()
+    gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(meshorder)
+    msh = Inti.import_mesh(; dim = 2)
+    Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
+    gmsh.finalize()
+    Γ = Inti.external_boundary(Ω)
+    op = Inti.Helmholtz(; k = 0.7, dim = 2)
+    err_corr = test_gradient_volume_potential(op, Ω, Γ, msh; interpolation_order, bdry_qorder)
+    @test maximum(err_corr) < rtol
+end
+
+@testset "Gradient volume potential 3D Helmholtz" begin
+    Inti.clear_entities!()
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Verbosity", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+    gmsh.model.occ.addSphere(0, 0, 0, 1)
+    gmsh.model.occ.synchronize()
+    gmsh.model.mesh.generate(3)
+    gmsh.model.mesh.setOrder(meshorder)
+    msh = Inti.import_mesh(; dim = 3)
+    Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 3, Inti.entities(msh))
+    gmsh.finalize()
+    Γ = Inti.external_boundary(Ω)
+    op = Inti.Helmholtz(; k = 1.2, dim = 3)
+    err_corr = test_gradient_volume_potential(op, Ω, Γ, msh; interpolation_order, bdry_qorder)
+    @test maximum(err_corr) < rtol
+end
+
+@testset "Gradient volume potential 2D Elastostatic" begin
+    Inti.clear_entities!()
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Verbosity", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+    gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
+    gmsh.model.occ.synchronize()
+    gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(meshorder)
+    msh = Inti.import_mesh(; dim = 2)
+    Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
+    gmsh.finalize()
+    Γ = Inti.external_boundary(Ω)
+    op = Inti.Elastostatic(; μ = 0.8, λ = 1.3, dim = 2)
+    err_corr = test_gradient_volume_potential(op, Ω, Γ, msh; interpolation_order, bdry_qorder)
+    @test maximum(err_corr) < rtol
+end
+
+@testset "Gradient volume potential 3D Elastostatic" begin
+    Inti.clear_entities!()
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Verbosity", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+    gmsh.model.occ.addSphere(0, 0, 0, 1)
+    gmsh.model.occ.synchronize()
+    gmsh.model.mesh.generate(3)
+    gmsh.model.mesh.setOrder(meshorder)
+    msh = Inti.import_mesh(; dim = 3)
+    Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 3, Inti.entities(msh))
+    gmsh.finalize()
+    Γ = Inti.external_boundary(Ω)
+    op = Inti.Elastostatic(; μ = 1.1, λ = 0.9, dim = 3)
+    err_corr = test_gradient_volume_potential(op, Ω, Γ, msh; interpolation_order, bdry_qorder)
+    @test maximum(err_corr) < rtol
+end
+
+@testset "Gradient volume potential 2D Stokes" begin
+    Inti.clear_entities!()
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Verbosity", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+    gmsh.model.occ.addDisk(0, 0, 0, 1, 1)
+    gmsh.model.occ.synchronize()
+    gmsh.model.mesh.generate(2)
+    gmsh.model.mesh.setOrder(meshorder)
+    msh = Inti.import_mesh(; dim = 2)
+    Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
+    gmsh.finalize()
+    Γ = Inti.external_boundary(Ω)
+    op = Inti.Stokes(; μ = 1.2, dim = 2)
+    err_corr = test_gradient_volume_potential(op, Ω, Γ, msh; interpolation_order, bdry_qorder)
+    @test maximum(err_corr) < rtol
+end
+
+@testset "Gradient volume potential 3D Stokes" begin
+    Inti.clear_entities!()
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Verbosity", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeMax", meshsize)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", meshsize)
+    gmsh.model.occ.addSphere(0, 0, 0, 1)
+    gmsh.model.occ.synchronize()
+    gmsh.model.mesh.generate(3)
+    gmsh.model.mesh.setOrder(meshorder)
+    msh = Inti.import_mesh(; dim = 3)
+    Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 3, Inti.entities(msh))
+    gmsh.finalize()
+    Γ = Inti.external_boundary(Ω)
+    op = Inti.Stokes(; μ = 1.2, dim = 3)
+    err_corr = test_gradient_volume_potential(op, Ω, Γ, msh; interpolation_order, bdry_qorder)
+    @test maximum(err_corr) < rtol
 end
