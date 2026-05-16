@@ -15,13 +15,14 @@ const CORRECTION_METHODS = [:none, :dim, :adaptive]
 
 """
     single_double_layer(; op, target, source::Quadrature, compression,
-    correction, derivative = false)
+    correction, kernel_variant = :default)
 
 Construct a discrete approximation to the single- and double-layer integral operators for
 `op`, mapping values defined on the quadrature nodes of `source` to values defined on the
-nodes of `target`. If `derivative = true`, return instead the adjoint double-layer and
-hypersingular operators (which are the generalized Neumann trace of the single- and
-double-layer, respectively).
+nodes of `target`. The `kernel_variant` keyword controls which pair of kernels is used:
+`:default` gives the standard single- and double-layer kernels, `:neumann` gives the
+adjoint double-layer and hypersingular kernels (i.e. the generalized Neumann trace of the
+single- and double-layer), and `:gradient` gives the gradient kernels.
 
 For finer control, you must choose a `compression` method and a `correction` method, as
 described below.
@@ -68,12 +69,28 @@ function single_double_layer(;
         source,
         compression = (method = :none,),
         correction = (method = :adaptive,),
-        derivative = false,
+        kernel_variant::Symbol = :default,
+        derivative = nothing,
     )
+    if !isnothing(derivative)
+        Base.depwarn(
+            "The `derivative` keyword is deprecated; use `kernel_variant = :neumann` instead.",
+            :single_double_layer,
+        )
+        kernel_variant = derivative ? :neumann : :default
+    end
     compression = _normalize_compression(compression, target, source)
     correction = _normalize_correction(correction, target, source)
-    G = derivative ? AdjointDoubleLayerKernel(op) : SingleLayerKernel(op)
-    dG = derivative ? HyperSingularKernel(op) : DoubleLayerKernel(op)
+    if kernel_variant === :gradient
+        G = GradientSingleLayerKernel(op)
+        dG = GradientDoubleLayerKernel(op)
+    elseif kernel_variant === :neumann
+        G = AdjointDoubleLayerKernel(op)
+        dG = HyperSingularKernel(op)
+    else
+        G = SingleLayerKernel(op)
+        dG = DoubleLayerKernel(op)
+    end
     Sop = IntegralOperator(G, target, source)
     Dop = IntegralOperator(dG, target, source)
     # handle compression
@@ -143,7 +160,7 @@ function single_double_layer(;
                 Dop_dim_mat;
                 green_multiplier = green_multiplier[glob_near_trgs],
                 correction.maxdist,
-                derivative,
+                kernel_variant,
                 filter_target_params,
             )
         else
@@ -155,7 +172,7 @@ function single_double_layer(;
                 Dmat;
                 green_multiplier,
                 correction.maxdist,
-                derivative,
+                kernel_variant,
             )
         end
     elseif correction.method == :adaptive
@@ -176,9 +193,8 @@ function single_double_layer(;
             S = axpy!(true, δS, Smat)
             D = axpy!(true, δD, Dmat)
         else
-            T = default_density_eltype(op)
-            S = LinearMap{T}(Smat) + LinearMap{T}(δS)
-            D = LinearMap{T}(Dmat) + LinearMap{T}(δD)
+            S = LinearMap(Smat) + LinearMap(δS)
+            D = LinearMap(Dmat) + LinearMap(δD)
         end
     elseif compression.method == :fmm
         S = Smat + LinearMap(δS)
@@ -208,7 +224,7 @@ function adj_double_layer_hypersingular(;
         source,
         compression,
         correction,
-        derivative = true,
+        kernel_variant = :neumann,
     )
 end
 
@@ -280,10 +296,10 @@ the specified compression method. If no compression is specified, the operator
 is returned as is. If a correction method is specified, the correction is
 computed and added to the compressed operator.
 """
-function volume_potential(; op, target, source::Quadrature, compression, correction)
+function volume_potential(; op, target, source::Quadrature, compression, correction, kernel_variant::Symbol = :default)
     correction = _normalize_correction(correction, target, source)
     compression = _normalize_compression(compression, target, source)
-    G = SingleLayerKernel(op)
+    G = kernel_variant === :gradient ? GradientSingleLayerKernel(op) : SingleLayerKernel(op)
     V = IntegralOperator(G, target, source)
     # compress V
     if compression.method == :none
@@ -340,6 +356,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
                     source = boundary,
                     compression,
                     correction = (correction..., target_location = loc),
+                    kernel_variant,
                 )
             end
         else
@@ -358,6 +375,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
             green_multiplier,
             correction.maxdist,
             interpolation_order,
+            kernel_variant,
         )
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
@@ -366,7 +384,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
     if compression.method ∈ (:hmatrix, :none)
         # TODO: in the hmatrix case, we may want to add the correction directly
         # to the HMatrix so that a direct solver can be later used
-        V = LinearMap{default_density_eltype(op)}(Vmat) + LinearMap{default_density_eltype(op)}(δV)
+        V = LinearMap(Vmat) + LinearMap(δV)
         # if target === source
         #     V = axpy!(true, δV, Vmat)
         # else
