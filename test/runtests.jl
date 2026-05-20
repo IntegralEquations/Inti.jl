@@ -50,3 +50,7 @@ end
 @safetestset "Curve 2D Mesh" include("curved_test_2d.jl")
 
 @safetestset "Curve 3D Mesh" include("curved_test_3d.jl")
+
+@safetestset "Kernel Split Laplace" include("kernel_split_Laplace_gradient_test.jl")
+
+@safetestset "Kernel Split Yukawa" include("kernel_split_Yukawa_gradient_test.jl")
