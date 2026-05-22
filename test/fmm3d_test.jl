@@ -29,10 +29,14 @@ for op in (
                 Inti.SingleLayerKernel(op),
                 Inti.AdjointDoubleLayerKernel(op),
                 Inti.HyperSingularKernel(op),
+                Inti.GradientSingleLayerKernel(op),
+                Inti.GradientDoubleLayerKernel(op),
             )
             # TODO Stokes has only single and double layer implemented for now
             (K isa Inti.AdjointDoubleLayerKernel && op isa Inti.Stokes) && continue
             (K isa Inti.HyperSingularKernel && op isa Inti.Stokes) && continue
+            (K isa Inti.GradientSingleLayerKernel && op isa Inti.Stokes) && continue
+            (K isa Inti.GradientDoubleLayerKernel && op isa Inti.Stokes) && continue
             for Γ_quad in (Γ₁_quad, Γ₂_quad)
                 iop = Inti.IntegralOperator(K, Γ₁_quad, Γ_quad)
                 iop_fmm = Inti.assemble_fmm(iop; rtol = 1.0e-8)

@@ -90,7 +90,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         end
         dipvecs = similar(normals)
         return LinearMaps.LinearMap{SVector{3, Float64}}(m, n) do y, x
-            dipvecs .= normals .* ((1 / (4π)) .* x .* weights)'
+            dipvecs .= normals .* transpose(((1 / (4π)) .* x .* weights))
             out = FMM3D.lfmm3d(rtol, sources; dipvecs, targets, pgt = 2)
             return copyto!(y, reinterpret(SVector{3, Float64}, vec(out.gradtarg)))
         end
@@ -150,6 +150,27 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             end
             out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 2)
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
+        end
+    elseif K isa Inti.GradientSingleLayerKernel{<:SVector{3}, <:Inti.Helmholtz{3}}
+        charges = Vector{ComplexF64}(undef, n)
+        zk = ComplexF64(K.op.k)
+        return LinearMaps.LinearMap{SVector{3, ComplexF64}}(m, n) do y, x
+            # multiply by weights and constant
+            @. charges = 1 / (4 * π) * weights * x
+            out = FMM3D.hfmm3d(rtol, zk, sources; charges, targets, pgt = 2)
+            return copyto!(y, reinterpret(SVector{3, ComplexF64}, vec(out.gradtarg)))
+        end
+    elseif K isa Inti.GradientDoubleLayerKernel{<:SVector{3}, <:Inti.Helmholtz{3}}
+        normals = Matrix{Float64}(undef, 3, n)
+        for j in 1:n
+            normals[:, j] = Inti.normal(iop.source[j])
+        end
+        dipvecs = similar(normals, ComplexF64)
+        zk = ComplexF64(K.op.k)
+        return LinearMaps.LinearMap{SVector{3, ComplexF64}}(m, n) do y, x
+            dipvecs .= normals .* transpose(((1 / (4π)) .* x .* weights))
+            out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 2)
+            return copyto!(y, reinterpret(SVector{3, ComplexF64}, vec(out.gradtarg)))
         end
         # Stokes
     elseif K isa Inti.SingleLayerKernel{SMatrix{3, 3, Float64, 9}, <:Inti.Stokes{3, Float64}}
