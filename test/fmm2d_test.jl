@@ -3,6 +3,7 @@ using Inti
 using FMM2D
 using Gmsh
 using LinearAlgebra
+using OrderedCollections
 using Random
 
 include("test_utils.jl")
@@ -19,16 +20,20 @@ include("test_utils.jl")
 
 for op in (Inti.Laplace(; dim = 2), Inti.Helmholtz(; dim = 2, k = 1.2))
     @testset "PDE: $op" begin
+    op = Inti.Laplace(; dim = 2)
         for K in (
                 Inti.DoubleLayerKernel(op),
                 Inti.SingleLayerKernel(op),
                 Inti.AdjointDoubleLayerKernel(op),
                 Inti.HyperSingularKernel(op),
+                Inti.GradientSingleLayerKernel(op),
+                Inti.GradientDoubleLayerKernel(op),
             )
+            K = Inti.GradientDoubleLayerKernel(op)
             for Γ_quad in (Γ₁_quad, Γ₂_quad)
                 iop = Inti.IntegralOperator(K, Γ₁_quad, Γ_quad)
                 iop_fmm = Inti.assemble_fmm(iop; rtol = 1.0e-8)
-                x = rand(eltype(iop), size(iop, 2))
+                x = rand(Inti.default_density_eltype(op), size(iop, 2))
                 yapprox = iop_fmm * x
                 # test on a given index set
                 idx_test = rand(1:size(iop, 1), 10)
@@ -39,4 +44,50 @@ for op in (Inti.Laplace(; dim = 2), Inti.Helmholtz(; dim = 2, k = 1.2))
             end
         end
     end
+end
+
+@testset "VDIM W Operator for Laplace 2D" begin
+    op = Inti.Laplace(; dim = 2)
+
+    # Create a coarse mesh for this test
+    Ω_coarse, msh_coarse = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = 0.4)
+    Γ_coarse = Inti.external_boundary(Ω_coarse)
+    Γₕ_quad = Inti.Quadrature(view(msh_coarse, Γ_coarse); qorder = 4)
+
+    # Create volume quadrature
+    Ωₕ = view(msh_coarse, Ω_coarse)
+    VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(2)
+    Q = Inti.VioreanuRokhlin(; domain = :triangle, order = VR_qorder)
+    Ωₕ_quad = Inti.Quadrature(Ωₕ, OrderedDict(E => Q for E in Inti.element_types(Ωₕ)))
+
+    # Build gradient operators with FMM
+    S, D = Inti.single_double_layer(;
+        op, target = Ωₕ_quad, source = Γₕ_quad,
+        compression = (method = :fmm, tol = 1.0e-10),
+        correction = (method = :dim, maxdist = 0.5, target_location = :inside),
+        kernel_variant = :gradient
+    )
+    V = Inti.volume_potential(;
+        op, target = Ωₕ_quad, source = Ωₕ_quad,
+        compression = (method = :fmm, tol = 1.0e-10), correction = (method = :none,),
+        kernel_variant = :gradient
+    )
+    δV = Inti.vdim_correction(
+        op, Ωₕ_quad, Ωₕ_quad, Γₕ_quad, S, D, V;
+        green_multiplier = -ones(length(Ωₕ_quad)), interpolation_order = 2,
+        kernel_variant = :gradient
+    )
+
+    # Test Green's identity with polynomial solution
+    basis = Inti.polynomial_solutions_vdim(op, 2)
+
+    # Use polynomial 2: x
+    u_d = [basis[2].gradient_solution(q) for q in Ωₕ_quad]
+    u_b = [basis[2].solution(q) for q in Γₕ_quad]
+    du_b = [basis[2].neumann_trace(q) for q in Γₕ_quad]
+    f_d = [basis[2].source(q) for q in Ωₕ_quad]
+
+    vref = u_d + D * u_b - S * du_b
+    vapprox = V * f_d + δV * f_d
+    @test norm(vref - vapprox, Inf) < 1.0e-10
 end

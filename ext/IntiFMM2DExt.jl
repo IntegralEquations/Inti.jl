@@ -3,6 +3,7 @@ module IntiFMM2DExt
 import Inti
 import FMM2D
 import LinearMaps
+using StaticArrays
 
 function __init__()
     return @info "Loading Inti.jl FMM2D extension"
@@ -146,6 +147,62 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
         end
+    elseif K isa Inti.GradientSingleLayerKernel{<:SVector{2}, <:Inti.Laplace{2}}
+        charges = Vector{Float64}(undef, n)
+        return LinearMaps.LinearMap{SVector{2, Float64}}(m, n) do y, x
+            # multiply by weights and constant
+            @. charges = -1 / (2 * π) * weights * x
+            if same_surface
+                out =
+                    FMM2D.rfmm2d(; sources = sources, charges = charges, eps = rtol, pg = 2)
+                return copyto!(y, reinterpret(SVector{2, Float64}, vec(out.grad)))
+            else
+                out = FMM2D.rfmm2d(;
+                    sources = sources,
+                    charges = charges,
+                    targets = targets,
+                    eps = rtol,
+                    pgt = 2,
+                )
+                return copyto!(y, reinterpret(SVector{2, Float64}, vec(out.gradtarg)))
+            end
+        end
+    elseif K isa Inti.GradientDoubleLayerKernel{<:SVector{2}, <:Inti.Laplace{2}}
+        normals = Matrix{Float64}(undef, 2, n)
+        for j in 1:n
+            normals[:, j] = Inti.normal(iop.source[j])
+        end
+        dipvecs = similar(normals)
+        return LinearMaps.LinearMap{SVector{2, Float64}}(m, n) do y, x
+            # multiply by weights and constant
+            for j in 1:n
+                dipvecs[:, j] = -1 / (2 * π) * view(normals, :, j) * weights[j]
+            end
+            dipstr = Vector{Float64}(undef, n)
+            for j in 1:n
+                dipstr[j] = x[j]
+            end
+            if same_surface
+                out = FMM2D.rfmm2d(;
+                    sources = sources,
+                    dipstr = dipstr,
+                    dipvecs = dipvecs,
+                    eps = rtol,
+                    pg = 2,
+                )
+                return copyto!(y, reinterpret(SVector{2, Float64}, vec(out.grad)))
+            else
+                out = FMM2D.rfmm2d(;
+                    sources = sources,
+                    targets = targets,
+                    dipstr = dipstr,
+                    dipvecs = dipvecs,
+                    eps = rtol,
+                    pgt = 2,
+                )
+                return copyto!(y, reinterpret(SVector{2, Float64}, vec(out.gradtarg)))
+            end
+        end
         # Helmholtz
     elseif K isa Inti.SingleLayerKernel{ComplexF64, <:Inti.Helmholtz{2}}
         charges = Vector{ComplexF64}(undef, n)
@@ -287,6 +344,73 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
         end
+    elseif K isa Inti.GradientSingleLayerKernel{<:SVector{2}, <:Inti.Helmholtz{2}}
+        charges = Vector{ComplexF64}(undef, n)
+        zk = ComplexF64(K.op.k)
+        return LinearMaps.LinearMap{SVector{2, ComplexF64}}(m, n) do y, x
+            # multiply by weights and constant
+            @. charges = weights * x
+            if same_surface
+                out = FMM2D.hfmm2d(;
+                    zk = zk,
+                    sources = sources,
+                    charges = charges,
+                    eps = rtol,
+                    pg = 2,
+                )
+                return copyto!(y, reinterpret(SVector{2, ComplexF64}, vec(out.grad)))
+            else
+                out = FMM2D.hfmm2d(;
+                    zk = zk,
+                    sources = sources,
+                    charges = charges,
+                    targets = targets,
+                    eps = rtol,
+                    pgt = 2,
+                )
+                return copyto!(y, reinterpret(SVector{2, ComplexF64}, vec(out.gradtarg)))
+            end
+        end
+    elseif K isa Inti.GradientDoubleLayerKernel{<:SVector{2}, <:Inti.Helmholtz{2}}
+        normals = Matrix{Float64}(undef, 2, n)
+        for j in 1:n
+            normals[:, j] = Inti.normal(iop.source[j])
+        end
+        dipvecs = similar(normals, Float64)
+        dipstrs = Vector{ComplexF64}(undef, n)
+        zk = ComplexF64(K.op.k)
+        return LinearMaps.LinearMap{SVector{2, ComplexF64}}(m, n) do y, x
+            # multiply by weights and constant
+            for j in 1:n
+                dipvecs[:, j] = view(normals, :, j) * weights[j]
+            end
+            for j in 1:n
+                dipstrs[j] = x[j]
+            end
+            if same_surface
+                out = FMM2D.hfmm2d(;
+                    zk = zk,
+                    sources = sources,
+                    dipstr = dipstrs,
+                    dipvecs = dipvecs,
+                    eps = rtol,
+                    pg = 2,
+                )
+                return copyto!(y, reinterpret(SVector{2, ComplexF64}, vec(out.grad)))
+            else
+                out = FMM2D.hfmm2d(;
+                    zk = zk,
+                    sources = sources,
+                    targets = targets,
+                    dipstr = dipstrs,
+                    dipvecs = dipvecs,
+                    eps = rtol,
+                    pgt = 2,
+                )
+                return copyto!(y, reinterpret(SVector{2, ComplexF64}, vec(out.gradtarg)))
+            end
+        end
+
     else
         error("integral operator not supported by Inti's FMM2D wrapper")
     end

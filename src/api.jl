@@ -348,6 +348,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
                     source = boundary,
                     compression,
                     correction,
+                    kernel_variant,
                 )
             else
                 S, D = single_double_layer(;
