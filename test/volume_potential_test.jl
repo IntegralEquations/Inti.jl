@@ -145,6 +145,47 @@ function test_gradient_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize; in
     return errors_corrected
 end
 
+"""
+    test_W_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize)
+
+Test the `W[g] = -∫∇yG⋅g` volume integral operator (vector density `g`, scalar output)
+regularized via eq. (3.25) of the 3D VDIM paper. For each scalar monomial `pₐ` and
+direction `j`, the density `g = pₐeⱼ` is itself a polynomial, so the method must reproduce
+the (3.25) boundary representation `μΨⱼ + D[Ψⱼ] - S[∂νΨⱼ + pₐνⱼ]` to machine precision.
+
+Builds the operator through the high-level `volume_potential(...; kernel_variant = :gradient_source)` so
+the `VectorDensityOperator` return path (and bare `W*g`) is exercised. Returns the list of
+relative errors and the output element type of `W*g`.
+"""
+function test_W_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize; interpolation_order = 2)
+    N = Inti.ambient_dimension(Ωₕ_quad)
+    S, D = Inti.single_double_layer(;
+        op, target = Ωₕ_quad, source = Γₕ_quad,
+        compression = (method = :none,),
+        correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
+    )
+    W = Inti.volume_potential(;
+        op, target = Ωₕ_quad, source = Ωₕ_quad,
+        compression = (method = :none,),
+        correction = (method = :dim, maxdist = 5 * meshsize, boundary = Γₕ_quad, interpolation_order),
+        kernel_variant = :gradient_source,
+    )
+    basis = Inti.polynomial_solutions_vdim_W(op, interpolation_order)
+    errors = Float64[]
+    out_eltype = eltype(W * [zero(SVector{N, Float64}) for _ in Ωₕ_quad])
+    for b in basis, j in 1:N
+        ej = SVector(ntuple(d -> d == j ? 1.0 : 0.0, N))
+        g_d = [b.source(q) * ej for q in Ωₕ_quad]
+        w_app = W * g_d
+        sol_vol = [b.solution(q)[j] for q in Ωₕ_quad]
+        sol_bnd = [b.solution(q)[j] for q in Γₕ_quad]
+        neu_bnd = [b.neumann_trace(q)[j] for q in Γₕ_quad]
+        w_ref = sol_vol + D * sol_bnd - S * neu_bnd
+        push!(errors, norm(w_app - w_ref, Inf) / max(norm(w_ref, Inf), 1))
+    end
+    return errors, out_eltype
+end
+
 ## Helper to build the shared volume + boundary quadratures for a given mesh/domain.
 function build_quadratures(Ωₕ, Γₕ, dim; interpolation_order, bdry_qorder)
     if dim == 2
@@ -207,6 +248,19 @@ end
     end
 end
 
+@testset "W volume potential 2D" begin
+    for (name, op, Tout) in [
+        ("Laplace",   Inti.Laplace(; dim = 2),               Float64),
+        ("Helmholtz", Inti.Helmholtz(; k = 0.7, dim = 2),    ComplexF64),
+    ]
+        @testset "W volume potential 2D $name" begin
+            err, out_eltype = test_W_volume_potential(op, Ωₕ_quad_2d, Γₕ_quad_2d, meshsize; interpolation_order)
+            @test maximum(err) < rtol
+            @test out_eltype == Tout   # bare `W*g` yields a clean scalar vector
+        end
+    end
+end
+
 # ── 3D tests ─────────────────────────────────────────────────────────────────────────────────
 # Build the 3D sphere mesh ONCE and reuse it across all 3D volume and gradient tests.
 Inti.clear_entities!()
@@ -251,6 +305,19 @@ end
         @testset "Gradient volume potential 3D $name" begin
             err_corr = test_gradient_volume_potential(op, Ωₕ_quad_3d, Γₕ_quad_3d, meshsize_3d; interpolation_order)
             @test maximum(err_corr) < rtol
+        end
+    end
+end
+
+@testset "W volume potential 3D" begin
+    for (name, op, Tout) in [
+        ("Laplace",   Inti.Laplace(; dim = 3),               Float64),
+        ("Helmholtz", Inti.Helmholtz(; k = 1.2, dim = 3),    ComplexF64),
+    ]
+        @testset "W volume potential 3D $name" begin
+            err, out_eltype = test_W_volume_potential(op, Ωₕ_quad_3d, Γₕ_quad_3d, meshsize_3d; interpolation_order)
+            @test maximum(err) < rtol
+            @test out_eltype == Tout
         end
     end
 end

@@ -299,7 +299,15 @@ computed and added to the compressed operator.
 function volume_potential(; op, target, source::Quadrature, compression, correction, kernel_variant::Symbol = :default)
     correction = _normalize_correction(correction, target, source)
     compression = _normalize_compression(compression, target, source)
-    G = kernel_variant === :gradient ? GradientSingleLayerKernel(op) : SingleLayerKernel(op)
+    if kernel_variant === :gradient
+        G = GradientSingleLayerKernel(op)
+    elseif kernel_variant === :gradient_source
+        # naive forward map of W[g] = -∫∇yG⋅g (vector density -> scalar). The kernel is
+        # ∇yG; the leading minus of W is applied when the operator is assembled below.
+        G = SourceGradientSingleLayerKernel(op)
+    else
+        G = SingleLayerKernel(op)
+    end
     V = IntegralOperator(G, target, source)
     # compress V
     if compression.method == :none
@@ -339,6 +347,11 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         else
             error("Missing correction.boundary field for :dim method on a volume potential")
         end
+        # The W regularization (3.25) uses standard single-/double-layer
+        # potentials, and the gradient single-layer is the volume operator
+        # that builds the correction (the naive `Vmat` above is the W forward
+        # map itself).
+        boundary_variant = kernel_variant === :gradient_source ? :default : kernel_variant
         # Advanced usage: Use previously constructed layer operators for VDIM
         if !haskey(correction, :S_b2d) || !haskey(correction, :D_b2d)
             if haskey(correction, :green_multiplier)
@@ -348,7 +361,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
                     source = boundary,
                     compression,
                     correction,
-                    kernel_variant,
+                    kernel_variant = boundary_variant,
                 )
             else
                 S, D = single_double_layer(;
@@ -357,12 +370,25 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
                     source = boundary,
                     compression,
                     correction = (correction..., target_location = loc),
-                    kernel_variant,
+                    kernel_variant = boundary_variant,
                 )
             end
         else
             S = correction.S_b2d
             D = correction.D_b2d
+        end
+        # Volume operator used to build the correction.
+        if kernel_variant === :gradient_source
+            Vg = IntegralOperator(GradientSingleLayerKernel(op), target, source)
+            if compression.method == :none
+                Vcorr = assemble_matrix(Vg)
+            elseif compression.method == :hmatrix
+                Vcorr = assemble_hmatrix(Vg; rtol = compression.tol)
+            else
+                Vcorr = assemble_fmm(Vg; rtol = compression.tol)
+            end
+        else
+            Vcorr = Vmat
         end
         interpolation_order = correction.interpolation_order
         δV = vdim_correction(
@@ -372,7 +398,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
             boundary,
             S,
             D,
-            Vmat;
+            Vcorr;
             green_multiplier,
             correction.maxdist,
             interpolation_order,
@@ -382,7 +408,14 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end
     # add correction
-    if compression.method ∈ (:hmatrix, :none)
+    if kernel_variant === :gradient_source
+        # W maps a vector (`SVector`) density to a scalar. `Vmat` assembles
+        # `∫∇yG⋅g`; the operator W[g] = -∫∇yG⋅g carries a leading minus, hence the
+        # `-Vmat` forward map. Wrap it together with the sparse correction in a
+        # `VectorDensityOperator` so that `W * g` allocates a clean scalar output
+        # (see the type's docstring).
+        V = VectorDensityOperator{default_kernel_eltype(op)}(-Vmat, δV, size(δV))
+    elseif compression.method ∈ (:hmatrix, :none)
         # TODO: in the hmatrix case, we may want to add the correction directly
         # to the HMatrix so that a direct solver can be later used
         V = LinearMap(Vmat) + LinearMap(δV)

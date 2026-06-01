@@ -203,6 +203,36 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, reinterpret(SVector{2, Float64}, vec(out.gradtarg)))
             end
         end
+    elseif K isa Inti.SourceGradientSingleLayerKernel{<:Any, <:Inti.Laplace{2}}
+        # ∇yG(x,y)⋅g : dipoles with vector strengths g (scalar output). The W operator
+        # W[g] = -∫∇yG⋅g applies the leading minus when this map is assembled.
+        dipvecs = Matrix{Float64}(undef, 2, n)
+        dipstr = ones(Float64, n)
+        return LinearMaps.LinearMap{Float64}(m, n) do y, x
+            for j in 1:n
+                dipvecs[:, j] = -(1 / (2 * π)) * x[j] * weights[j]
+            end
+            if same_surface
+                out = FMM2D.rfmm2d(;
+                    sources = sources,
+                    dipstr = dipstr,
+                    dipvecs = dipvecs,
+                    eps = rtol,
+                    pg = 1,
+                )
+                return copyto!(y, out.pot)
+            else
+                out = FMM2D.rfmm2d(;
+                    sources = sources,
+                    targets = targets,
+                    dipstr = dipstr,
+                    dipvecs = dipvecs,
+                    eps = rtol,
+                    pgt = 1,
+                )
+                return copyto!(y, out.pottarg)
+            end
+        end
         # Helmholtz
     elseif K isa Inti.SingleLayerKernel{ComplexF64, <:Inti.Helmholtz{2}}
         charges = Vector{ComplexF64}(undef, n)
@@ -411,6 +441,47 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             end
         end
 
+    elseif K isa Inti.SourceGradientSingleLayerKernel{<:Any, <:Inti.Helmholtz{2}}
+        # ∫∇yG⋅g = Σ wⱼ gⱼ⋅∇yG : dipoles with vector strengths g. The W operator
+        # W[g] = -∫∇yG⋅g applies the leading minus when this map is assembled.
+        # FMM2D's `hfmm2d` requires real dipole directions (with a complex
+        # strength), so the complex density is split into real/imaginary parts:
+        #   Re(g): dipvec=Re(gⱼ), dipstr=wⱼ ;  Im(g): dipvec=Im(gⱼ), dipstr=i wⱼ.
+        dipvecs = Matrix{Float64}(undef, 2, n)
+        dipstr = Vector{ComplexF64}(undef, n)
+        zk = ComplexF64(K.op.k)
+        return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
+            fill!(y, 0)
+            for (getpart, strconst) in ((real, one(ComplexF64)), (imag, 1im))
+                for j in 1:n
+                    dipvecs[:, j] = getpart.(x[j])
+                    dipstr[j] = strconst * weights[j]
+                end
+                if same_surface
+                    out = FMM2D.hfmm2d(;
+                        zk = zk,
+                        sources = sources,
+                        dipstr = dipstr,
+                        dipvecs = dipvecs,
+                        eps = rtol,
+                        pg = 1,
+                    )
+                    y .+= out.pot
+                else
+                    out = FMM2D.hfmm2d(;
+                        zk = zk,
+                        sources = sources,
+                        targets = targets,
+                        dipstr = dipstr,
+                        dipvecs = dipvecs,
+                        eps = rtol,
+                        pgt = 1,
+                    )
+                    y .+= out.pottarg
+                end
+            end
+            return y
+        end
     else
         error("integral operator not supported by Inti's FMM2D wrapper")
     end

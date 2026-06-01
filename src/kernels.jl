@@ -164,6 +164,52 @@ function singularity_order(K::GradientDoubleLayerKernel)
     return -N
 end
 
+"""
+    struct SourceGradientSingleLayerKernel{T,Op} <: AbstractKernel{T}
+
+Gradient of the single-layer kernel `G(x,y)` with respect to the source variable `y`,
+i.e. ``\\nabla_y G(x,y)``. The value is returned as the (row) covector
+`transpose(∇_yG)`, so that `K(x,y) * g(y)` contracts an `SVector` density to a
+scalar. It is the source-variable counterpart of [`GradientSingleLayerKernel`](@ref)
+(which is the target gradient ``\\nabla_x G``), and since ``\\nabla_y G = -\\nabla_x
+G`` it is built by negating the latter's evaluation.
+
+The associated volume integral operator is ``\\mathcal{W}[g](x) = -\\int_\\Omega
+\\nabla_y G(x,y) \\cdot g(y)\\,dy``; note the leading minus sign, so the
+discrete operator that evaluates ``\\mathcal{W}`` is the negative of
+`IntegralOperator(SourceGradientSingleLayerKernel(op), ...)`.
+"""
+struct SourceGradientSingleLayerKernel{T, Op} <: AbstractKernel{T}
+    op::Op
+end
+
+function SourceGradientSingleLayerKernel(
+        op::AbstractDifferentialOperator{N},
+        ::Type{S} = default_kernel_eltype(op),
+    ) where {N, S}
+    T = Transpose{S, SVector{N, S}}
+    return SourceGradientSingleLayerKernel{T, typeof(op)}(op)
+end
+
+function singularity_order(K::SourceGradientSingleLayerKernel)
+    N = ambient_dimension(K.op)
+    return 1 - N
+end
+
+function (K::SourceGradientSingleLayerKernel)(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    )
+    # ∇_y G(x,y) = -∇_x G(x,y); returned as a row covector to contract a vector density
+    gx = GradientSingleLayerKernel(K.op)(target, source, r)
+    return transpose(-gx)
+end
+
+# `zero` for the covector element type, needed when assembling the sparse VDIM
+# correction whose entries map an `SVector` density to a scalar.
+Base.zero(::Type{Transpose{T, SVector{N, T}}}) where {N, T} = transpose(zero(SVector{N, T}))
+
 struct Laplace{N} <: AbstractDifferentialOperator{N} end
 
 """

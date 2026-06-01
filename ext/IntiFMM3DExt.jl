@@ -94,6 +94,17 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             out = FMM3D.lfmm3d(rtol, sources; dipvecs, targets, pgt = 2)
             return copyto!(y, reinterpret(SVector{3, Float64}, vec(out.gradtarg)))
         end
+    elseif K isa Inti.SourceGradientSingleLayerKernel{<:Any, <:Inti.Laplace{3}}
+        # ∇yG(x,y)⋅g : dipoles with vector strengths g (scalar output). The W operator
+        # W[g] = -∫∇yG⋅g applies the leading minus when this map is assembled.
+        dipvecs = Matrix{Float64}(undef, 3, n)
+        return LinearMaps.LinearMap{Float64}(m, n) do y, x
+            for j in 1:n
+                dipvecs[:, j] = (1 / (4 * π)) * x[j] * weights[j]
+            end
+            out = FMM3D.lfmm3d(rtol, sources; dipvecs, targets, pgt = 1)
+            return copyto!(y, out.pottarg)
+        end
         # Helmholtz
     elseif K isa Inti.SingleLayerKernel{ComplexF64, <:Inti.Helmholtz{3}}
         charges = Vector{ComplexF64}(undef, n)
@@ -171,6 +182,18 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             dipvecs .= normals .* transpose(((1 / (4π)) .* x .* weights))
             out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 2)
             return copyto!(y, reinterpret(SVector{3, ComplexF64}, vec(out.gradtarg)))
+        end
+    elseif K isa Inti.SourceGradientSingleLayerKernel{<:Any, <:Inti.Helmholtz{3}}
+        # ∇yG(x,y)⋅g : dipoles with vector strengths g (scalar output). The W operator
+        # W[g] = -∫∇yG⋅g applies the leading minus when this map is assembled.
+        dipvecs = Matrix{ComplexF64}(undef, 3, n)
+        zk = ComplexF64(K.op.k)
+        return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
+            for j in 1:n
+                dipvecs[:, j] = (1 / (4 * π)) * x[j] * weights[j]
+            end
+            out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 1)
+            return copyto!(y, out.pottarg)
         end
         # Stokes
     elseif K isa Inti.SingleLayerKernel{SMatrix{3, 3, Float64, 9}, <:Inti.Stokes{3, Float64}}

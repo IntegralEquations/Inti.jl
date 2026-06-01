@@ -96,6 +96,50 @@ function Base.getindex(iop::IntegralOperator, i::Integer, j::Integer)
 end
 
 """
+    struct VectorDensityOperator{T,F,C}
+
+Operator returned by [`volume_potential`](@ref) for `kernel_variant = :gradient_source`. It
+maps an SVector density `g` to a scalar output through `forward * g + correction
+* g`, where `forward` is the (dense or FMM-accel) naive `W` map and `correction`
+is the sparse VDIM correction.
+
+A bespoke wrapper is used instead of a `LinearMap` so that `W * g` allocates a clean
+scalar output `Vector{T}`: `LinearMap`'s `*` infers the output element type by promoting
+the operand eltypes, which for a vector-density→scalar contraction collapses to
+`Vector{Any}`.
+"""
+struct VectorDensityOperator{T, F, C}
+    forward::F
+    correction::C
+    sz::Tuple{Int, Int}
+end
+
+VectorDensityOperator{T}(forward, correction, sz) where {T} =
+    VectorDensityOperator{T, typeof(forward), typeof(correction)}(forward, correction, sz)
+
+Base.size(W::VectorDensityOperator) = W.sz
+Base.size(W::VectorDensityOperator, i::Integer) = W.sz[i]
+Base.eltype(::VectorDensityOperator{T}) where {T} = T
+
+function LinearAlgebra.mul!(y::AbstractVector, W::VectorDensityOperator, g::AbstractVector)
+    mul!(y, W.forward, g)
+    mul!(y, W.correction, g, true, true)
+    return y
+end
+
+function LinearAlgebra.mul!(
+        y::AbstractVector, W::VectorDensityOperator, g::AbstractVector, α::Number, β::Number,
+    )
+    mul!(y, W.forward, g, α, β)
+    mul!(y, W.correction, g, α, true)
+    return y
+end
+
+function Base.:*(W::VectorDensityOperator{T}, g::AbstractVector) where {T}
+    return mul!(Vector{T}(undef, size(W, 1)), W, g)
+end
+
+"""
     assemble_matrix(iop::IntegralOperator; threads = true)
 
 Assemble a dense matrix representation of an `IntegralOperator`.
