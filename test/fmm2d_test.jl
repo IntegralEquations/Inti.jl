@@ -142,8 +142,7 @@ end
     @test norm(Mref - Mfmm, Inf) / norm(Mref, Inf) < 1.0e-8
 end
 
-@testset "X (∇W) operator (FMM vs dense) Laplace 2D" begin
-    op = Inti.Laplace(; dim = 2)
+@testset "X (∇W) operator (FMM vs dense) 2D" begin
     Ω_c, msh_c = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = 0.2)
     Γₕ_quad = Inti.Quadrature(view(msh_c, Inti.external_boundary(Ω_c)); qorder = 4)
     Ωₕ = view(msh_c, Ω_c)
@@ -151,14 +150,21 @@ end
     Q = Inti.VioreanuRokhlin(; domain = :triangle, order = VR_qorder)
     Ωₕ_quad = Inti.Quadrature(Ωₕ, OrderedDict(E => Q for E in Inti.element_types(Ωₕ)))
     cor = (method = :dim, maxdist = 0.5, boundary = Γₕ_quad, interpolation_order = 2)
-    Xd = Inti.volume_potential(; op, target = Ωₕ_quad, source = Ωₕ_quad,
-        compression = (method = :none,), correction = cor, kernel_variant = :hessian_source)
-    Xf = Inti.volume_potential(; op, target = Ωₕ_quad, source = Ωₕ_quad,
-        compression = (method = :fmm, tol = 1.0e-12), correction = cor, kernel_variant = :hessian_source)
-    g = [rand(SVector{2, Float64}) for _ in 1:length(Ωₕ_quad)]
-    yd = Xd * g
-    yf = Xf * g
-    @test eltype(yd) == SVector{2, Float64}
-    @test eltype(yf) == SVector{2, Float64}
-    @test norm(yf - yd, Inf) / norm(yd, Inf) < 1.0e-6
+    for (op, Tout) in (
+            (Inti.Laplace(; dim = 2), Float64),
+            (Inti.Helmholtz(; dim = 2, k = 1.2), ComplexF64),
+        )
+        @testset "PDE: $op" begin
+            Xd = Inti.volume_potential(; op, target = Ωₕ_quad, source = Ωₕ_quad,
+                compression = (method = :none,), correction = cor, kernel_variant = :hessian_source)
+            Xf = Inti.volume_potential(; op, target = Ωₕ_quad, source = Ωₕ_quad,
+                compression = (method = :fmm, tol = 1.0e-12), correction = cor, kernel_variant = :hessian_source)
+            g = [rand(SVector{2, Tout}) for _ in 1:length(Ωₕ_quad)]
+            yd = Xd * g
+            yf = Xf * g
+            @test eltype(yd) == SVector{2, Tout}
+            @test eltype(yf) == SVector{2, Tout}
+            @test norm(yf - yd, Inf) / norm(yd, Inf) < 1.0e-6
+        end
+    end
 end

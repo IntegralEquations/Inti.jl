@@ -326,13 +326,14 @@ end
 end
 
 @testset "X (∇W) volume potential 2D" begin
-    for (name, op) in [
-        ("Laplace", Inti.Laplace(; dim = 2)),
+    for (name, op, Tout) in [
+        ("Laplace", Inti.Laplace(; dim = 2), Float64),
+        ("Helmholtz", Inti.Helmholtz(; dim = 2, k = 1.2), ComplexF64),
     ]
         @testset "X volume potential 2D $name" begin
             err, out_eltype = test_X_volume_potential(op, Ωₕ_quad_2d, Γₕ_quad_2d, meshsize; interpolation_order)
             @test maximum(err) < rtol
-            @test out_eltype == SVector{2, Float64}   # X*g yields a clean vector
+            @test out_eltype == SVector{2, Tout}   # X*g yields a clean vector
         end
     end
 end
@@ -399,13 +400,14 @@ end
 end
 
 @testset "X (∇W) volume potential 3D" begin
-    for (name, op) in [
-        ("Laplace", Inti.Laplace(; dim = 3)),
+    for (name, op, Tout) in [
+        ("Laplace", Inti.Laplace(; dim = 3), Float64),
+        ("Helmholtz", Inti.Helmholtz(; dim = 3, k = 1.2), ComplexF64),
     ]
         @testset "X volume potential 3D $name" begin
             err, out_eltype = test_X_volume_potential(op, Ωₕ_quad_3d, Γₕ_quad_3d, meshsize_3d; interpolation_order)
             @test maximum(err) < rtol
-            @test out_eltype == SVector{3, Float64}
+            @test out_eltype == SVector{3, Tout}
         end
     end
 end

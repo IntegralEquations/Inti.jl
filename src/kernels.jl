@@ -623,6 +623,30 @@ function (GDL::GradientDoubleLayerKernel{T, <:Helmholtz{N}})(
     end
 end
 
+function (HSL::HessianSingleLayerKernel{T, <:Helmholtz{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
+    k = HSL.op.k
+    d = norm(r)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
+    # ∇ₓ∇ₓG = (g″−g′/d) r̂r̂ᵀ + (g′/d) I for the isotropic G = g(d).
+    if N == 2
+        # 2D: G = (i/4)H₀⁽¹⁾(kd);  uses H₂ via the recurrence (matches HyperSingularKernel).
+        return im * k^2 / 4 / d^2 * hankelh1(2, k * d) * (r * transpose(r)) -
+            im * k / 4 / d * hankelh1(1, k * d) * I
+    elseif N == 3
+        # 3D: G = eⁱᵏᵈ/(4πd).
+        pref = exp(im * k * d) / (4π)
+        cI = pref * (im * k / d^2 - 1 / d^3)
+        cR = pref * (3 / d^5 - 3 * im * k / d^4 - k^2 / d^3)
+        return cR * (r * transpose(r)) + cI * I
+    else
+        notimplemented()
+    end
+end
+
 ############################ STOKES ############################3
 struct Stokes{N, T} <: AbstractDifferentialOperator{N}
     μ::T

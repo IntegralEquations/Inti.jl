@@ -269,6 +269,23 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, out.pottarg)
         end
+    elseif K isa Inti.HessianSingleLayerKernel{<:Any, <:Inti.Helmholtz{3}}
+        # X forward (PV part) = +∫∇ₓ∇ₓG⋅g, realized as the target-gradient of the ∇yG-dipole
+        # field with strengths -g (gradtarg = ∫∇ₓ∇yG⋅g = -X_forward, so the strengths are
+        # negated). hfmm3d has no Hessian, but the forward only needs the gradient (pgt = 2).
+        zk = ComplexF64(K.op.k)
+        dipvecs = Matrix{ComplexF64}(undef, 3, n)
+        return LinearMaps.LinearMap{SVector{3, ComplexF64}}(m, n) do y, x
+            for j in 1:n
+                dipvecs[:, j] = -1.0 * x[j] * weights[j]
+            end
+            if !isnothing(ndiv)
+                out = FMM3D.hfmm3d_ndiv(rtol, zk, sources, ndiv; dipvecs, targets, pgt = 2)
+            else
+                out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 2)
+            end
+            return copyto!(y, reinterpret(SVector{3, ComplexF64}, vec(out.gradtarg)))
+        end
         # Stokes
     elseif K isa Inti.SingleLayerKernel{SMatrix{3, 3, Float64, 9}, <:Inti.Stokes{3, Float64}}
         T = SVector{3, Float64}

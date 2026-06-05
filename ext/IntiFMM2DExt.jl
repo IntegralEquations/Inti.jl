@@ -514,6 +514,38 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             end
             return y
         end
+    elseif K isa Inti.HessianSingleLayerKernel{<:Any, <:Inti.Helmholtz{2}}
+        # X forward = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g). The bracket is the ∇yG-dipole field (W
+        # forward); its target-gradient is ∫∇ₓ∇yG⋅g = -X_forward, so the dipole strengths
+        # are negated and `grad`/`gradtarg` is the output. As for the W forward, hfmm2d
+        # needs real dipvecs with complex strengths, so the complex density is split into
+        # real/imag parts (dipstr = wⱼ resp. i·wⱼ).
+        dipvecs = Matrix{Float64}(undef, 2, n)
+        dipstr = Vector{ComplexF64}(undef, n)
+        zk = ComplexF64(K.op.k)
+        return LinearMaps.LinearMap{SVector{2, ComplexF64}}(m, n) do y, x
+            fill!(y, zero(SVector{2, ComplexF64}))
+            for (getpart, strconst) in ((real, one(ComplexF64)), (imag, 1im))
+                for j in 1:n
+                    dipvecs[:, j] = -getpart.(x[j])
+                    dipstr[j] = strconst * weights[j]
+                end
+                if same_surface
+                    out = FMM2D.hfmm2d(;
+                        zk = zk, sources = sources, dipstr = dipstr, dipvecs = dipvecs,
+                        eps = rtol, pg = 2,
+                    )
+                    y .+= reinterpret(SVector{2, ComplexF64}, vec(out.grad))
+                else
+                    out = FMM2D.hfmm2d(;
+                        zk = zk, sources = sources, targets = targets, dipstr = dipstr,
+                        dipvecs = dipvecs, eps = rtol, pgt = 2,
+                    )
+                    y .+= reinterpret(SVector{2, ComplexF64}, vec(out.gradtarg))
+                end
+            end
+            return y
+        end
     else
         error("integral operator not supported by Inti's FMM2D wrapper")
     end
@@ -561,8 +593,34 @@ function Inti._assemble_fmm2d_chargehessian(iop::Inti.IntegralOperator; rtol = s
             end
             return y
         end
+    elseif K isa Inti.HessianSingleLayerKernel{<:Any, <:Inti.Helmholtz{2}}
+        # hfmm2d bakes in the (i/4)H₀⁽¹⁾ prefactor, so charges carry no extra constant
+        # (same as the Helmholtz single layer). `hess`/`hesstarg` is (3,·) = ∂xx, ∂xy, ∂yy.
+        zk = ComplexF64(K.op.k)
+        charges = Vector{ComplexF64}(undef, n)
+        return LinearMaps.LinearMap{SMatrix{2, 2, ComplexF64, 4}}(m, n) do y, x
+            @. charges = weights * x
+            if same_surface
+                out = FMM2D.hfmm2d(; zk = zk, sources = sources, charges = charges, eps = rtol, pg = 3)
+                H = out.hess
+            else
+                out = FMM2D.hfmm2d(;
+                    zk = zk,
+                    sources = sources,
+                    charges = charges,
+                    targets = targets,
+                    eps = rtol,
+                    pgt = 3,
+                )
+                H = out.hesstarg
+            end
+            @inbounds for i in 1:m
+                y[i] = SMatrix{2, 2, ComplexF64, 4}(H[1, i], H[2, i], H[2, i], H[3, i])
+            end
+            return y
+        end
     else
-        error("Inti's FMM2D charge→Hessian wrapper only supports Laplace 2D")
+        error("Inti's FMM2D charge→Hessian wrapper only supports Laplace/Helmholtz 2D")
     end
 end
 
