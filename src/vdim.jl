@@ -380,9 +380,12 @@ sparse correction maps an `SVector{N}` density to an `SVector{N}` output.
 
 (Implementation notes: This routine makes no use of Green's function isotropy
 which would allow to exploit Φ'_{σ(β)} = σ(Φ'_β) for a coordinate permutation σ
-and polynomial solution Φ. The routine also elects to not use batching across
-coordinate-directions which would reduce run-times, because of memory intensity
-(and Inti does not expose that in the FMM wrappers).)
+and polynomial solution Φ. The volume term is batched across the coordinate
+directions only for the FMM charge→Hessian operator — a single scalar→`SMatrix`
+pass per monomial yields the full Mₐ = ∫∇ₓ∇ₓG pₐ, avoiding N dipole passes; this
+only works if the fast algorithm for `Vop` supports a charge→Hessian operation.
+The dense (`BlockArray`) operator and the boundary `S`/`D`/`∇ₓS` terms are
+applied per coordinate direction.)
 """
 function _vdim_correction_X(
         op::AbstractDifferentialOperator{N},
@@ -466,17 +469,41 @@ function _vdim_correction_X(
     # `green_multiplier`), the (3.28) boundary signs are flipped: +∇ₓS, +S, −D.
     Θ = Matrix{SM}(undef, num_target, num_basis)
     volbuf = Vector{SV}(undef, num_target)
+    # Volume term: the j-th column of Mₐ(xᵢ) := ∫∇ₓ∇ₓG(xᵢ,y) pₐ(y) dy (an `SMatrix`)
+    # is exactly `Vop·(pₐeⱼ)`, so all N directions share the single `SMatrix` Mₐ. The FMM
+    # charge→Hessian operator (a `LinearMap{SMatrix}`, scalar density → `SMatrix`) forms
+    # every Mₐ with a single FMM pass per monomial, avoiding the N per-direction dipole
+    # passes (which re-traverse `Vop` N·num_basis times). All other operators — the dense
+    # `BlockArray{SMatrix}` and the FMM dipole→gradient map (`SVector` output) — use the
+    # per-direction application below.
+    opt_vol = eltype(Vop) == SM && !(Vop isa BlockArray)
+    MVol = Matrix{SM}(undef, opt_vol ? num_target : 0, opt_vol ? num_basis : 0)
+    if opt_vol
+        mbuf = Vector{SM}(undef, num_target)
+        for n in 1:num_basis
+            mul!(mbuf, Vop, view(b, :, n))
+            for i in 1:num_target
+                MVol[i, n] = mbuf[i]
+            end
+        end
+    end
     for n in 1:num_basis
         I = indices[n]
         Υtarg = [basis[n].solution(target[i]) for i in 1:num_target]   # SMatrix Υₙ(xᵢ)
         colvecs = ntuple(N) do j
             # σ-term: green_multiplier · Υₙⱼ(x)
             col = [green_multiplier[i] * Υtarg[i][:, j] for i in 1:num_target]
-            # naive volume: +∫∇ₓ∇ₓG·(pₐeⱼ) = X PV part for direction j
-            ej = svector(d -> d == j ? one(T) : zero(T), N)
-            dj = [b[k, n] * ej for k in 1:num_source]
-            mul!(volbuf, Vop, dj)
-            col .+= volbuf
+            # naive volume: +∫∇ₓ∇ₓG·(pₐeⱼ) = X PV part for direction j (column j of Mₐ)
+            if opt_vol
+                for i in 1:num_target
+                    col[i] += MVol[i, n][:, j]
+                end
+            else
+                ej = svector(d -> d == j ? one(T) : zero(T), N)
+                dj = [b[k, n] * ej for k in 1:num_source]
+                mul!(volbuf, Vop, dj)
+                col .+= volbuf
+            end
             # +∇ₓS[pₐνⱼ]
             φj = [γs[q, n][j] for q in 1:nbnd]
             col .+= GSop * φj
@@ -486,9 +513,6 @@ function _vdim_correction_X(
                 Iⱼ = T(I[j])
                 for c in 1:N
                     kc = (k - 1) * N + c
-                        if isdefined(Main, :Infiltrator)
-  Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-end
                     for i in 1:num_target
                         col[i] += SV(ntuple(d -> d == c ? Iⱼ * (SG[i, kc] - DG[i, kc]) : zero(T), N))
                     end

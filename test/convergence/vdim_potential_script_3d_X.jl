@@ -6,14 +6,35 @@ using Gmsh
 using LinearAlgebra
 using HMatrices
 using FMM3D
-using CairoMakie
 using DataStructures
+using Dates
 
-include("../test_utils.jl")
-compression = (method = :fmm, tol = 1.0e-13, ndiv = 1600)
+tinit = time() # hide
+
+include(joinpath(@__DIR__, "../test_utils.jl"))
+outfile = joinpath(@__DIR__, "Xop_iunius5_results.tsv")
+logfile = joinpath(@__DIR__, "Xop_iunius5_run.log")
+function logmsg(msg)
+    line = "[$(Dates.now())] $msg"
+    println(line)
+    open(logfile, "a") do io
+        println(io, line)
+        flush(io)
+    end
+end
+
+open(outfile, "w") do io
+    println(
+        io,
+        "timestamp\tmeshsize\tinterpolation_order\tqorder\tbdry_qorder\tndofs\tvol_err\terr_inf\ttmsh\tttotal",
+    )
+end
+open(logfile, "w") do io end
+
+compression = (method = :fmm, tol = 1.0e-13, ndiv = 700)
 #compression = (method = :none,)
 
-meshsize = 0.05
+meshsize = 0.4
 meshsize_bdry = meshsize
 Inti.clear_entities!()
 tmsh = @elapsed begin
@@ -37,8 +58,9 @@ meshsize_bdry = meshsize
 #    Γₕ_coarse = view(msh_coarse, Γ_coarse)
 #end
 #@info "Mesh generation time: $tmsh"
+logmsg("Mesh generation time: $tmsh")
 
-interpolation_order = 4
+interpolation_order = 1
 VR_qorder = Inti.Tetrahedron_VR_interpolation_order_to_quadrature_order(interpolation_order)
 bdry_qorder = 10 #min(2 * VR_qorder, 7)
 
@@ -192,7 +214,7 @@ end
 #               1/3 * exp(x[1] + x[2]) * cos(x[3]),
 #               1/3 * exp(x[1] + x[2]) * sin(x[3]) )
 
-α = π; β = α; γ = α;
+α = π/4; β = α; γ = α;
 Ψ(x) = cos(α * x[1]) * sin(β * x[2]) * cos(γ * x[3])
 gradΨ(x) = SVector(-α*sin(α * x[1]) * sin(β * x[2]) * cos(γ * x[3]),
                    β*cos(α * x[1]) * cos(β * x[2]) * cos(γ * x[3]),
@@ -216,3 +238,36 @@ w_app = X_d2d * g_d
 err = norm(w_app - w_ref, Inf)
 ndofs = length(w_app)
 @show ndofs, meshsize, err
+
+tend = time() # hide
+ttotal = tend - tinit
+logmsg("Example completed in $ttotal seconds") # hide
+ndofs = length(Ωₕ_quad)
+logmsg("ndofs: $ndofs")
+logmsg("Result meshsize=$(meshsize) ndofs=$(ndofs) err_inf=$(err)")
+
+open(outfile, "a") do io
+    println(
+        io,
+        string(
+            Dates.now(),
+            "\t",
+            meshsize,
+            "\t",
+            interpolation_order,
+            "\t",
+            VR_qorder,
+            "\t",
+            bdry_qorder,
+            "\t",
+            ndofs,
+            "\t",
+            err,
+            "\t",
+            tmsh,
+            "\t",
+            ttotal,
+        ),
+    )
+    flush(io)
+end

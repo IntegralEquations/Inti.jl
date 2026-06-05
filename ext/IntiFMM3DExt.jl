@@ -301,4 +301,44 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
     end
 end
 
+# Charge→Hessian realization of the Hessian single-layer *volume* operator used by the
+# `X = ∇W` VDIM correction: a scalar density `ρ` maps to `∫∇ₓ∇ₓG(x,y)ρ(y)dy` (an
+# `SMatrix` per target), i.e. the Hessian of the single-layer potential of charges `ρ`.
+# This is distinct from the forward `X` map above (a dipole→gradient contraction of the
+# Hessian with a *vector* density, `SVector→SVector`), which is why it gets its own
+# assembly entry point rather than dispatching on `HessianSingleLayerKernel`.
+function Inti._assemble_fmm3d_chargehessian(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
+    m, n = size(iop)
+    targets = Matrix{Float64}(undef, 3, m)
+    for i in 1:m
+        targets[:, i] = Inti.coords(iop.target[i])
+    end
+    sources = Matrix{Float64}(undef, 3, n)
+    for j in 1:n
+        sources[:, j] = Inti.coords(iop.source[j])
+    end
+    weights = [q.weight for q in iop.source]
+    K = iop.kernel
+    if K isa Inti.HessianSingleLayerKernel{<:Any, <:Inti.Laplace{3}}
+        charges = Vector{Float64}(undef, n)
+        return LinearMaps.LinearMap{SMatrix{3, 3, Float64, 9}}(m, n) do y, x
+            @. charges = weights * x
+            out = FMM3D.lfmm3d(rtol, sources; charges, targets, pgt = 3)
+            # `hesstarg` is (6, m): the unique second derivatives in the order
+            # ∂xx, ∂yy, ∂zz, ∂xy, ∂xz, ∂yz. Assemble the symmetric `SMatrix`.
+            H = out.hesstarg
+            @inbounds for i in 1:m
+                y[i] = SMatrix{3, 3, Float64, 9}(
+                    H[1, i], H[4, i], H[5, i],
+                    H[4, i], H[2, i], H[6, i],
+                    H[5, i], H[6, i], H[3, i],
+                )
+            end
+            return y
+        end
+    else
+        error("Inti's FMM3D charge→Hessian wrapper only supports Laplace 3D")
+    end
+end
+
 end # module

@@ -233,6 +233,38 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, out.pottarg)
             end
         end
+    elseif K isa Inti.HessianSingleLayerKernel{<:Any, <:Inti.Laplace{2}}
+        # X forward (PV part) = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g). The bracket is the
+        # `SourceGradientSingleLayer` dipole field above; its target-gradient (`gradtarg`,
+        # pgt = 2) is ∫∇ₓ∇yG⋅g = -X_forward. Negating the dipole strengths relative to the
+        # W branch folds in the leading minus, so `gradtarg` is the `SVector` output.
+        dipvecs = Matrix{Float64}(undef, 2, n)
+        dipstr = ones(Float64, n)
+        return LinearMaps.LinearMap{SVector{2, Float64}}(m, n) do y, x
+            for j in 1:n
+                dipvecs[:, j] = (1 / (2 * π)) * x[j] * weights[j]
+            end
+            if same_surface
+                out = FMM2D.rfmm2d(;
+                    sources = sources,
+                    dipstr = dipstr,
+                    dipvecs = dipvecs,
+                    eps = rtol,
+                    pg = 2,
+                )
+                return copyto!(y, reinterpret(SVector{2, Float64}, vec(out.grad)))
+            else
+                out = FMM2D.rfmm2d(;
+                    sources = sources,
+                    targets = targets,
+                    dipstr = dipstr,
+                    dipvecs = dipvecs,
+                    eps = rtol,
+                    pgt = 2,
+                )
+                return copyto!(y, reinterpret(SVector{2, Float64}, vec(out.gradtarg)))
+            end
+        end
         # Helmholtz
     elseif K isa Inti.SingleLayerKernel{ComplexF64, <:Inti.Helmholtz{2}}
         charges = Vector{ComplexF64}(undef, n)
@@ -484,6 +516,53 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         end
     else
         error("integral operator not supported by Inti's FMM2D wrapper")
+    end
+end
+
+# Charge→Hessian realization of the Hessian single-layer *volume* operator used by the
+# `X = ∇W` VDIM correction in 2D: a scalar density `ρ` maps to `∫∇ₓ∇ₓG(x,y)ρ(y)dy`
+# (a 2×2 `SMatrix` per target), i.e. the Hessian of the single-layer potential of
+# charges `ρ`. `rfmm2d` returns the 3 unique second derivatives per point as `(3,·)` in
+# the order ∂xx, ∂xy, ∂yy; Inti's Laplace 2D kernel carries the −1/(2π) prefactor, folded
+# into the charges exactly as for the single layer.
+function Inti._assemble_fmm2d_chargehessian(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
+    m, n = size(iop)
+    sources = Matrix{Float64}(undef, 2, n)
+    for j in 1:n
+        sources[:, j] = Inti.coords(iop.source[j])
+    end
+    targets = Matrix{Float64}(undef, 2, m)
+    for i in 1:m
+        targets[:, i] = Inti.coords(iop.target[i])
+    end
+    weights = [q.weight for q in iop.source]
+    same_surface =
+        m == n ? isapprox(targets, sources; atol = Inti.SAME_POINT_TOLERANCE) : false
+    K = iop.kernel
+    if K isa Inti.HessianSingleLayerKernel{<:Any, <:Inti.Laplace{2}}
+        charges = Vector{Float64}(undef, n)
+        return LinearMaps.LinearMap{SMatrix{2, 2, Float64, 4}}(m, n) do y, x
+            @. charges = -1 / (2 * π) * weights * x
+            if same_surface
+                out = FMM2D.rfmm2d(; sources = sources, charges = charges, eps = rtol, pg = 3)
+                H = out.hess        # (3, n): ∂xx, ∂xy, ∂yy
+            else
+                out = FMM2D.rfmm2d(;
+                    sources = sources,
+                    charges = charges,
+                    targets = targets,
+                    eps = rtol,
+                    pgt = 3,
+                )
+                H = out.hesstarg
+            end
+            @inbounds for i in 1:m
+                y[i] = SMatrix{2, 2, Float64, 4}(H[1, i], H[2, i], H[2, i], H[3, i])
+            end
+            return y
+        end
+    else
+        error("Inti's FMM2D charge→Hessian wrapper only supports Laplace 2D")
     end
 end
 
