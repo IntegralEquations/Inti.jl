@@ -305,6 +305,10 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         # naive forward map of W[g] = -∫∇yG⋅g (vector density -> scalar). The kernel is
         # ∇yG; the leading minus of W is applied when the operator is assembled below.
         G = SourceGradientSingleLayerKernel(op)
+    elseif kernel_variant === :hessian_source
+        # forward map of X[g] = ∇W[g] (vector density -> vector). The PV part is
+        # +∫∇ₓ∇ₓG⋅g, so the (target) Hessian single-layer kernel is assembled as-is.
+        G = HessianSingleLayerKernel(op)
     else
         G = SingleLayerKernel(op)
     end
@@ -315,7 +319,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
     elseif compression.method == :hmatrix
         Vmat = assemble_hmatrix(V; rtol = compression.tol)
     elseif compression.method == :fmm
-        Vmat = assemble_fmm(V; rtol = compression.tol)
+        Vmat = assemble_fmm(V; rtol = compression.tol, ndiv = compression.ndiv)
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
@@ -347,11 +351,10 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         else
             error("Missing correction.boundary field for :dim method on a volume potential")
         end
-        # The W regularization (3.25) uses standard single-/double-layer
-        # potentials, and the gradient single-layer is the volume operator
-        # that builds the correction (the naive `Vmat` above is the W forward
-        # map itself).
-        boundary_variant = kernel_variant === :gradient_source ? :default : kernel_variant
+        # The W (3.25) and X (3.28) regularizations both use the standard scalar
+        # single-/double-layer potentials, so for those variants the boundary
+        # operators are built with the `:default` kernel.
+        boundary_variant = kernel_variant in (:gradient_source, :hessian_source) ? :default : kernel_variant
         # Advanced usage: Use previously constructed layer operators for VDIM
         if !haskey(correction, :S_b2d) || !haskey(correction, :D_b2d)
             if haskey(correction, :green_multiplier)
@@ -376,6 +379,24 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         else
             S = correction.S_b2d
             D = correction.D_b2d
+        end
+        # The X regularization (3.28) additionally needs the gradient single-layer
+        # ∇ₓS for the `-∇ₓS[gⱼν]` term; build it from the `:gradient` variant (its
+        # single-layer return, `GS`, is the gradient single-layer).
+        grad_single_layer = nothing
+        if kernel_variant === :hessian_source
+            if haskey(correction, :green_multiplier)
+                grad_single_layer, _ = single_double_layer(;
+                    op, target, source = boundary, compression, correction,
+                    kernel_variant = :gradient,
+                )
+            else
+                grad_single_layer, _ = single_double_layer(;
+                    op, target, source = boundary, compression,
+                    correction = (correction..., target_location = loc),
+                    kernel_variant = :gradient,
+                )
+            end
         end
         # Volume operator used to build the correction.
         if kernel_variant === :gradient_source
@@ -403,6 +424,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
             correction.maxdist,
             interpolation_order,
             kernel_variant,
+            grad_single_layer,
         )
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
@@ -415,6 +437,14 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         # `VectorDensityOperator` so that `W * g` allocates a clean scalar output
         # (see the type's docstring).
         V = VectorDensityOperator{default_kernel_eltype(op)}(-Vmat, δV, size(δV))
+    elseif kernel_variant === :hessian_source
+        # X maps a vector (`SVector`) density to a vector (`SVector`) output. The
+        # PV part of `X[g] = ∇W[g]` equals `+∫∇ₓ∇ₓG⋅g`, so the forward map is `Vmat`
+        # (no leading minus). Wrap it with the sparse correction in a
+        # `VectorDensityOperator` so that `X * g` allocates a clean `Vector{SVector}`
+        # output (a plain `LinearMap` would infer an abstract `SArray` eltype).
+        N = ambient_dimension(op)
+        V = VectorDensityOperator{SVector{N, default_kernel_eltype(op)}}(Vmat, δV, size(δV))
     elseif compression.method ∈ (:hmatrix, :none)
         # TODO: in the hmatrix case, we may want to add the correction directly
         # to the HMatrix so that a direct solver can be later used

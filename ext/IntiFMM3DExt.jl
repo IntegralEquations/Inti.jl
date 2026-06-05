@@ -9,7 +9,7 @@ function __init__()
     return @info "Loading Inti.jl FMM3D extension"
 end
 
-function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
+function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), ndiv = nothing)
     # unpack the necessary fields in the appropriate format
     m, n = size(iop)
     targets = Matrix{Float64}(undef, 3, m)
@@ -27,8 +27,12 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         charges = Vector{Float64}(undef, n)
         return LinearMaps.LinearMap{Float64}(m, n) do y, x
             # multiply by weights and constant
-            @. charges = 1 / (4 * π) * weights * x
-            out = FMM3D.lfmm3d(rtol, sources; charges, targets, pgt = 1)
+            @. charges = weights * x
+            if !isnothing(ndiv)
+                out = FMM3D.lfmm3d_ndiv(rtol, sources, ndiv; charges, targets, pgt = 1)
+            else
+                out = FMM3D.lfmm3d(rtol, sources; charges, targets, pgt = 1)
+            end
             return copyto!(y, out.pottarg)
         end
     elseif K isa Inti.DoubleLayerKernel{Float64, <:Inti.Laplace{3}}
@@ -40,9 +44,13 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         return LinearMaps.LinearMap{Float64}(m, n) do y, x
             # multiply by weights and constant
             for j in 1:n
-                dipvecs[:, j] = 1 / (4 * π) * view(normals, :, j) * x[j] * weights[j]
+                dipvecs[:, j] = view(normals, :, j) * x[j] * weights[j]
             end
-            out = FMM3D.lfmm3d(rtol, sources; dipvecs, targets, pgt = 1)
+            if !isnothing(ndiv)
+                out = FMM3D.lfmm3d_ndiv(rtol, sources, ndiv; dipvecs, targets, pgt = 1)
+            else
+                out = FMM3D.lfmm3d(rtol, sources; dipvecs, targets, pgt = 1)
+            end
             return copyto!(y, out.pottarg)
         end
     elseif K isa Inti.AdjointDoubleLayerKernel{Float64, <:Inti.Laplace{3}}
@@ -53,8 +61,12 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         charges = Vector{Float64}(undef, n)
         return LinearMaps.LinearMap{Float64}(m, n) do y, x
             # multiply by weights and constant
-            @. charges = 1 / (4 * π) * weights * x
-            out = FMM3D.lfmm3d(rtol, sources; charges, targets, pgt = 2)
+            @. charges = weights * x
+            if !isnothing(ndiv)
+                out = FMM3D.lfmm3d_ndiv(rtol, sources, ndiv; charges, targets, pgt = 2)
+            else
+                out = FMM3D.lfmm3d(rtol, sources; charges, targets, pgt = 2)
+            end
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
         end
     elseif K isa Inti.HyperSingularKernel{Float64, <:Inti.Laplace{3}}
@@ -70,17 +82,25 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         return LinearMaps.LinearMap{Float64}(m, n) do y, x
             # multiply by weights and constant
             for j in 1:n
-                dipvecs[:, j] = 1 / (4 * π) * view(ynormals, :, j) * x[j] * weights[j]
+                dipvecs[:, j] = view(ynormals, :, j) * x[j] * weights[j]
             end
-            out = FMM3D.lfmm3d(rtol, sources; dipvecs, targets, pgt = 2)
+            if !isnothing(ndiv)
+                out = FMM3D.lfmm3d_ndiv(rtol, sources, ndiv; dipvecs, targets, pgt = 2)
+            else
+                out = FMM3D.lfmm3d(rtol, sources; dipvecs, targets, pgt = 2)
+            end
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
         end
     elseif K isa Inti.GradientSingleLayerKernel{<:SVector{3}, <:Inti.Laplace{3}}
         charges = Vector{Float64}(undef, n)
         return LinearMaps.LinearMap{SVector{3, Float64}}(m, n) do y, x
             # multiply by weights and constant
-            @. charges = 1 / (4 * π) * weights * x
-            out = FMM3D.lfmm3d(rtol, sources; charges, targets, pgt = 2)
+            @. charges = weights * x
+            if !isnothing(ndiv)
+                out = FMM3D.lfmm3d_ndiv(rtol, sources, ndiv; charges, targets, pgt = 2)
+            else
+                out = FMM3D.lfmm3d(rtol, sources; charges, targets, pgt = 2)
+            end
             return copyto!(y, reinterpret(SVector{3, Float64}, vec(out.gradtarg)))
         end
     elseif K isa Inti.GradientDoubleLayerKernel{<:SVector{3}, <:Inti.Laplace{3}}
@@ -90,8 +110,12 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         end
         dipvecs = similar(normals)
         return LinearMaps.LinearMap{SVector{3, Float64}}(m, n) do y, x
-            dipvecs .= normals .* transpose(((1 / (4π)) .* x .* weights))
-            out = FMM3D.lfmm3d(rtol, sources; dipvecs, targets, pgt = 2)
+            dipvecs .= normals .* transpose(x .* weights)
+            if !isnothing(ndiv)
+                out = FMM3D.lfmm3d_ndiv(rtol, sources, ndiv; dipvecs, targets, pgt = 2)
+            else
+                out = FMM3D.lfmm3d(rtol, sources; dipvecs, targets, pgt = 2)
+            end
             return copyto!(y, reinterpret(SVector{3, Float64}, vec(out.gradtarg)))
         end
     elseif K isa Inti.SourceGradientSingleLayerKernel{<:Any, <:Inti.Laplace{3}}
@@ -100,10 +124,32 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         dipvecs = Matrix{Float64}(undef, 3, n)
         return LinearMaps.LinearMap{Float64}(m, n) do y, x
             for j in 1:n
-                dipvecs[:, j] = (1 / (4 * π)) * x[j] * weights[j]
+                dipvecs[:, j] = x[j] * weights[j]
             end
-            out = FMM3D.lfmm3d(rtol, sources; dipvecs, targets, pgt = 1)
+            if !isnothing(ndiv)
+                out = FMM3D.lfmm3d_ndiv(rtol, sources, ndiv; dipvecs, targets, pgt = 1)
+            else
+                out = FMM3D.lfmm3d(rtol, sources; dipvecs, targets, pgt = 1)
+            end
             return copyto!(y, out.pottarg)
+        end
+    elseif K isa Inti.HessianSingleLayerKernel{<:Any, <:Inti.Laplace{3}}
+        # X forward (PV part) = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g). The bracket is exactly the
+        # `SourceGradientSingleLayer` dipole field above (dipoles g, scalar potential),
+        # so its target-gradient `gradtarg` (pgt = 2) is `∫∇ₓ∇yG⋅g = -X_forward`. Hence
+        # the leading minus is folded into the dipole strengths and `gradtarg` is the
+        # `SVector` output directly.
+        dipvecs = Matrix{Float64}(undef, 3, n)
+        return LinearMaps.LinearMap{SVector{3, Float64}}(m, n) do y, x
+            for j in 1:n
+                dipvecs[:, j] = -1.0 * x[j] * weights[j]
+            end
+            if !isnothing(ndiv)
+                out = FMM3D.lfmm3d_ndiv(rtol, sources, ndiv; dipvecs, targets, pgt = 2)
+            else
+                out = FMM3D.lfmm3d(rtol, sources; dipvecs, targets, pgt = 2)
+            end
+            return copyto!(y, reinterpret(SVector{3, Float64}, vec(out.gradtarg)))
         end
         # Helmholtz
     elseif K isa Inti.SingleLayerKernel{ComplexF64, <:Inti.Helmholtz{3}}
@@ -111,8 +157,12 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights and constant
-            @. charges = 1 / (4 * π) * weights * x
-            out = FMM3D.hfmm3d(rtol, zk, sources; charges, targets, pgt = 1)
+            @. charges = weights * x
+            if !isnothing(ndiv)
+                out = FMM3D.hfmm3d_ndiv(rtol, zk, sources, ndiv; charges, targets, pgt = 1)
+            else
+                out = FMM3D.hfmm3d(rtol, zk, sources; charges, targets, pgt = 1)
+            end
             return copyto!(y, out.pottarg)
         end
     elseif K isa Inti.DoubleLayerKernel{ComplexF64, <:Inti.Helmholtz{3}}
@@ -125,9 +175,13 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights and constant
             for j in 1:n
-                dipvecs[:, j] = 1 / (4 * π) * view(normals, :, j) * x[j] * weights[j]
+                dipvecs[:, j] = view(normals, :, j) * x[j] * weights[j]
             end
-            out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 1)
+            if !isnothing(ndiv)
+                out = FMM3D.hfmm3d_ndiv(rtol, zk, sources, ndiv; dipvecs, targets, pgt = 1)
+            else
+                out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 1)
+            end
             return copyto!(y, out.pottarg)
         end
     elseif K isa Inti.AdjointDoubleLayerKernel{ComplexF64, <:Inti.Helmholtz{3}}
@@ -139,8 +193,12 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights and constant
-            @. charges = 1 / (4 * π) * weights * x
-            out = FMM3D.hfmm3d(rtol, zk, sources; charges, targets, pgt = 2)
+            @. charges = weights * x
+            if !isnothing(ndiv)
+                out = FMM3D.hfmm3d_ndiv(rtol, zk, sources; charges, targets, pgt = 2)
+            else
+                out = FMM3D.hfmm3d(rtol, zk, sources; charges, targets, pgt = 2)
+            end
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
         end
     elseif K isa Inti.HyperSingularKernel{ComplexF64, <:Inti.Helmholtz{3}}
@@ -157,9 +215,13 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             # multiply by weights and constant
             for j in 1:n
-                dipvecs[:, j] = 1 / (4 * π) * view(ynormals, :, j) * x[j] * weights[j]
+                dipvecs[:, j] = view(ynormals, :, j) * x[j] * weights[j]
             end
-            out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 2)
+            if !isnothing(ndiv)
+                out = FMM3D.hfmm3d_ndiv(rtol, zk, sources, ndiv; dipvecs, targets, pgt = 2)
+            else
+                out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 2)
+            end
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
         end
     elseif K isa Inti.GradientSingleLayerKernel{<:SVector{3}, <:Inti.Helmholtz{3}}
@@ -167,8 +229,12 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{SVector{3, ComplexF64}}(m, n) do y, x
             # multiply by weights and constant
-            @. charges = 1 / (4 * π) * weights * x
-            out = FMM3D.hfmm3d(rtol, zk, sources; charges, targets, pgt = 2)
+            @. charges = weights * x
+            if !isnothing(ndiv)
+                out = FMM3D.hfmm3d_ndiv(rtol, zk, sources, ndiv; charges, targets, pgt = 2)
+            else
+                out = FMM3D.hfmm3d(rtol, zk, sources; charges, targets, pgt = 2)
+            end
             return copyto!(y, reinterpret(SVector{3, ComplexF64}, vec(out.gradtarg)))
         end
     elseif K isa Inti.GradientDoubleLayerKernel{<:SVector{3}, <:Inti.Helmholtz{3}}
@@ -179,8 +245,12 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         dipvecs = similar(normals, ComplexF64)
         zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{SVector{3, ComplexF64}}(m, n) do y, x
-            dipvecs .= normals .* transpose(((1 / (4π)) .* x .* weights))
-            out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 2)
+            dipvecs .= normals .* transpose(x .* weights)
+            if !isnothing(ndiv)
+                out = FMM3D.hfmm3d_ndiv(rtol, zk, sources, ndiv; dipvecs, targets, pgt = 2)
+            else
+                out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 2)
+            end
             return copyto!(y, reinterpret(SVector{3, ComplexF64}, vec(out.gradtarg)))
         end
     elseif K isa Inti.SourceGradientSingleLayerKernel{<:Any, <:Inti.Helmholtz{3}}
@@ -190,9 +260,13 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
             for j in 1:n
-                dipvecs[:, j] = (1 / (4 * π)) * x[j] * weights[j]
+                dipvecs[:, j] = x[j] * weights[j]
             end
-            out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 1)
+            if !isnothing(ndiv)
+                out = FMM3D.hfmm3d(rtol, zk, sources, ndiv; dipvecs, targets, pgt = 1)
+            else
+                out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 1)
+            end
             return copyto!(y, out.pottarg)
         end
         # Stokes
@@ -201,7 +275,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         stoklet = Matrix{Float64}(undef, 3, n)
         return LinearMaps.LinearMap{SMatrix{3, 3, Float64, 9}}(m, n) do y, x
             # multiply by weights and constant
-            stoklet[:] = 1 / (4 * π * K.op.μ) .* reinterpret(Float64, weights .* x)
+            stoklet[:] = 1 / K.op.μ .* reinterpret(Float64, weights .* x)
             out = FMM3D.stfmm3d(rtol, sources; stoklet, targets, ppregt = 1)
             return copyto!(y, reinterpret(T, out.pottarg))
         end
@@ -215,7 +289,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         strslet = similar(normals, Float64)
         # multiply by weights and constant
         for j in 1:n
-            strsvec[:, j] = -1 / (4 * π) * view(normals, :, j) .* weights[j]
+            strsvec[:, j] = view(normals, :, j) .* weights[j]
         end
         return LinearMaps.LinearMap{SMatrix{3, 3, Float64, 9}}(m, n) do y, x
             strslet[:] = reinterpret(Float64, x)

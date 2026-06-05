@@ -49,6 +49,7 @@ function vdim_correction(
         interpolation_order = nothing,
         kernel_variant::Symbol = :default,
         maxdist = Inf,
+        grad_single_layer = nothing,
     ) where {N}
     # The W operator (vector density -> scalar) is handled by a dedicated
     # routine: its boundary potentials are single-/double-layers (so `Sop`/`Dop`
@@ -58,6 +59,19 @@ function vdim_correction(
     if kernel_variant === :gradient_source
         return _vdim_correction_W(
             op, target, source, boundary, Sop, Dop, Vop;
+            green_multiplier, interpolation_order, maxdist,
+        )
+    end
+    # The X = ∇W operator (vector density -> vector output) is handled by another
+    # dedicated routine: `Sop`/`Dop` are the scalar single-/double-layer,
+    # `grad_single_layer` is the gradient single-layer (∇ₓS), and `Vop` is the
+    # Hessian single-layer volume operator. The resulting correction has
+    # `SMatrix` entries mapping an `SVector` density to an `SVector` output.
+    if kernel_variant === :hessian_source
+        isnothing(grad_single_layer) &&
+            error("kernel_variant = :hessian_source requires the `grad_single_layer` operator")
+        return _vdim_correction_X(
+            op, target, source, boundary, Sop, Dop, grad_single_layer, Vop;
             green_multiplier, interpolation_order, maxdist,
         )
     end
@@ -347,6 +361,183 @@ function _vdim_correction_W(
 end
 
 """
+    _vdim_correction_X(op, target, source, boundary, Sop, Dop, GSop, Vop; kwargs...)
+
+VDIM correction for the operator `X[g] = ∇W[g] = S·g(x) - PV∫∇ₓ∇_yG(x,y)·g(y)dy`
+(vector density `g`, vector output), using the regularization (3.28) of
+[anderson2026global](@cite).
+
+Here `Sop`, `Dop` are the (scalar) single-/double-layer, `GSop` is the gradient
+single-layer (`∇ₓS`, scalar density -> `SVector` output), and `Vop` is the
+*Hessian* single-layer volume operator (`SVector` density -> `SVector` output,
+`SMatrix` entries) whose action equals the principal-value part `+∫∇ₓ∇ₓG·g`.
+
+Per basis monomial `pₐ` and target `i`, `Θ[i,α] ∈ SMatrix{N,N}` collects, in its
+`j`-th column, the (3.28) representation of `X[pₐeⱼ](xᵢ)` together with the naive
+volume term; the local interpolation system is solved component-wise against the
+scalar Vandermonde and the weights are stored as `SMatrix`es so the resulting
+sparse correction maps an `SVector{N}` density to an `SVector{N}` output.
+
+(Implementation notes: This routine makes no use of Green's function isotropy
+which would allow to exploit Φ'_{σ(β)} = σ(Φ'_β) for a coordinate permutation σ
+and polynomial solution Φ. The routine also elects to not use batching across
+coordinate-directions which would reduce run-times, because of memory intensity
+(and Inti does not expose that in the FMM wrappers).)
+"""
+function _vdim_correction_X(
+        op::AbstractDifferentialOperator{N},
+        target,
+        source::Quadrature{N},
+        boundary::Quadrature,
+        Sop,
+        Dop,
+        GSop,
+        Vop;
+        green_multiplier::Vector{<:Real},
+        interpolation_order = nothing,
+        maxdist = Inf,
+    ) where {N}
+    T = default_kernel_eltype(op)          # scalar element type (Float64 / ComplexF64)
+    SV = SVector{N, T}                      # density / output element type
+    SM = SMatrix{N, N, T, N * N}            # Θ / correction entry type
+    # `Vop` is the Hessian single-layer volume operator; its dense form has
+    # `SMatrix` entries while the FMM form is a `LinearMap` with `SVector` output
+    # (both map an `SVector` density to an `SVector` output).
+    @assert eltype(Vop) in (SM, SV) "Vop must be the Hessian single-layer volume operator"
+    @assert eltype(GSop) == SV "GSop must be the gradient single-layer operator (SVector output)"
+    num_target, num_source = length(target), length(source)
+    isnothing(interpolation_order) &&
+        (interpolation_order = maximum(order, values(source.etype2qrule)))
+    basis = polynomial_solutions_vdim_X(op, interpolation_order, T)
+    num_basis = length(basis)
+    dict_near = etype_to_nearest_points(target, source; maxdist)
+
+    # source-node monomial values (scalar) for the volume term and the Vandermonde
+    b = Matrix{T}(undef, num_source, num_basis)
+    for k in 1:num_basis, j in 1:num_source
+        b[j, k] = basis[k].source(source[j])
+    end
+    # multi-index `I` of each basis monomial (same ordering as polynomial_solutions_vdim_X)
+    indices = [I for I in Iterators.product(ntuple(i -> 0:interpolation_order, N)...) if sum(I) <= interpolation_order]
+    @assert length(indices) == num_basis
+    # grad_single_trace (pₐν) on the boundary, for the ∇ₓS term
+    nbnd = length(boundary)
+    γs = Matrix{SV}(undef, nbnd, num_basis)
+    for k in 1:num_basis, q in 1:nbnd
+        γs[q, k] = basis[k].grad_single_trace(boundary[q])
+    end
+
+    # --- Optimization: dedup the S/D boundary applications over β = I − eⱼ ---
+    # `basis_from_monomial` is linear, so Ψₙⱼ = Iⱼ·Φ′_β with β = I − eⱼ and ℒΦ′_β = yᵝ;
+    # hence Υₙⱼ = Iⱼ·∇Φ′_β and the two (3.28) layer terms factor through β alone:
+    #   D[Υₙⱼ]_c             = Iⱼ · D[∂_cΦ′_β]                (γ₀ trace ∂_cΦ′_β)
+    #   S[(∂ⱼpₐ)ν + BνΥₙⱼ]_c = Iⱼ · S[τ_{β,c}],  τ_{β,c} = p_β ν_c + ∂ν(∂_cΦ′_β)
+    # Thus, the nominal per-(n,j,c) applications in the above description can be
+    # reduced to per-(β,c), β over |β| ≤ order−1, each scaled by Iⱼ in the
+    # assembly below.
+    βindices = [B for B in Iterators.product(ntuple(i -> 0:(interpolation_order - 1), N)...) if sum(B) <= interpolation_order - 1]
+    β2k = Dict(B => k for (k, B) in enumerate(βindices))
+    nβ = length(βindices)
+    g₀ = Matrix{T}(undef, nbnd, nβ * N)    # γ₀ traces ∂_cΦ′_β, column index (β,c) = (k-1)N+c
+    g₁ = Matrix{T}(undef, nbnd, nβ * N)    # γ₁ traces τ_{β,c}
+    for k in 1:nβ
+        pβ = Polynomial(βindices[k] => one(T))
+        Φβ, _ = basis_from_monomial(op, pβ)
+        ∇Φβ = ElementaryPDESolutions.gradient(Φβ)                       # ∂_cΦ′_β
+        HessΦβ = ntuple(c -> ElementaryPDESolutions.gradient(∇Φβ[c]), N) # ∂_d∂_cΦ′_β
+        for q in 1:nbnd
+            xq, nu = coords(boundary[q]), normal(boundary[q])
+            pv = pβ(xq)
+            for c in 1:N
+                g₀[q, (k - 1) * N + c] = ∇Φβ[c](xq)
+                g₁[q, (k - 1) * N + c] = pv * nu[c] + dot(nu, HessΦβ[c](xq))
+            end
+        end
+    end
+    # Apply D (resp. S) once over all (β,c) columns; reused (scaled by Iⱼ) for every n.
+    # `mul!` into a dense matrix forces eager evaluation: BLAS `gemm` when `Dop` is a
+    # dense matrix, LinearMaps' column-wise apply when it is an (FMM) `LinearMap`.
+    DG = Matrix{T}(undef, num_target, nβ * N)    # num_target × (nβ·N)
+    SG = Matrix{T}(undef, num_target, nβ * N)
+    nβ * N > 0 && (mul!(DG, Dop, g₀); mul!(SG, Sop, g₁))
+
+    # Assemble Θ[i,n] ∈ SMatrix{N,N}. Following the internal sign convention used for
+    # the scalar/W cases (Θ = naive_volume − analytic_representation, σ-term carried by
+    # `green_multiplier`), the (3.28) boundary signs are flipped: +∇ₓS, +S, −D.
+    Θ = Matrix{SM}(undef, num_target, num_basis)
+    volbuf = Vector{SV}(undef, num_target)
+    for n in 1:num_basis
+        I = indices[n]
+        Υtarg = [basis[n].solution(target[i]) for i in 1:num_target]   # SMatrix Υₙ(xᵢ)
+        colvecs = ntuple(N) do j
+            # σ-term: green_multiplier · Υₙⱼ(x)
+            col = [green_multiplier[i] * Υtarg[i][:, j] for i in 1:num_target]
+            # naive volume: +∫∇ₓ∇ₓG·(pₐeⱼ) = X PV part for direction j
+            ej = svector(d -> d == j ? one(T) : zero(T), N)
+            dj = [b[k, n] * ej for k in 1:num_source]
+            mul!(volbuf, Vop, dj)
+            col .+= volbuf
+            # +∇ₓS[pₐνⱼ]
+            φj = [γs[q, n][j] for q in 1:nbnd]
+            col .+= GSop * φj
+            # +S[(∂ⱼpₐ)ν + BνΥⱼ] − D[Υⱼ], via the β = I − eⱼ dedup (scaled by Iⱼ)
+            if I[j] ≥ 1
+                k = β2k[ntuple(d -> d == j ? I[d] - 1 : I[d], N)]
+                Iⱼ = T(I[j])
+                for c in 1:N
+                    kc = (k - 1) * N + c
+                        if isdefined(Main, :Infiltrator)
+  Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+end
+                    for i in 1:num_target
+                        col[i] += SV(ntuple(d -> d == c ? Iⱼ * (SG[i, kc] - DG[i, kc]) : zero(T), N))
+                    end
+                end
+            end
+            col
+        end
+        for i in 1:num_target
+            Θ[i, n] = reduce(hcat, ntuple(j -> colvecs[j][i], N))
+        end
+    end
+
+    # Local interpolation solve + SMatrix storage (flatten column-major over the
+    # N×N entries, solve against the scalar Vandermonde, reconstruct the SMatrix).
+    Is = Int[]
+    Js = Int[]
+    Vs = SM[]
+    for (E, qtags) in source.etype2qtags
+        near_list = dict_near[E]
+        nq, ne = size(qtags)
+        @assert length(near_list) == ne
+        L = Matrix{T}(undef, num_basis, nq)
+        bdata = Matrix{T}(undef, num_basis, N * N)
+        weidata = Matrix{T}(undef, nq, N * N)
+        for n in 1:ne
+            isempty(near_list[n]) && continue
+            jglob = @view qtags[:, n]
+            for k in 1:nq, m in 1:num_basis
+                L[m, k] = basis[m].source(view(source, jglob)[k])
+            end
+            F = svd(L)
+            for i in near_list[n]
+                for m in 1:num_basis
+                    bdata[m, :] .= vec(Θ[i, m])
+                end
+                ldiv!(weidata, F, bdata)
+                for k in 1:nq
+                    push!(Is, i)
+                    push!(Js, jglob[k])
+                    push!(Vs, -SM(ntuple(idx -> weidata[k, idx], N * N)))
+                end
+            end
+        end
+    end
+    δV = sparse(Is, Js, Vs, num_target, num_source)
+    return δV
+end
+
+"""
     polynomial_solutions_vdim(op, order, [T])
 
 Build a basis of polynomial solutions for the VDIM method.
@@ -420,6 +611,86 @@ function polynomial_solutions_vdim_W(
             svector(j -> γ₁Ψ[j](q) + pv * nu[j], N)
         end
         (source = monomial, solution = solution, neumann_trace = neumann_trace)
+    end
+end
+
+"""
+    polynomial_solutions_vdim_X(op, order, [T])
+
+Build a basis for the VDIM evaluation of the singular operator `X[g] = ∇W[g] =
+S·g(x) - PV∫∇ₓ∇_yG(x,y)·g(y)dy` acting on a vector density `g`, using the
+regularization of eq. (3.28) in [anderson2026global](@cite).
+
+As for `W` ([`polynomial_solutions_vdim_W`](@ref)), the density is interpolated
+component-wise, so the basis is indexed by the scalar monomials `pₐ = yᴵ`
+(`|I| ≤ order`). For each monomial, and each coordinate direction `j`, the vector
+monomial is `gₐⱼ = pₐeⱼ`, whose divergence is `∂ⱼpₐ`; the polynomial PDE solution
+`Ψₐⱼ` satisfies `ℒΨₐⱼ = ∂ⱼpₐ`, and the relevant solution for `X` is `Υₐⱼ = ∇Ψₐⱼ`
+(so that `ℒΥₐⱼ = ∇∂ⱼpₐ`). Per (3.28),
+
+    X[gₐⱼ] = μ(x)Υₐⱼ(x) - ∇ₓS[pₐνⱼ](x) - S[(∂ⱼpₐ)ν + BνΥₐⱼ](x) + D[Υₐⱼ](x),
+
+with `BνΥₐⱼ` the (Laplace) conormal derivative `∂ν∇Ψₐⱼ = (HessΨₐⱼ)·ν`. Since `X`
+maps a vector density to a vector output, the `N` directions are bundled into
+`SMatrix{N,N}`-valued traces (column `j` ↔ density direction `j`, row ↔ output
+component):
+
+- `source`           : the scalar monomial `pₐ` (volume term and Vandermonde)
+- `solution`         : `q -> SMatrix` with column `j` equal to `Υₐⱼ(q) = ∇Ψₐⱼ(q)`
+                       (γ₀ trace for `D`, and the σ-term `μΥ`)
+- `single_trace`     : `q -> SMatrix` with column `j` equal to
+                       `(∂ⱼpₐ)(q)ν(q) + BνΥₐⱼ(q)`  (γ₁-type trace for `S`)
+                       NOTE: This is not actually used in the associated
+                       correction routine, because there is de-duping performed
+                       there that is more efficient than use of `single-trace`
+                       would be. However this is useful in the testsuite
+                       (`test_X_volume_potential`) so is kept.
+- `grad_single_trace`: `q -> SVector` equal to `pₐ(q)ν(q)`, whose component `j`
+                       is the scalar trace `pₐνⱼ` for the `∇ₓS` term
+"""
+function polynomial_solutions_vdim_X(
+        op::AbstractDifferentialOperator{N},
+        order::Integer,
+        ::Type{T} = default_kernel_eltype(op),
+    ) where {N, T}
+    indices = [I for I in Iterators.product(ntuple(i -> 0:order, N)...) if sum(I) <= order]
+    return map(indices) do I
+        monomial = Polynomial(I => one(T))       # raw monomial yᴵ
+        ∂p = ElementaryPDESolutions.gradient(monomial)   # (∂₁,…,∂_N) yᴵ
+        # per direction j: Υⱼ = ∇Ψⱼ (with ℒΨⱼ = ∂ⱼpₐ) and the conormal BνΥⱼ = HessΨⱼ·ν.
+        dirs = ntuple(N) do j
+            dj = ∂p[j]
+            if isempty(dj.order2coeff)
+                # ∂ⱼyᴵ = 0  ⇒  Ψⱼ = 0, Υⱼ = 0, BνΥⱼ = 0
+                (
+                    Υ = (_ -> zero(SVector{N, T})),
+                    BνΥ = (_ -> zero(SVector{N, T})),
+                    ∂jp = (_ -> zero(T)),
+                )
+            else
+                Ψj, _ = basis_from_monomial(op, dj)        # ℒΨⱼ = ∂ⱼpₐ
+                Υj = ElementaryPDESolutions.gradient(Ψj)    # ∇Ψⱼ (NTuple{N,Polynomial})
+                Hessj = ntuple(c -> ElementaryPDESolutions.gradient(Υj[c]), N) # ∇(∂_cΨⱼ)
+                (
+                    Υ = (x -> Υj(x)),
+                    BνΥ = (q -> svector(c -> dot(normal(q), Hessj[c](coords(q))), N)),
+                    ∂jp = (x -> dj(x)),
+                )
+            end
+        end
+        solution = q -> reduce(hcat, ntuple(j -> dirs[j].Υ(coords(q)), N))
+        single_trace = q -> begin
+            nu = normal(q)
+            x = coords(q)
+            reduce(hcat, ntuple(j -> dirs[j].∂jp(x) * nu + dirs[j].BνΥ(q), N))
+        end
+        grad_single_trace = q -> monomial(coords(q)) * normal(q)
+        (
+            source = monomial,
+            solution = solution,
+            single_trace = single_trace,
+            grad_single_trace = grad_single_trace,
+        )
     end
 end
 

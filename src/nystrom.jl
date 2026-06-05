@@ -98,15 +98,18 @@ end
 """
     struct VectorDensityOperator{T,F,C}
 
-Operator returned by [`volume_potential`](@ref) for `kernel_variant = :gradient_source`. It
-maps an SVector density `g` to a scalar output through `forward * g + correction
-* g`, where `forward` is the (dense or FMM-accel) naive `W` map and `correction`
-is the sparse VDIM correction.
+Operator returned by [`volume_potential`](@ref) for the vector-density variants
+`kernel_variant = :gradient_source` (`W`) and `:hessian_source` (`X`). It maps an
+`SVector` density `g` to a `Vector{T}` output through `forward * g + correction *
+g`, where `forward` is the (dense or FMM-accel) naive map and `correction` is the
+sparse VDIM correction.
 
-A bespoke wrapper is used instead of a `LinearMap` so that `W * g` allocates a clean
-scalar output `Vector{T}`: `LinearMap`'s `*` infers the output element type by promoting
-the operand eltypes, which for a vector-density→scalar contraction collapses to
-`Vector{Any}`.
+A bespoke wrapper is used instead of a `LinearMap` so that `W * g` / `X * g`
+allocates a clean output `Vector{T}` (`T = Float64`/`ComplexF64` for the
+scalar-output `W`, `T = SVector{N,…}` for the vector-output `X`). `LinearMap`'s
+`*` infers the output element type by promoting the operand eltypes, which for a
+vector-density→scalar contraction collapses to `Vector{Any}`, and for the
+`SMatrix`-entry→`SVector` contraction of `X` to an abstract `SArray` eltype.
 """
 struct VectorDensityOperator{T, F, C}
     forward::F
@@ -179,12 +182,12 @@ loaded) while in 3D `FMM3D` is used.
     will return `Inf` values if `iop.target !== iop.source`, but there is a
     point `x ∈ iop.target` such that `x ∈ iop.source`.
 """
-function assemble_fmm(iop::IntegralOperator; rtol)
+function assemble_fmm(iop::IntegralOperator; rtol, ndiv = nothing)
     N = ambient_dimension(iop.source)
     if N == 2
         return _assemble_fmm2d(iop; rtol)
     elseif N == 3
-        return _assemble_fmm3d(iop; rtol)
+        return _assemble_fmm3d(iop; rtol, ndiv)
     else
         return error("Only 2D and 3D FMMs are supported")
     end

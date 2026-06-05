@@ -167,3 +167,24 @@ end
         end
     end
 end
+
+@testset "X (∇W) operator (FMM vs dense) Laplace 3D" begin
+    op = Inti.Laplace(; dim = 3)
+    Ω_c, msh_c = gmsh_ball(; center = [0.0, 0.0, 0.0], radius = 1.0, meshsize = 0.4)
+    Γₕ_quad = Inti.Quadrature(view(msh_c, Inti.external_boundary(Ω_c)); qorder = 4)
+    Ωₕ = view(msh_c, Ω_c)
+    VR_qorder = Inti.Tetrahedron_VR_interpolation_order_to_quadrature_order(1)
+    Q = Inti.VioreanuRokhlin(; domain = :tetrahedron, order = VR_qorder)
+    Ωₕ_quad = Inti.Quadrature(Ωₕ, OrderedDict(E => Q for E in Inti.element_types(Ωₕ)))
+    cor = (method = :dim, maxdist = 0.5, boundary = Γₕ_quad, interpolation_order = 1)
+    Xd = Inti.volume_potential(; op, target = Ωₕ_quad, source = Ωₕ_quad,
+        compression = (method = :none,), correction = cor, kernel_variant = :hessian_source)
+    Xf = Inti.volume_potential(; op, target = Ωₕ_quad, source = Ωₕ_quad,
+        compression = (method = :fmm, tol = 1.0e-12), correction = cor, kernel_variant = :hessian_source)
+    g = [rand(SVector{3, Float64}) for _ in 1:length(Ωₕ_quad)]
+    yd = Xd * g
+    yf = Xf * g
+    @test eltype(yd) == SVector{3, Float64}
+    @test eltype(yf) == SVector{3, Float64}
+    @test norm(yf - yd, Inf) / norm(yd, Inf) < 1.0e-6
+end

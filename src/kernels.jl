@@ -210,6 +210,38 @@ end
 # correction whose entries map an `SVector` density to a scalar.
 Base.zero(::Type{Transpose{T, SVector{N, T}}}) where {N, T} = transpose(zero(SVector{N, T}))
 
+"""
+    struct HessianSingleLayerKernel{T,Op} <: AbstractKernel{T}
+
+The Hessian of the single-layer kernel `G(x,y)` with respect to the *target*
+variable `x`, i.e. ``\\nabla_x\\nabla_x G(x,y)``, returned as an `N×N`
+`SMatrix`.
+
+This is the kernel of the strongly-singular volume integral operator
+``\\mathcal{X}[g](x) = \\nabla\\mathcal{W}[g](x) = \\mathsf{S}\\,g(x) -
+\\mathrm{p.v.}\\!\\int_\\Omega \\nabla_x\\nabla_y G(x,y)\\cdot g(y)\\,dy`` (eq.
+(2.24) of [anderson2026global](@cite)) acting on a vector density `g`. Since
+``\\nabla_x\\nabla_y G = -\\nabla_x\\nabla_x G``, the principal-value integral
+equals ``+\\int_\\Omega \\nabla_x\\nabla_x G \\cdot g``, so this (target) Hessian
+is the kernel assembled for the forward map of ``\\mathcal{X}``; the free-term
+tensor ``\\mathsf{S}`` is handled by the density-interpolation regularization.
+"""
+struct HessianSingleLayerKernel{T, Op} <: AbstractKernel{T}
+    op::Op
+end
+
+function HessianSingleLayerKernel(
+        op::AbstractDifferentialOperator{N},
+        ::Type{T} = SMatrix{N, N, default_kernel_eltype(op), N * N},
+    ) where {N, T}
+    return HessianSingleLayerKernel{T, typeof(op)}(op)
+end
+
+function singularity_order(K::HessianSingleLayerKernel)
+    N = ambient_dimension(K.op)
+    return -N
+end
+
 struct Laplace{N} <: AbstractDifferentialOperator{N} end
 
 """
@@ -319,6 +351,24 @@ function (GDL::GradientDoubleLayerKernel{T, Laplace{N}})(
         return 1 / (2π) / (d^2) * (ny - 2 * dot(r, ny) / d^2 * r)
     elseif N == 3
         return 1 / (4π) / (d^3) * (ny - 3 * dot(r, ny) / d^2 * r)
+    end
+end
+
+function (HSL::HessianSingleLayerKernel{T, Laplace{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N, T}
+    d = norm(r)
+    d ≤ SAME_POINT_TOLERANCE && return zero(T)
+    # ∇ₓ∇ₓG: for Laplace, ∂ᵢ∂ⱼG = c/dᴺ (k·r̂ᵢr̂ⱼ - δᵢⱼ) with (c,k) = (1/2π,2) in 2D
+    # and (1/4π,3) in 3D.
+    if N == 2
+        return 1 / (2π) / d^2 * (2 * r * transpose(r) / d^2 - I)
+    elseif N == 3
+        return 1 / (4π) / d^3 * (3 * r * transpose(r) / d^2 - I)
+    else
+        notimplemented()
     end
 end
 

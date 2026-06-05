@@ -186,6 +186,70 @@ function test_W_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize; interpola
     return errors, out_eltype
 end
 
+# Apply a scalar boundary→target layer operator `Op` component-wise to a
+# vector-valued boundary trace `trace_bnd::Vector{SVector{N}}`, returning a
+# `Vector{SVector{N}}` over the targets.
+function _apply_componentwise(Op, trace_bnd, N, ntarget)
+    out = [zero(SVector{N, ComplexF64}) for _ in 1:ntarget]
+    for c in 1:N
+        oc = Op * [t[c] for t in trace_bnd]
+        for i in 1:ntarget
+            out[i] += SVector(ntuple(d -> d == c ? oc[i] : zero(eltype(oc)), N))
+        end
+    end
+    return out
+end
+
+"""
+    test_X_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize)
+
+Test the `X[g] = ∇W[g] = S·g - PV∫∇ₓ∇_yG⋅g` volume integral operator (vector
+density `g`, vector output) regularized via eq. (3.28) of the 3D VDIM paper. For
+each scalar monomial `pₐ` and direction `j`, `g = pₐeⱼ` is a polynomial, so the
+method must reproduce the (3.28) boundary representation
+`μΥⱼ - ∇ₓS[pₐνⱼ] - S[(∂ⱼpₐ)ν + BνΥⱼ] + D[Υⱼ]` to machine precision (the free-term
+tensor `S` is implicitly contained in this representation).
+
+Builds the operator through `volume_potential(...; kernel_variant = :hessian_source)`.
+Returns the list of relative errors and the output element type of `X*g`.
+"""
+function test_X_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize; interpolation_order = 2)
+    N = Inti.ambient_dimension(Ωₕ_quad)
+    corr = (method = :dim, maxdist = 5 * meshsize, target_location = :inside)
+    S, D = Inti.single_double_layer(;
+        op, target = Ωₕ_quad, source = Γₕ_quad,
+        compression = (method = :none,), correction = corr,
+    )
+    GS, _ = Inti.single_double_layer(;
+        op, target = Ωₕ_quad, source = Γₕ_quad,
+        compression = (method = :none,), correction = corr,
+        kernel_variant = :gradient,
+    )
+    X = Inti.volume_potential(;
+        op, target = Ωₕ_quad, source = Ωₕ_quad,
+        compression = (method = :none,),
+        correction = (method = :dim, maxdist = 5 * meshsize, boundary = Γₕ_quad, interpolation_order),
+        kernel_variant = :hessian_source,
+    )
+    basis = Inti.polynomial_solutions_vdim_X(op, interpolation_order)
+    ntarget = length(Ωₕ_quad)
+    errors = Float64[]
+    out_eltype = eltype(X * [zero(SVector{N, Float64}) for _ in Ωₕ_quad])
+    for b in basis, j in 1:N
+        ej = SVector(ntuple(d -> d == j ? 1.0 : 0.0, N))
+        g_d = [b.source(q) * ej for q in Ωₕ_quad]
+        x_app = X * g_d
+        # (3.28) reference (interior μ = 1):  Υⱼ - ∇ₓS[pₐνⱼ] - S[(∂ⱼpₐ)ν+BνΥⱼ] + D[Υⱼ]
+        Υj_vol = [b.solution(q)[:, j] for q in Ωₕ_quad]
+        gsterm = GS * [b.grad_single_trace(q)[j] for q in Γₕ_quad]
+        Sterm = _apply_componentwise(S, [b.single_trace(q)[:, j] for q in Γₕ_quad], N, ntarget)
+        Dterm = _apply_componentwise(D, [b.solution(q)[:, j] for q in Γₕ_quad], N, ntarget)
+        x_ref = Υj_vol .- gsterm .- Sterm .+ Dterm
+        push!(errors, norm(x_app - x_ref, Inf) / max(norm(x_ref, Inf), 1))
+    end
+    return errors, out_eltype
+end
+
 ## Helper to build the shared volume + boundary quadratures for a given mesh/domain.
 function build_quadratures(Ωₕ, Γₕ, dim; interpolation_order, bdry_qorder)
     if dim == 2
@@ -261,6 +325,18 @@ end
     end
 end
 
+@testset "X (∇W) volume potential 2D" begin
+    for (name, op) in [
+        ("Laplace", Inti.Laplace(; dim = 2)),
+    ]
+        @testset "X volume potential 2D $name" begin
+            err, out_eltype = test_X_volume_potential(op, Ωₕ_quad_2d, Γₕ_quad_2d, meshsize; interpolation_order)
+            @test maximum(err) < rtol
+            @test out_eltype == SVector{2, Float64}   # X*g yields a clean vector
+        end
+    end
+end
+
 # ── 3D tests ─────────────────────────────────────────────────────────────────────────────────
 # Build the 3D sphere mesh ONCE and reuse it across all 3D volume and gradient tests.
 Inti.clear_entities!()
@@ -318,6 +394,18 @@ end
             err, out_eltype = test_W_volume_potential(op, Ωₕ_quad_3d, Γₕ_quad_3d, meshsize_3d; interpolation_order)
             @test maximum(err) < rtol
             @test out_eltype == Tout
+        end
+    end
+end
+
+@testset "X (∇W) volume potential 3D" begin
+    for (name, op) in [
+        ("Laplace", Inti.Laplace(; dim = 3)),
+    ]
+        @testset "X volume potential 3D $name" begin
+            err, out_eltype = test_X_volume_potential(op, Ωₕ_quad_3d, Γₕ_quad_3d, meshsize_3d; interpolation_order)
+            @test maximum(err) < rtol
+            @test out_eltype == SVector{3, Float64}
         end
     end
 end

@@ -10,7 +10,8 @@ using CairoMakie
 using DataStructures
 
 include("../test_utils.jl")
-compression = (method = :fmm, tol = 1.0e-11)
+compression = (method = :fmm, tol = 1.0e-13, ndiv = 1600)
+#compression = (method = :none,)
 
 meshsize = 0.05
 meshsize_bdry = meshsize
@@ -37,9 +38,9 @@ meshsize_bdry = meshsize
 #end
 #@info "Mesh generation time: $tmsh"
 
-interpolation_order = 2
+interpolation_order = 4
 VR_qorder = Inti.Tetrahedron_VR_interpolation_order_to_quadrature_order(interpolation_order)
-bdry_qorder = 7 #min(2 * VR_qorder, 7)
+bdry_qorder = 10 #min(2 * VR_qorder, 7)
 
 tquad = @elapsed begin
     # Use VDIM with the Vioreanu-Rokhlin quadrature rule for Ωₕ
@@ -86,17 +87,17 @@ tbnd = @elapsed begin
     )
 end
 @info "(Standard) Boundary operators time: $tbnd"
-#tbnd = @elapsed begin
-#    S_b2d_grad, D_b2d_grad = Inti.single_double_layer(;
-#        op,
-#        target = Ωₕ_quad,
-#        source = Γₕ_quad,
-#        compression,
-#        correction = (method = :dim, maxdist = 5 * meshsize_bdry, target_location = :inside),
-#        kernel_variant = :gradient,
-#    )
-#end
-#@info "(Gradient) Boundary operators time: $tbnd"
+tbnd = @elapsed begin
+    S_b2d_grad, D_b2d_grad = Inti.single_double_layer(;
+        op,
+        target = Ωₕ_quad,
+        source = Γₕ_quad,
+        compression,
+        correction = (method = :dim, maxdist = 5 * meshsize_bdry, target_location = :inside),
+        kernel_variant = :gradient,
+    )
+end
+@info "(Gradient) Boundary operators time: $tbnd"
 
 ## Volume potentials
 #tvol = @elapsed begin
@@ -136,7 +137,7 @@ end
 #end
 #@info "(Gradient) Volume potential time: $tvol"
 tvol = @elapsed begin
-    W_d2d = Inti.volume_potential(;
+    X_d2d = Inti.volume_potential(;
         op,
         target = Ωₕ_quad,
         source = Ωₕ_quad,
@@ -149,10 +150,11 @@ tvol = @elapsed begin
             S_b2d = S_b2d_std,
             D_b2d = D_b2d_std,
         ),
-        kernel_variant = :gradient_source,
+        kernel_variant = :hessian_source,
+        #kernel_variant = :gradient_source,
     )
 end
-@info "(W) Volume potential time: $tvol"
+@info "(X) Volume potential time: $tvol"
 
 # Standard plane wave test
 #u_d_nonpoly_std = [u_exact(q.coords) for q in Ωₕ_quad]
@@ -190,7 +192,7 @@ end
 #               1/3 * exp(x[1] + x[2]) * cos(x[3]),
 #               1/3 * exp(x[1] + x[2]) * sin(x[3]) )
 
-α = 2π; β = α; γ = α;
+α = π; β = α; γ = α;
 Ψ(x) = cos(α * x[1]) * sin(β * x[2]) * cos(γ * x[3])
 gradΨ(x) = SVector(-α*sin(α * x[1]) * sin(β * x[2]) * cos(γ * x[3]),
                    β*cos(α * x[1]) * cos(β * x[2]) * cos(γ * x[3]),
@@ -201,9 +203,16 @@ g(x) = SVector(α * sin(α * x[1]) * sin(β * x[2]) * cos(γ * x[3]),
 g_d = [g(q.coords) for q in Ωₕ_quad]
 Ψ_b = [Ψ(q.coords) for q in Γₕ_quad]
 Ψ_d = [Ψ(q.coords) for q in Ωₕ_quad]
+gradΨ_d = [gradΨ(q.coords) for q in Ωₕ_quad]
 BvΨ_plus_gnu = [dot(gradΨ(q.coords), q.normal) for q in Γₕ_quad] + [dot(g(q.coords), q.normal) for q in Γₕ_quad]
-w_ref = Ψ_d + D_b2d_std * Ψ_b - S_b2d_std * BvΨ_plus_gnu
-w_app = W_d2d * g_d
+w_ref = gradΨ_d + D_b2d_grad * Ψ_b - S_b2d_grad * BvΨ_plus_gnu
+#Id = [1 0 0; 0 1 0; 0 0 1]
+#Sdotg = similar(w_ref)
+#for i in 1:length(w_ref)
+#    Sdotg[i] = -1/3 * Id * g_d[i]
+#end
+#w_ref = Ψ_d + D_b2d_std * Ψ_b - S_b2d_std * BvΨ_plus_gnu
+w_app = X_d2d * g_d
 err = norm(w_app - w_ref, Inf)
 ndofs = length(w_app)
 @show ndofs, meshsize, err
