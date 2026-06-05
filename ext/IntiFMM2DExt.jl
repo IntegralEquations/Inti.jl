@@ -3,6 +3,7 @@ module IntiFMM2DExt
 import Inti
 import FMM2D
 import LinearMaps
+using StaticArrays # For Stokes types
 
 function __init__()
     return @debug "Loading Inti.jl FMM2D extension"
@@ -285,6 +286,67 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                     pgt = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
+            end
+        end
+        # Stokes
+    elseif K isa Inti.SingleLayerKernel{SMatrix{2, 2, Float64, 4}, <:Inti.Stokes{2}}
+        T = SVector{2, Float64}
+        stoklet = Matrix{Float64}(undef, 2, n)
+        return LinearMaps.LinearMap{SMatrix{2, 2, Float64, 4}}(m, n) do y, x
+            # FMM2D returns the raw Stokeslet sum (without the 1/2π scaling), so
+            # Inti's single-layer kernel = pot / (2π μ). Fold the constant and the
+            # quadrature weights into the Stokeslet strengths.
+            stoklet[:] = 1 / (2 * π * K.op.μ) .* reinterpret(Float64, weights .* x)
+            if same_surface
+                out = FMM2D.stfmm2d(; eps = rtol, sources = sources, stoklet = stoklet, ppreg = 1)
+                return copyto!(y, reinterpret(T, out.pot))
+            else
+                out = FMM2D.stfmm2d(;
+                    eps = rtol,
+                    sources = sources,
+                    stoklet = stoklet,
+                    targets = targets,
+                    ppregt = 1,
+                )
+                return copyto!(y, reinterpret(T, out.pottarg))
+            end
+        end
+    elseif K isa Inti.DoubleLayerKernel{SMatrix{2, 2, Float64, 4}, <:Inti.Stokes{2}}
+        T = SVector{2, Float64}
+        normals = Matrix{Float64}(undef, 2, n)
+        for j in 1:n
+            normals[:, j] = Inti.normal(iop.source[j])
+        end
+        # FMM2D returns the raw stresslet sum T_ijk μ_j ν_k (without the 1/2π
+        # scaling), and Inti's double-layer kernel = -pot / (2π). Fold the constant
+        # and the quadrature weights into the stresslet orientation vectors, and the
+        # density into the stresslet strengths.
+        strsvec = similar(normals, Float64)
+        strslet = similar(normals, Float64)
+        for j in 1:n
+            strsvec[:, j] = -1 / (2 * π) * view(normals, :, j) .* weights[j]
+        end
+        return LinearMaps.LinearMap{SMatrix{2, 2, Float64, 4}}(m, n) do y, x
+            strslet[:] = reinterpret(Float64, x)
+            if same_surface
+                out = FMM2D.stfmm2d(;
+                    eps = rtol,
+                    sources = sources,
+                    strslet = strslet,
+                    strsvec = strsvec,
+                    ppreg = 1,
+                )
+                return copyto!(y, reinterpret(T, out.pot))
+            else
+                out = FMM2D.stfmm2d(;
+                    eps = rtol,
+                    sources = sources,
+                    strslet = strslet,
+                    strsvec = strsvec,
+                    targets = targets,
+                    ppregt = 1,
+                )
+                return copyto!(y, reinterpret(T, out.pottarg))
             end
         end
     else
