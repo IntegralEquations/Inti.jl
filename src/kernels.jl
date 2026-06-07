@@ -211,7 +211,7 @@ end
 Base.zero(::Type{Transpose{T, SVector{N, T}}}) where {N, T} = transpose(zero(SVector{N, T}))
 
 """
-    struct HessianSingleLayerKernel{T,Op} <: AbstractKernel{T}
+    struct HessianKernel{T,Op} <: AbstractKernel{T}
 
 The Hessian of the single-layer kernel `G(x,y)` with respect to the *target*
 variable `x`, i.e. ``\\nabla_x\\nabla_x G(x,y)``, returned as an `N×N`
@@ -226,18 +226,23 @@ equals ``+\\int_\\Omega \\nabla_x\\nabla_x G \\cdot g``, so this (target) Hessia
 is the kernel assembled for the forward map of ``\\mathcal{X}``; the free-term
 tensor ``\\mathsf{S}`` is handled by the density-interpolation regularization.
 """
-struct HessianSingleLayerKernel{T, Op} <: AbstractKernel{T}
+struct HessianKernel{T, Op} <: AbstractKernel{T}
     op::Op
+    charge_dipole::Symbol
 end
 
-function HessianSingleLayerKernel(
+function HessianKernel(
         op::AbstractDifferentialOperator{N},
+        charge_dipole::Symbol = :charge,
         ::Type{T} = SMatrix{N, N, default_kernel_eltype(op), N * N},
     ) where {N, T}
-    return HessianSingleLayerKernel{T, typeof(op)}(op)
+    if !(charge_dipole == :charge || charge_dipole == :dipole)
+        error("Invalid charge/dipole selection")
+    end
+    return HessianKernel{T, typeof(op)}(op, charge_dipole)
 end
 
-function singularity_order(K::HessianSingleLayerKernel)
+function singularity_order(K::HessianKernel)
     N = ambient_dimension(K.op)
     return -N
 end
@@ -354,7 +359,7 @@ function (GDL::GradientDoubleLayerKernel{T, Laplace{N}})(
     end
 end
 
-function (HSL::HessianSingleLayerKernel{T, Laplace{N}})(
+function (HSL::HessianKernel{T, Laplace{N}})(
         target,
         source,
         r = coords(target) - coords(source),
@@ -623,7 +628,7 @@ function (GDL::GradientDoubleLayerKernel{T, <:Helmholtz{N}})(
     end
 end
 
-function (HSL::HessianSingleLayerKernel{T, <:Helmholtz{N}})(
+function (HSL::HessianKernel{T, <:Helmholtz{N}})(
         target,
         source,
         r = coords(target) - coords(source),

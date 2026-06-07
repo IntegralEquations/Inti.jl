@@ -308,7 +308,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
     elseif kernel_variant === :hessian_source
         # forward map of X[g] = ∇W[g] (vector density -> vector). The PV part is
         # +∫∇ₓ∇ₓG⋅g, so the (target) Hessian single-layer kernel is assembled as-is.
-        G = HessianSingleLayerKernel(op)
+        G = HessianKernel(op, :dipole)
     else
         G = SingleLayerKernel(op)
     end
@@ -413,12 +413,12 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
             # and cannot produce the Hessian `SMatrix` from a scalar monomial density. Build
             # a dedicated charge→Hessian volume operator (scalar→`SMatrix`) so the correction
             # applies it once per monomial (see `_vdim_correction_X`).
-            Vh = IntegralOperator(HessianSingleLayerKernel(op), target, source)
             if (ambient_dimension(op) == 3 && op isa Laplace) || (ambient_dimension(op) == 2 && (op isa Laplace || op isa Helmholtz))
-                Vcorr = assemble_fmm_chargehessian(Vh; rtol = compression.tol)
+                Vh = IntegralOperator(HessianKernel(op, :charge), target, source)
             else
-                Vcorr = assemble_fmm(Vh; rtol = compression.tol)
+                Vh = IntegralOperator(HessianKernel(op, :dipole), target, source)
             end
+            Vcorr = assemble_fmm(Vh; rtol = compression.tol)
         else
             Vcorr = Vmat
         end

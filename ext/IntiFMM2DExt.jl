@@ -233,36 +233,60 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, out.pottarg)
             end
         end
-    elseif K isa Inti.HessianSingleLayerKernel{<:Any, <:Inti.Laplace{2}}
+    elseif K isa Inti.HessianKernel{<:Any, <:Inti.Laplace{2}}
         # X forward (PV part) = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g). The bracket is the
         # `SourceGradientSingleLayer` dipole field above; its target-gradient (`gradtarg`,
         # pgt = 2) is ∫∇ₓ∇yG⋅g = -X_forward. Negating the dipole strengths relative to the
         # W branch folds in the leading minus, so `gradtarg` is the `SVector` output.
-        dipvecs = Matrix{Float64}(undef, 2, n)
-        dipstr = ones(Float64, n)
-        return LinearMaps.LinearMap{SVector{2, Float64}}(m, n) do y, x
-            for j in 1:n
-                dipvecs[:, j] = (1 / (2 * π)) * x[j] * weights[j]
+        if K.charge_dipole == :charge
+            charges = Vector{Float64}(undef, n)
+            return LinearMaps.LinearMap{SMatrix{2, 2, Float64, 4}}(m, n) do y, x
+                @. charges = -1 / (2 * π) * weights * x
+                if same_surface
+                    out = FMM2D.rfmm2d(; sources = sources, charges = charges, eps = rtol, pg = 3)
+                    H = out.hess        # (3, n): ∂xx, ∂xy, ∂yy
+                else
+                    out = FMM2D.rfmm2d(;
+                        sources = sources,
+                        charges = charges,
+                        targets = targets,
+                        eps = rtol,
+                        pgt = 3,
+                    )
+                    H = out.hesstarg
+                end
+                @inbounds for i in 1:m
+                    y[i] = SMatrix{2, 2, Float64, 4}(H[1, i], H[2, i], H[2, i], H[3, i])
+                end
+                return y
             end
-            if same_surface
-                out = FMM2D.rfmm2d(;
-                    sources = sources,
-                    dipstr = dipstr,
-                    dipvecs = dipvecs,
-                    eps = rtol,
-                    pg = 2,
-                )
-                return copyto!(y, reinterpret(SVector{2, Float64}, vec(out.grad)))
-            else
-                out = FMM2D.rfmm2d(;
-                    sources = sources,
-                    targets = targets,
-                    dipstr = dipstr,
-                    dipvecs = dipvecs,
-                    eps = rtol,
-                    pgt = 2,
-                )
-                return copyto!(y, reinterpret(SVector{2, Float64}, vec(out.gradtarg)))
+        else
+            dipvecs = Matrix{Float64}(undef, 2, n)
+            dipstr = ones(Float64, n)
+            return LinearMaps.LinearMap{SVector{2, Float64}}(m, n) do y, x
+                for j in 1:n
+                    dipvecs[:, j] = (1 / (2 * π)) * x[j] * weights[j]
+                end
+                if same_surface
+                    out = FMM2D.rfmm2d(;
+                        sources = sources,
+                        dipstr = dipstr,
+                        dipvecs = dipvecs,
+                        eps = rtol,
+                        pg = 2,
+                    )
+                    return copyto!(y, reinterpret(SVector{2, Float64}, vec(out.grad)))
+                else
+                    out = FMM2D.rfmm2d(;
+                        sources = sources,
+                        targets = targets,
+                        dipstr = dipstr,
+                        dipvecs = dipvecs,
+                        eps = rtol,
+                        pgt = 2,
+                    )
+                    return copyto!(y, reinterpret(SVector{2, Float64}, vec(out.gradtarg)))
+                end
             end
         end
         # Helmholtz
@@ -514,113 +538,72 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             end
             return y
         end
-    elseif K isa Inti.HessianSingleLayerKernel{<:Any, <:Inti.Helmholtz{2}}
+    elseif K isa Inti.HessianKernel{<:Any, <:Inti.Helmholtz{2}}
+        # Charge→Hessian realization of the Hessian single-layer *volume* operator used by the
+        # `X = ∇W` VDIM correction in 2D: a scalar density `ρ` maps to `∫∇ₓ∇ₓG(x,y)ρ(y)dy`
+        # (a 2×2 `SMatrix` per target), i.e. the Hessian of the single-layer potential of
+        # charges `ρ`. `rfmm2d` returns the 3 unique second derivatives per point as `(3,·)` in
+        # the order ∂xx, ∂xy, ∂yy;
+        if K.charge_dipole == :charge
+            #`hess`/`hesstarg` is (3,·) = ∂xx, ∂xy, ∂yy.
+            charges = Vector{ComplexF64}(undef, n)
+            zk = ComplexF64(K.op.k)
+            return LinearMaps.LinearMap{SMatrix{2, 2, ComplexF64, 4}}(m, n) do y, x
+                @. charges = weights * x
+                if same_surface
+                    out = FMM2D.hfmm2d(; zk = zk, sources = sources, charges = charges, eps = rtol, pg = 3)
+                    H = out.hess
+                else
+                    out = FMM2D.hfmm2d(;
+                        zk = zk,
+                        sources = sources,
+                        charges = charges,
+                        targets = targets,
+                        eps = rtol,
+                        pgt = 3,
+                    )
+                    H = out.hesstarg
+                end
+                @inbounds for i in 1:m
+                    y[i] = SMatrix{2, 2, ComplexF64, 4}(H[1, i], H[2, i], H[2, i], H[3, i])
+                end
+                return y
+            end
         # X forward = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g). The bracket is the ∇yG-dipole field (W
         # forward); its target-gradient is ∫∇ₓ∇yG⋅g = -X_forward, so the dipole strengths
         # are negated and `grad`/`gradtarg` is the output. As for the W forward, hfmm2d
         # needs real dipvecs with complex strengths, so the complex density is split into
         # real/imag parts (dipstr = wⱼ resp. i·wⱼ).
-        dipvecs = Matrix{Float64}(undef, 2, n)
-        dipstr = Vector{ComplexF64}(undef, n)
-        zk = ComplexF64(K.op.k)
-        return LinearMaps.LinearMap{SVector{2, ComplexF64}}(m, n) do y, x
-            fill!(y, zero(SVector{2, ComplexF64}))
-            for (getpart, strconst) in ((real, one(ComplexF64)), (imag, 1im))
-                for j in 1:n
-                    dipvecs[:, j] = -getpart.(x[j])
-                    dipstr[j] = strconst * weights[j]
+        else
+            dipvecs = Matrix{Float64}(undef, 2, n)
+            dipstr = Vector{ComplexF64}(undef, n)
+            zk = ComplexF64(K.op.k)
+            return LinearMaps.LinearMap{SVector{2, ComplexF64}}(m, n) do y, x
+                fill!(y, zero(SVector{2, ComplexF64}))
+                for (getpart, strconst) in ((real, one(ComplexF64)), (imag, 1im))
+                    for j in 1:n
+                        dipvecs[:, j] = -getpart.(x[j])
+                        dipstr[j] = strconst * weights[j]
+                    end
+                    if same_surface
+                        out = FMM2D.hfmm2d(;
+                            zk = zk, sources = sources, dipstr = dipstr, dipvecs = dipvecs,
+                            eps = rtol, pg = 2,
+                        )
+                        y .+= reinterpret(SVector{2, ComplexF64}, vec(out.grad))
+                    else
+                        out = FMM2D.hfmm2d(;
+                            zk = zk, sources = sources, targets = targets, dipstr = dipstr,
+                            dipvecs = dipvecs, eps = rtol, pgt = 2,
+                        )
+                        y .+= reinterpret(SVector{2, ComplexF64}, vec(out.gradtarg))
+                    end
                 end
-                if same_surface
-                    out = FMM2D.hfmm2d(;
-                        zk = zk, sources = sources, dipstr = dipstr, dipvecs = dipvecs,
-                        eps = rtol, pg = 2,
-                    )
-                    y .+= reinterpret(SVector{2, ComplexF64}, vec(out.grad))
-                else
-                    out = FMM2D.hfmm2d(;
-                        zk = zk, sources = sources, targets = targets, dipstr = dipstr,
-                        dipvecs = dipvecs, eps = rtol, pgt = 2,
-                    )
-                    y .+= reinterpret(SVector{2, ComplexF64}, vec(out.gradtarg))
-                end
+                return y
             end
-            return y
         end
     else
         error("integral operator not supported by Inti's FMM2D wrapper")
-    end
-end
-
-# Charge→Hessian realization of the Hessian single-layer *volume* operator used by the
-# `X = ∇W` VDIM correction in 2D: a scalar density `ρ` maps to `∫∇ₓ∇ₓG(x,y)ρ(y)dy`
-# (a 2×2 `SMatrix` per target), i.e. the Hessian of the single-layer potential of
-# charges `ρ`. `rfmm2d` returns the 3 unique second derivatives per point as `(3,·)` in
-# the order ∂xx, ∂xy, ∂yy; Inti's Laplace 2D kernel carries the −1/(2π) prefactor, folded
-# into the charges exactly as for the single layer.
-function Inti._assemble_fmm2d_chargehessian(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
-    m, n = size(iop)
-    sources = Matrix{Float64}(undef, 2, n)
-    for j in 1:n
-        sources[:, j] = Inti.coords(iop.source[j])
-    end
-    targets = Matrix{Float64}(undef, 2, m)
-    for i in 1:m
-        targets[:, i] = Inti.coords(iop.target[i])
-    end
-    weights = [q.weight for q in iop.source]
-    same_surface =
-        m == n ? isapprox(targets, sources; atol = Inti.SAME_POINT_TOLERANCE) : false
-    K = iop.kernel
-    if K isa Inti.HessianSingleLayerKernel{<:Any, <:Inti.Laplace{2}}
-        charges = Vector{Float64}(undef, n)
-        return LinearMaps.LinearMap{SMatrix{2, 2, Float64, 4}}(m, n) do y, x
-            @. charges = -1 / (2 * π) * weights * x
-            if same_surface
-                out = FMM2D.rfmm2d(; sources = sources, charges = charges, eps = rtol, pg = 3)
-                H = out.hess        # (3, n): ∂xx, ∂xy, ∂yy
-            else
-                out = FMM2D.rfmm2d(;
-                    sources = sources,
-                    charges = charges,
-                    targets = targets,
-                    eps = rtol,
-                    pgt = 3,
-                )
-                H = out.hesstarg
-            end
-            @inbounds for i in 1:m
-                y[i] = SMatrix{2, 2, Float64, 4}(H[1, i], H[2, i], H[2, i], H[3, i])
-            end
-            return y
-        end
-    elseif K isa Inti.HessianSingleLayerKernel{<:Any, <:Inti.Helmholtz{2}}
-        # hfmm2d bakes in the (i/4)H₀⁽¹⁾ prefactor, so charges carry no extra constant
-        # (same as the Helmholtz single layer). `hess`/`hesstarg` is (3,·) = ∂xx, ∂xy, ∂yy.
-        zk = ComplexF64(K.op.k)
-        charges = Vector{ComplexF64}(undef, n)
-        return LinearMaps.LinearMap{SMatrix{2, 2, ComplexF64, 4}}(m, n) do y, x
-            @. charges = weights * x
-            if same_surface
-                out = FMM2D.hfmm2d(; zk = zk, sources = sources, charges = charges, eps = rtol, pg = 3)
-                H = out.hess
-            else
-                out = FMM2D.hfmm2d(;
-                    zk = zk,
-                    sources = sources,
-                    charges = charges,
-                    targets = targets,
-                    eps = rtol,
-                    pgt = 3,
-                )
-                H = out.hesstarg
-            end
-            @inbounds for i in 1:m
-                y[i] = SMatrix{2, 2, ComplexF64, 4}(H[1, i], H[2, i], H[2, i], H[3, i])
-            end
-            return y
-        end
-    else
-        error("Inti's FMM2D charge→Hessian wrapper only supports Laplace/Helmholtz 2D")
     end
 end
 
