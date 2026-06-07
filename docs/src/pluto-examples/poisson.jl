@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.17
+# v1.0.1
 
 using Markdown
 using InteractiveUtils
@@ -124,9 +124,9 @@ end
 
 # ╔═╡ 2c4bace3-ef35-4500-829f-2f5ae6725249
 begin
-    using Meshes, GLMakie
-    viz(Ω_msh; showsegments = true)
-    viz!(Γ_msh; color = :red)
+    using GLMakie
+    plot(Ω_msh; strokewidth = 1)
+    plot!(Γ_msh; color = :red)
     Makie.current_figure() #hide
 end
 
@@ -333,14 +333,14 @@ begin
     colorrange = extrema(u_nodes)
     fig = Figure(; size = (800, 300))
     ax = Axis(fig[1, 1]; aspect = DataAspect())
-    viz!(Ω_msh; colorrange, color = u_nodes, interpolate = true)
+    plot!(Ω_msh; colorrange, color = u_nodes, interpolate = true)
     cb = Colorbar(fig[1, 2]; label = "u", colorrange)
     # plot error
     log_er = log10.(abs.(er))
     colorrange = extrema(log_er)
     colormap = :inferno
     ax = Axis(fig[1, 3]; aspect = DataAspect())
-    viz!(Ω_msh; colorrange, colormap, color = log_er, interpolate = true)
+    plot!(Ω_msh; colorrange, colormap, color = log_er, interpolate = true)
     cb = Colorbar(fig[1, 4]; label = "log₁₀|u - uₑ|", colormap, colorrange)
     fig #hide
 end

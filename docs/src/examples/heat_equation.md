@@ -189,16 +189,14 @@ Let's visualize the mesh to confirm our domain setup. The red outline shows the 
 which consists of both the outer boundary and the boundaries of the interior holes:
 
 ```@example heat_equation
-using Meshes
 using GLMakie
-fig = viz(
+fig = plot(
     Ω_msh;
-    segmentsize = 1,
-    showsegments = true,
+    strokewidth = 1,
     axis = (aspect = DataAspect(),),
     figure = (; size = (500, 400)),
 )
-viz!(Γ_msh; color = :red, segmentsize = 4)
+plot!(Γ_msh; color = :red, linewidth = 4)
 fig # hide
 ```
 
@@ -399,8 +397,8 @@ record(fig, joinpath(@__DIR__,"heat.gif")) do io
 		
 		# Setup visualization for current frame
 		ax.title = "Temperature at t = $(round(t, digits = 2))"
-		viz!(Ω_quad.mesh; showsegments = true, color = u_nodes, colorrange)
-		viz!(Γ_msh; color = :black, segmentsize = 4)
+		plot!(Ω_quad.mesh; strokewidth = 1, color = u_nodes, colorrange)
+		plot!(Γ_msh; color = :black, linewidth = 4)
 		Colorbar(fig[1, 2]; colorrange = colorrange, label = "Temperature")
 		
 		# Record current frame

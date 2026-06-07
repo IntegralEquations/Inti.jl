@@ -100,9 +100,9 @@ nothing #hide
 and visualize them:
 
 ```@example poisson
-using Meshes, GLMakie
-viz(Ω_msh; showsegments=true)
-viz!(Γ_msh; color=:red)
+using GLMakie
+plot(Ω_msh; strokewidth=1)
+plot!(Γ_msh; color=:red)
 Makie.current_figure() #hide
 ```
 
@@ -262,14 +262,14 @@ er = u_nodes - map(uₑ, nodes)
 colorrange = extrema(u_nodes)
 fig = Figure(; size = (800, 300))
 ax = Axis(fig[1, 1]; aspect = DataAspect())
-viz!(Ω_msh; colorrange, color = u_nodes, interpolate = true)
+plot!(Ω_msh; colorrange, color = u_nodes, interpolate = true)
 cb = Colorbar(fig[1, 2]; label = "u", colorrange)
 # plot error
 log_er = log10.(abs.(er))
 colorrange = extrema(log_er)
 colormap = :inferno
 ax = Axis(fig[1, 3]; aspect = DataAspect())
-viz!(Ω_msh; colorrange, colormap, color = log_er, interpolate = true)
+plot!(Ω_msh; colorrange, colormap, color = log_er, interpolate = true)
 cb = Colorbar(fig[1, 4]; label = "log₁₀|u - uₑ|", colormap, colorrange)
 fig # hide
 ```
