@@ -243,11 +243,10 @@ equation: factoring out the asymptotic (non-smooth) behavior of the solution usi
 function.
 
 Finally, we can visualize the displacement field on the mesh by interpolating the computed
-values on the quadrature points to the mesh nodes. We use `Meshes` to visualize the
+values on the quadrature points to the mesh nodes. We use `plot` to visualize the
 solution:
 
 ```@example crack_elasticity
-using Meshes
 φ3w_nodes = Inti.quadrature_to_node_vals(Q, getindex.(φw, 3))
 msh_nodes = Inti.nodes(Q.mesh)
 w_nodes = [weight(x) for x in msh_nodes]
@@ -256,7 +255,7 @@ colorrange = extrema(φ3_nodes)
 fig = Figure(; size = (800, 600))
 ax = Axis3(fig[1, 1])
 n = length(Q.mesh.nodes)
-viz!(Q.mesh; color = φ3_nodes, interpolate = false, showsegments=true)
+plot!(Q.mesh; color = φ3_nodes, interpolate = false, strokewidth=1)
 cb = Colorbar(fig[1, 2]; label = "φ₃", colorrange)
 fig
 ```

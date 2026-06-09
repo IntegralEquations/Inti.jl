@@ -73,13 +73,13 @@ mesh:
 msh = Inti.meshgen(Γ; meshsize = 2π / k / 10)
 ```
 
-To visualize the mesh, we can load
-[Meshes.jl](https://github.com/JuliaGeometry/Meshes.jl) and one of
-[Makie](https://github.com/MakieOrg/Makie.jl)'s backends:
+To visualize the mesh, we can load one of
+[Makie](https://github.com/MakieOrg/Makie.jl)'s backends and call `plot`, which
+dispatches to `Inti`'s mesh recipe:
 
 ```@example getting_started
-using Meshes, GLMakie
-viz(msh; segmentsize = 3, axis = (aspect = DataAspect(), ), figure = (; size = (400,300)))
+using GLMakie
+plot(msh; linewidth = 3, axis = (aspect = DataAspect(), ), figure = (; size = (400,300)))
 ```
 
 ## Quadrature
@@ -240,7 +240,7 @@ fig, ax, hm = heatmap(
     interpolate = true,
     axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
 )
-viz!(msh; segmentsize = 2)
+plot!(msh; linewidth = 2)
 Colorbar(fig[1, 2], hm; label = "real(u)")
 fig # hide
 ```

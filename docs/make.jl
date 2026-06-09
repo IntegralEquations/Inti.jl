@@ -7,7 +7,6 @@ using Runic
 # packages needed for extensions
 using Gmsh
 using HMatrices
-using Meshes
 using GLMakie
 using FMM2D
 using FMM3D
@@ -92,7 +91,6 @@ function generate_md(input; output = replace(input, r"\.jl$" => ".md"))
 end
 
 links = InterLinks(
-    "Meshes" => "https://juliageometry.github.io/MeshesDocs/dev/objects.inv",
     "HMatrices" => "https://integralequations.github.io/HMatrices.jl/stable/objects.inv",
 )
 
@@ -106,7 +104,7 @@ modules = [Inti]
 for extension in
     [:IntiGmshExt, :IntiHMatricesExt, :IntiMakieExt, :IntiFMM2DExt, :IntiFMM3DExt]
     ext = Base.get_extension(Inti, extension)
-    isnothing(ext) && "error loading $ext"
+    isnothing(ext) && error("error loading $extension")
     push!(modules, ext)
 end
 

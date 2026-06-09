@@ -4,7 +4,7 @@ docsdir = joinpath(@__DIR__, "../..") #src
 Pkg.activate(docsdir)                 #src
 
 #nb ## Environment setup
-#nb const DEPENDENCIES = ["GLMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "Meshes"];
+#nb const DEPENDENCIES = ["GLMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL"];
 #nb ## __NOTEBOOK_SETUP__
 
 # # [Helmholtz scattering](@id helmholtz_scattering)
@@ -104,7 +104,6 @@ using Inti
 using LinearAlgebra
 using StaticArrays
 using Gmsh
-using Meshes
 using GLMakie
 using SpecialFunctions
 using GSL
@@ -314,7 +313,7 @@ fig, ax, hm = heatmap(
     interpolate = true,
     axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
 )
-viz!(Γ_msh; color = :white, segmentsize = 5)
+plot!(Γ_msh; color = :white, linewidth = 5)
 Colorbar(fig[1, 2], hm)
 fig
 
@@ -361,7 +360,7 @@ fig, ax, hm = heatmap(
     interpolate = true,
     axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
 )
-viz!(Γ_msh; color = :black, segmentsize = 4)
+plot!(Γ_msh; color = :black, linewidth = 4)
 Colorbar(fig[1, 2], hm)
 fig
 
@@ -563,14 +562,14 @@ us_eval_msh = D * σ - im * k * S * σ
 u_eval_msh = ui_eval_msh + us_eval_msh
 nothing #hide
 
-# Finalize, we use [`Meshes.viz`](@extref) to visualize the scattered field:
+# Finalize, we use `plot` to visualize the scattered field:
 
 nv = length(Inti.nodes(Γ_msh))
 colorrange = extrema(real(u_eval_msh))
 colormap = :inferno
 fig = Figure(; size = (800, 500))
 ax = Axis3(fig[1, 1]; aspect = :data)
-viz!(Γ_msh; colorrange, colormap, color = zeros(nv), interpolate = true)
-viz!(Σ_msh; colorrange, colormap, color = real(u_eval_msh))
+plot!(Γ_msh; colorrange, colormap, color = zeros(nv), interpolate = true)
+plot!(Σ_msh; colorrange, colormap, color = real(u_eval_msh))
 cb = Colorbar(fig[1, 2]; label = "real(u)", colormap, colorrange)
 fig # hide

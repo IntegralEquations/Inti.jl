@@ -433,7 +433,6 @@ multipole method to compute the action of the operator on the eigenfunction.
 The visualization will be done on a 3D volume slices using `Makie`.
 
 ```@example NPEP
-using Meshes # to visualize the mesh using `viz!`
 vₙ = vᵢ[8]
 pts_per_dim = 100
 xx = yy = zz = range(-2,2,pts_per_dim)
@@ -449,7 +448,7 @@ plt = volumeslices!(ax, xx, yy, zz, reshape(uₙ,pts_per_dim,pts_per_dim,pts_per
 plt[:update_yz][](pts_per_dim ÷ 2)
 plt[:update_xz][](pts_per_dim ÷ 2)
 plt[:update_xy][](length(zz) ÷ 2)
-viz!(Inti.mesh(Q); showsegments = true, color = :lightgray, alpha = 0.5)
+plot!(Inti.mesh(Q); strokewidth = 1, color = :lightgray, alpha = 0.5)
 current_figure() # hide
 ```
 

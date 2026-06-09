@@ -204,7 +204,6 @@ will simply sample points on a grid in the `xz` plane, and plot the velocity vec
 points:
 
 ```@example stokes_drag
-using Meshes
 using GLMakie
 L = 5
 targets     = [SVector(x, 0, z) for x in -L:meshsize:L, z in -L:meshsize:L] |> vec
@@ -213,7 +212,7 @@ directions  = u.(targets)
 strength    = norm.(directions)
 fig = Figure(size = (1000, 800))
 ax  = Axis3(fig[1, 1]; title = "Velocity field", aspect = :data, limits = ([-L, L], [-R, R], [-L, L]))
-viz!(msh[Γ], showsegments=true)
+plot!(msh[Γ], strokewidth=1)
 arrows!(ax, Point3.(targets), Point3.(directions), arrowsize = 0.15, lengthscale = 0.4, arrowcolor = strength, linecolor = strength)
 current_figure()
 fig
