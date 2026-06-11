@@ -169,7 +169,8 @@ function assemble_hmatrix(args...; kwargs...)
 end
 
 """
-    assemble_kernelmatrix(iop::IntegralOperator; backend = KernelAbstractions.CPU())
+    assemble_kernelmatrix(iop::IntegralOperator; backend = KernelAbstractions.CPU(),
+                          workgroupsize = 64, targets_per_lane = 4)
 
 Return a matrix-free `AbstractMatrix` that applies the [`IntegralOperator`](@ref)
 `iop` without ever assembling the dense matrix. The matrix-vector product is
@@ -180,6 +181,14 @@ run on a GPU).
 
 The result is mathematically equivalent to `assemble_matrix(iop)` followed by a
 matrix-vector product (up to floating-point reduction order).
+
+In `mul!(y, A, x, α, β)` the vectors `x` and `y` may live on the host or on the
+device: host data is transferred per product (and the result copied back), while
+passing device-resident `x` and `y` runs entirely on the device.
+
+The performance knobs `workgroupsize` (lanes per workgroup, also the number of
+sources staged per shared-memory tile) and `targets_per_lane` (register-blocking
+factor) may be tuned per architecture.
 
 
 !!! note

@@ -93,6 +93,42 @@ function test_assemble_kernelmatrix(backend, ::Type{T}) where {T}
         @test norm(A * x - yref) / norm(yref) < tol
     end
 
+    @testset "device-resident vectors" begin
+        quad = km_quadrature(3, T)
+        n = length(quad)
+        iop = Inti.IntegralOperator(Inti.SingleLayerKernel(Inti.Laplace(; dim = 3)), quad, quad)
+        A = Inti.assemble_kernelmatrix(iop; backend)
+        x = rand(T, n)
+        y0 = rand(T, n)
+        yref = Inti.assemble_matrix(iop) * x
+        xd = KernelAbstractions.adapt(backend, copy(x))
+        # fully on-device 5-arg mul!
+        yd = KernelAbstractions.adapt(backend, copy(y0))
+        α, β = T(2), T(-0.5)
+        mul!(yd, A, xd, α, β)
+        @test norm(Array(yd) - (α * yref + β * y0)) / norm(yref) < tol
+        # device * returns a device vector
+        yd = A * xd
+        @test KernelAbstractions.get_backend(yd) == backend
+        @test norm(Array(yd) - yref) / norm(yref) < tol
+        # mixed: device x, host y
+        y = similar(x)
+        mul!(y, A, xd)
+        @test norm(y - yref) / norm(yref) < tol
+    end
+
+    @testset "non-default tile parameters" begin
+        quad = km_quadrature(2, T)
+        n = length(quad)
+        iop = Inti.IntegralOperator(Inti.SingleLayerKernel(Inti.Laplace(; dim = 2)), quad, quad)
+        x = rand(T, n)
+        yref = Inti.assemble_matrix(iop) * x
+        for (tg, tb) in ((32, 2), (128, 1))
+            A = Inti.assemble_kernelmatrix(iop; backend, workgroupsize = tg, targets_per_lane = tb)
+            @test norm(A * x - yref) / norm(yref) < tol
+        end
+    end
+
     @testset "complex density" begin
         quad = km_quadrature(3, T)
         n = length(quad)

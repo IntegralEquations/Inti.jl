@@ -11,42 +11,49 @@ function __init__()
     return @debug "Loading Inti.jl KernelAbstractions (matrix-free) extension"
 end
 
-function _node_normal(q::AbstractVector)
-    return zero(q)
-end
-function _node_normal(q::Inti.QuadratureNode{N, T}) where {N, T}
+_node_normal(q::AbstractVector) = zero(q)
+function _node_normal(q::Inti.QuadratureNode)
     n = Inti.normal(q)
-    if isnothing(n)
-        return zero(Inti.coords(q))
-    else
-        return n
-    end
+    return isnothing(n) ? zero(Inti.coords(q)) : n
 end
+
+# Default tile shape. On an M3 Pro (Float32, N≈92k) performance is flat for
+# workgroupsize in 32…128 (degrades ≥256) and for targets_per_lane in 2…8; other
+# architectures may prefer different values, hence the keywords below.
+const KMM_TG = 64   # lanes per workgroup == sources staged per shared-memory tile
+const KMM_TB = 4    # targets owned by each lane (register blocking)
 
 """
     KernelMatrix{T} <: AbstractMatrix{T}
 
-Matrix-free representation of an [`Inti.IntegralOperator`](@ref): it applies the
+Matrix-free representation of an [`Inti.IntegralOperator`](@ref): applies the
 operator in `O(N²)` work and `O(N)` memory on a `KernelAbstractions` backend,
-without ever assembling the dense matrix. Built via
+without assembling the dense matrix. Built via
 [`Inti.assemble_kernelmatrix`](@ref). Use `mul!`/`*` for fast batched evaluation;
-scalar `getindex` is supported but slow (it copies a node back from the device).
+scalar `getindex` is supported but slow.
 """
 struct KernelMatrix{T, Op, B, VC, VW} <: AbstractMatrix{T}
-    iop::Op       # the IntegralOperator's kernel, called as K(target, source)
+    iop::Op        # the IntegralOperator's kernel, called as K(target, source)
     backend::B
-    tcoords::VC     # device Vector{SVector{N,Tc}}  (targets)
-    tnormals::VC    # device Vector{SVector{N,Tc}}  (zeros where absent)
-    scoords::VC     # device Vector{SVector{N,Tc}}  (sources)
-    snormals::VC    # device Vector{SVector{N,Tc}}
-    weights::VW     # device Vector{Tc}             (quadrature weights)
+    tcoords::VC    # device vectors of coords/normals (zero normal where absent)
+    tnormals::VC
+    scoords::VC
+    snormals::VC
+    weights::VW    # device vector of quadrature weights
+    workgroupsize::Int
+    targets_per_lane::Int
 end
 
 Inti.kernel(A::KernelMatrix) = Inti.kernel(A.iop)
 Base.size(A::KernelMatrix) = size(A.iop)
 Base.getindex(A::KernelMatrix, args...) = getindex(A.iop, args...)
 
-function KernelMatrix(iop::Inti.IntegralOperator; backend = KA.CPU())
+function KernelMatrix(
+        iop::Inti.IntegralOperator;
+        backend = KA.CPU(),
+        workgroupsize::Integer = KMM_TG,
+        targets_per_lane::Integer = KMM_TB,
+    )
     X = Inti.target(iop)
     Y = Inti.source(iop)
     T = eltype(iop)
@@ -58,135 +65,125 @@ function KernelMatrix(iop::Inti.IntegralOperator; backend = KA.CPU())
     w = KA.adapt(backend, map(Inti.weight, Y))
 
     return KernelMatrix{T, typeof(iop), typeof(backend), typeof(tc), typeof(w)}(
-        iop, backend, tc, tn, sc, sn, w,
+        iop, backend, tc, tn, sc, sn, w, workgroupsize, targets_per_lane,
     )
 end
 
 # Public entry point (method on the core stub).
-function Inti.assemble_kernelmatrix(iop::Inti.IntegralOperator; backend = KA.CPU())
-    return KernelMatrix(iop; backend)
+function Inti.assemble_kernelmatrix(iop::Inti.IntegralOperator; kwargs...)
+    return KernelMatrix(iop; kwargs...)
 end
 
-# Threadgroup size: KMM_TG work-items cooperate to stage a tile of KMM_TG sources into
-# on-chip shared memory before reading them back from there. Each work-item owns KMM_TB
-# targets ("register blocking"): every staged source is reused KMM_TB times from
-# registers, which both amortizes the shared-memory reads and gives the scheduler
-# independent arithmetic to hide the rsqrt latency. Empirically (M3 Pro, Float32,
-# N≈92k): Laplace DL 121→159 Gpairs/s, Stokes DL 69→75; performance is flat for
-# KMM_TG in 32…128 and degrades ≥256, and flat for KMM_TB in 2…8 — so the values
-# below are not worth exposing as user-facing knobs.
-const KMM_TG = 64
-const KMM_TB = 4
-
-# Single matrix-free matvec kernel, portable across the KA CPU and GPU backends.
-#
-# Portability note: on the CPU backend KA emulates each `@synchronize` by splitting the
-# kernel into regions and looping over work-items per region; only kernel arguments,
-# `@index`, `@uniform` and `@localmem`/`@private` storage survive across a barrier
-# (plain locals do not). Hence `m`/`n` are `@uniform` and the accumulators and
-# per-thread target data live in `@private` storage. On the GPU none of this matters
-# (registers persist across barriers); the annotations are free.
+# Tiled matvec, portable across the KA CPU and GPU backends. Each workgroup of TG
+# lanes cooperatively stages TG sources into shared memory; each lane owns TB targets
+# and reuses every staged source TB times from registers, which amortizes the
+# shared-memory reads and hides the rsqrt latency. On the CPU backend only
+# `@uniform`/`@private`/`@localmem` storage survives a `@synchronize` barrier, hence
+# the annotations (free on the GPU).
 @kernel function _kmm_mul!(
-        y, @Const(wx), K,
+        y, @Const(wx), β, K,
         @Const(tc), @Const(tn), @Const(sc), @Const(sn),
-    )
-    gi = @index(Group)         # my threadgroup
-    il = @index(Local)         # my lane within the threadgroup, 1 … KMM_TG
+        ::Val{TG}, ::Val{TB},
+    ) where {TG, TB}
+    gi = @index(Group)
+    il = @index(Local)
     @uniform m = length(y)
     @uniform n = length(wx)
 
-    # Shared-memory tile: filled cooperatively (one slot per lane), read by everyone.
-    lsc = @localmem eltype(sc) (KMM_TG,)   # source coords
-    lsn = @localmem eltype(sn) (KMM_TG,)   # source normals
-    lwx = @localmem eltype(wx) (KMM_TG,)   # weighted density (weights already folded in)
+    lsc = @localmem eltype(sc) (TG,)
+    lsn = @localmem eltype(sn) (TG,)
+    lwx = @localmem eltype(wx) (TG,)
 
-    # This thread's KMM_TB targets: group gi covers targets (gi-1)*KMM_TB*KMM_TG+1 …
-    # gi*KMM_TB*KMM_TG, in KMM_TB lane-contiguous (coalesced) sub-blocks of KMM_TG.
-    # `min(i, m)` clamps out-of-range slots to a valid target; their result is
-    # computed but never written back (guard at the end).
-    acc = @private eltype(y) (KMM_TB,)     # accumulators (persist across barriers)
-    tci = @private eltype(tc) (KMM_TB,)    # target coords
-    tni = @private eltype(tn) (KMM_TB,)    # target normals
-    @inbounds for b in 1:KMM_TB
+    # Lane il of group gi owns TB lane-contiguous (coalesced) sub-blocks of targets;
+    # out-of-range slots are clamped to a valid target and masked on write-back.
+    acc = @private eltype(y) (TB,)
+    tci = @private eltype(tc) (TB,)
+    tni = @private eltype(tn) (TB,)
+    @inbounds for b in 1:TB
         acc[b] = zero(eltype(y))
-        i = (gi - 1) * KMM_TB * KMM_TG + (b - 1) * KMM_TG + il
+        i = (gi - 1) * TB * TG + (b - 1) * TG + il
         tci[b] = tc[min(i, m)]
         tni[b] = tn[min(i, m)]
     end
-    @inbounds for tile in 0:KMM_TG:(n - 1)
-        j = tile + il                      # this lane stages source j
+    @inbounds for tile in 0:TG:(n - 1)
+        j = tile + il
         ok = j ≤ n
-        # Out-of-range slots get a zero source with zero weight -> contribute 0
-        # (K is finite, so 0 * K = 0). Every lane participates, so the barrier holds.
+        # Out-of-range slots stage a zero source with zero weight (contributes 0),
+        # so every lane participates and the barrier holds.
         lsc[il] = ok ? sc[j] : zero(eltype(sc))
         lsn[il] = ok ? sn[j] : zero(eltype(sn))
         lwx[il] = ok ? wx[j] : zero(eltype(wx))
-        @synchronize                       # tile fully staged before anyone reads
-        for k in 1:KMM_TG
+        @synchronize
+        for k in 1:TG
             sj = (coords = lsc[k], normal = lsn[k])
-            for b in 1:KMM_TB
+            for b in 1:TB
                 ti = (coords = tci[b], normal = tni[b])
-                # `apply_kernel_unscaled(K, ti, sj, v)` == `K(ti, sj) * v` up to the
-                # constant `kernel_prefactor(K)`, which `mul!` folds into `wx` on the
-                # host. For matrix-valued kernels with low-rank structure (Stokes,
-                # Elastostatic) it computes the action directly, never assembling the
-                # per-pair matrix; kernels without a specialization fall back to
-                # forming the kernel value and multiplying.
+                # == K(ti, sj) * lwx[k] up to the constant kernel_prefactor(K), which
+                # mul! folds into wx; low-rank matrix-valued kernels (Stokes, ...)
+                # compute the action without forming the per-pair matrix.
                 acc[b] += Inti.apply_kernel_unscaled(K, ti, sj, lwx[k])
             end
         end
-        @synchronize                       # all done reading before next overwrite
+        @synchronize
     end
-    @inbounds for b in 1:KMM_TB
-        i = (gi - 1) * KMM_TB * KMM_TG + (b - 1) * KMM_TG + il
-        i ≤ m && (y[i] = acc[b])           # masked write-back
+    # y = acc + β·y; when β == 0, y must not be read (it may be uninitialized).
+    @inbounds for b in 1:TB
+        i = (gi - 1) * TB * TG + (b - 1) * TG + il
+        i ≤ m && (y[i] = iszero(β) ? acc[b] : acc[b] + β * y[i])
     end
 end
 
-function LinearAlgebra.mul!(y::AbstractVector, A::KernelMatrix, x::AbstractVector)
+# Move a host vector to the device; device-resident input is used as-is. Host
+# wrappers (views, reinterpreted vectors) are materialized first: adapting one would
+# upload its whole parent, or fail outright on some backends.
+function _on_device(backend, v)
+    KA.get_backend(v) == backend && return v
+    return KA.adapt(backend, v isa Array ? v : Array(v))
+end
+
+# Convert a scalar to the device's real precision, so that e.g. a Float64 α does not
+# promote a Float32 device computation (which some backends reject outright).
+_to_precision(::Type{T}, a::Complex) where {T} = convert(Complex{T}, a)
+_to_precision(::Type{T}, a::Number) where {T} = convert(T, a)
+
+# Primary implementation: y = α·A·x + β·y, with x and y each living on the host or
+# on A's backend; device-resident vectors are used in place, so passing both runs
+# entirely on the device. The 3-arg mul! comes from LinearAlgebra's generic fallback.
+function LinearAlgebra.mul!(
+        y::AbstractVector, A::KernelMatrix, x::AbstractVector, α::Number, β::Number,
+    )
     m, n = size(A)
     length(x) == n || throw(DimensionMismatch("x has length $(length(x)), expected $(n)"))
     length(y) == m || throw(DimensionMismatch("y has length $(length(y)), expected $(m)"))
     backend = A.backend
     K = Inti.kernel(A)
-    # Device density: quadrature weights and the constant kernel prefactor are folded
-    # in once here, so the O(N²) loop runs the unscaled action only. The prefactor is
-    # converted to the weight precision (it may be an exact Float64 like 1/4π).
-    c = convert(eltype(A.weights), Inti.kernel_prefactor(K))
-    # Materialize views/reinterpreted vectors (e.g. the column slices `bdim_correction`
-    # passes for vector-valued problems) before the device transfer: adapting a wrapper
-    # would upload its whole parent, or fail outright on some backends.
-    xh = x isa Array ? x : Array(x)
-    wx = c .* A.weights .* KA.adapt(backend, xh)
+    # Fold α, the quadrature weights, and the constant kernel prefactor into the
+    # density once, so the O(N²) loop runs the unscaled action only.
+    Tw = eltype(A.weights)
+    c = _to_precision(Tw, Inti.kernel_prefactor(K)) * _to_precision(Tw, α)
+    wx = c .* A.weights .* _on_device(backend, x)
     R = Base.promote_op(*, eltype(A), eltype(wx))     # SVector for Stokes, scalar for Laplace
-    ydev = KA.zeros(backend, R, m)
-    # Fixed workgroupsize KMM_TG (matches the @localmem tile); each group handles
-    # KMM_TB*KMM_TG targets. ndrange is padded to a whole number of groups so KA
-    # launches no partial group whose extra lanes would skip the @synchronize barrier
-    # (-> deadlock).
-    _kmm_mul!(backend, KMM_TG)(
-        ydev, wx, K, A.tcoords, A.tnormals, A.scoords, A.snormals;
-        ndrange = cld(m, KMM_TB * KMM_TG) * KMM_TG,
+    ondevice = KA.get_backend(y) == backend
+    ydev = ondevice ? y : KA.allocate(backend, R, m)  # scratch is fully overwritten
+    β′ = ondevice ? _to_precision(Tw, β) : zero(Tw)
+    tg, tb = A.workgroupsize, A.targets_per_lane
+    # ndrange is padded to whole workgroups: a partial group would skip the
+    # @synchronize barrier on some lanes (-> deadlock).
+    _kmm_mul!(backend, tg)(
+        ydev, wx, β′, K, A.tcoords, A.tnormals, A.scoords, A.snormals, Val(tg), Val(tb);
+        ndrange = cld(m, tb * tg) * tg,
     )
     KA.synchronize(backend)
-    copyto!(y, ydev)
+    if !ondevice
+        Axh = copyto!(Vector{R}(undef, m), ydev)
+        iszero(β) ? (y .= Axh) : (@. y = Axh + β * y)
+    end
     return y
 end
 
-# 5-arg mul! (y = α·A·x + β·y) — used by Krylov solvers.
-function LinearAlgebra.mul!(
-        y::AbstractVector, A::KernelMatrix, x::AbstractVector, α::Number, β::Number,
-    )
-    tmp = A * x
-    @. y = α * tmp + β * y
-    return y
-end
-
-# Matrix right-hand sides (e.g. the monopole traces in `bdim_correction`): apply the
-# device matvec column by column. Without this method, `mul!` with a matrix falls back
-# to LinearAlgebra's generic matmul, which evaluates the operator entry by entry on the
-# host through `getindex` — O(m·n) kernel evaluations per column, never touching the
-# device.
+# Matrix right-hand sides: apply the device matvec column by column. Without this,
+# LinearAlgebra's generic fallback would evaluate the operator entry by entry on the
+# host through getindex.
 function LinearAlgebra.mul!(
         Y::AbstractMatrix, A::KernelMatrix, X::AbstractMatrix, α::Number, β::Number,
     )
