@@ -43,6 +43,8 @@ end
 
 @safetestset "HMatrices extension" include("hmatrices_test.jl")
 
+@safetestset "KernelMatrix extension" include("kernelmatrix_test.jl")
+
 @safetestset "FMM2D extension" include("fmm2d_test.jl")
 
 @safetestset "FMM3D extension" include("fmm3d_test.jl")

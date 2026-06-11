@@ -169,6 +169,32 @@ function assemble_hmatrix(args...; kwargs...)
 end
 
 """
+    assemble_kernelmatrix(iop::IntegralOperator; backend = KernelAbstractions.CPU())
+
+Return a matrix-free `AbstractMatrix` that applies the [`IntegralOperator`](@ref)
+`iop` without ever assembling the dense matrix. The matrix-vector product is
+computed in `O(N²)` work but `O(N)` memory through `KernelAbstractions`, and runs on
+the device selected by `backend` (defaults to the CPU; pass e.g.
+`Metal.MetalBackend()` after `using Metal`, or `CUDABackend()` after `using CUDA`, to
+run on a GPU).
+
+The result is mathematically equivalent to `assemble_matrix(iop)` followed by a
+matrix-vector product (up to floating-point reduction order).
+
+
+!!! note
+    This function lives in the `IntiKernelMatrixExt` extension; load it with `using
+    KernelAbstractions` (plus e.g. `using Metal`/`using CUDA` for a GPU backend).
+"""
+function assemble_kernelmatrix(args...; kwargs...)
+    return error(
+        "Inti.assemble_kernelmatrix not found. Did you forget to import KernelAbstractions
+        and compatible backend such as CUDA or Metal?",
+    )
+end
+
+
+"""
     _green_multiplier(x, quad)
 
 Helper function to help determine the constant σ in the Green identity S\\[γ₁u\\](x)
