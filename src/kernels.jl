@@ -639,7 +639,78 @@ function apply_kernel(
     return d2 ≤ tol * tol ? zero(out) : out
 end
 
-# TODO: Stokes hypersingular kernel
+function (HS::HyperSingularKernel{<:Stokes{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N}
+    μ = HS.op.μ
+    nx = normal(target)
+    ny = normal(source)
+    d2 = dot(r, r)
+    tol = oftype(d2, SAME_POINT_TOLERANCE)
+    invd = @fastmath one(d2) / sqrt(d2)
+    id2 = invd * invd
+    rdnx = dot(r, nx)
+    rdny = dot(r, ny)
+    nxdny = dot(nx, ny)
+    # Stokes is the incompressible limit (ν = 1/2) of the Elastostatic operator; the
+    # hypersingular kernel below is the Elastostatic one specialized to ν = 1/2 (the
+    # (1 - 2ν) terms vanish and 1/(1 - ν) stays finite). The value is assembled as
+    # c * (r⊗vr + nx⊗vnx + ny⊗vny + a_diag*I).
+    if N == 2
+        c = μ * id2 / π                                  # μ/(π d²)
+        α = 2 * rdny * id2
+        vr = (-4α * rdnx + nxdny) * id2 * r + α * nx / 2
+        vnx = ny
+        vny = rdnx * id2 * r
+        a_diag = α * rdnx / 2
+    elseif N == 3
+        c = μ * id2 * invd / 2 / π                       # μ/(2π d³)
+        α = 3 * rdny * id2
+        vr = (-5α * rdnx + 3 * nxdny / 2) * id2 * r + α * nx / 2
+        vnx = ny
+        vny = 3 * rdnx * id2 * r / 2
+        a_diag = α * rdnx / 2
+    else
+        notimplemented()
+    end
+    v = c * (r * transpose(vr) + nx * transpose(vnx) + ny * transpose(vny) + a_diag * I)
+    return d2 ≤ tol * tol ? zero(v) : v
+end
+
+function apply_kernel(HS::HyperSingularKernel{<:Stokes{N}}, target, source, v) where {N}
+    μ = HS.op.μ
+    nx = normal(target)
+    ny = normal(source)
+    r = coords(target) - coords(source)
+    d2 = dot(r, r)
+    tol = oftype(d2, SAME_POINT_TOLERANCE)
+    invd = @fastmath one(d2) / sqrt(d2)
+    id2 = invd * invd
+    rdnx = dot(r, nx)
+    rdny = dot(r, ny)
+    nxdny = dot(nx, ny)
+    if N == 2
+        c = μ * id2 / π
+        α = 2 * rdny * id2
+        vr = (-4α * rdnx + nxdny) * id2 * r + α * nx / 2
+        vnx = ny
+        vny = rdnx * id2 * r
+        a_diag = α * rdnx / 2
+    elseif N == 3
+        c = μ * id2 * invd / 2 / π
+        α = 3 * rdny * id2
+        vr = (-5α * rdnx + 3 * nxdny / 2) * id2 * r + α * nx / 2
+        vnx = ny
+        vny = 3 * rdnx * id2 * r / 2
+        a_diag = α * rdnx / 2
+    else
+        notimplemented()
+    end
+    out = c * (dot(vr, v) * r + dot(vnx, v) * nx + dot(vny, v) * ny + a_diag * v)
+    return d2 ≤ tol * tol ? zero(out) : out
+end
 
 ################################################################################
 ################################# Elastostatic #################################

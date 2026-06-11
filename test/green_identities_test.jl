@@ -104,10 +104,6 @@ for correction in corrections
                             @test norm(e1, Inf) < rtol1
                         end
                         # adjoint double-layer and hypersingular.
-                        if op isa Inti.Stokes
-                            # skip cases where hypersingular has not been implemented
-                            continue
-                        end
                         Kop = Inti.IntegralOperator(Inti.AdjointDoubleLayerKernel(op), quad)
                         Kmat = Inti.assemble_matrix(Kop)
                         Hop = Inti.IntegralOperator(Inti.HyperSingularKernel(op), quad)
