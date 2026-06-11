@@ -162,13 +162,14 @@ end
 end
 
 """
-    Quadrature(Ω::Domain; meshsize, qorder)
+    Quadrature(Ω::Domain; meshsize, qorder[, T = Float64])
 
-Construct a `Quadrature` over the domain `Ω` with a mesh of size `meshsize` and
-quadrature order `qorder`.
+Construct a `Quadrature` over the domain `Ω` with a mesh of size `meshsize` and quadrature
+order `qorder`. The type parameter `T` controls the underlying data type; pass `T = Float32`
+for single-precision.
 """
-function Quadrature(Ω::Domain; meshsize, qorder)
-    msh = meshgen(Ω; meshsize)
+function Quadrature(Ω::Domain; meshsize, qorder, T = Float64)
+    msh = meshgen(Ω; meshsize, T)
     Q = Quadrature(view(msh, Ω); qorder)
     return Q
 end
