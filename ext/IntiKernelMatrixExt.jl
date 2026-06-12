@@ -17,6 +17,33 @@ function _node_normal(q::Inti.QuadratureNode)
     return isnothing(n) ? zero(Inti.coords(q)) : n
 end
 
+# Cast a single geometric value (scalar weight or SVector coord) to scalar float type T.
+_cast(::Type{T}, v::Real) where {T<:AbstractFloat} = T(v)
+_cast(::Type{T}, v::Complex) where {T<:AbstractFloat} = Complex{T}(v)
+_cast(::Type{T}, v) where {T<:AbstractFloat} = T.(v)  # SVector and similar containers
+
+# Convert a vector's elements to scalar float type T; no-op when precision already matches.
+function _cast_to_precision(::Type{T}, x::AbstractVector) where {T<:AbstractFloat}
+    ET = eltype(x)
+    ET <: Real    && ET == T          && return x
+    ET <: Complex && real(ET) == T    && return x
+    # StaticArray or similar container: check inner scalar type
+    if !(ET <: Number)
+        IET = eltype(ET)
+        (IET <: Real && IET == T || IET <: Complex && real(IET) == T) && return x
+    end
+    return map(v -> _cast(T, v), x)
+end
+
+# True when the KA backend is Metal (detected by name to avoid a hard Metal dependency).
+_is_metal(backend) = occursin("Metal", string(typeof(backend)))
+
+# Return the matrix element type with Float64 replaced by Float32 (for Metal downcast).
+# Handles scalars (Float64 → Float32), complex, and static matrices (SMatrix{N,N,Float64} → SMatrix{N,N,Float32}).
+_to_f32(::Type{T}) where {T<:AbstractFloat} = Float32
+_to_f32(::Type{Complex{T}}) where {T<:AbstractFloat} = Complex{Float32}
+_to_f32(::Type{T}) where {T} = StaticArrays.similar_type(T, Float32)
+
 # Default tile shape. On an M3 Pro (Float32, N≈92k) performance is flat for
 # workgroupsize in 32…128 (degrades ≥256) and for targets_per_lane in 2…8; other
 # architectures may prefer different values, hence the keywords below.
@@ -56,13 +83,20 @@ function KernelMatrix(
     )
     X = Inti.target(iop)
     Y = Inti.source(iop)
-    T = eltype(iop)
+    T  = eltype(iop)       # matrix element type (e.g. Float64, SMatrix{3,3,Float64,9})
+    Tf = eltype(T)         # scalar float type (e.g. Float64 for both Laplace and Stokes)
 
-    tc = KA.adapt(backend, map(Inti.coords, X))
-    tn = KA.adapt(backend, map(_node_normal, X))
-    sc = KA.adapt(backend, map(Inti.coords, Y))
-    sn = KA.adapt(backend, map(_node_normal, Y))
-    w = KA.adapt(backend, map(Inti.weight, Y))
+    if Tf == Float64 && _is_metal(backend)
+        @warn "Metal backend does not support Float64; downcast to Float32." maxlog = 1
+        T  = _to_f32(T)
+        Tf = Float32
+    end
+
+    tc = KA.adapt(backend, map(x -> _cast(Tf, Inti.coords(x)), X))
+    tn = KA.adapt(backend, map(x -> _cast(Tf, _node_normal(x)), X))
+    sc = KA.adapt(backend, map(x -> _cast(Tf, Inti.coords(x)), Y))
+    sn = KA.adapt(backend, map(x -> _cast(Tf, _node_normal(x)), Y))
+    w  = KA.adapt(backend, map(x -> _cast(Tf, Inti.weight(x)), Y))
 
     return KernelMatrix{T, typeof(iop), typeof(backend), typeof(tc), typeof(w)}(
         iop, backend, tc, tn, sc, sn, w, workgroupsize, targets_per_lane,
@@ -161,7 +195,9 @@ function LinearAlgebra.mul!(
     # density once, so the O(N²) loop runs the unscaled action only.
     Tw = eltype(A.weights)
     c = _to_precision(Tw, Inti.kernel_prefactor(K)) * _to_precision(Tw, α)
-    wx = c .* A.weights .* _on_device(backend, x)
+    # Cast x to the device's scalar precision so that Float64 inputs work with a
+    # Float32 KernelMatrix (e.g. on Metal, which does not support Float64).
+    wx = c .* A.weights .* _on_device(backend, _cast_to_precision(Tw, x))
     R = Base.promote_op(*, eltype(A), eltype(wx))     # SVector for Stokes, scalar for Laplace
     ondevice = KA.get_backend(y) == backend
     ydev = ondevice ? y : KA.allocate(backend, R, m)  # scratch is fully overwritten
