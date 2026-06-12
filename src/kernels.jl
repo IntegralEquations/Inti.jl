@@ -380,6 +380,9 @@ end
 default_kernel_eltype(::Yukawa) = Float64
 default_density_eltype(::Yukawa) = Float64
 
+# same precision-preserving wrapper as `hankelh1`
+besselk(n, x::T) where {T <: Real} = float(T)(Bessels.besselk(n, x))
+
 function (SL::SingleLayerKernel{<:Yukawa{N, K}})(target, source) where {N, K}
     λ = SL.op.λ
     r = coords(target) - coords(source)
@@ -387,7 +390,7 @@ function (SL::SingleLayerKernel{<:Yukawa{N, K}})(target, source) where {N, K}
     tol = oftype(d2, SAME_POINT_TOLERANCE)
     if N == 2
         d = sqrt(d2)
-        v = Bessels.besselk(0, λ * d) / 2 / π
+        v = besselk(0, λ * d) / 2 / π
     elseif N == 3
         invd = @fastmath one(d2) / sqrt(d2)
         d = d2 * invd
@@ -407,7 +410,7 @@ function (DL::DoubleLayerKernel{<:Yukawa{N, K}})(target, source) where {N, K}
     rdny = dot(r, ny)
     if N == 2
         d = sqrt(d2)
-        v = λ * Bessels.besselk(1, λ * d) * rdny / d / 2 / π
+        v = λ * besselk(1, λ * d) * rdny / d / 2 / π
     elseif N == 3
         invd = @fastmath one(d2) / sqrt(d2)
         d = d2 * invd
@@ -428,7 +431,7 @@ function (ADL::AdjointDoubleLayerKernel{<:Yukawa{N, K}})(target, source) where {
     rdnx = dot(r, nx)
     if N == 2
         d = sqrt(d2)
-        v = -λ * Bessels.besselk(1, λ * d) * rdnx / d / 2 / π
+        v = -λ * besselk(1, λ * d) * rdnx / d / 2 / π
     elseif N == 3
         invd = @fastmath one(d2) / sqrt(d2)
         d = d2 * invd
@@ -452,10 +455,11 @@ function (HS::HyperSingularKernel{<:Yukawa{N, K}})(target, source) where {N, K}
     nxdny = dot(nx, ny)
     if N == 2
         d = sqrt(d2)
-        k1 = Bessels.besselk(1, λ * d)
-        k2 = Bessels.besselk(2, λ * d)
-        a = -λ^2 / (2π * d^2) * k2
-        b = λ / (2π * d) * k1
+        k1 = besselk(1, λ * d)
+        k2 = besselk(2, λ * d)
+        # avoid `2π`: it is a Float64 and would promote single-precision inputs
+        a = -λ^2 / (2 * d2) / π * k2
+        b = λ / (2 * d) / π * k1
         v = a * rdnx * rdny + b * nxdny
     elseif N == 3
         @fastmath begin
@@ -511,7 +515,9 @@ end
 default_kernel_eltype(::Helmholtz) = ComplexF64
 default_density_eltype(::Helmholtz) = ComplexF64
 
-hankelh1(n, x::Real) = Bessels.hankelh1(n, x)
+# Bessels.jl evaluates some order/argument ranges in Float64, so convert back to the
+# input precision to keep kernel evaluations type-stable
+hankelh1(n, x::T) where {T <: Real} = Complex{float(T)}(Bessels.hankelh1(n, x))
 hankelh1(n, x::Complex) = SpecialFunctions.hankelh1(n, x)
 
 function (SL::SingleLayerKernel{<:Helmholtz{N}})(target, source) where {N}
@@ -521,7 +527,8 @@ function (SL::SingleLayerKernel{<:Helmholtz{N}})(target, source) where {N}
     tol = oftype(d2, SAME_POINT_TOLERANCE)
     if N == 2
         d = sqrt(d2)
-        v = im / 4 * hankelh1(0, k * d)
+        # leading with `im / 4` (a ComplexF64) would promote single-precision inputs
+        v = im * hankelh1(0, k * d) / 4
         return d2 ≤ tol * tol ? zero(v) : v
     elseif N == 3
         invd = @fastmath one(d2) / sqrt(d2)

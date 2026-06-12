@@ -61,10 +61,7 @@ function bdim_correction(
     )
     imat_cond = imat_norm = res_norm = rhs_norm = theta_norm = -Inf
     T = eltype(Sop)
-    # convert to the working precision (green_multiplier is e.g. a Float64 -1/2 even
-    # when the computation is carried out in Float32)
     green_multiplier = convert(Vector{real(eltype(T))}, green_multiplier)
-    # determine type for dense matrices
     Dense = T <: SMatrix ? BlockArray : Array
     N = ambient_dimension(source)
     @assert eltype(Dop) == T "eltype of S and D must match"
@@ -78,22 +75,14 @@ function bdim_correction(
         num_trgs = filter_target_params.num_trgs
         glob_loc_near_trgs = filter_target_params.glob_loc_near_trgs
     end
-    # find first an appropriate set of source points to center the monopoles. The
-    # `max(qmax, 2)` floor matters for low-order rules: with one node per element
-    # (e.g. `qorder = 1` on triangles) the unfloored heuristic gives only 3 sources,
-    # for which the per-element interpolation system is numerically rank-deficient
-    # for vector-valued operators (verified for Stokes: cond ~ 1e16 with 3 sources,
-    # ~ 1e1 with 6), producing meaningless corrections.
-    qmax = sum(size(mat, 1) for mat in values(source.etype2qtags)) # max number of qnodes per el
+    # find an appropriate set of source points to center the monopoles
+    qmax = sum(size(mat, 1) for mat in values(source.etype2qtags))
     ns = ceil(Int, parameters.sources_oversample_factor * max(qmax, 2))
-    # compute a bounding box for source points
     low_corner = reduce((p, q) -> min.(coords(p), coords(q)), source)
     high_corner = reduce((p, q) -> max.(coords(p), coords(q)), source)
     xc = (low_corner + high_corner) / 2
     R = parameters.sources_radius_multiplier * norm(high_corner - low_corner) / 2
-    # generate the monopole sources in the working precision of the quadrature so the
-    # kernel evaluations below do not silently promote (e.g. for Float32 computations)
-    Tc = eltype(xc)
+    Tc = eltype(xc) # working precision
     xs = if N === 2
         uniform_points_circle(Tc, ns, R, xc)
     elseif N === 3
@@ -101,7 +90,6 @@ function bdim_correction(
     else
         error("only 2D and 3D supported")
     end
-    # compute traces of monopoles on the source mesh
     G = SingleLayerKernel(op)
     γ₁G = AdjointDoubleLayerKernel(op)
     γ₀B = Dense{T}(undef, length(source), ns)
@@ -112,11 +100,9 @@ function bdim_correction(
             γ₁B[j, k] = γ₁G(source[j], xs[k])
         end
     end
-    # integrate the monopoles/dipoles over Y with target on X. This is the
-    # slowest step, and passing a custom S,D can accelerate this computation.
+    # compute Θ ← μ*B + S*γ₁B - D*γ₀B using in-place matvecs
     Θ = Dense{T}(undef, m, ns)
     fill!(Θ, zero(T))
-    # Compute Θ <-- S * γ₁B - D * γ₀B + μ * B(x) usig in-place matvec
     for k in 1:ns
         for i in 1:length(target)
             μ = green_multiplier[i]
@@ -128,8 +114,7 @@ function bdim_correction(
         mul!(Θ, Sop, γ₁B, 1, 1)
         mul!(Θ, Dop, γ₀B, -1, 1)
     else
-        # for vector value problems, we only assume that Sop and Dop can be multiplied by
-        # Vectors of SVectors, and so we need to perform multiplication column by column
+        # column-by-column multiplication for vector-valued problems
         P, Q = size(T)
         S = eltype(T)
         Θ_data = parent(Θ)
@@ -144,48 +129,32 @@ function bdim_correction(
         end
     end
 
-    # finally compute the corrected weights as sparse matrices
     Is, Js, Ss, Ds = Int[], Int[], T[], T[]
     for (E, qtags) in source.etype2qtags
         near_list = dict_near[E]
         nq, ne = size(qtags)
         @assert length(near_list) == ne
-        # preallocate a local matrix to store interpolant values resulting
-        # weights. To benefit from Lapack, we must convert everything to
-        # matrices of scalars, so when `T` is an `SMatrix` we are careful to
-        # convert between the `Matrix{<:SMatrix}` and `Matrix{<:Number}` formats
-        # by viewing the elements of type `T` as `σ × σ` matrices of
-        # `eltype(T)`.
+        # for each element, solve Mᵀ W = Θᵢᵀ for the correction weights W. Lapack
+        # operates on the scalar `parent` of the (possibly block) matrices.
         M = Dense{T}(undef, 2 * nq, ns)
         W = Dense{T}(undef, 2 * nq, 1)
         Θi = Dense{T}(undef, 1, ns)
         Mdata, Wdata, Θidata = parent(M)::Matrix, parent(W)::Matrix, parent(Θi)::Matrix
-        # buffer for the explicit transpose of Mdata (the pivoted LAPACK QR below
-        # requires a plain strided matrix, not a lazy `transpose` wrapper)
         Mtdata = Matrix{eltype(Mdata)}(undef, size(Mdata, 2), size(Mdata, 1))
-        # for each element, we will solve Mᵀ W = Θiᵀ, where W is a vector of
-        # size 2nq, and Θi is a row vector of length(ns)
         for n in 1:ne
-            # if there is nothing near, skip immediately to next element
             isempty(near_list[n]) && continue
-            # copy the monopoles/dipoles for the current element
             jglob = @view qtags[:, n]
             M[1:nq, :] .= γ₀B[jglob, :]
             M[(nq + 1):2nq, :] .= γ₁B[jglob, :]
-            # TODO: get ride of all this transposing mumble jumble by assembling
-            # the matrix in the correct orientation in the first place
-            # NOTE: column pivoting localizes a possible numerical rank deficiency at
-            # the last diagonal entry of R, which we check to catch ill-posed
-            # interpolation systems instead of silently producing huge weights.
             permutedims!(Mtdata, Mdata, (2, 1))
-            F = qr!(Mtdata, ColumnNorm())
-            nr = size(Mtdata, 2)
-            rd = abs(F.factors[nr, nr]) / abs(F.factors[1, 1])
-            if rd < eps(real(eltype(Mdata)))^(2 // 3)
-                @warn """the interpolation matrix of `bdim_correction` is numerically
-                rank-deficient (σmin/σmax ≈ $rd): the correction is likely inaccurate.
-                Consider increasing `sources_oversample_factor` and/or the working
-                precision.""" maxlog = 1
+            F = svd!(Mtdata)
+            # `ldiv!` below truncates singular values under eps*σmax (pseudo-inverse);
+            # warn if that regularization kicks in
+            rd = F.S[end] / F.S[1]
+            if rd < eps(real(eltype(Mdata)))
+                @warn "rank-deficient interpolation matrix in `bdim_correction` \
+                (σmin/σmax ≈ $rd): correction may be inaccurate. Consider increasing \
+                `sources_oversample_factor` and/or the working precision." maxlog = 1
             end
             @debug (imat_cond = max(cond(Mdata), imat_cond)) maxlog = 0
             @debug (imat_norm = max(norm(Mdata), imat_norm)) maxlog = 0
@@ -201,10 +170,9 @@ function bdim_correction(
                 for k in 1:nq
                     push!(Is, i)
                     push!(Js, jglob[k])
-                    # Since we actually computed the tranpose of the weights, we
-                    # need to transpose it again. This matters for e.g. elasticity
-                    push!(Ss, -transpose(W[nq + k])) # single layer corresponds to α=0,β=-1
-                    push!(Ds, transpose(W[k]))     # double layer corresponds to α=1,β=0
+                    # the transpose matters for matrix-valued kernels
+                    push!(Ss, -transpose(W[nq + k]))
+                    push!(Ds, transpose(W[k]))
                 end
             end
         end
