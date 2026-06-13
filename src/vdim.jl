@@ -271,8 +271,8 @@ function local_vdim_correction(
                     need_layer_corr
                 )
             else
-            # NB Laplace low-frequency is supported, but is disabled as it is
-            # unnecessary; we keep it only for diagnostics
+                # NB Laplace low-frequency is supported, but is disabled as it is
+                # unnecessary; we keep it only for diagnostics
                 lowfreq = false
                 Yvol, Ybdry, need_layer_corr, els_idxs = _local_vdim_construct_local_quadratures(
                     N,
@@ -325,12 +325,15 @@ function local_vdim_correction(
                 # slower than the high-frequency code path), but it makes the
                 # low frequency code much, much, more readable so that indeed
                 # the formulas one derives for V[p_β] are precisely what one
-                # codes.  This sacrifice is judged by me (tga) to be acceptable
-                # because this code path will only run for strongly
-                # sub-wavelength features and is essentially a safety valve so
-                # that we can claim the method is stable; most elements will not
-                # follow the `lowfreq` path.  But, if it ever becomes relevant;
-                # note that this can be significantly optimized.
+                # codes; there are subtle dangers if one takes the more direct
+                # path, including the need to account for G(x,x) = 0 in both the
+                # direct and FMM evaluation of the kernels.  This sacrifice is
+                # judged by me (tga) to be acceptable because this code path
+                # will only run for strongly sub-wavelength features and is
+                # essentially a safety valve so that we can claim the method is
+                # stable; most elements will not follow the `lowfreq` path.
+                # But, if it ever becomes relevant; note that this can be
+                # significantly optimized.
                 Gker = SingleLayerKernel(op)
                 ntarg = length(near_list[n])
                 Rq = zeros(eltype(R), ntarg, num_basis)

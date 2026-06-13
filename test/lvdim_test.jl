@@ -14,7 +14,7 @@ using Plots
 
 #meshsize = 0.001/8
 #meshsize = 0.125/8
-meshsize = 0.125/2
+meshsize = 0.125 / 2
 interpolation_order = 2
 VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(4)
 #VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
@@ -105,11 +105,11 @@ import ElementaryPDESolutions: Polynomial
 
 k0 = 1.1
 θ = (cos(π / 3), sin(π / 3))
-u  = (x) -> exp(im * k0 * dot(x, θ))
-du = (x,n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
+u = (x) -> exp(im * k0 * dot(x, θ))
+du = (x, n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
 #u = (x) -> cos(k0 * dot(x, θ))
 #du = (x, n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
-f = (x) -> -1*(k^2 - k0^2) * u(x)
+f = (x) -> -1 * (k^2 - k0^2) * u(x)
 
 #I = (2, 0)
 # `L` must match the major semi-axis passed to `gmsh_disk` so that f = (x/L)²
