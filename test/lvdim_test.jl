@@ -14,9 +14,10 @@ using Plots
 
 #meshsize = 0.001/8
 #meshsize = 0.125/8
-meshsize = 0.125
+meshsize = 0.125/2
 interpolation_order = 2
-VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
+VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(4)
+#VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
 bdry_qorder = 2 * VR_qorder
 
 function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
@@ -37,8 +38,8 @@ function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
 end
 
 name = joinpath(@__DIR__, "disk.msh")
-gmsh_disk(; meshsize, order = 2, name, paxis = (2, 1))
-#gmsh_disk(; meshsize, order = 2, name, paxis = (meshsize * 20, meshsize * 10))
+gmsh_disk(; meshsize, order = 1, name, paxis = (1, 1))
+#gmsh_disk(; meshsize, order = 1, name, paxis = (meshsize * 20, meshsize * 10))
 
 Inti.clear_entities!() # empty the entity cache
 msh = Inti.import_mesh(name; dim = 2)
@@ -62,7 +63,8 @@ tquad = @elapsed begin
 end
 @info "Quadrature generation time: $tquad"
 
-k = 0
+#k = 0.1 / meshsize
+k = 1.0
 op = k == 0 ? Inti.Laplace(; dim = 2) : Inti.Helmholtz(; dim = 2, k)
 
 ## Boundary operators
@@ -103,34 +105,38 @@ import ElementaryPDESolutions: Polynomial
 
 k0 = 1.1
 θ = (cos(π / 3), sin(π / 3))
-#u  = (x) -> exp(im * k0 * dot(x, θ))
-#du = (x,n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
+u  = (x) -> exp(im * k0 * dot(x, θ))
+du = (x,n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
 #u = (x) -> cos(k0 * dot(x, θ))
 #du = (x, n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
-#f = (x) -> (k^2 - k0^2) * u(x)
+f = (x) -> -1*(k^2 - k0^2) * u(x)
 
-I = (2, 0)
-f = Polynomial(I => one(Float64))
-u = convert_coefs(ElementaryPDESolutions.solve_laplace(-f), Float64)
-gradu = ElementaryPDESolutions.gradient(u)
+#I = (2, 0)
+# `L` must match the major semi-axis passed to `gmsh_disk` so that f = (x/L)²
+# is O(1) on the domain; otherwise norm(er, Inf) is inflated by the constant
+# 1/L² while the relative error is unaffected.
+#L = 1.0
+#f = Polynomial(I => 1 / L^2)
+#u = if k == 0
+#    convert_coefs(ElementaryPDESolutions.solve_laplace(-f), Float64)
+#else
+#    convert_coefs(ElementaryPDESolutions.solve_helmholtz(-f; k), ComplexF64)
+#end
+#gradu = ElementaryPDESolutions.gradient(u)
 #du = (x, n) -> map(zip(gradu, 1:length(n))) do v
 #
-#if isdefined(Main, :Infiltrator)
-#  Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-#end
 #    p = v[1](x)
 #    normal = n[v[2]]
 #    return p[1]*normal[1] + p[2]*normal[2]
 #
 #end
-function du(x, n)
-    accum = 0.0
-    for i in 1:length(n)
-        accum+= gradu[i](x) * n[i]
-    end
-    return accum
-end
-#du = (x, n) -> 
+#function du(x, n)
+#    accum = 0.0
+#    for i in 1:length(n)
+#        accum+= gradu[i](x) * n[i]
+#    end
+#    return accum
+#end
 
 
 #s  = 4
@@ -150,4 +156,40 @@ er = vref - vapprox
 
 ndofs = length(er)
 
-@show ndofs, meshsize, norm(er, Inf)
+@show ndofs, meshsize, k, norm(er, Inf), norm(er, Inf) / norm(vref, Inf)
+
+## ---- exterior evaluation just outside Γ ----
+δoff = 0.5 * meshsize
+ext_pts = [q.coords + δoff * q.normal for q in Γₕ_quad]
+
+S_b2e, D_b2e = Inti.single_double_layer(;
+    op,
+    target = ext_pts,
+    source = Γₕ_quad,
+    compression = (method = :fmm, tol = 1.0e-14),
+    correction = (method = :dim, maxdist = 5 * meshsize, target_location = :outside),
+)
+
+V_d2e = Inti.volume_potential(;
+    op,
+    target = ext_pts,
+    source = Ωₕ_quad,
+    compression = (method = :fmm, tol = 1.0e-14),
+    correction = (
+        method = :ldim,
+        mesh = Ωₕ,
+        interpolation_order,
+        quadrature_order = VR_qorder,
+        bdry_nodes = Γₕ.nodes,
+        maxdist = 5 * meshsize,
+        meshsize = meshsize,
+        boundary = Γₕ_quad,
+        target_location = :outside,
+    ),
+)
+
+# Green identity for exterior targets: μ = 0, so the u term drops out
+vref_ext = D_b2e * u_b - S_b2e * du_b
+vapprox_ext = V_d2e * f_d
+er_ext = vref_ext - vapprox_ext
+@show norm(er_ext, Inf), norm(er_ext, Inf) / norm(vref_ext, Inf)
