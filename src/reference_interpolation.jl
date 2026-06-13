@@ -57,8 +57,8 @@ end
 
 function first_fundamental_form(el::ReferenceInterpolant, x̂)
     jac = jacobian(el, x̂)
-    # first fundamental form
     E = dot(jac[:, 1], jac[:, 1])
+    geometric_dimension(el) == 1 && return E
     F = dot(jac[:, 1], jac[:, 2])
     G = dot(jac[:, 2], jac[:, 2])
     return E, F, G
@@ -67,43 +67,89 @@ end
 function second_fundamental_form(el::ReferenceInterpolant, x̂)
     jac = jacobian(el, x̂)
     ν = _normal(jac)
-    # second fundamental form
     hess = hessian(el, x̂)
     L = dot(hess[:, 1, 1], ν)
+    geometric_dimension(el) == 1 && return L
     M = dot(hess[:, 1, 2], ν)
     N = dot(hess[:, 2, 2], ν)
-
     return L, M, N
 end
 
 """
-    mean_curvature(τ, x̂)
+    principal_curvatures(τ, x̂; surface_type::Symbol=:extrusion)
+
+Calculate the two principal curvatures (κ₁, κ₂) of the surface defined by element `τ` at the
+parametric coordinate `x̂`.  
+
+If `τ` is a curve in two-dimensions, it is treated as the generator of a surface of
+revolution (if `surface_type=:revolution`) or of an extrusion (if
+`surface_type=:extrusion`).
+"""
+function principal_curvatures(el::ReferenceInterpolant, x̂; surface_type::Symbol = :extrusion)
+    jac = jacobian(el, x̂)
+    hess = hessian(el, x̂)
+    ν = _normal(jac)
+
+    if geometric_dimension(el) == 1
+        E = dot(jac[:, 1], jac[:, 1])
+        L = dot(hess[:, 1, 1], ν)
+        κ_meridian = L / E
+
+        if surface_type === :revolution
+            r = el(x̂)[1]
+            if abs(r) < 1.0e-12
+                κ_azimuthal = κ_meridian
+            else
+                κ_azimuthal = -ν[1] / r
+            end
+            return (κ_meridian, κ_azimuthal)
+        else
+            return (κ_meridian, zero(κ_meridian))
+        end
+    else
+        E = dot(jac[:, 1], jac[:, 1])
+        F = dot(jac[:, 1], jac[:, 2])
+        G = dot(jac[:, 2], jac[:, 2])
+        L = dot(hess[:, 1, 1], ν)
+        M = dot(hess[:, 1, 2], ν)
+        N = dot(hess[:, 2, 2], ν)
+
+        denom = E * G - F^2
+        H = (L * G - 2 * F * M + E * N) / (2 * denom)
+        K = (L * N - M^2) / denom
+
+        disc = max(zero(H), H^2 - K)
+        sqrt_disc = sqrt(disc)
+        return (H + sqrt_disc, H - sqrt_disc)
+    end
+end
+
+"""
+    curvature(τ, x̂; kwargs...)
+
+Calculate the sum of the principal curvatures (κ₁ + κ₂) of the element `τ` 
+at the parametric coordinate `x̂`. 
+
+This quantity is commonly used in physics to compute the Laplace pressure across an interface.
+"""
+curvature(el::ReferenceInterpolant, x̂; kwargs...) = sum(principal_curvatures(el, x̂; kwargs...))
+
+"""
+    mean_curvature(τ, x̂; kwargs...)
 
 Calculate the [mean curvature](https://en.wikipedia.org/wiki/Mean_curvature) of
 the element `τ` at the parametric coordinate `x̂`.
 """
-function mean_curvature(el::ReferenceInterpolant, x̂)
-    E, F, G = first_fundamental_form(el, x̂)
-    L, M, N = second_fundamental_form(el, x̂)
-    # mean curvature
-    κ = (L * G - 2 * F * M + E * N) / (2 * (E * G - F^2))
-    return κ
-end
+mean_curvature(el::ReferenceInterpolant, x̂; kwargs...) = curvature(el, x̂; kwargs...) / 2
 
 """
-    gauss_curvature(τ, x̂)
+    gauss_curvature(τ, x̂; kwargs...)
 
 Calculate the [Gaussian
 curvature](https://en.wikipedia.org/wiki/Gaussian_curvature) of the element `τ`
 at the parametric coordinate `x̂`.
 """
-function gauss_curvature(el::ReferenceInterpolant, x̂)
-    E, F, G = first_fundamental_form(el, x̂)
-    L, M, N = second_fundamental_form(el, x̂)
-    # Guassian curvature
-    κ = (L * N - M^2) / (E * G - F^2)
-    return κ
-end
+gauss_curvature(el::ReferenceInterpolant, x̂; kwargs...) = prod(principal_curvatures(el, x̂; kwargs...))
 
 domain(::ReferenceInterpolant{D, T}) where {D, T} = D()
 domain(::Type{<:ReferenceInterpolant{D, T}}) where {D, T} = D()

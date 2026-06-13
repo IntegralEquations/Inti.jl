@@ -67,3 +67,61 @@ end
     ratios = errs[1:(end - 1)] ./ errs[2:end]
     @test all(r > 1.5 for r in ratios)
 end
+
+@testset "surface divergence (3D torus)" begin
+    Inti.clear_entities!()
+    Ω = Inti.torus(R = 2.0, r = 0.5) |> Inti.Domain
+    Γ = Inti.external_boundary(Ω)
+    quad = Inti.Quadrature(Γ; meshsize = 0.4, qorder = 4)
+
+    # Vector field v(x) = x. ∇_Γ ⋅ x = 2
+    v = map(q -> q.coords, quad)
+    div_v = Inti.surface_divergence(v, quad)
+
+    div_exact = fill(2.0, length(quad))
+    err = norm(div_v .- div_exact, Inf)
+    @test err < 5.0e-2
+end
+
+@testset "surface laplacian (3D torus)" begin
+    Inti.clear_entities!()
+    Ω = Inti.torus(R = 2.0, r = 0.5) |> Inti.Domain
+    Γ = Inti.external_boundary(Ω)
+
+    # Use a finer mesh and higher order to demonstrate convergence
+    quad = Inti.Quadrature(Γ; meshsize = 0.2, qorder = 8)
+
+    # u(x) = x[1] (linear coordinate)
+    # Δ_Γ u = 2 * mean_curvature * n_1
+    u = map(q -> q.coords[1], quad)
+    lap_u = Inti.surface_laplacian(u, quad)
+
+    curv = Inti.mean_curvature(quad)
+    lap_exact = map(quad, curv) do q, H
+        2.0 * H * q.normal[1]
+    end
+
+    err = norm(lap_u .- lap_exact, Inf)
+    @test err < 5.0e-3
+end
+
+@testset "surface laplacian (3D ellipsoid)" begin
+    Inti.clear_entities!()
+    Ω = Inti.GeometricEntity("ellipsoid") |> Inti.Domain
+    Γ = Inti.external_boundary(Ω)
+
+    # The ellipsoid parametrisation is non-polynomial (cubed-sphere).
+    # We must use a high quadrature order to correctly interpolate the mapping Hessian.
+    quad = Inti.Quadrature(Γ; meshsize = 0.2, qorder = 8)
+
+    u = map(q -> q.coords[1], quad)
+    lap_u = Inti.surface_laplacian(u, quad)
+
+    curv = Inti.mean_curvature(quad)
+    lap_exact = map(quad, curv) do q, H
+        2.0 * H * q.normal[1]
+    end
+
+    err = norm(lap_u .- lap_exact, Inf)
+    @test err < 2.0e-2
+end

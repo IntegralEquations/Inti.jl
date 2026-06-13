@@ -3,6 +3,7 @@ module IntiFMM2DExt
 import Inti
 import FMM2D
 import LinearMaps
+using StaticArrays # For Stokes types
 
 function __init__()
     return @debug "Loading Inti.jl FMM2D extension"
@@ -26,7 +27,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         m == n ? isapprox(targets, sources; atol = Inti.SAME_POINT_TOLERANCE) : false
     K = iop.kernel
     # Laplace
-    if K isa Inti.SingleLayerKernel{Float64, <:Inti.Laplace{2}}
+    if K isa Inti.SingleLayerKernel{<:Inti.Laplace{2}}
         charges = Vector{Float64}(undef, n)
         return LinearMaps.LinearMap{Float64}(m, n) do y, x
             # multiply by weights and constant
@@ -46,7 +47,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, out.pottarg)
             end
         end
-    elseif K isa Inti.DoubleLayerKernel{Float64, <:Inti.Laplace{2}}
+    elseif K isa Inti.DoubleLayerKernel{<:Inti.Laplace{2}}
         normals = Matrix{Float64}(undef, 2, n)
         for j in 1:n
             normals[:, j] = Inti.normal(iop.source[j])
@@ -82,7 +83,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, out.pottarg)
             end
         end
-    elseif K isa Inti.AdjointDoubleLayerKernel{Float64, <:Inti.Laplace{2}}
+    elseif K isa Inti.AdjointDoubleLayerKernel{<:Inti.Laplace{2}}
         xnormals = Matrix{Float64}(undef, 2, m)
         for j in 1:m
             xnormals[:, j] = Inti.normal(iop.target[j])
@@ -106,7 +107,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
         end
-    elseif K isa Inti.HyperSingularKernel{Float64, <:Inti.Laplace{2}}
+    elseif K isa Inti.HyperSingularKernel{<:Inti.Laplace{2}}
         xnormals = Matrix{Float64}(undef, 2, m)
         ynormals = Matrix{Float64}(undef, 2, n)
         for j in 1:m
@@ -147,7 +148,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             end
         end
         # Helmholtz
-    elseif K isa Inti.SingleLayerKernel{ComplexF64, <:Inti.Helmholtz{2}}
+    elseif K isa Inti.SingleLayerKernel{<:Inti.Helmholtz{2}}
         charges = Vector{ComplexF64}(undef, n)
         zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
@@ -174,7 +175,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, out.pottarg)
             end
         end
-    elseif K isa Inti.DoubleLayerKernel{ComplexF64, <:Inti.Helmholtz{2}}
+    elseif K isa Inti.DoubleLayerKernel{<:Inti.Helmholtz{2}}
         normals = Matrix{Float64}(undef, 2, n)
         for j in 1:n
             normals[:, j] = Inti.normal(iop.source[j])
@@ -213,7 +214,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, out.pottarg)
             end
         end
-    elseif K isa Inti.AdjointDoubleLayerKernel{ComplexF64, <:Inti.Helmholtz{2}}
+    elseif K isa Inti.AdjointDoubleLayerKernel{<:Inti.Helmholtz{2}}
         xnormals = Matrix{Float64}(undef, 2, m)
         for j in 1:m
             xnormals[:, j] = Inti.normal(iop.target[j])
@@ -244,7 +245,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
         end
-    elseif K isa Inti.HyperSingularKernel{ComplexF64, <:Inti.Helmholtz{2}}
+    elseif K isa Inti.HyperSingularKernel{<:Inti.Helmholtz{2}}
         xnormals = Matrix{Float64}(undef, 2, m)
         ynormals = Matrix{Float64}(undef, 2, n)
         for j in 1:m
@@ -285,6 +286,67 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                     pgt = 2,
                 )
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
+            end
+        end
+        # Stokes
+    elseif K isa Inti.SingleLayerKernel{<:Inti.Stokes{2}}
+        T = SVector{2, Float64}
+        stoklet = Matrix{Float64}(undef, 2, n)
+        return LinearMaps.LinearMap{SMatrix{2, 2, Float64, 4}}(m, n) do y, x
+            # FMM2D returns the raw Stokeslet sum (without the 1/2π scaling), so
+            # Inti's single-layer kernel = pot / (2π μ). Fold the constant and the
+            # quadrature weights into the Stokeslet strengths.
+            stoklet[:] = 1 / (2 * π * K.op.μ) .* reinterpret(Float64, weights .* x)
+            if same_surface
+                out = FMM2D.stfmm2d(; eps = rtol, sources = sources, stoklet = stoklet, ppreg = 1)
+                return copyto!(y, reinterpret(T, out.pot))
+            else
+                out = FMM2D.stfmm2d(;
+                    eps = rtol,
+                    sources = sources,
+                    stoklet = stoklet,
+                    targets = targets,
+                    ppregt = 1,
+                )
+                return copyto!(y, reinterpret(T, out.pottarg))
+            end
+        end
+    elseif K isa Inti.DoubleLayerKernel{<:Inti.Stokes{2}}
+        T = SVector{2, Float64}
+        normals = Matrix{Float64}(undef, 2, n)
+        for j in 1:n
+            normals[:, j] = Inti.normal(iop.source[j])
+        end
+        # FMM2D returns the raw stresslet sum T_ijk μ_j ν_k (without the 1/2π
+        # scaling), and Inti's double-layer kernel = -pot / (2π). Fold the constant
+        # and the quadrature weights into the stresslet orientation vectors, and the
+        # density into the stresslet strengths.
+        strsvec = similar(normals, Float64)
+        strslet = similar(normals, Float64)
+        for j in 1:n
+            strsvec[:, j] = -1 / (2 * π) * view(normals, :, j) .* weights[j]
+        end
+        return LinearMaps.LinearMap{SMatrix{2, 2, Float64, 4}}(m, n) do y, x
+            strslet[:] = reinterpret(Float64, x)
+            if same_surface
+                out = FMM2D.stfmm2d(;
+                    eps = rtol,
+                    sources = sources,
+                    strslet = strslet,
+                    strsvec = strsvec,
+                    ppreg = 1,
+                )
+                return copyto!(y, reinterpret(T, out.pot))
+            else
+                out = FMM2D.stfmm2d(;
+                    eps = rtol,
+                    sources = sources,
+                    strslet = strslet,
+                    strsvec = strsvec,
+                    targets = targets,
+                    ppregt = 1,
+                )
+                return copyto!(y, reinterpret(T, out.pottarg))
             end
         end
     else

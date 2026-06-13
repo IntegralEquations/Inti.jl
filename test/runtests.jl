@@ -39,7 +39,7 @@ end
 
 @safetestset "Gmsh extension" include("gmsh_test.jl")
 
-@safetestset "Meshes extension" include("meshes_test.jl")
+@safetestset "Makie extension" include("meshes_test.jl")
 
 @safetestset "HMatrices extension" include("hmatrices_test.jl")
 

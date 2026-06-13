@@ -165,9 +165,9 @@ function LinearAlgebra.mul!(
 end
 
 function LinearAlgebra.mul!(
-        C::Vector{<:SVector},
+        C::AbstractVector{<:SVector},
         A::BlockArray,
-        B::Vector{<:SVector},
+        B::AbstractVector{<:SVector},
         a::Number,
         b::Number,
     )

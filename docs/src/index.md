@@ -163,18 +163,18 @@ println("Approx. value at $pt: ", uₕ(pt))
 If we care about the solution on the entire domain, we can visualize it using:
 
 ```@example lap2d
-using Meshes, GLMakie # trigger the loading of some Inti extensions
+using GLMakie # triggers the loading of the Makie extension
 xx = yy = range(-2, 2, length = 100)
 fig = Figure(; size = (600,300))
 inside = x -> Inti.isinside(x, Q) 
 opts = (xlabel = "x", ylabel = "y", aspect = DataAspect())
 ax1 = Axis(fig[1, 1]; title = "Exact solution", opts...)
 h1 = heatmap!(ax1, xx,yy,(x, y) -> inside((x,y)) ? uₑ((x,y)) : NaN)
-viz!(msh; segmentsize = 3)
+plot!(msh; linewidth = 3)
 cb = Colorbar(fig[1, 3], h1, size = 20, height = 200)
 ax2 = Axis(fig[1, 2]; title = "Approx. solution", opts...)
 h2 = heatmap!(ax2, xx,yy, (x, y) -> inside((x,y)) ? uₕ((x,y)) : NaN, colorrange = cb.limits[])
-viz!(msh; segmentsize = 3)
+plot!(msh; linewidth = 3)
 fig # hide
 ```
 

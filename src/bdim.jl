@@ -91,8 +91,8 @@ function bdim_correction(
         error("only 2D and 3D supported")
     end
     # compute traces of monopoles on the source mesh
-    G = SingleLayerKernel(op, T)
-    γ₁G = AdjointDoubleLayerKernel(op, T)
+    G = SingleLayerKernel(op)
+    γ₁G = AdjointDoubleLayerKernel(op)
     γ₀B = Dense{T}(undef, length(source), ns)
     γ₁B = Dense{T}(undef, length(source), ns)
     for k in 1:ns
