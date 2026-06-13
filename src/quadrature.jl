@@ -91,7 +91,7 @@ function Base.show(io::IO, quad::Quadrature)
 end
 
 """
-    Quadrature(msh::AbstractMesh, etype2qrule::Dict)
+    Quadrature(msh::AbstractMesh, etype2qrule::OrderedDict)
     Quadrature(msh::AbstractMesh, qrule::ReferenceQuadrature)
     Quadrature(msh::AbstractMesh; qorder)
 
@@ -128,7 +128,7 @@ end
 function Quadrature(
         ::Type{T},
         elementlist::AbstractVector{E},
-        etype2qrule::Dict{DataType, Q},
+        etype2qrule::OrderedDict{DataType, Q},
         qrule::Q;
         center::SVector{N, Float64} = zero(SVector{N, Float64}),
         scale::Float64 = 1.0,
@@ -138,7 +138,7 @@ function Quadrature(
         nothing,
         etype2qrule,
         QuadratureNode{N, T}[],
-        Dict{DataType, Matrix{Int}}(),
+        OrderedDict{DataType, Matrix{Int}}(),
     )
     ori = ones(Int64, length(elementlist))
     # loop element types and generate quadrature for each

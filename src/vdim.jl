@@ -139,9 +139,9 @@ function build_vander(vals_trg, pts, PFE_p, c, r)
     return vals_trg
 end
 
-function _scaled_operator(op::AbstractDifferentialOperator, scale)
+function _scaled_operator(op::AbstractDifferentialOperator{N}, scale) where {N}
     if op isa Helmholtz
-        return Helmholtz(; k = scale * op.k, dim = ambient_dimension(op))
+        return Helmholtz(; k = scale * op.k, dim = N)
     elseif op isa Laplace
         return op
     else
@@ -153,7 +153,7 @@ function _lowfreq_operator(op::AbstractDifferentialOperator{N}) where {N}
     if op isa Helmholtz
         return Laplace(; dim = N)
     elseif op isa Laplace
-        return Laplace(; dim = N)
+        return op
     else
         error("Unsupported operator for stabilized Local VDIM")
     end
@@ -216,13 +216,13 @@ function local_vdim_correction(
         bdry_qorder = 2 * quadrature_order
         if N == 3
             bdry_qrule = _qrule_for_reference_shape(ReferenceSimplex{2}(), bdry_qorder)
-            bdry_etype2qrule = Dict(ReferenceSimplex{2} => bdry_qrule)
+            bdry_etype2qrule = OrderedDict(ReferenceSimplex{2} => bdry_qrule)
         else
             bdry_qrule = _qrule_for_reference_shape(ReferenceHyperCube{1}(), bdry_qorder)
-            bdry_etype2qrule = Dict(ReferenceHyperCube{1} => bdry_qrule)
+            bdry_etype2qrule = OrderedDict(ReferenceHyperCube{1} => bdry_qrule)
         end
         vol_qrule = VioreanuRokhlin(; domain = domain(E), order = quadrature_order)
-        vol_etype2qrule = Dict(E => vol_qrule)
+        vol_etype2qrule = OrderedDict(E => vol_qrule)
 
         topo_neighs = 1
         neighbors = topological_neighbors(mesh, topo_neighs)
@@ -234,8 +234,8 @@ function local_vdim_correction(
             # Low-frequency (kr small) elements use the Laplace-based expansion
             # of Section 3.1/4; otherwise the high-frequency rescaling of
             # Section 3.2 with s = meshsize (so that k*s = O(1) is fixed and
-            # s/r is bounded) is stable.
-            if op isa Laplace || r * op.k < 10^(-3)
+            # s/r is bounded from above and below) is stable.
+            if op isa Helmholtz && r * op.k < 10^(-3)
                 lowfreq = true
                 Yvol, Ybdry, need_layer_corr, els_idxs = _local_vdim_construct_local_quadratures(
                     N,
@@ -271,6 +271,8 @@ function local_vdim_correction(
                     need_layer_corr
                 )
             else
+            # NB Laplace low-frequency is supported, but is disabled as it is
+            # unnecessary; we keep it only for diagnostics
                 lowfreq = false
                 Yvol, Ybdry, need_layer_corr, els_idxs = _local_vdim_construct_local_quadratures(
                     N,
@@ -313,6 +315,22 @@ function local_vdim_correction(
                 # assembly (and consistent with the FMM), including its zero
                 # convention at coincident points — so it matches the operator
                 # being corrected by construction.
+
+                # Optimization note: The following code is not strictly needed,
+                # and it does come with some cost.  We actually already compute
+                # the below contraction in the forward-map, and so we are adding
+                # it twice to subtract off one of them in the low-frequency
+                # computation. This is admittedly a waste of flops and costs
+                # about 40% of the overall cost of construction (about 25%
+                # slower than the high-frequency code path), but it makes the
+                # low frequency code much, much, more readable so that indeed
+                # the formulas one derives for V[p_β] are precisely what one
+                # codes.  This sacrifice is judged by me (tga) to be acceptable
+                # because this code path will only run for strongly
+                # sub-wavelength features and is essentially a safety valve so
+                # that we can claim the method is stable; most elements will not
+                # follow the `lowfreq` path.  But, if it ever becomes relevant;
+                # note that this can be significantly optimized.
                 Gker = SingleLayerKernel(op)
                 ntarg = length(near_list[n])
                 Rq = zeros(eltype(R), ntarg, num_basis)
@@ -324,8 +342,7 @@ function local_vdim_correction(
                         ytmp .= (coords(yq) - c) / r
                         ElementaryPDESolutions.fast_evaluate!(pvals, ytmp, PFE_p)
                         for (ii, i) in enumerate(near_list[n])
-                            g = Gker(target[i], yq) * yq.weight
-                            @views Rq[ii, :] .+= g .* pvals
+                            @views Rq[ii, :] .+= Gker(target[i], yq) .* pvals .* yq.weight
                         end
                     end
                 end
