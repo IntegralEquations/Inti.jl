@@ -111,9 +111,20 @@ function assemble_matrix(iop::IntegralOperator; threads = true)
     else
         Array{T}(undef, m, n)
     end
-    K = kernel(iop)
+    return assemble_matrix!(out, iop; threads)
+end
+
+"""
+    assemble_matrix!(out, iop::IntegralOperator; threads = true)
+
+In-place version of [`assemble_matrix`](@ref): fill `out` (an `m × n`
+`AbstractMatrix`, which may be a `view` into a larger preallocated buffer) with
+the dense representation of `iop`. No allocation of the output is performed.
+"""
+function assemble_matrix!(out, iop::IntegralOperator; threads = true)
+    @assert size(out) == size(iop) "`out` must have size $(size(iop)), got $(size(out))"
     # function barrier
-    _assemble_matrix!(out, K, iop.target, iop.source, threads)
+    _assemble_matrix!(out, kernel(iop), iop.target, iop.source, threads)
     return out
 end
 

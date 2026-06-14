@@ -10,11 +10,10 @@ using HMatrices
 using FMMLIB2D
 using Meshes
 using DataStructures
-using Plots
 
 #meshsize = 0.001/8
 #meshsize = 0.125/8
-meshsize = 0.125 / 2
+meshsize = 0.125 / 2 /2
 interpolation_order = 2
 VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(4)
 #VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
@@ -64,7 +63,8 @@ end
 @info "Quadrature generation time: $tquad"
 
 #k = 0.1 / meshsize
-k = 1.0
+#k = 1.0
+k = 0
 op = k == 0 ? Inti.Laplace(; dim = 2) : Inti.Helmholtz(; dim = 2, k)
 
 ## Boundary operators
@@ -105,10 +105,10 @@ import ElementaryPDESolutions: Polynomial
 
 k0 = 1.1
 θ = (cos(π / 3), sin(π / 3))
-u = (x) -> exp(im * k0 * dot(x, θ))
-du = (x, n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
-#u = (x) -> cos(k0 * dot(x, θ))
-#du = (x, n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
+#u = (x) -> exp(im * k0 * dot(x, θ))
+#du = (x, n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
+u = (x) -> cos(k0 * dot(x, θ))
+du = (x, n) -> -k0 * dot(θ, n) * sin(k0 * dot(x, θ))
 f = (x) -> -1 * (k^2 - k0^2) * u(x)
 
 #I = (2, 0)

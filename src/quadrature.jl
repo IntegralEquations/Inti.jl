@@ -158,6 +158,23 @@ function Quadrature(
     return quad
 end
 
+# In-place refill of a local-vdim Quadrature, reusing its qnodes buffer.
+# `empty!` retains capacity; the `shrink=false` sizehint in `_build_quadrature!`
+# then grows it only at new high-water marks, so steady state allocates no qnodes.
+function build_local_quadrature!(
+        quad::Quadrature{N, T},
+        elementlist::AbstractVector{E},
+        qrule::ReferenceQuadrature;
+        center::SVector{N, Float64} = zero(SVector{N, Float64}),
+        scale::Float64 = 1.0,
+    ) where {N, T, E}
+    empty!(quad.qnodes)
+    empty!(quad.etype2qtags)
+    ori = ones(Int, length(elementlist))
+    _build_quadrature!(quad, elementlist, ori, qrule; center, scale)
+    return quad
+end
+
 function Quadrature(msh::AbstractMesh{N, T}, qrule::ReferenceQuadrature) where {N, T}
     etype2qrule = OrderedDict(E => qrule for E in element_types(msh))
     return Quadrature(msh, etype2qrule)
@@ -184,7 +201,7 @@ end
     M = geometric_dimension(domain(E))
     codim = N - M
     istart = length(quad.qnodes) + 1
-    sizehint!(quad.qnodes, length(els) * length(x̂))
+    sizehint!(quad.qnodes, length(els) * length(x̂); shrink = false)
     @assert length(els) == length(orientation)
     for (s, el) in zip(orientation, els)
         # and all qnodes for that element

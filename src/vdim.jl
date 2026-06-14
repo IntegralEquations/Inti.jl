@@ -187,7 +187,13 @@ function local_vdim_correction(
         (interpolation_order = maximum(order, values(source.etype2qrule)))
 
     # Helmholtz PDE operator in x̂ coordinates where x = scale * x̂
-    s = meshsize
+    if op isa Helmholtz
+        s = meshsize
+    elseif op isa Laplace
+        s = 1.0
+    else
+        error("not implemented")
+    end
     op_hat = _scaled_operator(op, s)
     op_lowfreq = _lowfreq_operator(op)
     PFE_p_lowfreq, PFE_P_lowfreq, multiindices_lowfreq, monomials_indices_lowfreq =
@@ -227,6 +233,23 @@ function local_vdim_correction(
         topo_neighs = 1
         neighbors = topological_neighbors(mesh, topo_neighs)
 
+        # preallocated local quadratures, reused (refilled in place) across the
+        # element loop so the qnodes buffers are not reallocated every iteration
+        Yvol = Quadrature{N, Float64}(
+            nothing,
+            vol_etype2qrule,
+            QuadratureNode{N, Float64}[],
+            OrderedDict{DataType, Matrix{Int}}(),
+        )
+        Ybdry = Quadrature{N, Float64}(
+            nothing,
+            bdry_etype2qrule,
+            QuadratureNode{N, Float64}[],
+            OrderedDict{DataType, Matrix{Int}}(),
+        )
+        # reusable scratch for the per-element auxiliary quantities
+        ws = LocalVDIMWorkspace{Eltype, N}()
+
         for n in 1:ne
             # indices of nodes in element `n`
             isempty(near_list[n]) && continue
@@ -235,7 +258,9 @@ function local_vdim_correction(
             # of Section 3.1/4; otherwise the high-frequency rescaling of
             # Section 3.2 with s = meshsize (so that k*s = O(1) is fixed and
             # s/r is bounded from above and below) is stable.
-            if op isa Helmholtz && r * op.k < 10^(-3)
+
+            # Run Laplace through low-frequency path too, for stability.
+            if op isa Laplace || (op isa Helmholtz && r * op.k < 10^(-3))
                 lowfreq = true
                 Yvol, Ybdry, need_layer_corr, els_idxs = _local_vdim_construct_local_quadratures(
                     N,
@@ -246,8 +271,8 @@ function local_vdim_correction(
                     r,
                     diam,
                     bdry_kdtree,
-                    bdry_etype2qrule,
-                    vol_etype2qrule,
+                    Yvol,
+                    Ybdry,
                     bdry_qrule,
                     vol_qrule,
                 )
@@ -271,8 +296,6 @@ function local_vdim_correction(
                     need_layer_corr
                 )
             else
-                # NB Laplace low-frequency is supported, but is disabled as it is
-                # unnecessary; we keep it only for diagnostics
                 lowfreq = false
                 Yvol, Ybdry, need_layer_corr, els_idxs = _local_vdim_construct_local_quadratures(
                     N,
@@ -283,8 +306,8 @@ function local_vdim_correction(
                     s,
                     diam,
                     bdry_kdtree,
-                    bdry_etype2qrule,
-                    vol_etype2qrule,
+                    Yvol,
+                    Ybdry,
                     bdry_qrule,
                     vol_qrule,
                 )
@@ -299,7 +322,8 @@ function local_vdim_correction(
                     Yvol,
                     Ybdry,
                     diam,
-                    need_layer_corr
+                    need_layer_corr,
+                    ws,
                 )
             end
             jglob = @view qtags[:, n]
@@ -316,46 +340,61 @@ function local_vdim_correction(
                 # convention at coincident points — so it matches the operator
                 # being corrected by construction.
 
-                # Optimization note: The following code is not strictly needed,
-                # and it does come with some cost.  We actually already compute
-                # the below contraction in the forward-map, and so we are adding
-                # it twice to subtract off one of them in the low-frequency
-                # computation. This is admittedly a waste of flops and costs
-                # about 40% of the overall cost of construction (about 25%
-                # slower than the high-frequency code path), but it makes the
-                # low frequency code much, much, more readable so that indeed
-                # the formulas one derives for V[p_β] are precisely what one
-                # codes; there are subtle dangers if one takes the more direct
-                # path, including the need to account for G(x,x) = 0 in both the
-                # direct and FMM evaluation of the kernels.  This sacrifice is
-                # judged by me (tga) to be acceptable because this code path
-                # will only run for strongly sub-wavelength features and is
-                # essentially a safety valve so that we can claim the method is
-                # stable; most elements will not follow the `lowfreq` path.
-                # But, if it ever becomes relevant; note that this can be
-                # significantly optimized.
+                # Optimization note: this contraction is not strictly needed —
+                # the forward map already computes it, so in the low-frequency
+                # path we effectively add it twice and subtract one off. We keep
+                # it for readability (the coded formula matches the derived
+                # V[p_β]) and to handle the G(x,x) = 0 convention consistently
+                # with the direct/FMM kernels. This path runs only for Helmholtz strongly
+                # sub-wavelength features and is essentially a safety valve so
+                # that we can claim the method is stable; most elements will not
+                # follow the `lowfreq` path. If the redundancy ever matters it
+                # can be removed entirely, but see the G(x,x) = 0 subtlety above.
+
+                # FIXME: For any kernel not needing stabilization this is the
+                # default code path and is slow We may need the uglier but more
+                # efficient code long-term
+                #
+                # The naive-quadrature contraction is the matrix product
+                # Rq = Gmat * Bmat, with
+                #   Gmat[ii, j] = G(xᵢ, yⱼ)   (near target × patch node)
+                #   Bmat[j,  β] = wⱼ pβ(yⱼ)   (patch node × monomial)
+                # one gemm is far cheaper than accumulating a length-num_basis
+                # broadcast per (target, node) pair.
                 Gker = SingleLayerKernel(op)
                 ntarg = length(near_list[n])
-                Rq = zeros(eltype(R), ntarg, num_basis)
+                nsrc = nq * length(els_idxs)
+                Gmat = Matrix{eltype(R)}(undef, ntarg, nsrc)
+                Bmat = Matrix{Float64}(undef, nsrc, num_basis)
                 pvals = Vector{Float64}(undef, num_basis)
                 ytmp = Vector{Float64}(undef, N)
+                jcol = 0
                 for el_idx in els_idxs
                     for j in @view qtags[:, el_idx]
+                        jcol += 1
                         yq = source[j]
                         ytmp .= (coords(yq) - c) / r
                         ElementaryPDESolutions.fast_evaluate!(pvals, ytmp, PFE_p)
-                        for (ii, i) in enumerate(near_list[n])
-                            @views Rq[ii, :] .+= Gker(target[i], yq) .* pvals .* yq.weight
+                        w = yq.weight
+                        @inbounds for β in 1:num_basis
+                            Bmat[jcol, β] = w * pvals[β]
+                        end
+                        @inbounds for (ii, i) in enumerate(near_list[n])
+                            Gmat[ii, jcol] = Gker(target[i], yq)
                         end
                     end
                 end
+                Rq = Gmat * Bmat
                 wei = transpose(Linv) * transpose(Rq - R)
                 append!(Is, repeat(near_list[n]; inner = nq))
                 append!(Js, repeat(jglob; outer = length(near_list[n])))
                 append!(Vs, -wei)
             else
-                S = s^2 * Diagonal((s / r) .^ (abs.(multiindices)))
-                wei = transpose(Linv) * S * transpose(R)
+                S = ws.Sdiagvec
+                resize!(S, length(multiindices))
+                S .= s^2 * (s / r) .^ (abs.(multiindices))
+                R .*= transpose(S)
+                wei = transpose(Linv) * transpose(R)
                 # δV = -(quad - exact)
                 append!(Is, repeat(near_list[n]; inner = nq))
                 append!(Js, repeat(jglob; outer = length(near_list[n])))
@@ -520,8 +559,8 @@ function _local_vdim_construct_local_quadratures(
         scale,
         diam,
         bdry_kdtree,
-        bdry_etype2qrule,
-        vol_etype2qrule,
+        Yvol,
+        Ybdry,
         bdry_qrule,
         vol_qrule
     )
@@ -557,12 +596,50 @@ function _local_vdim_construct_local_quadratures(
 
     # Now begin working in x̂ coordinates where x = scale * x̂
 
-    # build O(h) volume neighbors
-    Yvol = Quadrature(Float64, els_list, vol_etype2qrule, vol_qrule; center, scale)
-    Ybdry = Quadrature(Float64, bords, bdry_etype2qrule, bdry_qrule; center, scale)
+    # build O(h) volume neighbors, reusing the preallocated quadrature buffers
+    build_local_quadrature!(Yvol, els_list, vol_qrule; center, scale)
+    build_local_quadrature!(Ybdry, bords, bdry_qrule; center, scale)
 
     return Yvol, Ybdry, need_layer_corr, els_idxs
 end
+
+# Reusable scratch buffers for LVDIM.  Each field is a flat Vector whose
+# capacity is retained across calls (growing via `resize!` only at new
+# high-water marks), so after the first few elements no per-element allocation
+# of these buffers occurs. `T` is the kernel/matrix eltype.
+struct LocalVDIMWorkspace{T, N}
+    Xshift::Vector{SVector{N, Float64}}
+    Smat::Vector{T}
+    Dmat::Vector{T}
+    Vmat::Vector{T}
+    Θ::Vector{T}
+    b::Vector{Float64}
+    γ₀B::Vector{Float64}
+    γ₁B::Vector{Float64}
+    P::Vector{Float64}
+    grad::Vector{Float64}
+    gm::Vector{Float64}
+    Sdiagvec::Vector{Float64}
+end
+
+function LocalVDIMWorkspace{T, N}() where {T, N}
+    return LocalVDIMWorkspace{T, N}(
+        SVector{N, Float64}[],
+        T[], T[], T[], T[],
+        Float64[], Float64[], Float64[], Float64[], Float64[],
+        Float64[],Float64[],
+    )
+end
+
+# Return a `dims`-shaped, BLAS-strided view backed by `buf`, growing `buf` only
+# when a larger block is needed. `reshape(view(buf, 1:len), dims)` is a packed
+# `StridedArray`, so the result stays on the BLAS path in `mul!`.
+@inline function _ws_reshape(buf::Vector, dims::Dims)
+    len = prod(dims)
+    length(buf) < len && resize!(buf, len)
+    return reshape(view(buf, 1:len), dims)
+end
+_ws_reshape(buf::Vector, dims::Integer...) = _ws_reshape(buf, dims)
 
 function _local_vdim_auxiliary_quantities(
         op::AbstractDifferentialOperator{N},
@@ -575,20 +652,36 @@ function _local_vdim_auxiliary_quantities(
         Yvol,
         Ybdry,
         diam,
-        need_layer_corr
-    ) where {N}
+        need_layer_corr,
+        ws::LocalVDIMWorkspace{T, N},
+    ) where {T, N}
     # TODO handle derivative case
     G = SingleLayerKernel(op)
     dG = DoubleLayerKernel(op)
-    Xshift = [(coords(q) - center) / scale for q in X]
+    num_basis = length(PFE_P)
+    num_targets = length(X)
+    nb = length(Ybdry)
+    nv = length(Yvol)
+
+    Xshift = ws.Xshift
+    resize!(Xshift, num_targets)
+    @inbounds for i in 1:num_targets
+        Xshift[i] = (coords(X[i]) - center) / scale
+    end
     Sop = IntegralOperator(G, Xshift, Ybdry)
     Dop = IntegralOperator(dG, Xshift, Ybdry)
     Vop = IntegralOperator(G, Xshift, Yvol)
-    Smat = assemble_matrix(Sop)
-    Dmat = assemble_matrix(Dop)
-    Vmat = assemble_matrix(Vop)
+    Smat = _ws_reshape(ws.Smat, num_targets, nb)
+    Dmat = _ws_reshape(ws.Dmat, num_targets, nb)
+    Vmat = _ws_reshape(ws.Vmat, num_targets, nv)
+    assemble_matrix!(Smat, Sop; threads = false)
+    assemble_matrix!(Dmat, Dop; threads = false)
+    assemble_matrix!(Vmat, Vop; threads = false)
+    Smap = LinearMap(Smat)
+    Dmap = LinearMap(Dmat)
     if need_layer_corr
-        green_multiplier = collect(Float64, μ)
+        green_multiplier = resize!(ws.gm, num_targets)
+        copyto!(green_multiplier, μ)
         δS, δD = bdim_correction(
             op,
             Xshift,
@@ -600,25 +693,25 @@ function _local_vdim_auxiliary_quantities(
             derivative = false,
         )
 
-        Smat += δS
-        Dmat += δD
+        #Smat += δS
+        Smap += LinearMap(δS)
+        #Dmat += δD
+        Dmap += LinearMap(δD)
     end
 
-    num_basis = length(PFE_P)
-    num_targets = length(X)
-    b = Matrix{Float64}(undef, length(Yvol), num_basis)
-    γ₁B = Matrix{Float64}(undef, length(Ybdry), num_basis)
-    γ₀B = Matrix{Float64}(undef, length(Ybdry), num_basis)
-    P = Matrix{Float64}(undef, length(X), num_basis)
-    grad = Array{Float64}(undef, num_basis, N, length(Ybdry))
+    b = _ws_reshape(ws.b, nv, num_basis)
+    γ₁B = _ws_reshape(ws.γ₁B, nb, num_basis)
+    γ₀B = _ws_reshape(ws.γ₀B, nb, num_basis)
+    P = _ws_reshape(ws.P, num_targets, num_basis)
+    grad = _ws_reshape(ws.grad, num_basis, N, nb)
 
-    for i in 1:length(Yvol)
+    for i in 1:nv
         ElementaryPDESolutions.fast_evaluate!(view(b, i, :), Yvol[i].coords, PFE_p)
     end
-    for i in 1:length(X)
+    for i in 1:num_targets
         ElementaryPDESolutions.fast_evaluate!(view(P, i, :), Xshift[i], PFE_P)
     end
-    for i in 1:length(Ybdry)
+    for i in 1:nb
         ElementaryPDESolutions.fast_evaluate_with_jacobian!(
             view(γ₀B, i, :),
             view(grad, :, :, i),
@@ -626,7 +719,7 @@ function _local_vdim_auxiliary_quantities(
             PFE_P,
         )
     end
-    for i in 1:length(Ybdry)
+    for i in 1:nb
         for j in 1:num_basis
             γ₁B[i, j] = 0
             for k in 1:N
@@ -635,11 +728,12 @@ function _local_vdim_auxiliary_quantities(
         end
     end
 
-    Θ = zeros(eltype(Vop), num_targets, num_basis)
+    Θ = _ws_reshape(ws.Θ, num_targets, num_basis)
+    fill!(Θ, zero(T))
     # Compute Θ <-- S * γ₁B - D * γ₀B + V * b + σ * B(x) using in-place matvec
     for n in 1:num_basis
-        @views mul!(Θ[:, n], Smat, γ₁B[:, n])
-        @views mul!(Θ[:, n], Dmat, γ₀B[:, n], -1, 1)
+        @views mul!(Θ[:, n], Smap, γ₁B[:, n])
+        @views mul!(Θ[:, n], Dmap, γ₀B[:, n], -1, 1)
         @views mul!(Θ[:, n], Vmat, b[:, n], 1, 1)
         for i in 1:num_targets
             Θ[i, n] += μ[i] * P[i, n]
