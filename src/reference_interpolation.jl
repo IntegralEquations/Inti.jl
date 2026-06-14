@@ -418,6 +418,10 @@ function boundary_idxs(T::Type{<:LagrangeSquare})
     return (I[1], I[2]), (I[2], I[3]), (I[3], I[4]), (I[4], I[1])
 end
 
+function boundary_idxs(::Type{<:LagrangeTetrahedron{4}})
+    return (3, 2, 1), (1, 4, 3), (2, 3, 4), (1, 2, 4)
+end
+
 # generic ℚₖ elements for ReferenceHyperCube
 function reference_nodes(T::Type{<:LagrangeElement{ReferenceHyperCube{D}, Np}}) where {D, Np}
     n = order(T) + 1

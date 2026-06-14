@@ -10,10 +10,11 @@ using LinearAlgebra
 using HMatrices
 using FMM3D
 using GLMakie
+using DataStructures
 
-meshsize = 0.05
-interpolation_order = 4
-VR_qorder = Inti.Tetrahedron_VR_interpolation_order_to_quadrature_order(interpolation_order)
+meshsize = 0.2
+interpolation_order = 2
+VR_qorder = Inti.Tetrahedron_VR_interpolation_order_to_quadrature_order(interpolation_order+1)
 bdry_qorder = 2 * VR_qorder
 
 function gmsh_sphere(; order = 1, name, meshsize)
@@ -43,13 +44,11 @@ msh = Inti.import_mesh(name; dim = 3)
 
 Ωₕ = msh[Ω]
 Γₕ = msh[Γ]
-Ωₕ_Sub = view(msh, Ω)
-Γₕ_Sub = view(msh, Γ)
 
 tquad = @elapsed begin
     # Use VDIM with the Vioreanu-Rokhlin quadrature rule for Ωₕ
     Q = Inti.VioreanuRokhlin(; domain = :tetrahedron, order = VR_qorder)
-    dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
+    dict = OrderedDict(E => Q for E in Inti.element_types(Ωₕ))
     Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
     # Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorders[1])
     Γₕ_quad = Inti.Quadrature(Γₕ; qorder = bdry_qorder)
@@ -57,7 +56,7 @@ end
 @info "Quadrature generation time: $tquad"
 
 k0 = π
-k = 0
+k = 1.0
 θ = (sin(π / 3) * cos(π / 3), sin(π / 3) * sin(π / 3), cos(π / 3))
 #u  = (x) -> exp(im * k0 * dot(x, θ))
 #du = (x,n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
@@ -70,12 +69,12 @@ u_b = map(q -> u(q.coords), Γₕ_quad)
 du_b = map(q -> du(q.coords, q.normal), Γₕ_quad)
 f_d = map(q -> f(q.coords), Ωₕ_quad)
 
-pde = k == 0 ? Inti.Laplace(; dim = 3) : Inti.Helmholtz(; dim = 3, k)
+op = k == 0 ? Inti.Laplace(; dim = 3) : Inti.Helmholtz(; dim = 3, k)
 
 ## Boundary operators
 tbnd = @elapsed begin
     S_b2d, D_b2d = Inti.single_double_layer(;
-        pde,
+        op,
         target = Ωₕ_quad,
         source = Γₕ_quad,
         compression = (method = :fmm, tol = 1.0e-8),
@@ -87,7 +86,7 @@ end
 ## Volume potentials
 tvol = @elapsed begin
     V_d2d = Inti.volume_potential(;
-        pde,
+        op,
         target = Ωₕ_quad,
         source = Ωₕ_quad,
         compression = (method = :fmm, tol = 1.0e-8),
@@ -98,6 +97,8 @@ tvol = @elapsed begin
             mesh = Ωₕ,
             bdry_nodes = Γₕ.nodes,
             maxdist = 5 * meshsize,
+            meshsize = meshsize,
+            form = :analytic,
         ),
     )
 end

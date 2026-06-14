@@ -428,7 +428,7 @@ function local_vdim_correction(
             else
                 S = ws.Sdiagvec
                 resize!(S, length(multiindices))
-                S .= s^2 * (s / r) .^ (abs.(multiindices))
+                S .= s^N * (s / r) .^ (abs.(multiindices))
                 R .*= transpose(S)
                 wei = transpose(Linv) * transpose(R)
                 # δV = -(quad - exact)
@@ -775,6 +775,9 @@ function _local_vdim_auxiliary_quantities(
             Θ[i, n] += μ[i] * P[i, n]
         end
     end
+    if op isa Helmholtz && N == 3
+        Θ .*= 1/scale
+    end
     return Θ, b
 end
 
@@ -1076,6 +1079,52 @@ function _lowfreq_vdim_cancellation_quantities(
                     R[i, n] += coef * b[j, monomials_indices_lowfreq[multiindices[n]]]
                 end
             end
+        end
+    end
+    return R
+end
+
+function _lowfreq_vdim_cancellation_quantities(
+        op::Laplace{3},
+        op_lowfreq::Laplace{3},
+        center,
+        scale,
+        num_basis,
+        PFE_p_lowfreq,
+        PFE_P_lowfreq,
+        multiindices,
+        multiindices_lowfreq,
+        monomials_indices,
+        monomials_indices_lowfreq,
+        X,
+        μ,
+        Yvol,
+        Ybdry,
+        diam,
+        need_layer_corr,
+        ws::LocalVDIMWorkspace,
+    )
+    Θ, b = _local_vdim_auxiliary_quantities(
+        op_lowfreq,
+        center,
+        scale,
+        PFE_p_lowfreq,
+        PFE_P_lowfreq,
+        X,
+        μ,
+        Yvol,
+        Ybdry,
+        diam,
+        need_layer_corr,
+        ws,
+    )
+    num_targets = length(X)
+    # quad - exact = scale² Θ;
+    R = Matrix{eltype(Θ)}(undef, num_targets, num_basis)
+    for n in 1:num_basis
+        col = monomials_indices_lowfreq[multiindices[n]]
+        for i in 1:num_targets
+            R[i, n] = scale^2 * Θ[i, col]
         end
     end
     return R
