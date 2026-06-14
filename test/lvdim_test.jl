@@ -13,7 +13,7 @@ using DataStructures
 
 #meshsize = 0.001/8
 #meshsize = 0.125/8
-meshsize = 0.125 / 2 /2
+meshsize = 0.125 / 2 /2 / 2 / 2
 interpolation_order = 2
 VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(4)
 #VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
@@ -64,7 +64,7 @@ end
 
 #k = 0.1 / meshsize
 #k = 1.0
-k = 0
+k = 1.0
 op = k == 0 ? Inti.Laplace(; dim = 2) : Inti.Helmholtz(; dim = 2, k)
 
 ## Boundary operators
@@ -185,6 +185,7 @@ V_d2e = Inti.volume_potential(;
         meshsize = meshsize,
         boundary = Γₕ_quad,
         target_location = :outside,
+        form = :analytic,
     ),
 )
 

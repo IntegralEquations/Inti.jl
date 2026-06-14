@@ -173,8 +173,28 @@ function local_vdim_correction(
         maxdist = Inf,
         center = nothing,
         shift::Val{SHIFT} = Val(false),
+        form::Symbol = :contraction,
     ) where {SHIFT, Eltype}
     SHIFT || error("unsupported local VDIM without shifting")
+    # `form` selects how the low-frequency local correction `δV = -(quad - exact)`
+    # forms its `quad - exact` difference (both give the same sparse δV, columns
+    # on the element's own nodes):
+    #   :contraction — build the naive patch operator by contracting the literal
+    #                  single-layer kernel entries against the basis values
+    #                  (`Rq = Gmat*Bmat`) and subtract the exact operator `R`.
+    #                  Uses the same kernel function (and `G(x,x)=0` convention)
+    #                  as the dense/FMM forward map, so no analytic self-node
+    #                  term is needed. This code path shows the math more
+    #                  cleanly, but is much slower.
+    #   :analytic    — obtain `quad - exact` directly from the rescaled-coordinate
+    #                  Laplace expansion (eqs. (3.11)/(4.1)), reusing the scaled
+    #                  single/double/volume operators already assembled by
+    #                  `_local_vdim_auxiliary_quantities`. Mirrors the
+    #                  manuscript, but must add an analytic self-node term to
+    #                  account for the `G(x,x)=0` convention of the operator
+    #                  being corrected, that depends on `H(z=0)`.
+    form in (:contraction, :analytic) ||
+        error("unknown local VDIM correction form: $form (expected :contraction or :analytic)")
     # variables for debugging the condition properties of the method
     vander_cond = vander_norm = rhs_norm = res_norm = shift_norm = -Inf
     # figure out if we are dealing with a scalar or vector PDE
@@ -276,25 +296,52 @@ function local_vdim_correction(
                     bdry_qrule,
                     vol_qrule,
                 )
-                R = _lowfreq_vdim_auxiliary_quantities(
-                    op,
-                    op_lowfreq,
-                    c,
-                    r,
-                    num_basis,
-                    PFE_p_lowfreq,
-                    PFE_P_lowfreq,
-                    multiindices,
-                    multiindices_lowfreq,
-                    monomials_indices,
-                    monomials_indices_lowfreq,
-                    target[near_list[n]],
-                    green_multiplier[near_list[n]],
-                    Yvol,
-                    Ybdry,
-                    diam,
-                    need_layer_corr
-                )
+                if form === :analytic
+                    # R holds the physical (quad - exact) difference directly,
+                    # from the rescaled expansion + analytic self-node term.
+                    R = _lowfreq_vdim_cancellation_quantities(
+                        op,
+                        op_lowfreq,
+                        c,
+                        r,
+                        num_basis,
+                        PFE_p_lowfreq,
+                        PFE_P_lowfreq,
+                        multiindices,
+                        multiindices_lowfreq,
+                        monomials_indices,
+                        monomials_indices_lowfreq,
+                        target[near_list[n]],
+                        green_multiplier[near_list[n]],
+                        Yvol,
+                        Ybdry,
+                        diam,
+                        need_layer_corr,
+                        ws,
+                    )
+                else
+                    # R holds the exact local operator; the naive quad side is
+                    # built by contraction in the assembly below.
+                    R = _lowfreq_vdim_auxiliary_quantities(
+                        op,
+                        op_lowfreq,
+                        c,
+                        r,
+                        num_basis,
+                        PFE_p_lowfreq,
+                        PFE_P_lowfreq,
+                        multiindices,
+                        multiindices_lowfreq,
+                        monomials_indices,
+                        monomials_indices_lowfreq,
+                        target[near_list[n]],
+                        green_multiplier[near_list[n]],
+                        Yvol,
+                        Ybdry,
+                        diam,
+                        need_layer_corr
+                    )
+                end
             else
                 lowfreq = false
                 Yvol, Ybdry, need_layer_corr, els_idxs = _local_vdim_construct_local_quadratures(
@@ -332,60 +379,49 @@ function local_vdim_correction(
             if lowfreq
                 # eq. (2.10): δV = -(quad - exact) applied through the
                 # interpolant of element `n`, with columns on the element's own
-                # nodes only (and including the V_N[f - fₙ] remainder). `R`
-                # holds the exact local operator V_exact,N[p_β]; the quad side
-                # is obtained by contracting the naive operator entries against
-                # the basis values, using the same kernel function as the dense
-                # assembly (and consistent with the FMM), including its zero
-                # convention at coincident points — so it matches the operator
-                # being corrected by construction.
-
-                # Optimization note: this contraction is not strictly needed —
-                # the forward map already computes it, so in the low-frequency
-                # path we effectively add it twice and subtract one off. We keep
-                # it for readability (the coded formula matches the derived
-                # V[p_β]) and to handle the G(x,x) = 0 convention consistently
-                # with the direct/FMM kernels. This path runs only for Helmholtz strongly
-                # sub-wavelength features and is essentially a safety valve so
-                # that we can claim the method is stable; most elements will not
-                # follow the `lowfreq` path. If the redundancy ever matters it
-                # can be removed entirely, but see the G(x,x) = 0 subtlety above.
-
-                # FIXME: For any kernel not needing stabilization this is the
-                # default code path and is slow We may need the uglier but more
-                # efficient code long-term
-                #
-                # The naive-quadrature contraction is the matrix product
-                # Rq = Gmat * Bmat, with
-                #   Gmat[ii, j] = G(xᵢ, yⱼ)   (near target × patch node)
-                #   Bmat[j,  β] = wⱼ pβ(yⱼ)   (patch node × monomial)
-                # one gemm is far cheaper than accumulating a length-num_basis
-                # broadcast per (target, node) pair.
-                Gker = SingleLayerKernel(op)
-                ntarg = length(near_list[n])
-                nsrc = nq * length(els_idxs)
-                Gmat = Matrix{eltype(R)}(undef, ntarg, nsrc)
-                Bmat = Matrix{Float64}(undef, nsrc, num_basis)
-                pvals = Vector{Float64}(undef, num_basis)
-                ytmp = Vector{Float64}(undef, N)
-                jcol = 0
-                for el_idx in els_idxs
-                    for j in @view qtags[:, el_idx]
-                        jcol += 1
-                        yq = source[j]
-                        ytmp .= (coords(yq) - c) / r
-                        ElementaryPDESolutions.fast_evaluate!(pvals, ytmp, PFE_p)
-                        w = yq.weight
-                        @inbounds for β in 1:num_basis
-                            Bmat[jcol, β] = w * pvals[β]
-                        end
-                        @inbounds for (ii, i) in enumerate(near_list[n])
-                            Gmat[ii, jcol] = Gker(target[i], yq)
+                # nodes only (and including the V_N[f - fₙ] remainder). How the
+                # `quad - exact` difference `Δ` is formed depends on `form`.
+                if form === :analytic
+                    # R already holds the physical (quad - exact) directly.
+                    Δ = R
+                else
+                    # `R` holds the exact local operator V_exact,N[p_β]; the quad
+                    # side is obtained by contracting the naive operator entries
+                    # against the basis values, using the same kernel function as
+                    # the dense assembly (and consistent with the FMM), including
+                    # its zero convention at coincident points — so it matches the
+                    # operator being corrected by construction.
+                    #
+                    # The naive-quadrature contraction is the matrix product
+                    # Rq = Gmat * Bmat, with
+                    #   Gmat[ii, j] = G(xᵢ, yⱼ)   (near target × patch node)
+                    #   Bmat[j,  β] = wⱼ pβ(yⱼ)   (patch node × monomial)
+                    Gker = SingleLayerKernel(op)
+                    ntarg = length(near_list[n])
+                    nsrc = nq * length(els_idxs)
+                    Gmat = Matrix{eltype(R)}(undef, ntarg, nsrc)
+                    Bmat = Matrix{Float64}(undef, nsrc, num_basis)
+                    pvals = Vector{Float64}(undef, num_basis)
+                    ytmp = Vector{Float64}(undef, N)
+                    jcol = 0
+                    for el_idx in els_idxs
+                        for j in @view qtags[:, el_idx]
+                            jcol += 1
+                            yq = source[j]
+                            ytmp .= (coords(yq) - c) / r
+                            ElementaryPDESolutions.fast_evaluate!(pvals, ytmp, PFE_p)
+                            w = yq.weight
+                            @inbounds for β in 1:num_basis
+                                Bmat[jcol, β] = w * pvals[β]
+                            end
+                            @inbounds for (ii, i) in enumerate(near_list[n])
+                                Gmat[ii, jcol] = Gker(target[i], yq)
+                            end
                         end
                     end
+                    Δ = Gmat * Bmat - R
                 end
-                Rq = Gmat * Bmat
-                wei = transpose(Linv) * transpose(Rq - R)
+                wei = transpose(Linv) * transpose(Δ)
                 append!(Is, repeat(near_list[n]; inner = nq))
                 append!(Js, repeat(jglob; outer = length(near_list[n])))
                 append!(Vs, -wei)
@@ -967,6 +1003,158 @@ function _lowfreq_vdim_auxiliary_quantities(
             )
         end
         @views R[:, n] .+= scale^2 .* (Hmat * b[:, monomials_indices_lowfreq[beta]])
+    end
+    return R
+end
+
+"""
+    _lowfreq_vdim_cancellation_quantities(op, op_lowfreq, center, scale, num_basis, ...)
+
+Return the physical *(naive quad - exact)* local volume operator `R[i, β] =
+V_quad,N[p_β](xᵢ) - V_exact,N[p_β](xᵢ)` for the low-frequency path, formed
+analytically from the rescaled-coordinate Laplace expansion rather than by an
+explicit kernel contraction (see [`local_vdim_correction`](@ref) `form` kwarg).
+
+The key reuse is that `_local_vdim_auxiliary_quantities` already returns
+`Θ = V_scaled·b - E_scaled`, i.e. the scaled (naive quad - exact) Laplace
+potentials of the padded monomial basis. The log(scale)/(2π)∫p̃ term of eq.
+(4.1) (Laplace) and the smooth ∫H p̃ term of eq. (3.12) (Helmholtz) cancel
+between quad and exact, leaving only an analytic self-node term that accounts
+for the `G(x,x)=0` convention of the operator being corrected.
+"""
+function _lowfreq_vdim_cancellation_quantities(
+        op::Laplace{2},
+        op_lowfreq::Laplace{2},
+        center,
+        scale,
+        num_basis,
+        PFE_p_lowfreq,
+        PFE_P_lowfreq,
+        multiindices,
+        multiindices_lowfreq,
+        monomials_indices,
+        monomials_indices_lowfreq,
+        X,
+        μ,
+        Yvol,
+        Ybdry,
+        diam,
+        need_layer_corr,
+        ws::LocalVDIMWorkspace,
+    )
+    Θ, b = _local_vdim_auxiliary_quantities(
+        op_lowfreq,
+        center,
+        scale,
+        PFE_p_lowfreq,
+        PFE_P_lowfreq,
+        X,
+        μ,
+        Yvol,
+        Ybdry,
+        diam,
+        need_layer_corr,
+        ws,
+    )
+    num_targets = length(X)
+    # quad - exact = scale² Θ; the log(scale)/(2π)∫p̃ term cancels.
+    R = Matrix{eltype(Θ)}(undef, num_targets, num_basis)
+    for n in 1:num_basis
+        col = monomials_indices_lowfreq[multiindices[n]]
+        for i in 1:num_targets
+            R[i, n] = scale^2 * Θ[i, col]
+        end
+    end
+    # Self-node term: the physical naive operator uses G(x,x) = 0, omitting the
+    # -log(scale)/(2π) shift the rescaling applies at the coincident node.
+    Xshift = [(coords(q) - center) / scale for q in X]
+    for i in 1:num_targets
+        for j in 1:length(Yvol)
+            if norm(Xshift[i] - Yvol[j].coords) ≤ SAME_POINT_TOLERANCE
+                coef = 1 / (2π) * log(scale) * Yvol[j].weight * scale^2
+                for n in 1:num_basis
+                    R[i, n] += coef * b[j, monomials_indices_lowfreq[multiindices[n]]]
+                end
+            end
+        end
+    end
+    return R
+end
+
+function _lowfreq_vdim_cancellation_quantities(
+        op::Helmholtz{2},
+        op_lowfreq::Laplace{2},
+        center,
+        scale,
+        num_basis,
+        PFE_p_lowfreq,
+        PFE_P_lowfreq,
+        multiindices,
+        multiindices_lowfreq,
+        monomials_indices,
+        monomials_indices_lowfreq,
+        X,
+        μ,
+        Yvol,
+        Ybdry,
+        diam,
+        need_layer_corr,
+        ws::LocalVDIMWorkspace,
+    )
+    Θ, b = _local_vdim_auxiliary_quantities(
+        op_lowfreq,
+        center,
+        scale,
+        PFE_p_lowfreq,
+        PFE_P_lowfreq,
+        X,
+        μ,
+        Yvol,
+        Ybdry,
+        diam,
+        need_layer_corr,
+        ws,
+    )
+    Xshift = [(coords(q) - center) / scale for q in X]
+    num_targets = length(X)
+    R = zeros(ComplexF64, num_targets, num_basis)
+    kr2 = (op.k * scale)^2
+    γ = 0.5772156649015328606
+
+    # quad - exact: the P_J⁽¹⁾ combination (eq. (3.11)) of the Laplace
+    # (quad - exact) Θ of nearby monomials. The smooth ∫H p̃ part cancels
+    # between quad and exact except at the self node, handled below.
+    for n in 1:num_basis
+        beta = multiindices[n]
+        beta10 = beta + MultiIndex((1, 0))
+        beta01 = beta + MultiIndex((0, 1))
+        beta20 = beta + MultiIndex((2, 0))
+        beta02 = beta + MultiIndex((0, 2))
+        for j in 1:num_targets
+            x1t = Xshift[j][1]
+            x2t = Xshift[j][2]
+            R[j, n] =
+                scale^2 * (
+                (1 - 1 / 4 * kr2 * (x1t^2 + x2t^2)) * Θ[j, monomials_indices_lowfreq[beta]] +
+                    1 / 2 * kr2 * x1t * factorial(beta10) / factorial(beta) * Θ[j, monomials_indices_lowfreq[beta10]] +
+                    1 / 2 * kr2 * x2t * factorial(beta01) / factorial(beta) * Θ[j, monomials_indices_lowfreq[beta01]] -
+                    1 / 4 * kr2 * factorial(beta20) / factorial(beta) * Θ[j, monomials_indices_lowfreq[beta20]] -
+                    1 / 4 * kr2 * factorial(beta02) / factorial(beta) * Θ[j, monomials_indices_lowfreq[beta02]]
+            )
+        end
+    end
+    # Self-node term: physical naive drops H(0) = i/4 - (γ + log(kr/2))/(2π)
+    # at the coincident node (G_k(x,x) = 0).
+    H0 = im / 4 - 1 / (2π) * (γ + 1 / 2 * log(kr2 / 4))
+    for i in 1:num_targets
+        for j in 1:length(Yvol)
+            if norm(Xshift[i] - Yvol[j].coords) ≤ SAME_POINT_TOLERANCE
+                w = Yvol[j].weight * scale^2
+                for n in 1:num_basis
+                    R[i, n] -= H0 * w * b[j, monomials_indices_lowfreq[multiindices[n]]]
+                end
+            end
+        end
     end
     return R
 end
