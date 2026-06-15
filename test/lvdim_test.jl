@@ -13,11 +13,11 @@ using DataStructures
 
 #meshsize = 0.001/8
 #meshsize = 0.125/8
-meshsize = 0.125 / 2 /2 / 2 / 2
+meshsize = 0.125 / 2 /2 / 2 / 4 / 2
 interpolation_order = 2
-VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(4)
+VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(3)
 #VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
-bdry_qorder = 2 * VR_qorder
+bdry_qorder = 7
 
 function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
     return try
@@ -64,7 +64,7 @@ end
 
 #k = 0.1 / meshsize
 #k = 1.0
-k = 1.0
+k = 32.0
 op = k == 0 ? Inti.Laplace(; dim = 2) : Inti.Helmholtz(; dim = 2, k)
 
 ## Boundary operators
@@ -80,7 +80,7 @@ end
 @info "Boundary operators time: $tbnd"
 
 ## Volume potentials
-#tvol = @elapsed begin
+tvol = @elapsed begin
 V_d2d = Inti.volume_potential(;
     op,
     target = Ωₕ_quad,
@@ -95,10 +95,11 @@ V_d2d = Inti.volume_potential(;
         maxdist = 5 * meshsize,
         meshsize = meshsize,
         boundary = Γₕ_quad,
+        form = :analytic,
     ),
 )
-#end
-#@info "Volume potential time: $tvol"
+end
+@info "Volume potential time: $tvol"
 
 using ElementaryPDESolutions
 import ElementaryPDESolutions: Polynomial

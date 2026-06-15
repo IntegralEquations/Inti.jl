@@ -173,7 +173,7 @@ function local_vdim_correction(
         maxdist = Inf,
         center = nothing,
         shift::Val{SHIFT} = Val(false),
-        form::Symbol = :contraction,
+        form::Symbol = :analytic,
     ) where {SHIFT, Eltype}
     SHIFT || error("unsupported local VDIM without shifting")
     # `form` selects how the low-frequency local correction `δV = -(quad - exact)`
@@ -216,10 +216,6 @@ function local_vdim_correction(
     end
     op_hat = _scaled_operator(op, s)
     op_lowfreq = _lowfreq_operator(op)
-    PFE_p_lowfreq, PFE_P_lowfreq, multiindices_lowfreq, monomials_indices_lowfreq =
-        polynomial_solutions_local_vdim(op_lowfreq, interpolation_order + 2)
-    PFE_p, PFE_P, multiindices, monomials_indices =
-        polynomial_solutions_local_vdim(op_hat, interpolation_order)
 
     dict_near = etype_to_nearest_points(target, source; maxdist)
     bdry_kdtree = KDTree(bdry_nodes)
@@ -236,8 +232,6 @@ function local_vdim_correction(
         sizehint!(Js, ne * nq * nq)
         sizehint!(Vs, ne * nq * nq)
         num_basis = binomial(interpolation_order + N, N)
-        L̃ = Matrix{Float64}(undef, nq, num_basis)
-        vals_trg = Matrix{Float64}(undef, num_basis, nq)
 
         bdry_qorder = 2 * quadrature_order
         if N == 3
@@ -253,64 +247,150 @@ function local_vdim_correction(
         topo_neighs = 1
         neighbors = topological_neighbors(mesh, topo_neighs)
 
-        # preallocated local quadratures, reused (refilled in place) across the
-        # element loop so the qnodes buffers are not reallocated every iteration
-        Yvol = Quadrature{N, Float64}(
-            nothing,
-            vol_etype2qrule,
-            QuadratureNode{N, Float64}[],
-            OrderedDict{DataType, Matrix{Int}}(),
-        )
-        Ybdry = Quadrature{N, Float64}(
-            nothing,
-            bdry_etype2qrule,
-            QuadratureNode{N, Float64}[],
-            OrderedDict{DataType, Matrix{Int}}(),
-        )
-        # reusable scratch for the per-element auxiliary quantities
-        ws = LocalVDIMWorkspace{Eltype, N}()
+        # Parallelize the element loop across threads.  The work is split into
+        # one chunk per thread; each chunk owns *private* scratch that must NOT
+        # be shared between threads: a `LocalVDIMWorkspace`, the in-place local
+        # quadrature buffers (`Yvol`/`Ybdry`), and the Vandermonde scratch
+        # (`L̃`/`vals_trg`).  Each chunk accumulates into its own (Is, Js, Vs)
+        # buffers, which are concatenated into the global ones after the
+        # threaded region (so no locking is needed in the hot loop).
+        nchunks = max(1, min(Threads.nthreads(), ne))
+        chunks = collect(Iterators.partition(1:ne, cld(ne, nchunks)))
+        chunk_Is = [Int[] for _ in chunks]
+        chunk_Js = [Int[] for _ in chunks]
+        chunk_Vs = [Eltype[] for _ in chunks]
+        # Per-thread polynomial fast-evaluators.  Each carries an internal
+        # mutable `cfg` (FixedPolynomials.JacobianConfig) written on every
+        # `fast_evaluate!`, so it MUST NOT be shared between threads.  Build a
+        # private set per chunk *serially* here (the construction goes through
+        # DynamicPolynomials' `@polyvar`, which is itself not thread-safe).  The
+        # accompanying multiindices / monomials_indices are read-only data.
+        chunk_pfe_lowfreq =
+            [polynomial_solutions_local_vdim(op_lowfreq, interpolation_order + 4) for _ in chunks]
+        chunk_pfe =
+            [polynomial_solutions_local_vdim(op_hat, interpolation_order) for _ in chunks]
+        Threads.@threads for ci in eachindex(chunks)
+            # --- per-thread (per-chunk) private scratch; never shared ---
+            L̃ = Matrix{Float64}(undef, nq, num_basis)
+            vals_trg = Matrix{Float64}(undef, num_basis, nq)
+            # preallocated local quadratures, reused across this chunk's
+            # elements so the qnodes buffers are not reallocated every iteration
+            Yvol = Quadrature{N, Float64}(
+                nothing,
+                vol_etype2qrule,
+                QuadratureNode{N, Float64}[],
+                OrderedDict{DataType, Matrix{Int}}(),
+            )
+            Ybdry = Quadrature{N, Float64}(
+                nothing,
+                bdry_etype2qrule,
+                QuadratureNode{N, Float64}[],
+                OrderedDict{DataType, Matrix{Int}}(),
+            )
+            # reusable scratch for the per-element auxiliary quantities
+            ws = LocalVDIMWorkspace{Eltype, N}()
+            # this chunk's private fast-evaluators (built serially above)
+            PFE_p_lowfreq, PFE_P_lowfreq, multiindices_lowfreq, monomials_indices_lowfreq =
+                chunk_pfe_lowfreq[ci]
+            PFE_p, PFE_P, multiindices, monomials_indices = chunk_pfe[ci]
+            # chunk-local correction triplets, merged after the threaded region
+            lIs = chunk_Is[ci]
+            lJs = chunk_Js[ci]
+            lVs = chunk_Vs[ci]
+            for n in chunks[ci]
+                # indices of nodes in element `n`
+                isempty(near_list[n]) && continue
+                c, r, diam = translation_and_scaling(els[n])
+                # Low-frequency (kr small) elements use the Laplace-based expansion
+                # of Section 3.1/4; otherwise the high-frequency rescaling of
+                # Section 3.2 with s = meshsize (so that k*s = O(1) is fixed and
+                # s/r is bounded from above and below) is stable.
 
-        for n in 1:ne
-            # indices of nodes in element `n`
-            isempty(near_list[n]) && continue
-            c, r, diam = translation_and_scaling(els[n])
-            # Low-frequency (kr small) elements use the Laplace-based expansion
-            # of Section 3.1/4; otherwise the high-frequency rescaling of
-            # Section 3.2 with s = meshsize (so that k*s = O(1) is fixed and
-            # s/r is bounded from above and below) is stable.
-
-            # Run Laplace through low-frequency path too, for stability.
-            if op isa Laplace || (op isa Helmholtz && r * op.k < 10^(-3))
-                lowfreq = true
-                Yvol, Ybdry, need_layer_corr, els_idxs = _local_vdim_construct_local_quadratures(
-                    N,
-                    mesh,
-                    neighbors,
-                    n,
-                    c,
-                    r,
-                    diam,
-                    bdry_kdtree,
-                    Yvol,
-                    Ybdry,
-                    bdry_qrule,
-                    vol_qrule,
-                )
-                if form === :analytic
-                    # R holds the physical (quad - exact) difference directly,
-                    # from the rescaled expansion + analytic self-node term.
-                    R = _lowfreq_vdim_cancellation_quantities(
-                        op,
-                        op_lowfreq,
+                # Run Laplace through low-frequency path too, for stability.
+                if op isa Laplace || (op isa Helmholtz && r * op.k < 5*10^(-2))
+                    lowfreq = true
+                    Yvol, Ybdry, need_layer_corr, els_idxs = _local_vdim_construct_local_quadratures(
+                        N,
+                        mesh,
+                        neighbors,
+                        n,
                         c,
                         r,
-                        num_basis,
-                        PFE_p_lowfreq,
-                        PFE_P_lowfreq,
-                        multiindices,
-                        multiindices_lowfreq,
-                        monomials_indices,
-                        monomials_indices_lowfreq,
+                        diam,
+                        bdry_kdtree,
+                        Yvol,
+                        Ybdry,
+                        bdry_qrule,
+                        vol_qrule,
+                    )
+                    if form === :analytic
+                        # R holds the physical (quad - exact) difference directly,
+                        # from the rescaled expansion + analytic self-node term.
+                        R = _lowfreq_vdim_cancellation_quantities(
+                            op,
+                            op_lowfreq,
+                            c,
+                            r,
+                            num_basis,
+                            PFE_p_lowfreq,
+                            PFE_P_lowfreq,
+                            multiindices,
+                            multiindices_lowfreq,
+                            monomials_indices,
+                            monomials_indices_lowfreq,
+                            target[near_list[n]],
+                            green_multiplier[near_list[n]],
+                            Yvol,
+                            Ybdry,
+                            diam,
+                            need_layer_corr,
+                            ws,
+                        )
+                    else
+                        # R holds the exact local operator; the naive quad side is
+                        # built by contraction in the assembly below.
+                        R = _lowfreq_vdim_auxiliary_quantities(
+                            op,
+                            op_lowfreq,
+                            c,
+                            r,
+                            num_basis,
+                            PFE_p_lowfreq,
+                            PFE_P_lowfreq,
+                            multiindices,
+                            multiindices_lowfreq,
+                            monomials_indices,
+                            monomials_indices_lowfreq,
+                            target[near_list[n]],
+                            green_multiplier[near_list[n]],
+                            Yvol,
+                            Ybdry,
+                            diam,
+                            need_layer_corr
+                        )
+                    end
+                else
+                    lowfreq = false
+                    Yvol, Ybdry, need_layer_corr, els_idxs = _local_vdim_construct_local_quadratures(
+                        N,
+                        mesh,
+                        neighbors,
+                        n,
+                        c,
+                        s,
+                        diam,
+                        bdry_kdtree,
+                        Yvol,
+                        Ybdry,
+                        bdry_qrule,
+                        vol_qrule,
+                    )
+                    R, b = _local_vdim_auxiliary_quantities(
+                        op_hat,
+                        c,
+                        s,
+                        PFE_p,
+                        PFE_P,
                         target[near_list[n]],
                         green_multiplier[near_list[n]],
                         Yvol,
@@ -319,123 +399,77 @@ function local_vdim_correction(
                         need_layer_corr,
                         ws,
                     )
-                else
-                    # R holds the exact local operator; the naive quad side is
-                    # built by contraction in the assembly below.
-                    R = _lowfreq_vdim_auxiliary_quantities(
-                        op,
-                        op_lowfreq,
-                        c,
-                        r,
-                        num_basis,
-                        PFE_p_lowfreq,
-                        PFE_P_lowfreq,
-                        multiindices,
-                        multiindices_lowfreq,
-                        monomials_indices,
-                        monomials_indices_lowfreq,
-                        target[near_list[n]],
-                        green_multiplier[near_list[n]],
-                        Yvol,
-                        Ybdry,
-                        diam,
-                        need_layer_corr
-                    )
                 end
-            else
-                lowfreq = false
-                Yvol, Ybdry, need_layer_corr, els_idxs = _local_vdim_construct_local_quadratures(
-                    N,
-                    mesh,
-                    neighbors,
-                    n,
-                    c,
-                    s,
-                    diam,
-                    bdry_kdtree,
-                    Yvol,
-                    Ybdry,
-                    bdry_qrule,
-                    vol_qrule,
-                )
-                R, b = _local_vdim_auxiliary_quantities(
-                    op_hat,
-                    c,
-                    s,
-                    PFE_p,
-                    PFE_P,
-                    target[near_list[n]],
-                    green_multiplier[near_list[n]],
-                    Yvol,
-                    Ybdry,
-                    diam,
-                    need_layer_corr,
-                    ws,
-                )
-            end
-            jglob = @view qtags[:, n]
-            L̃ .= transpose(build_vander(vals_trg, view(source, jglob), PFE_p, c, r))
-            Linv = pinv(L̃)
-            if lowfreq
-                # eq. (2.10): δV = -(quad - exact) applied through the
-                # interpolant of element `n`, with columns on the element's own
-                # nodes only (and including the V_N[f - fₙ] remainder). How the
-                # `quad - exact` difference `Δ` is formed depends on `form`.
-                if form === :analytic
-                    # R already holds the physical (quad - exact) directly.
-                    Δ = R
-                else
-                    # `R` holds the exact local operator V_exact,N[p_β]; the quad
-                    # side is obtained by contracting the naive operator entries
-                    # against the basis values, using the same kernel function as
-                    # the dense assembly (and consistent with the FMM), including
-                    # its zero convention at coincident points — so it matches the
-                    # operator being corrected by construction.
-                    #
-                    # The naive-quadrature contraction is the matrix product
-                    # Rq = Gmat * Bmat, with
-                    #   Gmat[ii, j] = G(xᵢ, yⱼ)   (near target × patch node)
-                    #   Bmat[j,  β] = wⱼ pβ(yⱼ)   (patch node × monomial)
-                    Gker = SingleLayerKernel(op)
-                    ntarg = length(near_list[n])
-                    nsrc = nq * length(els_idxs)
-                    Gmat = Matrix{eltype(R)}(undef, ntarg, nsrc)
-                    Bmat = Matrix{Float64}(undef, nsrc, num_basis)
-                    pvals = Vector{Float64}(undef, num_basis)
-                    ytmp = Vector{Float64}(undef, N)
-                    jcol = 0
-                    for el_idx in els_idxs
-                        for j in @view qtags[:, el_idx]
-                            jcol += 1
-                            yq = source[j]
-                            ytmp .= (coords(yq) - c) / r
-                            ElementaryPDESolutions.fast_evaluate!(pvals, ytmp, PFE_p)
-                            w = yq.weight
-                            @inbounds for β in 1:num_basis
-                                Bmat[jcol, β] = w * pvals[β]
-                            end
-                            @inbounds for (ii, i) in enumerate(near_list[n])
-                                Gmat[ii, jcol] = Gker(target[i], yq)
+                jglob = @view qtags[:, n]
+                L̃ .= transpose(build_vander(vals_trg, view(source, jglob), PFE_p, c, r))
+                Linv = pinv(L̃)
+                if lowfreq
+                    # eq. (2.10): δV = -(quad - exact) applied through the
+                    # interpolant of element `n`, with columns on the element's own
+                    # nodes only (and including the V_N[f - fₙ] remainder). How the
+                    # `quad - exact` difference `Δ` is formed depends on `form`.
+                    if form === :analytic
+                        # R already holds the physical (quad - exact) directly.
+                        Δ = R
+                    else
+                        # `R` holds the exact local operator V_exact,N[p_β]; the quad
+                        # side is obtained by contracting the naive operator entries
+                        # against the basis values, using the same kernel function as
+                        # the dense assembly (and consistent with the FMM), including
+                        # its zero convention at coincident points — so it matches the
+                        # operator being corrected by construction.
+                        #
+                        # The naive-quadrature contraction is the matrix product
+                        # Rq = Gmat * Bmat, with
+                        #   Gmat[ii, j] = G(xᵢ, yⱼ)   (near target × patch node)
+                        #   Bmat[j,  β] = wⱼ pβ(yⱼ)   (patch node × monomial)
+                        Gker = SingleLayerKernel(op)
+                        ntarg = length(near_list[n])
+                        nsrc = nq * length(els_idxs)
+                        Gmat = Matrix{eltype(R)}(undef, ntarg, nsrc)
+                        Bmat = Matrix{Float64}(undef, nsrc, num_basis)
+                        pvals = Vector{Float64}(undef, num_basis)
+                        ytmp = Vector{Float64}(undef, N)
+                        jcol = 0
+                        for el_idx in els_idxs
+                            for j in @view qtags[:, el_idx]
+                                jcol += 1
+                                yq = source[j]
+                                ytmp .= (coords(yq) - c) / r
+                                ElementaryPDESolutions.fast_evaluate!(pvals, ytmp, PFE_p)
+                                w = yq.weight
+                                @inbounds for β in 1:num_basis
+                                    Bmat[jcol, β] = w * pvals[β]
+                                end
+                                @inbounds for (ii, i) in enumerate(near_list[n])
+                                    Gmat[ii, jcol] = Gker(target[i], yq)
+                                end
                             end
                         end
+                        Δ = Gmat * Bmat - R
                     end
-                    Δ = Gmat * Bmat - R
+                    wei = transpose(Linv) * transpose(Δ)
+                    append!(lIs, repeat(near_list[n]; inner = nq))
+                    append!(lJs, repeat(jglob; outer = length(near_list[n])))
+                    append!(lVs, -wei)
+                else
+                    S = ws.Sdiagvec
+                    resize!(S, length(multiindices))
+                    S .= s^N * (s / r) .^ (abs.(multiindices))
+                    R .*= transpose(S)
+                    wei = transpose(Linv) * transpose(R)
+                    # δV = -(quad - exact)
+                    append!(lIs, repeat(near_list[n]; inner = nq))
+                    append!(lJs, repeat(jglob; outer = length(near_list[n])))
+                    append!(lVs, -wei)
                 end
-                wei = transpose(Linv) * transpose(Δ)
-                append!(Is, repeat(near_list[n]; inner = nq))
-                append!(Js, repeat(jglob; outer = length(near_list[n])))
-                append!(Vs, -wei)
-            else
-                S = ws.Sdiagvec
-                resize!(S, length(multiindices))
-                S .= s^N * (s / r) .^ (abs.(multiindices))
-                R .*= transpose(S)
-                wei = transpose(Linv) * transpose(R)
-                # δV = -(quad - exact)
-                append!(Is, repeat(near_list[n]; inner = nq))
-                append!(Js, repeat(jglob; outer = length(near_list[n])))
-                append!(Vs, -wei)
             end
+        end
+        # merge per-chunk correction triplets into the global buffers
+        for ci in eachindex(chunks)
+            append!(Is, chunk_Is[ci])
+            append!(Js, chunk_Js[ci])
+            append!(Vs, chunk_Vs[ci])
         end
     end
     @debug """Condition properties of vdim correction:
@@ -663,7 +697,7 @@ function LocalVDIMWorkspace{T, N}() where {T, N}
         SVector{N, Float64}[],
         T[], T[], T[], T[],
         Float64[], Float64[], Float64[], Float64[], Float64[],
-        Float64[],Float64[],
+        Float64[], Float64[],
     )
 end
 
@@ -776,7 +810,7 @@ function _local_vdim_auxiliary_quantities(
         end
     end
     if op isa Helmholtz && N == 3
-        Θ .*= 1/scale
+        Θ .*= 1 / scale
     end
     return Θ, b
 end
@@ -993,6 +1027,15 @@ function _lowfreq_vdim_auxiliary_quantities(
         beta01 = beta + MultiIndex((0, 1))
         beta20 = beta + MultiIndex((2, 0))
         beta02 = beta + MultiIndex((0, 2))
+        # N=2 terms
+        beta11 = beta + MultiIndex((1, 1))
+        beta30 = beta + MultiIndex((3, 0))
+        beta21 = beta + MultiIndex((2, 1))
+        beta12 = beta + MultiIndex((1, 2))
+        beta03 = beta + MultiIndex((0, 3))
+        beta40 = beta + MultiIndex((4, 0))
+        beta22 = beta + MultiIndex((2, 2))
+        beta04 = beta + MultiIndex((0, 4))
         for j in 1:num_targets
             x1t = Xshift[j][1]
             x2t = Xshift[j][2]
@@ -1003,6 +1046,21 @@ function _lowfreq_vdim_auxiliary_quantities(
                     1 / 2 * kr2 * x2t * factorial(beta01) / factorial(beta) * E[j, monomials_indices_lowfreq[beta01]] -
                     1 / 4 * kr2 * factorial(beta20) / factorial(beta) * E[j, monomials_indices_lowfreq[beta20]] -
                     1 / 4 * kr2 * factorial(beta02) / factorial(beta) * E[j, monomials_indices_lowfreq[beta02]]
+            )
+            R[j, n] += scale^2 * kr2^2 / 64.0 * (
+                (x1t^2 + x2t^2)^2 * E[j, monomials_indices_lowfreq[beta]] +
+                -4*x1t*(x1t^2 + x2t^2)*factorial(beta10)/factorial(beta) * E[j, monomials_indices_lowfreq[beta10]] +
+                -4*x2t*(x1t^2 + x2t^2)*factorial(beta01)/factorial(beta) * E[j, monomials_indices_lowfreq[beta01]] +
+                (6*x1t^2 + 2*x2t^2)*factorial(beta20)/factorial(beta) * E[j, monomials_indices_lowfreq[beta20]] +
+                8*x1t*x2t * factorial(beta11)/factorial(beta) * E[j, monomials_indices_lowfreq[beta11]] +
+                (2*x1t^2 + 6*x2t^2)*factorial(beta02)/factorial(beta) * E[j, monomials_indices_lowfreq[beta02]] +
+                -4*x1t*factorial(beta30)/factorial(beta) * E[j, monomials_indices_lowfreq[beta30]] +
+                -4*x2t*factorial(beta21)/factorial(beta) * E[j, monomials_indices_lowfreq[beta21]] +
+                -4*x1t*factorial(beta12)/factorial(beta) * E[j, monomials_indices_lowfreq[beta12]] +
+                -4*x2t*factorial(beta03)/factorial(beta) * E[j, monomials_indices_lowfreq[beta03]] +
+                factorial(beta40)/factorial(beta) * E[j, monomials_indices_lowfreq[beta40]] +
+                2*factorial(beta22)/factorial(beta) * E[j, monomials_indices_lowfreq[beta22]] +
+                factorial(beta04)/factorial(beta) * E[j, monomials_indices_lowfreq[beta04]]
             )
         end
         @views R[:, n] .+= scale^2 .* (Hmat * b[:, monomials_indices_lowfreq[beta]])
@@ -1179,6 +1237,15 @@ function _lowfreq_vdim_cancellation_quantities(
         beta01 = beta + MultiIndex((0, 1))
         beta20 = beta + MultiIndex((2, 0))
         beta02 = beta + MultiIndex((0, 2))
+        # N=2 terms
+        beta11 = beta + MultiIndex((1, 1))
+        beta30 = beta + MultiIndex((3, 0))
+        beta21 = beta + MultiIndex((2, 1))
+        beta12 = beta + MultiIndex((1, 2))
+        beta03 = beta + MultiIndex((0, 3))
+        beta40 = beta + MultiIndex((4, 0))
+        beta22 = beta + MultiIndex((2, 2))
+        beta04 = beta + MultiIndex((0, 4))
         for j in 1:num_targets
             x1t = Xshift[j][1]
             x2t = Xshift[j][2]
@@ -1189,6 +1256,21 @@ function _lowfreq_vdim_cancellation_quantities(
                     1 / 2 * kr2 * x2t * factorial(beta01) / factorial(beta) * Θ[j, monomials_indices_lowfreq[beta01]] -
                     1 / 4 * kr2 * factorial(beta20) / factorial(beta) * Θ[j, monomials_indices_lowfreq[beta20]] -
                     1 / 4 * kr2 * factorial(beta02) / factorial(beta) * Θ[j, monomials_indices_lowfreq[beta02]]
+            )
+            R[j, n] += scale^2 * kr2^2 / 64.0 * (
+                (x1t^2 + x2t^2)^2 * Θ[j, monomials_indices_lowfreq[beta]] +
+                -4*x1t*(x1t^2 + x2t^2)*factorial(beta10)/factorial(beta) * Θ[j, monomials_indices_lowfreq[beta10]] +
+                -4*x2t*(x1t^2 + x2t^2)*factorial(beta01)/factorial(beta) * Θ[j, monomials_indices_lowfreq[beta01]] +
+                (6*x1t^2 + 2*x2t^2)*factorial(beta20)/factorial(beta) * Θ[j, monomials_indices_lowfreq[beta20]] +
+                8*x1t*x2t * factorial(beta11)/factorial(beta) * Θ[j, monomials_indices_lowfreq[beta11]] +
+                (2*x1t^2 + 6*x2t^2)*factorial(beta02)/factorial(beta) * Θ[j, monomials_indices_lowfreq[beta02]] +
+                -4*x1t*factorial(beta30)/factorial(beta) * Θ[j, monomials_indices_lowfreq[beta30]] +
+                -4*x2t*factorial(beta21)/factorial(beta) * Θ[j, monomials_indices_lowfreq[beta21]] +
+                -4*x1t*factorial(beta12)/factorial(beta) * Θ[j, monomials_indices_lowfreq[beta12]] +
+                -4*x2t*factorial(beta03)/factorial(beta) * Θ[j, monomials_indices_lowfreq[beta03]] +
+                factorial(beta40)/factorial(beta) * Θ[j, monomials_indices_lowfreq[beta40]] +
+                2*factorial(beta22)/factorial(beta) * Θ[j, monomials_indices_lowfreq[beta22]] +
+                factorial(beta04)/factorial(beta) * Θ[j, monomials_indices_lowfreq[beta04]]
             )
         end
     end
