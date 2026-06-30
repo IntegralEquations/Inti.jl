@@ -159,6 +159,20 @@ function _lowfreq_operator(op::AbstractDifferentialOperator{N}) where {N}
     end
 end
 
+# TODO: This can be optimized; rather than inflating to a basis of larger degree
+# and indexing into that larger basis, as is done here, one can simply add the
+# relevant extra polynomial multiindices used for stabilization.  This matters
+# especially at higher orders.
+function _local_vdim_lowfreq_adjusted_interp_order(op::AbstractDifferentialOperator{N}, n) where {N}
+    if op isa Laplace
+        return n
+    elseif op isa Helmholtz{2}
+        return n + 4
+    elseif op isa Helmholtz{3} # TODO implement higher-order stabilization for N=3
+        return n + 2
+    end
+end
+
 function local_vdim_correction(
         op,
         ::Type{Eltype},
@@ -275,7 +289,7 @@ function local_vdim_correction(
         # DynamicPolynomials' `@polyvar`, which is itself not thread-safe).  The
         # accompanying multiindices / monomials_indices are read-only data.
         chunk_pfe_lowfreq =
-            [polynomial_solutions_local_vdim(op_lowfreq, interpolation_order + 4) for _ in chunks]
+            [polynomial_solutions_local_vdim(op_lowfreq, _local_vdim_lowfreq_adjusted_interp_order(op, interpolation_order)) for _ in chunks]
         chunk_pfe =
             [polynomial_solutions_local_vdim(op_hat, interpolation_order) for _ in chunks]
         Threads.@threads for ci in eachindex(chunks)
@@ -1484,6 +1498,89 @@ function _lowfreq_vdim_cancellation_quantities(
         for j in 1:length(Yvol)
             if norm(Xshift[i] - Yvol[j].coords) ≤ SAME_POINT_TOLERANCE
                 w = Yvol[j].weight * scale^2
+                for n in 1:num_basis
+                    R[i, n] -= H0 * w * b[j, monomials_indices_lowfreq[multiindices[n]]]
+                end
+            end
+        end
+    end
+    return R
+end
+
+function _lowfreq_vdim_cancellation_quantities(
+        op::Helmholtz{3},
+        op_lowfreq::Laplace{3},
+        center,
+        scale,
+        num_basis,
+        PFE_p_lowfreq,
+        PFE_P_lowfreq,
+        multiindices,
+        multiindices_lowfreq,
+        monomials_indices,
+        monomials_indices_lowfreq,
+        X,
+        μ,
+        Yvol,
+        Ybdry,
+        diam,
+        need_layer_corr,
+        ws::LocalVDIMWorkspace,
+    )
+    Θ, b = _local_vdim_auxiliary_quantities(
+        op_lowfreq,
+        center,
+        scale,
+        PFE_p_lowfreq,
+        PFE_P_lowfreq,
+        X,
+        μ,
+        Yvol,
+        Ybdry,
+        diam,
+        need_layer_corr,
+        ws,
+    )
+    Xshift = [(coords(q) - center) / scale for q in X]
+    num_targets = length(X)
+    R = zeros(ComplexF64, num_targets, num_basis)
+    kr2 = (op.k * scale)^2
+
+    # quad - exact: the P_C⁽¹⁾ combination (eq. (3.11)) of the Laplace
+    # (quad - exact) Θ of nearby monomials. The smooth ∫H p̃ part cancels
+    # between quad and exact except at the self node, handled below.
+    for n in 1:num_basis
+        beta = multiindices[n]
+        beta100 = beta + MultiIndex((1, 0, 0))
+        beta010 = beta + MultiIndex((0, 1, 0))
+        beta001 = beta + MultiIndex((0, 0, 1))
+        beta200 = beta + MultiIndex((2, 0, 0))
+        beta020 = beta + MultiIndex((0, 2, 0))
+        beta002 = beta + MultiIndex((0, 0, 2))
+        for j in 1:num_targets
+            x1t = Xshift[j][1]
+            x2t = Xshift[j][2]
+            x3t = Xshift[j][3]
+            R[j, n] =
+                scale^2 * (
+                (1 - 1 / 2 * kr2 * (x1t^2 + x2t^2 + x3t^2)) * Θ[j, monomials_indices_lowfreq[beta]] +
+                    kr2 * x1t * factorial(beta100) / factorial(beta) * Θ[j, monomials_indices_lowfreq[beta100]] +
+                    kr2 * x2t * factorial(beta010) / factorial(beta) * Θ[j, monomials_indices_lowfreq[beta010]] +
+                    kr2 * x3t * factorial(beta001) / factorial(beta) * Θ[j, monomials_indices_lowfreq[beta001]] -
+                    1 / 2 * kr2 * factorial(beta200) / factorial(beta) * Θ[j, monomials_indices_lowfreq[beta200]] -
+                    1 / 2 * kr2 * factorial(beta020) / factorial(beta) * Θ[j, monomials_indices_lowfreq[beta020]] -
+                    1 / 2 * kr2 * factorial(beta002) / factorial(beta) * Θ[j, monomials_indices_lowfreq[beta002]]
+            )
+        end
+    end
+    # Self-node term: physical naive drops H(0) = i/(4π)
+    # at the coincident node (G_k(x,x) = 0).
+    #H0 = im / (4π) * op.k * scale
+    H0 = 0.0
+    for i in 1:num_targets
+        for j in 1:length(Yvol)
+            if norm(Xshift[i] - Yvol[j].coords) ≤ SAME_POINT_TOLERANCE
+                w = -1 * Yvol[j].weight * scale^3 * op.k
                 for n in 1:num_basis
                     R[i, n] -= H0 * w * b[j, monomials_indices_lowfreq[multiindices[n]]]
                 end
