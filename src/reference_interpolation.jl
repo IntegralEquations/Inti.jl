@@ -422,6 +422,13 @@ function boundary_idxs(::Type{<:LagrangeTetrahedron{4}})
     return (3, 2, 1), (1, 4, 3), (2, 3, 4), (1, 2, 4)
 end
 
+# Curved (parametric) simplices store only their vertices in the connectivity
+# matrix, so their boundary faces are enumerated over the vertex rows just like
+# the straight `LagrangeElement` of the same reference shape.
+function boundary_idxs(::Type{<:ParametricElement{ReferenceTriangle}})
+    return (1, 2), (2, 3), (3, 1)
+end
+
 # generic ℚₖ elements for ReferenceHyperCube
 function reference_nodes(T::Type{<:LagrangeElement{ReferenceHyperCube{D}, Np}}) where {D, Np}
     n = order(T) + 1
@@ -615,6 +622,8 @@ function lagrange_basis(::Type{LagrangeElement{D, N, T}}) where {D, N, T}
     return LagrangeElement{D}(vals)
 end
 
+# stale code, works juts for meshes with entirely P1 triangles; retained only
+# for performance testing
 function boundarynd(::Type{T}, els, msh) where {T}
     bdi = Inti.boundary_idxs(T)
     nedges = length(els) * length(bdi)

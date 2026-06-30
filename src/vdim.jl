@@ -169,6 +169,7 @@ function local_vdim_correction(
         green_multiplier::Vector{<:Real},
         interpolation_order = nothing,
         quadrature_order = nothing,
+        bdry_quadrature_order = nothing,
         meshsize = 1.0,
         maxdist = Inf,
         center = nothing,
@@ -195,6 +196,14 @@ function local_vdim_correction(
     #                  being corrected, that depends on `H(z=0)`.
     form in (:contraction, :analytic) ||
         error("unknown local VDIM correction form: $form (expected :contraction or :analytic)")
+    # The :contraction path indexes `etype2qtags[E]` with the patch element
+    # indices, which is only valid when the patch is homogeneous in element type.
+    # Curved (`curve_mesh`) meshes mix straight and curved elements, so require
+    # the :analytic form there.
+    form === :analytic || length(element_types(mesh)) == 1 ||
+        error(
+        "local VDIM with form = :contraction does not support meshes with multiple element types (e.g. curved meshes from `curve_mesh`); use form = :analytic",
+    )
     # variables for debugging the condition properties of the method
     vander_cond = vander_norm = rhs_norm = res_norm = shift_norm = -Inf
     # figure out if we are dealing with a scalar or vector PDE
@@ -233,7 +242,7 @@ function local_vdim_correction(
         sizehint!(Vs, ne * nq * nq)
         num_basis = binomial(interpolation_order + N, N)
 
-        bdry_qorder = 2 * quadrature_order
+        bdry_qorder = bdry_quadrature_order
         if N == 3
             bdry_qrule = _qrule_for_reference_shape(ReferenceSimplex{2}(), bdry_qorder)
             bdry_etype2qrule = OrderedDict(ReferenceSimplex{2} => bdry_qrule)
@@ -313,6 +322,7 @@ function local_vdim_correction(
                         N,
                         mesh,
                         neighbors,
+                        E,
                         n,
                         c,
                         r,
@@ -375,6 +385,7 @@ function local_vdim_correction(
                         N,
                         mesh,
                         neighbors,
+                        E,
                         n,
                         c,
                         s,
@@ -620,10 +631,103 @@ _newbord_line(vtxs) = LagrangeLine(SVector{2}(vtxs))
 # function barrier for type stability purposes
 _newbord_tri(vtxs) = LagrangeElement{ReferenceSimplex{2}}(SVector{3}(vtxs))
 
+# Build a curved patch-boundary line that follows the curved volume element `el`
+# along the reference edge from `ra` to `rb` (the reference preimages of the
+# edge's two endpoints). Calling `parametrization(el)` directly avoids the domain
+# membership assertion of `el(u)` for points that sit exactly on ∂(reference
+# triangle). The closure has a single concrete type across all curved elements of
+# a given mesh (they share one parametrization type), so the resulting
+# `ParametricElement`s can be collected in a concretely-typed vector.
+function _make_curved_bord(el, ra::SVector{2, Float64}, rb::SVector{2, Float64})
+    f = parametrization(el)
+    return ParametricElement{ReferenceHyperCube{1}, SVector{2, Float64}}(
+        s -> f((1 - s[1]) * ra + s[1] * rb),
+    )
+end
+
+# Group an element's topological-neighbor set (a `Set` of `(type, idx)` tuples)
+# by element type. On a curved mesh a single patch mixes straight
+# `LagrangeElement`s with curved `ParametricElement`s, so the indices must stay
+# paired with their type.
+function _patch_by_type(el_neighs)
+    patch = OrderedDict{DataType, Vector{Int}}()
+    for (E′, idx) in el_neighs
+        push!(get!(patch, E′, Int[]), idx)
+    end
+    return patch
+end
+
+# Topological boundary of the (possibly mixed-type) local patch: the set of
+# element faces that appear exactly once. Each returned face is a vector of node
+# indices whose ordering preserves the winding induced by `boundary_idxs`, which
+# `_normal` uses to orient the outward normal.
+function _local_patch_boundary(patch_by_type, msh)
+    faces_unsrt = Vector{Int}[]
+    faces_srt = Vector{Int}[]
+    for (E′, idxs) in patch_by_type
+        conn = connectivity(msh, E′)
+        bdi = boundary_idxs(E′)
+        for el in idxs
+            for face in bdi
+                f = [conn[v, el] for v in face]
+                push!(faces_unsrt, f)
+                push!(faces_srt, sort(f))
+            end
+        end
+    end
+    perm = sortperm(faces_srt)
+    keep = Int[]
+    i = 1
+    n = length(perm)
+    while i <= n
+        if i < n && faces_srt[perm[i]] == faces_srt[perm[i + 1]]
+            i += 2 # interior face, shared by two patch elements: drop both
+        else
+            push!(keep, perm[i])
+            i += 1
+        end
+    end
+    return faces_unsrt[keep]
+end
+
+# For every curved (parametric) element in the patch, identify the edge that lies
+# on Γ and record how to rebuild it as a curved line. A curved volume element from
+# `curve_mesh` has exactly one edge on Γ (the reference edge joining the vertices
+# at (1,0) and (0,1); the third vertex (0,0) is interior), so that edge is always
+# part of the patch boundary. The returned dictionary is keyed by the sorted node
+# pair of the Γ edge; the value carries the element and the reference preimages of
+# its two endpoints so the line can be oriented to match the patch winding.
+function _curved_patch_edges_on_gamma(patch_by_type, msh)
+    curved = Dict{SVector{2, Int}, Any}()
+    ref = (SVector(0.0, 0.0), SVector(1.0, 0.0), SVector(0.0, 1.0))
+    for (E′, idxs) in patch_by_type
+        E′ <: ParametricElement || continue
+        conn = connectivity(msh, E′)
+        els = msh.etype2els[E′]
+        for idx in idxs
+            el = els[idx]
+            f = parametrization(el)
+            vidx = conn[:, idx]
+            pcoords = nodes(msh)[vidx]
+            # match the two Γ vertices (reference (1,0) and (0,1)) to node indices
+            p10 = f(ref[2])
+            p01 = f(ref[3])
+            k1 = argmin(map(c -> norm(c - p10), pcoords))
+            k2 = argmin(map(c -> norm(c - p01), pcoords))
+            n1 = vidx[k1]
+            n2 = vidx[k2]
+            key = SVector(minmax(n1, n2)...)
+            curved[key] = (el = el, n1 = n1, r1 = ref[2], n2 = n2, r2 = ref[3])
+        end
+    end
+    return curved
+end
+
 function _local_vdim_construct_local_quadratures(
         N,
         mesh,
         neighbors,
+        E,
         el,
         center,
         scale,
@@ -634,41 +738,72 @@ function _local_vdim_construct_local_quadratures(
         bdry_qrule,
         vol_qrule
     )
-    # construct the local region
-    Etype = first(element_types(mesh))
-    el_neighs = neighbors[(Etype, el)]
+    # construct the local region; the patch may span several element types (e.g.
+    # straight + curved triangles on a `curve_mesh`ed domain), so keep indices
+    # paired with their type.
+    el_neighs = neighbors[(E, el)]
+    patch_by_type = _patch_by_type(el_neighs)
 
-    T = first(el_neighs)[1]
-    els_idxs = [i[2] for i in collect(el_neighs)]
-    els_list = mesh.etype2els[Etype][els_idxs]
+    # Now begin working in x̂ coordinates where x = scale * x̂.
+    # Build the O(h) volume neighbors over the whole patch, reusing the
+    # preallocated quadrature buffers. `_build_quadrature!` appends and registers
+    # one `etype2qtags` entry per type, so it is called once per type group.
+    empty!(Yvol.qnodes)
+    empty!(Yvol.etype2qtags)
+    els_idxs = Int[] # retained for the :contraction path (single-type meshes)
+    for (E′, idxs) in patch_by_type
+        els_list = mesh.etype2els[E′][idxs]
+        _build_quadrature!(Yvol, els_list, ones(Int, length(els_list)), vol_qrule; center, scale)
+        append!(els_idxs, idxs)
+    end
 
-    loc_bdry = boundarynd(T, els_idxs, mesh)
-    # TODO handle curved boundary of Γ??
+    # Patch boundary faces (mixed-type aware, winding preserved for outward
+    # normals).
+    loc_bdry = _local_patch_boundary(patch_by_type, mesh)
+
+    empty!(Ybdry.qnodes)
+    empty!(Ybdry.etype2qtags)
     if N == 2
-        bords = LagrangeElement{ReferenceHyperCube{N - 1}, 2, SVector{N, Float64}}[]
-    else
-        bords = LagrangeElement{ReferenceSimplex{N - 1}, 3, SVector{N, Float64}}[]
-    end
-
-    for idxs in loc_bdry
-        vtxs = nodes(mesh)[idxs]
-        if N == 2
-            bord = _newbord_line(vtxs)
-        else
-            bord = _newbord_tri(vtxs)
+        # Faces on Γ that belong to curved elements must follow the true curve;
+        # all other patch edges (interior cuts, straight boundary segments) stay
+        # straight. Straight and curved lines are different element types, so they
+        # are accumulated separately and quadrature is built per type.
+        curved_edges = _curved_patch_edges_on_gamma(patch_by_type, mesh)
+        straight_bords = LagrangeElement{ReferenceHyperCube{1}, 2, SVector{2, Float64}}[]
+        curved_bords = nothing
+        for face in loc_bdry
+            a, b = face[1], face[2]
+            spec = get(curved_edges, SVector(minmax(a, b)...), nothing)
+            if spec === nothing
+                push!(straight_bords, _newbord_line(nodes(mesh)[face]))
+            else
+                ra = a == spec.n1 ? spec.r1 : spec.r2
+                rb = b == spec.n1 ? spec.r1 : spec.r2
+                bord = _make_curved_bord(spec.el, ra, rb)
+                curved_bords === nothing && (curved_bords = typeof(bord)[])
+                push!(curved_bords, bord)
+            end
         end
-        push!(bords, bord)
+        isempty(straight_bords) || _build_quadrature!(
+            Ybdry, straight_bords, ones(Int, length(straight_bords)), bdry_qrule; center, scale,
+        )
+        curved_bords === nothing || _build_quadrature!(
+            Ybdry, curved_bords, ones(Int, length(curved_bords)), bdry_qrule; center, scale,
+        )
+    else
+        # TODO handle curved boundary of Γ in 3D
+        bords = LagrangeElement{ReferenceSimplex{N - 1}, 3, SVector{N, Float64}}[]
+        for face in loc_bdry
+            push!(bords, _newbord_tri(nodes(mesh)[face]))
+        end
+        _build_quadrature!(Ybdry, bords, ones(Int, length(bords)), bdry_qrule; center, scale)
     end
 
-    # Check if we need to do near-singular layer potential evaluation
-    vertices = mesh.etype2els[Etype][el].vals[vertices_idxs(Etype)]
+    # Check if we need to do near-singular layer potential evaluation. Use the
+    # connectivity (works for both `LagrangeElement` and `ParametricElement`,
+    # the latter having no `.vals` field).
+    vertices = nodes(mesh)[connectivity(mesh, E)[vertices_idxs(E), el]]
     need_layer_corr = sum(inrangecount(bdry_kdtree, vertices, diam / 2)) > 0
-
-    # Now begin working in x̂ coordinates where x = scale * x̂
-
-    # build O(h) volume neighbors, reusing the preallocated quadrature buffers
-    build_local_quadrature!(Yvol, els_list, vol_qrule; center, scale)
-    build_local_quadrature!(Ybdry, bords, bdry_qrule; center, scale)
 
     return Yvol, Ybdry, need_layer_corr, els_idxs
 end

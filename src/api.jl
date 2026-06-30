@@ -375,6 +375,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
             correction.maxdist,
             correction.interpolation_order,
             correction.quadrature_order,
+            correction.bdry_quadrature_order,
             correction.meshsize,
             shift,
             form,

@@ -13,11 +13,18 @@ using DataStructures
 
 #meshsize = 0.001/8
 #meshsize = 0.125/8
-meshsize = 0.125 / 2 /2 / 2 / 4 / 2
+meshsize = 0.125
 interpolation_order = 2
-VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(3)
+VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(4)
 #VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
 bdry_qorder = 7
+
+# Set `curved = true` to lift the boundary-touching elements to high-order curved
+# (ParametricElement) elements that follow the exact unit circle; `false` keeps
+# the straight (P1) triangulation. Curved meshes require `form = :analytic` below.
+curved = true
+θ = 6 # smoothness order of the curved boundary elements (used when `curved`)
+ψ = (t) -> SVector(cos(2π * t), sin(2π * t)) # unit-circle parametrization
 
 function gmsh_disk(; name, meshsize, order = 1, center = (0, 0), paxis = (2, 1))
     return try
@@ -45,10 +52,13 @@ msh = Inti.import_mesh(name; dim = 2)
 Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
 Γ = Inti.boundary(Ω)
 
-Ωₕ = msh[Ω]
-Γₕ = msh[Γ]
-Ωₕ_Sub = view(msh, Ω)
-Γₕ_Sub = view(msh, Γ)
+# Optionally curve the boundary elements to match the exact circle.
+basemsh = curved ? Inti.curve_mesh(msh, ψ, θ) : msh
+
+Ωₕ = basemsh[Ω]
+Γₕ = basemsh[Γ]
+Ωₕ_Sub = view(basemsh, Ω)
+Γₕ_Sub = view(basemsh, Γ)
 
 tquad = @elapsed begin
     # Use VDIM with the Vioreanu-Rokhlin quadrature rule for Ωₕ
@@ -64,7 +74,7 @@ end
 
 #k = 0.1 / meshsize
 #k = 1.0
-k = 32.0
+k = 0.0
 op = k == 0 ? Inti.Laplace(; dim = 2) : Inti.Helmholtz(; dim = 2, k)
 
 ## Boundary operators
