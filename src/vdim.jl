@@ -321,6 +321,7 @@ function local_vdim_correction(
                     Yvol, Ybdry, need_layer_corr, els_idxs = _local_vdim_construct_local_quadratures(
                         N,
                         mesh,
+                        source,
                         neighbors,
                         E,
                         n,
@@ -384,6 +385,7 @@ function local_vdim_correction(
                     Yvol, Ybdry, need_layer_corr, els_idxs = _local_vdim_construct_local_quadratures(
                         N,
                         mesh,
+                        source,
                         neighbors,
                         E,
                         n,
@@ -658,29 +660,49 @@ function _patch_by_type(el_neighs)
 end
 
 # Topological boundary of the (possibly mixed-type) local patch: the set of
-# element faces that appear exactly once. Each returned face is a vector of node
-# indices whose ordering preserves the winding induced by `boundary_idxs`, which
-# `_normal` uses to orient the outward normal.
+# element faces that appear exactly once. Each returned face is an `SVector` of
+# node indices whose ordering preserves the winding induced by `boundary_idxs`,
+# which `_normal` uses to orient the outward normal.
+#
+# Mirrors the buffer strategy of the (single-type, P1-only) `boundarynd`: faces
+# are fixed-width `SVector{Nf,Int}` written into pre-sized flat buffers, so there
+# is no per-face heap allocation and the sort/compare stay on the fast `SVector`
+# path (the previous `Vector{Int}`-per-face version was ~8× slower / ~6× more
+# allocation on identical patches). Mixed-type patches (straight + curved on a
+# `curve_mesh`ed domain) are handled by looping `patch_by_type`; in a fixed
+# ambient dimension every patch element type shares the same face-node count `Nf`
+# (2 in 2D, 3 in 3D). A `Val(Nf)` barrier makes `Nf` a compile-time parameter so
+# the buffers are concretely typed.
 function _local_patch_boundary(patch_by_type, msh)
-    faces_unsrt = Vector{Int}[]
-    faces_srt = Vector{Int}[]
+    nfaces = 0
+    Nf = 0
     for (E′, idxs) in patch_by_type
-        conn = connectivity(msh, E′)
         bdi = boundary_idxs(E′)
-        for el in idxs
-            for face in bdi
-                f = [conn[v, el] for v in face]
-                push!(faces_unsrt, f)
-                push!(faces_srt, sort(f))
-            end
-        end
+        Nf = length(first(bdi))
+        nfaces += length(idxs) * length(bdi)
+    end
+    nfaces == 0 && return SVector{Nf, Int}[]
+    return _local_patch_boundary(patch_by_type, msh, nfaces, Val(Nf))
+end
+
+function _local_patch_boundary(patch_by_type, msh, nfaces::Int, ::Val{Nf}) where {Nf}
+    faces_unsrt = Vector{SVector{Nf, Int}}(undef, nfaces)
+    faces_srt = Vector{SVector{Nf, Int}}(undef, nfaces)
+    j = 1
+    for (E′, idxs) in patch_by_type
+        # Function barrier: specialize the hot fill loop on the concrete
+        # connectivity-matrix and `boundary_idxs` tuple types (`E′` is a runtime
+        # `DataType`, so this resolves once per type group — a handful per patch).
+        j = _fill_patch_faces!(
+            faces_unsrt, faces_srt, connectivity(msh, E′), boundary_idxs(E′), idxs, j, Val(Nf),
+        )
     end
     perm = sortperm(faces_srt)
     keep = Int[]
+    sizehint!(keep, nfaces)
     i = 1
-    n = length(perm)
-    while i <= n
-        if i < n && faces_srt[perm[i]] == faces_srt[perm[i + 1]]
+    while i <= nfaces
+        if i < nfaces && faces_srt[perm[i]] == faces_srt[perm[i + 1]]
             i += 2 # interior face, shared by two patch elements: drop both
         else
             push!(keep, perm[i])
@@ -688,6 +710,20 @@ function _local_patch_boundary(patch_by_type, msh)
         end
     end
     return faces_unsrt[keep]
+end
+
+@inline function _fill_patch_faces!(
+        faces_unsrt, faces_srt, conn::AbstractMatrix, bdi, idxs, j, ::Val{Nf},
+    ) where {Nf}
+    for el in idxs
+        for face in bdi
+            f = SVector(ntuple(i -> conn[face[i], el], Val(Nf)))
+            faces_unsrt[j] = f
+            faces_srt[j] = sort(f)
+            j += 1
+        end
+    end
+    return j
 end
 
 # For every curved (parametric) element in the patch, identify the edge that lies
@@ -726,6 +762,7 @@ end
 function _local_vdim_construct_local_quadratures(
         N,
         mesh,
+        source,
         neighbors,
         E,
         el,
@@ -746,14 +783,45 @@ function _local_vdim_construct_local_quadratures(
 
     # Now begin working in x̂ coordinates where x = scale * x̂.
     # Build the O(h) volume neighbors over the whole patch, reusing the
-    # preallocated quadrature buffers. `_build_quadrature!` appends and registers
-    # one `etype2qtags` entry per type, so it is called once per type group.
+    # preallocated quadrature buffers.
+    #
+    # The patch volume quadrature is exactly the global `source` quadrature
+    # restricted to the patch elements, mapped into the rescaled x̂ = (x - c)/r
+    # coordinates. The unscaled nodes `el(x̂ᵢ)` and weights `μ·ŵᵢ` depend only on
+    # the element and the (fixed) VR rule — not on the patch `center`/`scale` — and
+    # are already stored in `source` (built with the same rule, center=0, scale=1).
+    # So we gather those nodes and apply the cheap affine `(x-c)/r`, `w/rᴺ` instead
+    # of re-evaluating the (expensive, curved) element maps and ForwardDiff
+    # Jacobians once per patch. Falls back to `_build_quadrature!` if `source` does
+    # not carry a matching per-element rule for the type (off the consistent VDIM
+    # path). `Yvol` is consumed only via scaled coords/weights (volume is codim 0,
+    # so no normals), and the downstream Θ is a sum over these nodes, so their
+    # ordering is irrelevant.
     empty!(Yvol.qnodes)
     empty!(Yvol.etype2qtags)
     els_idxs = Int[] # retained for the :contraction path (single-type meshes)
+    scaleN = scale^N            # volume weight rescaling: w -> w / scale^N (M = N here)
+    nq_vol = length(qcoords(vol_qrule))
     for (E′, idxs) in patch_by_type
-        els_list = mesh.etype2els[E′][idxs]
-        _build_quadrature!(Yvol, els_list, ones(Int, length(els_list)), vol_qrule; center, scale)
+        qtags = get(source.etype2qtags, E′, nothing)
+        if qtags !== nothing && size(qtags, 1) == nq_vol
+            # Mirror `_build_quadrature!`'s exact arithmetic ((x-c)/scale, w/scale^N)
+            # so the imported nodes are bit-identical to the regenerated ones.
+            istart = length(Yvol.qnodes) + 1
+            for idx in idxs
+                @inbounds for k in 1:nq_vol
+                    q = source.qnodes[qtags[k, idx]]
+                    push!(
+                        Yvol.qnodes,
+                        QuadratureNode((coords(q) - center) / scale, weight(q) / scaleN, nothing),
+                    )
+                end
+            end
+            Yvol.etype2qtags[E′] = reshape(collect(istart:length(Yvol.qnodes)), nq_vol, :)
+        else
+            els_list = mesh.etype2els[E′][idxs]
+            _build_quadrature!(Yvol, els_list, ones(Int, length(els_list)), vol_qrule; center, scale)
+        end
         append!(els_idxs, idxs)
     end
 

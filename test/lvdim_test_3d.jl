@@ -12,10 +12,10 @@ using FMM3D
 using GLMakie
 using DataStructures
 
-meshsize = 0.2
-interpolation_order = 2
+meshsize = 0.15/2
+interpolation_order = 1
 VR_qorder = Inti.Tetrahedron_VR_interpolation_order_to_quadrature_order(interpolation_order+1)
-bdry_qorder = 2 * VR_qorder
+bdry_qorder = 2 * VR_qorder - 1
 
 function gmsh_sphere(; order = 1, name, meshsize)
     return try
@@ -56,7 +56,7 @@ end
 @info "Quadrature generation time: $tquad"
 
 k0 = π
-k = 1.0
+k = 0.02
 θ = (sin(π / 3) * cos(π / 3), sin(π / 3) * sin(π / 3), cos(π / 3))
 #u  = (x) -> exp(im * k0 * dot(x, θ))
 #du = (x,n) -> im * k0 * dot(θ, n) * exp(im * k0 * dot(x, θ))
@@ -94,6 +94,7 @@ tvol = @elapsed begin
             method = :ldim,
             interpolation_order,
             quadrature_order = VR_qorder,
+            bdry_quadrature_order = 5,
             mesh = Ωₕ,
             bdry_nodes = Γₕ.nodes,
             maxdist = 5 * meshsize,
