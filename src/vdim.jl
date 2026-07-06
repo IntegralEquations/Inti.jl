@@ -426,6 +426,9 @@ function local_vdim_correction(
                         need_layer_corr,
                         ws,
                     )
+                    if op isa Helmholtz{3}
+                        R .*= 1 / scale
+                    end
                 end
                 jglob = @view qtags[:, n]
                 L̃ .= transpose(build_vander(vals_trg, view(source, jglob), PFE_p, c, r))
@@ -1025,9 +1028,6 @@ function _local_vdim_auxiliary_quantities(
         for i in 1:num_targets
             Θ[i, n] += μ[i] * P[i, n]
         end
-    end
-    if op isa Helmholtz && N == 3
-        Θ .*= 1 / scale
     end
     return Θ, b
 end
