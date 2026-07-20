@@ -364,6 +364,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         green_multiplier = fill(μ, length(target))
         shift = Val(true)
         form = get(correction, :form, :contraction)
+        stabilize = get(correction, :stabilize, true)
         δV = local_vdim_correction(
             op,
             eltype(V),
@@ -379,6 +380,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
             correction.meshsize,
             shift,
             form,
+            stabilize,
         )
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")

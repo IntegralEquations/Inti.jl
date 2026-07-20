@@ -189,6 +189,7 @@ function local_vdim_correction(
         center = nothing,
         shift::Val{SHIFT} = Val(false),
         form::Symbol = :analytic,
+        stabilize::Bool = true,
     ) where {SHIFT, Eltype}
     SHIFT || error("unsupported local VDIM without shifting")
     # `form` selects how the low-frequency local correction `δV = -(quad - exact)`
@@ -231,7 +232,11 @@ function local_vdim_correction(
 
     # Helmholtz PDE operator in x̂ coordinates where x = scale * x̂
     if op isa Helmholtz
-        s = meshsize
+        if stabilize
+            s = meshsize
+        else
+            s = 1.0
+        end
     elseif op isa Laplace
         s = 1.0
     else
@@ -330,7 +335,12 @@ function local_vdim_correction(
                 # s/r is bounded from above and below) is stable.
 
                 # Run Laplace through low-frequency path too, for stability.
-                if op isa Laplace || (op isa Helmholtz && r * op.k < 5*10^(-2))
+                # `stabilize = false` forces the direct (unstabilized) evaluation
+                # of the local Green-identity quantities of eq. (2.10) in
+                # s-scaled coordinates; for Laplace (s = 1) that means physical
+                # coordinates, so the (s/r)^|β| change-of-basis amplifies errors
+                # on elements with r ≪ s.
+                if stabilize && (op isa Laplace || (op isa Helmholtz && r * op.k < 5*10^(-2)))
                     lowfreq = true
                     Yvol, Ybdry, need_layer_corr, els_idxs = _local_vdim_construct_local_quadratures(
                         N,
