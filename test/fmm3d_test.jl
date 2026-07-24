@@ -182,9 +182,9 @@ end
         )
         @testset "PDE: $op" begin
             Xd = Inti.volume_potential(; op, target = Ωₕ_quad, source = Ωₕ_quad,
-                compression = (method = :none,), correction = cor, kernel_variant = :hessian_source)
+                compression = (method = :none,), correction = cor, kernel_variant = :hessian)
             Xf = Inti.volume_potential(; op, target = Ωₕ_quad, source = Ωₕ_quad,
-                compression = (method = :fmm, tol = 1.0e-12), correction = cor, kernel_variant = :hessian_source)
+                compression = (method = :fmm, tol = 1.0e-12), correction = cor, kernel_variant = :hessian)
             g = [rand(SVector{3, Tout}) for _ in 1:length(Ωₕ_quad)]
             yd = Xd * g
             yf = Xf * g

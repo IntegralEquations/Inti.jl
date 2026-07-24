@@ -21,7 +21,6 @@ using LinearMaps
 using Logging
 using NearestNeighbors
 using Pkg
-using Printf
 using QuadGK
 using Richardson
 using Scratch

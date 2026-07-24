@@ -204,8 +204,10 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             end
         end
     elseif K isa Inti.SourceGradientSingleLayerKernel{<:Any, <:Inti.Laplace{2}}
-        # ∇yG(x,y)⋅g : dipoles with vector strengths g (scalar output). The W operator
-        # W[g] = -∫∇yG⋅g applies the leading minus when this map is assembled.
+        # ∫∇yG(x,y)⋅g = Σ wⱼ gⱼ⋅∇yG : contraction of ∇yG and dipoles with vector
+        # strengths g. The W operator
+        #   W[g] = -∫∇yG⋅g
+        # applies the leading minus when this map is assembled.
         dipvecs = Matrix{Float64}(undef, 2, n)
         dipstr = ones(Float64, n)
         return LinearMaps.LinearMap{Float64}(m, n) do y, x
@@ -234,10 +236,10 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             end
         end
     elseif K isa Inti.HessianKernel{<:Any, <:Inti.Laplace{2}}
-        # X forward (PV part) = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g). The bracket is the
-        # `SourceGradientSingleLayer` dipole field above; its target-gradient (`gradtarg`,
-        # pgt = 2) is ∫∇ₓ∇yG⋅g = -X_forward. Negating the dipole strengths relative to the
-        # W branch folds in the leading minus, so `gradtarg` is the `SVector` output.
+        # Charge→Hessian realization of the 'Hessian' volume operator used in constructing the
+        # `X = ∇W` VDIM correction: a scalar density `ρ` maps to `∫∇ₓ∇ₓG(x,y)ρ(y)dy`
+        # (a 2×2 `SMatrix` per target). `rfmm2d` returns the 3 unique second derivatives per point as `(3,·)` in
+        # the order ∂xx, ∂xy, ∂yy;
         if K.charge_dipole == :charge
             charges = Vector{Float64}(undef, n)
             return LinearMaps.LinearMap{SMatrix{2, 2, Float64, 4}}(m, n) do y, x
@@ -498,8 +500,10 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         end
 
     elseif K isa Inti.SourceGradientSingleLayerKernel{<:Any, <:Inti.Helmholtz{2}}
-        # ∫∇yG⋅g = Σ wⱼ gⱼ⋅∇yG : dipoles with vector strengths g. The W operator
-        # W[g] = -∫∇yG⋅g applies the leading minus when this map is assembled.
+        # ∫∇yG⋅g = Σ wⱼ gⱼ⋅∇yG :  contraction of ∇yG and dipoles with vector
+        # strengths g. The W operator
+        #   W[g] = -∫∇yG⋅g
+        # applies the leading minus when this map is assembled.
         # FMM2D's `hfmm2d` requires real dipole directions (with a complex
         # strength), so the complex density is split into real/imaginary parts:
         #   Re(g): dipvec=Re(gⱼ), dipstr=wⱼ ;  Im(g): dipvec=Im(gⱼ), dipstr=i wⱼ.
@@ -539,10 +543,9 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             return y
         end
     elseif K isa Inti.HessianKernel{<:Any, <:Inti.Helmholtz{2}}
-        # Charge→Hessian realization of the Hessian single-layer *volume* operator used by the
-        # `X = ∇W` VDIM correction in 2D: a scalar density `ρ` maps to `∫∇ₓ∇ₓG(x,y)ρ(y)dy`
-        # (a 2×2 `SMatrix` per target), i.e. the Hessian of the single-layer potential of
-        # charges `ρ`. `rfmm2d` returns the 3 unique second derivatives per point as `(3,·)` in
+        # Charge→Hessian realization of the 'Hessian' volume operator used in constructing the
+        # `X = ∇W` VDIM correction: a scalar density `ρ` maps to `∫∇ₓ∇ₓG(x,y)ρ(y)dy`
+        # (a 2×2 `SMatrix` per target). `hfmm2d` returns the 3 unique second derivatives per point as `(3,·)` in
         # the order ∂xx, ∂xy, ∂yy;
         if K.charge_dipole == :charge
             #`hess`/`hesstarg` is (3,·) = ∂xx, ∂xy, ∂yy.
@@ -569,11 +572,11 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 end
                 return y
             end
-        # X forward = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g). The bracket is the ∇yG-dipole field (W
-        # forward); its target-gradient is ∫∇ₓ∇yG⋅g = -X_forward, so the dipole strengths
-        # are negated and `grad`/`gradtarg` is the output. As for the W forward, hfmm2d
-        # needs real dipvecs with complex strengths, so the complex density is split into
-        # real/imag parts (dipstr = wⱼ resp. i·wⱼ).
+        # X_forward = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g). The bracket quantity is the
+        # ∇yG-dipole field (W forward) and the negative sign is incorporated
+        # into the dipole strengths. hfmm2d needs real dipvecs with complex
+        # strengths, so the complex density is split into real/imag parts
+        # (dipstr = wⱼ resp. i·wⱼ).
         else
             dipvecs = Matrix{Float64}(undef, 2, n)
             dipstr = Vector{ComplexF64}(undef, n)

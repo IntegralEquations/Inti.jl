@@ -172,7 +172,7 @@ tvol = @elapsed begin
             S_b2d = S_b2d_std,
             D_b2d = D_b2d_std,
         ),
-        kernel_variant = :hessian_source,
+        kernel_variant = :hessian,
         #kernel_variant = :gradient_source,
     )
 end

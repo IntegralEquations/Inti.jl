@@ -302,12 +302,12 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
     if kernel_variant === :gradient
         G = GradientSingleLayerKernel(op)
     elseif kernel_variant === :gradient_source
-        # naive forward map of W[g] = -∫∇yG⋅g (vector density -> scalar). The kernel is
-        # ∇yG; the leading minus of W is applied when the operator is assembled below.
+        # naive forward map of W[g] = -∫∇yG⋅g (vector density -> scalar). The
+        # kernel is ∇yG; the leading minus is applied when the operator is
+        # assembled.
         G = SourceGradientSingleLayerKernel(op)
-    elseif kernel_variant === :hessian_source
-        # forward map of X[g] = ∇W[g] (vector density -> vector). The PV part is
-        # +∫∇ₓ∇ₓG⋅g, so the (target) Hessian single-layer kernel is assembled as-is.
+    elseif kernel_variant === :hessian
+        # forward map of X[g] = ∇W[g] (vector density -> vector).
         G = HessianKernel(op, :dipole)
     else
         G = SingleLayerKernel(op)
@@ -319,7 +319,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
     elseif compression.method == :hmatrix
         Vmat = assemble_hmatrix(V; rtol = compression.tol)
     elseif compression.method == :fmm
-        Vmat = assemble_fmm(V; rtol = compression.tol, ndiv = compression.ndiv)
+        Vmat = assemble_fmm(V; rtol = compression.tol, ndiv = compression.fmmndiv)
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
@@ -354,7 +354,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         # The W (3.25) and X (3.28) regularizations both use the standard scalar
         # single-/double-layer potentials, so for those variants the boundary
         # operators are built with the `:default` kernel.
-        boundary_variant = kernel_variant in (:gradient_source, :hessian_source) ? :default : kernel_variant
+        boundary_variant = kernel_variant in (:gradient_source, :hessian) ? :default : kernel_variant
         # Advanced usage: Use previously constructed layer operators for VDIM
         if !haskey(correction, :S_b2d) || !haskey(correction, :D_b2d)
             if haskey(correction, :green_multiplier)
@@ -384,7 +384,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         # ∇ₓS for the `-∇ₓS[gⱼν]` term; build it from the `:gradient` variant (its
         # single-layer return, `GS`, is the gradient single-layer).
         grad_single_layer = nothing
-        if kernel_variant === :hessian_source
+        if kernel_variant === :hessian
             if haskey(correction, :green_multiplier)
                 grad_single_layer, _ = single_double_layer(;
                     op, target, source = boundary, compression, correction,
@@ -408,11 +408,17 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
             else
                 Vcorr = assemble_fmm(Vg; rtol = compression.tol)
             end
-        elseif kernel_variant === :hessian_source && compression.method == :fmm
-            # X under FMM: the forward `Vmat` is a dipole→gradient map (`SVector` output)
-            # and cannot produce the Hessian `SMatrix` from a scalar monomial density. Build
-            # a dedicated charge→Hessian volume operator (scalar→`SMatrix`) so the correction
-            # applies it once per monomial (see `_vdim_correction_X`).
+        elseif kernel_variant === :hessian && compression.method == :fmm
+            # Here we construct the uncorrected forward map that is regularized
+            # by VDIM. There are two viable paths: (1) dipole→gradient map
+            # (`SVector` output) applied to a vector (the dipole) quantity,
+            # iterated over the number of cardinal directions and (2)
+            # charge→Hessian map (scalar→`SMatrix` output) applied to a scalar
+            # (monomial). As (2) can re-use the scalars across all cardinal
+            # directions, it is more efficient, but not all FMMs support this
+            # option. Note that this applies only for construction of the
+            # operator; in the application phase, the dipole→gradient map is the
+            # desired one.
             if (ambient_dimension(op) == 3 && op isa Laplace) || (ambient_dimension(op) == 2 && (op isa Laplace || op isa Helmholtz))
                 Vh = IntegralOperator(HessianKernel(op, :charge), target, source)
             else
@@ -443,17 +449,17 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
     # add correction
     if kernel_variant === :gradient_source
         # W maps a vector (`SVector`) density to a scalar. `Vmat` assembles
-        # `∫∇yG⋅g`; the operator W[g] = -∫∇yG⋅g carries a leading minus, hence the
-        # `-Vmat` forward map. Wrap it together with the sparse correction in a
+        # `∫∇yG⋅g`; the desired operator is W[g] = -∫∇yG⋅g.
+        # Wrap it together with the sparse correction in a
         # `VectorDensityOperator` so that `W * g` allocates a clean scalar output
-        # (see the type's docstring).
         V = VectorDensityOperator{default_kernel_eltype(op)}(-Vmat, δV, size(δV))
-    elseif kernel_variant === :hessian_source
-        # X maps a vector (`SVector`) density to a vector (`SVector`) output. The
-        # PV part of `X[g] = ∇W[g]` equals `+∫∇ₓ∇ₓG⋅g`, so the forward map is `Vmat`
-        # (no leading minus). Wrap it with the sparse correction in a
-        # `VectorDensityOperator` so that `X * g` allocates a clean `Vector{SVector}`
-        # output (a plain `LinearMap` would infer an abstract `SArray` eltype).
+    elseif kernel_variant === :hessian
+        # The PV part of `X[g] = ∇W[g]` equals `+∫∇ₓ∇ₓG⋅g` and maps a vector
+        # (`SVector`) density to a vector (`SVector`) output, so the forward map
+        # is `Vmat`.
+        # Wrap it with the sparse correction in a `VectorDensityOperator` so
+        # that `X * g` allocates a clean `Vector{SVector}` output (a plain
+        # `LinearMap` would infer an abstract `SArray` eltype).
         N = ambient_dimension(op)
         V = VectorDensityOperator{SVector{N, default_kernel_eltype(op)}}(Vmat, δV, size(δV))
     elseif compression.method ∈ (:hmatrix, :none)

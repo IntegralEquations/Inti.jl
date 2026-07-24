@@ -220,7 +220,7 @@ variable `x`, i.e. ``\\nabla_x\\nabla_x G(x,y)``, returned as an `N×N`
 This is the kernel of the strongly-singular volume integral operator
 ``\\mathcal{X}[g](x) = \\nabla\\mathcal{W}[g](x) = \\mathsf{S}\\,g(x) -
 \\mathrm{p.v.}\\!\\int_\\Omega \\nabla_x\\nabla_y G(x,y)\\cdot g(y)\\,dy`` (eq.
-(2.24) of [anderson2026global](@cite)) acting on a vector density `g`. Since
+(2.24) of [anderson2026general](@cite)) acting on a vector density `g`. Since
 ``\\nabla_x\\nabla_y G = -\\nabla_x\\nabla_x G``, the principal-value integral
 equals ``+\\int_\\Omega \\nabla_x\\nabla_x G \\cdot g``, so this (target) Hessian
 is the kernel assembled for the forward map of ``\\mathcal{X}``; the free-term
@@ -229,6 +229,12 @@ tensor ``\\mathsf{S}`` is handled by the density-interpolation regularization.
 struct HessianKernel{T, Op} <: AbstractKernel{T}
     op::Op
     charge_dipole::Symbol
+    # Constrain `charge_dipole::Symbol` so this 2-arg constructor does not
+    # overlap the generic `(::Type{K})(op, ::Type{T})` kernel constructor
+    # (kernels.jl:48), which is only ambiguous for a `Type`-valued second
+    # argument.
+    HessianKernel{T, Op}(op, charge_dipole::Symbol) where {T, Op} =
+        new{T, Op}(op, charge_dipole)
 end
 
 function HessianKernel(
@@ -638,7 +644,7 @@ function (HSL::HessianKernel{T, <:Helmholtz{N}})(
     d ≤ SAME_POINT_TOLERANCE && return zero(T)
     # ∇ₓ∇ₓG = (g″−g′/d) r̂r̂ᵀ + (g′/d) I for the isotropic G = g(d).
     if N == 2
-        # 2D: G = (i/4)H₀⁽¹⁾(kd);  uses H₂ via the recurrence (matches HyperSingularKernel).
+        # 2D: G = (i/4)H₀⁽¹⁾(kd);  recurrence leads to H₂.
         return im * k^2 / 4 / d^2 * hankelh1(2, k * d) * (r * transpose(r)) -
             im * k / 4 / d * hankelh1(1, k * d) * I
     elseif N == 3

@@ -210,7 +210,7 @@ method must reproduce the (3.28) boundary representation
 `μΥⱼ - ∇ₓS[pₐνⱼ] - S[(∂ⱼpₐ)ν + BνΥⱼ] + D[Υⱼ]` to machine precision (the free-term
 tensor `S` is implicitly contained in this representation).
 
-Builds the operator through `volume_potential(...; kernel_variant = :hessian_source)`.
+Builds the operator through `volume_potential(...; kernel_variant = :hessian)`.
 Returns the list of relative errors and the output element type of `X*g`.
 """
 function test_X_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize; interpolation_order = 2)
@@ -229,7 +229,7 @@ function test_X_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize; interpola
         op, target = Ωₕ_quad, source = Ωₕ_quad,
         compression = (method = :none,),
         correction = (method = :dim, maxdist = 5 * meshsize, boundary = Γₕ_quad, interpolation_order),
-        kernel_variant = :hessian_source,
+        kernel_variant = :hessian,
     )
     basis = Inti.polynomial_solutions_vdim_X(op, interpolation_order)
     ntarget = length(Ωₕ_quad)

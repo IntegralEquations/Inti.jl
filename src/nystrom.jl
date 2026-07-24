@@ -99,7 +99,7 @@ end
     struct VectorDensityOperator{T,F,C}
 
 Operator returned by [`volume_potential`](@ref) for the vector-density variants
-`kernel_variant = :gradient_source` (`W`) and `:hessian_source` (`X`). It maps an
+`kernel_variant = :gradient_source` (`W`) and `:hessian` (`X`). It maps an
 `SVector` density `g` to a `Vector{T}` output through `forward * g + correction *
 g`, where `forward` is the (dense or FMM-accel) naive map and `correction` is the
 sparse VDIM correction.
@@ -199,35 +199,6 @@ end
 
 function _assemble_fmm3d(args...; kwargs...)
     return error("_assemble_fmm3d not found. Did you forget to import FMM3D ?")
-end
-
-"""
-    assemble_fmm_chargehessian(iop; rtol)
-
-Charge→Hessian FMM realization of the Hessian single-layer *volume* operator: maps a
-*scalar* density `ρ` to the `SMatrix` output `∫∇ₓ∇ₓG(x,y)ρ(y)dy`. Used to build the
-volume operator for the `X = ∇W` VDIM correction under FMM compression, where the
-forward (dipole→gradient, `SVector` output) map cannot produce the Hessian `SMatrix`
-from a scalar monomial density. Supported for the Laplace kernel in 2D (`FMM2D` or
-`FMMLIB2D`, whichever was most recently loaded) and 3D (`FMM3D`).
-"""
-function assemble_fmm_chargehessian(iop::IntegralOperator; rtol)
-    N = ambient_dimension(iop.source)
-    if N == 2
-        return _assemble_fmm2d_chargehessian(iop; rtol)
-    elseif N == 3
-        return _assemble_fmm3d_chargehessian(iop; rtol)
-    else
-        return error("assemble_fmm_chargehessian is only supported in 2D and 3D")
-    end
-end
-
-function _assemble_fmm2d_chargehessian(args...; kwargs...)
-    return error("_assemble_fmm2d_chargehessian not found. Did you forget to import FMM2D or FMMLIB2D ?")
-end
-
-function _assemble_fmm3d_chargehessian(args...; kwargs...)
-    return error("_assemble_fmm3d_chargehessian not found. Did you forget to import FMM3D ?")
 end
 
 """

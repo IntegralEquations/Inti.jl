@@ -23,11 +23,12 @@ See [anderson2024fast](@cite) for more details on the method.
   so that no correction is needed. This is used to determine a threshold for
   nearly-singular corrections.
 - `kernel_variant`: `:default` for the standard volume potential, `:gradient` for
-  the gradient of the volume potential, or `:gradient_source` for the operator
-  `W[g] = -∫∇yG⋅g` acting on a vector density `g` (regularized via eq. (3.25) of
-  [anderson2026global](@cite)). For `:default`/`:gradient`, `S`, `D`, and `V` must be
-  built with the same `kernel_variant`; for `:gradient_source`, `S`/`D` are the standard
-  single-/double-layer operators and `V` is the gradient single-layer volume operator.
+  the gradient of the volume potential, `:gradient_source` for the operator
+  `W[g] = -∫∇yG⋅g` acting on a vector density `g`, or `:hessian` for the operator
+  `X[g] = ∇W[g]`. For `:default`/`:gradient`, `S`, `D`, and `V` must be built with
+  the same `kernel_variant`; for `:gradient_source`, `S`/`D` are the standard
+  single-/double-layer operators and `V` is the gradient volume
+  operator.
 """
 # Helper: fill one row of bdata from Θ[i,m] — dispatches on element type
 _vdim_fill_bdata!(bdata, val, m, ::Type{<:Number}) = (bdata[m, 1] = val)
@@ -53,7 +54,7 @@ function vdim_correction(
     ) where {N}
     # The W operator (vector density -> scalar) is handled by a dedicated
     # routine: its boundary potentials are single-/double-layers (so `Sop`/`Dop`
-    # here are scalar-valued), `Vop` is the gradient single-layer volume
+    # here are scalar-valued), `Vop` is the gradient volume
     # operator, and the resulting correction maps an `SVector` density to a
     # scalar.
     if kernel_variant === :gradient_source
@@ -65,11 +66,11 @@ function vdim_correction(
     # The X = ∇W operator (vector density -> vector output) is handled by another
     # dedicated routine: `Sop`/`Dop` are the scalar single-/double-layer,
     # `grad_single_layer` is the gradient single-layer (∇ₓS), and `Vop` is the
-    # Hessian single-layer volume operator. The resulting correction has
+    # Hessian volume operator. The resulting correction has
     # `SMatrix` entries mapping an `SVector` density to an `SVector` output.
-    if kernel_variant === :hessian_source
+    if kernel_variant === :hessian
         isnothing(grad_single_layer) &&
-            error("kernel_variant = :hessian_source requires the `grad_single_layer` operator")
+            error("kernel_variant = :hessian requires the `grad_single_layer` operator")
         return _vdim_correction_X(
             op, target, source, boundary, Sop, Dop, grad_single_layer, Vop;
             green_multiplier, interpolation_order, maxdist,
@@ -251,10 +252,10 @@ end
     _vdim_correction_W(op, target, source, boundary, Sop, Dop, Vop; kwargs...)
 
 VDIM correction for the operator `W[g] = -∫∇yG(x,y)⋅g(y)dy` (vector density `g`,
-scalar output), using the regularization (3.25) of [anderson2026global](@cite).
+scalar output), using the regularization (3.11) of [anderson2026general](@cite).
 
 Here `Sop`, `Dop` are the (scalar) single-/double-layer, and `Vop` is the
-*gradient* single-layer volume operator (scalar density -> `SVector` output);
+*gradient* volume operator (scalar density -> `SVector` output);
 the per-monomial volume contribution `W[pₐeⱼ] = [∇ₓV[pₐ]]ⱼ` is exactly `Vop`
 applied to the scalar monomial.
 
@@ -278,7 +279,7 @@ function _vdim_correction_W(
     ) where {N}
     T = default_kernel_eltype(op)          # scalar element type (Float64 / ComplexF64)
     SV = SVector{N, T}                      # density / Θ element type
-    @assert eltype(Vop) == SV "Vop must be the gradient single-layer volume operator (SVector output)"
+    @assert eltype(Vop) == SV "Vop must be the gradient volume operator (SVector output)"
     num_target, num_source = length(target), length(source)
     isnothing(interpolation_order) &&
         (interpolation_order = maximum(order, values(source.etype2qrule)))
@@ -364,16 +365,16 @@ end
     _vdim_correction_X(op, target, source, boundary, Sop, Dop, GSop, Vop; kwargs...)
 
 VDIM correction for the operator `X[g] = ∇W[g] = S·g(x) - PV∫∇ₓ∇_yG(x,y)·g(y)dy`
-(vector density `g`, vector output), using the regularization (3.28) of
-[anderson2026global](@cite).
+(vector density `g`, vector output), using the regularization (3.12) of
+[anderson2026general](@cite).
 
 Here `Sop`, `Dop` are the (scalar) single-/double-layer, `GSop` is the gradient
 single-layer (`∇ₓS`, scalar density -> `SVector` output), and `Vop` is the
-*Hessian* single-layer volume operator (`SVector` density -> `SVector` output,
+Hessian volume operator (`SVector` density -> `SVector` output,
 `SMatrix` entries) whose action equals the principal-value part `+∫∇ₓ∇ₓG·g`.
 
 Per basis monomial `pₐ` and target `i`, `Θ[i,α] ∈ SMatrix{N,N}` collects, in its
-`j`-th column, the (3.28) representation of `X[pₐeⱼ](xᵢ)` together with the naive
+`j`-th column, the (3.12) representation of `X[pₐeⱼ](xᵢ)` together with the naive
 volume term; the local interpolation system is solved component-wise against the
 scalar Vandermonde and the weights are stored as `SMatrix`es so the resulting
 sparse correction maps an `SVector{N}` density to an `SVector{N}` output.
@@ -403,10 +404,10 @@ function _vdim_correction_X(
     T = default_kernel_eltype(op)          # scalar element type (Float64 / ComplexF64)
     SV = SVector{N, T}                      # density / output element type
     SM = SMatrix{N, N, T, N * N}            # Θ / correction entry type
-    # `Vop` is the Hessian single-layer volume operator; its dense form has
+    # `Vop` is the Hessian volume operator; its dense form has
     # `SMatrix` entries while the FMM form is a `LinearMap` with `SVector` output
     # (both map an `SVector` density to an `SVector` output).
-    @assert eltype(Vop) in (SM, SV) "Vop must be the Hessian single-layer volume operator"
+    @assert eltype(Vop) in (SM, SV) "Vop must be the Hessian volume operator"
     @assert eltype(GSop) == SV "GSop must be the gradient single-layer operator (SVector output)"
     num_target, num_source = length(target), length(source)
     isnothing(interpolation_order) &&
@@ -432,7 +433,7 @@ function _vdim_correction_X(
 
     # --- Optimization: dedup the S/D boundary applications over β = I − eⱼ ---
     # `basis_from_monomial` is linear, so Ψₙⱼ = Iⱼ·Φ′_β with β = I − eⱼ and ℒΦ′_β = yᵝ;
-    # hence Υₙⱼ = Iⱼ·∇Φ′_β and the two (3.28) layer terms factor through β alone:
+    # hence Υₙⱼ = Iⱼ·∇Φ′_β and the two (3.12) layer terms factor through β alone:
     #   D[Υₙⱼ]_c             = Iⱼ · D[∂_cΦ′_β]                (γ₀ trace ∂_cΦ′_β)
     #   S[(∂ⱼpₐ)ν + BνΥₙⱼ]_c = Iⱼ · S[τ_{β,c}],  τ_{β,c} = p_β ν_c + ∂ν(∂_cΦ′_β)
     # Thus, the nominal per-(n,j,c) applications in the above description can be
@@ -466,7 +467,7 @@ function _vdim_correction_X(
 
     # Assemble Θ[i,n] ∈ SMatrix{N,N}. Following the internal sign convention used for
     # the scalar/W cases (Θ = naive_volume − analytic_representation, σ-term carried by
-    # `green_multiplier`), the (3.28) boundary signs are flipped: +∇ₓS, +S, −D.
+    # `green_multiplier`), the (3.12) boundary signs are flipped: +∇ₓS, +S, −D.
     Θ = Matrix{SM}(undef, num_target, num_basis)
     volbuf = Vector{SV}(undef, num_target)
     # Volume term: the j-th column of Mₐ(xᵢ) := ∫∇ₓ∇ₓG(xᵢ,y) pₐ(y) dy (an `SMatrix`)
@@ -589,13 +590,13 @@ end
     polynomial_solutions_vdim_W(op, order, [T])
 
 Build a basis for the VDIM evaluation of the operator `W[g] = -∫∇yG(x,y)⋅g(y)dy`
-acting on a vector density `g`, using the regularization of eq. (3.25) in
-[anderson2026global](@cite).
+acting on a vector density `g`, using the regularization of eq. (3.11) in
+[anderson2026general](@cite).
 
 The density is interpolated component-wise, so the basis is indexed by the scalar
 monomials `pₐ = yᴵ` (`|I| ≤ order`). For each monomial, and each coordinate direction
 `j`, the associated vector monomial is `gₐⱼ = pₐ eⱼ`, whose divergence is `∂ⱼpₐ`; the
-polynomial PDE solution `Ψₐⱼ` then satisfies `ℒΨₐⱼ = ∂ⱼpₐ`. Per (3.25),
+polynomial PDE solution `Ψₐⱼ` then satisfies `ℒΨₐⱼ = ∂ⱼpₐ`. Per (3.11),
 
     W[gₐⱼ] = μ(x)Ψₐⱼ(x) + D[Ψₐⱼ](x) - S[∂νΨₐⱼ + (gₐⱼ⋅ν)](x),
 
@@ -643,14 +644,14 @@ end
 
 Build a basis for the VDIM evaluation of the singular operator `X[g] = ∇W[g] =
 S·g(x) - PV∫∇ₓ∇_yG(x,y)·g(y)dy` acting on a vector density `g`, using the
-regularization of eq. (3.28) in [anderson2026global](@cite).
+regularization of eq. (3.12) in [anderson2026general](@cite).
 
 As for `W` ([`polynomial_solutions_vdim_W`](@ref)), the density is interpolated
 component-wise, so the basis is indexed by the scalar monomials `pₐ = yᴵ`
 (`|I| ≤ order`). For each monomial, and each coordinate direction `j`, the vector
 monomial is `gₐⱼ = pₐeⱼ`, whose divergence is `∂ⱼpₐ`; the polynomial PDE solution
 `Ψₐⱼ` satisfies `ℒΨₐⱼ = ∂ⱼpₐ`, and the relevant solution for `X` is `Υₐⱼ = ∇Ψₐⱼ`
-(so that `ℒΥₐⱼ = ∇∂ⱼpₐ`). Per (3.28),
+(so that `ℒΥₐⱼ = ∇∂ⱼpₐ`). Per (3.12),
 
     X[gₐⱼ] = μ(x)Υₐⱼ(x) - ∇ₓS[pₐνⱼ](x) - S[(∂ⱼpₐ)ν + BνΥₐⱼ](x) + D[Υₐⱼ](x),
 

@@ -134,15 +134,18 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             return copyto!(y, out.pottarg)
         end
     elseif K isa Inti.HessianKernel{<:Any, <:Inti.Laplace{3}}
-        # Charge→Hessian realization of the Hessian *volume* operator used by
-        # the `X = ∇W` VDIM correction: a scalar density `ρ` maps to
-        # `∫∇ₓ∇ₓG(x,y)ρ(y)dy` (an `SMatrix` per target), i.e. the Hessian of the
-        # volume potential of charges `ρ`.
+        # Charge→Hessian realization of the 'Hessian' volume operator used in
+        # constructing the `X = ∇W` VDIM correction: a scalar density `ρ` maps
+        # to `∫∇ₓ∇ₓG(x,y)ρ(y)dy` (a 3×3 `SMatrix` per target).
         if K.charge_dipole == :charges
             charges = Vector{Float64}(undef, n)
             return LinearMaps.LinearMap{SMatrix{3, 3, Float64, 9}}(m, n) do y, x
                 @. charges = weights * x
-                out = FMM3D.lfmm3d(rtol, sources; charges, targets, pgt = 3)
+                if !isnothing(ndiv)
+                    out = FMM3D.lfmm3d_ndiv(rtol, sources, ndiv; charges, targets, pgt = 3)
+                else
+                    out = FMM3D.lfmm3d(rtol, sources; charges, targets, pgt = 3)
+                end
                 # `hesstarg` is (6, m): the unique second derivatives in the order
                 # ∂xx, ∂yy, ∂zz, ∂xy, ∂xz, ∂yz. Assemble the symmetric `SMatrix`.
                 H = out.hesstarg
@@ -155,10 +158,10 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
                 end
                 return y
             end
-        # X forward = +∫∇ₓ∇ₓG⋅g, realized as the target-gradient of the
-        # ∇yG-dipole field with strengths -g (gradtarg = ∫∇ₓ∇yG⋅g = -X_forward,
-        # so the strengths are negated). It performs a dipole→gradient
-        # contraction of the Hessian: `SVector→SVector`.
+        # X_forward = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g). The bracket quantity is the
+        # ∇yG-dipole field (W forward) and the negative sign is incorporated
+        # into the dipole strengths. It performs a dipole→gradient contraction
+        # of the Hessian: `SVector→SVector`.
         else
             dipvecs = Matrix{Float64}(undef, 3, n)
             return LinearMaps.LinearMap{SVector{3, Float64}}(m, n) do y, x
@@ -285,7 +288,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
                 dipvecs[:, j] = x[j] * weights[j]
             end
             if !isnothing(ndiv)
-                out = FMM3D.hfmm3d(rtol, zk, sources, ndiv; dipvecs, targets, pgt = 1)
+                out = FMM3D.hfmm3d_ndiv(rtol, zk, sources, ndiv; dipvecs, targets, pgt = 1)
             else
                 out = FMM3D.hfmm3d(rtol, zk, sources; dipvecs, targets, pgt = 1)
             end
@@ -296,8 +299,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
         # ∇yG-dipole field with strengths -g (gradtarg = ∫∇ₓ∇yG⋅g = -X_forward,
         # so the strengths are negated). It performs a dipole→gradient
         # contraction of the Hessian: `SVector→SVector`.
-        # hfmm3d has no Hessian for an optimized volume routine (see 'opt_vol'
-        # in vdim.jl), but the forward map only needs the gradient (pgt = 2).
+        # (hfmm3d has no Hessian for an optimized volume construction routine)
         msg = "FMM3D does not support charge Hessian computations for Helmholtz"
         K.charge_dipole == :dipole || error(msg)
         zk = ComplexF64(K.op.k)

@@ -193,11 +193,11 @@ function _normalize_compression(compression, target, source)
         "Unknown compression.method $(compression.method). Available options: $methods",
     )
     # set default tolerance if not provided
-    if haskey(compression, :fmmndiv)
+    if haskey(compression, :fmmndiv) && !isnothing(compression.fmmndiv)
         compression.method == :fmm || error("FMM ndiv passed but compression method is not FMM!")
     end
     compression = merge((tol = 1.0e-8,), compression)
-    compression = merge((ndiv = nothing,), compression)
+    compression = merge((fmmndiv = nothing,), compression)
     return compression
 end
 

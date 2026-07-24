@@ -121,21 +121,21 @@ end
 end
 
 @testset "X charge→Hessian volume op (FMM vs dense) Laplace 2D" begin
-    # Validates `assemble_fmm_chargehessian` (the scalar-density → `SMatrix` Hessian
-    # single-layer volume operator used by the X = ∇W VDIM correction) against the dense
-    # Hessian operator.
+    # Validates the charge→Hessian FMM realization of the `HessianKernel` (the
+    # scalar-density → `SMatrix` Hessian single-layer volume operator used by the X = ∇W
+    # VDIM correction) against the dense Hessian operator.
     op = Inti.Laplace(; dim = 2)
     Ω_c, msh_c = gmsh_disk(; center = [0.0, 0.0], rx = 1.0, ry = 1.0, meshsize = 0.2)
     Ωₕ = view(msh_c, Ω_c)
     VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(2)
     Q = Inti.VioreanuRokhlin(; domain = :triangle, order = VR_qorder)
     Ωₕ_quad = Inti.Quadrature(Ωₕ, OrderedDict(E => Q for E in Inti.element_types(Ωₕ)))
-    Vh = Inti.IntegralOperator(Inti.HessianSingleLayerKernel(op), Ωₕ_quad, Ωₕ_quad)
+    Vh = Inti.IntegralOperator(Inti.HessianKernel(op, :charge), Ωₕ_quad, Ωₕ_quad)
     m, n = size(Vh)
     ρ = rand(n)
     # dense reference: Mᵢ = Σₖ Vh[i,k] ρₖ  (an SMatrix per target)
     Mref = [sum(Vh[i, k] * ρ[k] for k in 1:n) for i in 1:m]
-    Vfmm = Inti.assemble_fmm_chargehessian(Vh; rtol = 1.0e-12)
+    Vfmm = Inti.assemble_fmm(Vh; rtol = 1.0e-12)
     @test eltype(Vfmm) == SMatrix{2, 2, Float64, 4}
     Mfmm = Vector{SMatrix{2, 2, Float64, 4}}(undef, m)
     mul!(Mfmm, Vfmm, ρ)
@@ -156,9 +156,9 @@ end
         )
         @testset "PDE: $op" begin
             Xd = Inti.volume_potential(; op, target = Ωₕ_quad, source = Ωₕ_quad,
-                compression = (method = :none,), correction = cor, kernel_variant = :hessian_source)
+                compression = (method = :none,), correction = cor, kernel_variant = :hessian)
             Xf = Inti.volume_potential(; op, target = Ωₕ_quad, source = Ωₕ_quad,
-                compression = (method = :fmm, tol = 1.0e-12), correction = cor, kernel_variant = :hessian_source)
+                compression = (method = :fmm, tol = 1.0e-12), correction = cor, kernel_variant = :hessian)
             g = [rand(SVector{2, Tout}) for _ in 1:length(Ωₕ_quad)]
             yd = Xd * g
             yf = Xf * g
