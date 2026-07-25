@@ -66,4 +66,5 @@ SparseArrays = "1"
 SpecialFunctions = "2"
 StaticArrays = "1"
 TOML = "1"
-julia = "1.9"
+# Require >=1.11 so that resize! has the shrink=false option
+julia = "1.11"

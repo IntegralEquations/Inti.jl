@@ -76,15 +76,18 @@ kernel(iop::IntegralOperator) = iop.kernel
 target(iop::IntegralOperator) = iop.target
 source(iop::IntegralOperator) = iop.source
 
-function IntegralOperator(k, X, Y::Quadrature = X)
+function IntegralOperator(k, X, Y = X)
     # check that all entities in the quadrature are of the same dimension
-    if !allequal(geometric_dimension(ent) for ent in entities(Y))
-        msg = "entities in the target quadrature have different geometric dimensions"
-        throw(ArgumentError(msg))
+    if Y isa Quadrature && !isnothing(Y.mesh)
+        if !allequal(geometric_dimension(ent) for ent in entities(Y))
+            msg = "entities in the target quadrature have different geometric dimensions"
+            throw(ArgumentError(msg))
+        end
     end
     T = return_type(k, eltype(X), eltype(Y))
-    msg = """IntegralOperator of nonbits being created: $T"""
-    isbitstype(T) || (@warn msg)
+    # FIXME This cripples performance for local VDIM
+    #msg = """IntegralOperator of nonbits being created: $T"""
+    #isbitstype(T) || (@warn msg)
     return IntegralOperator{T, typeof(k), typeof(X), typeof(Y)}(k, X, Y)
 end
 
@@ -108,16 +111,27 @@ function assemble_matrix(iop::IntegralOperator; threads = true)
     else
         Array{T}(undef, m, n)
     end
-    K = kernel(iop)
+    return assemble_matrix!(out, iop; threads)
+end
+
+"""
+    assemble_matrix!(out, iop::IntegralOperator; threads = true)
+
+In-place version of [`assemble_matrix`](@ref): fill `out` (an `m × n`
+`AbstractMatrix`, which may be a `view` into a larger preallocated buffer) with
+the dense representation of `iop`. No allocation of the output is performed.
+"""
+function assemble_matrix!(out, iop::IntegralOperator; threads = true)
+    @assert size(out) == size(iop) "`out` must have size $(size(iop)), got $(size(out))"
     # function barrier
-    _assemble_matrix!(out, K, iop.target, iop.source, threads)
+    _assemble_matrix!(out, kernel(iop), iop.target, iop.source, threads)
     return out
 end
 
 @noinline function _assemble_matrix!(out, K, X, Y::Quadrature, threads)
     @usethreads threads for j in 1:length(Y)
         for i in 1:length(X)
-            out[i, j] = K(X[i], Y[j]) * weight(Y[j])
+            @inbounds out[i, j] = K(X[i], Y[j]) * weight(Y[j])
         end
     end
     return out

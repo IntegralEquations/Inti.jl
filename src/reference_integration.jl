@@ -169,17 +169,20 @@ struct Gauss{D, N} <: ReferenceQuadrature{D}
     function Gauss(; domain, order)
         domain == :segment && (domain = ReferenceLine())
         domain == :triangle && (domain = ReferenceTriangle())
-        domain == :tetrahedron && (domain = ReferenceTetrahedron())
-        msg = "quadrature of order $order not available for $domain"
+        domain == :tetrehedron && (domain = ReferenceTetrahedron())
         if domain isa ReferenceLine
             # TODO: support Gauss-Legendre quadratures of arbitrary order
-            order == 13 || error(msg)
+            order == 13 || error("quadrature of order $order not available for $domain")
             n = 7
         elseif domain isa ReferenceTriangle
-            haskey(TRIANGLE_GAUSS_ORDER_TO_NPTS, order) || error(msg)
+            if !haskey(TRIANGLE_GAUSS_ORDER_TO_NPTS, order)
+                error("quadrature of order $order not available for $domain")
+            end
             n = TRIANGLE_GAUSS_ORDER_TO_NPTS[order]
         elseif domain isa ReferenceTetrahedron
-            haskey(TETRAHEDRON_GAUSS_ORDER_TO_NPTS, order) || error(msg)
+            if !haskey(TETRAHEDRON_GAUSS_ORDER_TO_NPTS, order)
+                error("quadrature of order $order not available for $domain")
+            end
             n = TETRAHEDRON_GAUSS_ORDER_TO_NPTS[order]
         else
             error(
@@ -272,12 +275,18 @@ struct VioreanuRokhlin{D, N} <: ReferenceQuadrature{D}
         domain == :triangle && (domain = ReferenceTriangle())
         domain == :tetrahedron && (domain = ReferenceTetrahedron())
         if domain isa ReferenceTriangle
-            msg = "VioreanuRokhlin quadrature of order $order not available for ReferenceTriangle"
-            haskey(TRIANGLE_VR_ORDER_TO_NPTS, order) || error(msg)
+            if !haskey(TRIANGLE_VR_ORDER_TO_NPTS, order)
+                error(
+                    "VioreanuRokhlin quadrature of order $order not available for ReferenceTriangle",
+                )
+            end
             n = TRIANGLE_VR_ORDER_TO_NPTS[order]
         elseif domain isa ReferenceTetrahedron
-            msg = "VioreanuRokhlin quadrature of order $order not available for ReferenceTetrahedron"
-            haskey(TETRAHEDRON_VR_ORDER_TO_NPTS, order) || error(msg)
+            if !haskey(TETRAHEDRON_VR_ORDER_TO_NPTS, order)
+                error(
+                    "VioreanuRokhlin quadrature of order $order not available for ReferenceTetrahedron",
+                )
+            end
             n = TETRAHEDRON_VR_ORDER_TO_NPTS[order]
         else
             error(

@@ -6,7 +6,7 @@ using Gmsh
 using LinearAlgebra
 using HMatrices
 using FMMLIB2D
-using CairoMakie
+using GLMakie
 
 function domain_and_mesh(; meshsize, meshorder = 1)
     Inti.clear_entities!()
@@ -31,18 +31,14 @@ interpolation_order = 4
 VR_qorder = Inti.Triangle_VR_interpolation_order_to_quadrature_order(interpolation_order)
 bdry_qorder = 2 * VR_qorder
 
-tmesh = @elapsed begin
-    Ω, msh = domain_and_mesh(; meshsize)
-end
-@info "Mesh generation time: $tmesh"
-
+Ω, msh = domain_and_mesh(; meshsize)
 Γ = Inti.external_boundary(Ω)
 #Γₕ = msh[Γ]
 #Ωₕ = msh[Ω]
 
 ψ = (t) -> [cos(2 * π * t), sin(2 * π * t)]
 θ = 3 # smoothness order of curved elements
-crvmsh = Inti.curve_mesh(msh, ψ, θ, 500 * Int(1 / meshsize))
+crvmsh = Inti.curve_mesh(msh, ψ, θ; patch_sample_num = 500 * Int(1 / meshsize))
 Ωₕ = view(crvmsh, Ω)
 Γₕ = view(crvmsh, Γ)
 #
@@ -54,7 +50,6 @@ tquad = @elapsed begin
     Q = Inti.VioreanuRokhlin(; domain = :triangle, order = VR_qorder)
     dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
     Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
-    # Ωₕ_quad = Inti.Quadrature(Ωₕ; qorder = qorders[1])
     Γₕ_quad = Inti.Quadrature(Γₕ; qorder = bdry_qorder)
 end
 @info "Quadrature generation time: $tquad"
