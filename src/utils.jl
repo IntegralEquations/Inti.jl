@@ -139,14 +139,16 @@ end
 
 Return `N` points uniformly distributed on a circle of radius `r` centered at `c`.
 """
-function uniform_points_circle(N, r, c)
-    pts = SVector{2, Float64}[]
+function uniform_points_circle(::Type{T}, N, r, c) where {T}
+    pts = SVector{2, T}[]
     for i in 0:(N - 1)
+        # generate in Float64, convert each point to the requested precision
         x = r * SVector(cos(2π * i / N), sin(2π * i / N)) + c
-        push!(pts, x)
+        push!(pts, SVector{2, T}(x))
     end
     return pts
 end
+uniform_points_circle(N, r, c) = uniform_points_circle(Float64, N, r, c)
 
 # https://stackoverflow.com/questions/9600801/evenly-distributing-n-points-on-a-sphere
 """
@@ -155,20 +157,22 @@ end
 Return `N` points distributed (roughly) in a uniform manner on the sphere of
 radius `r` centered at `c`.
 """
-function fibonnaci_points_sphere(N, r, center)
-    pts = Vector{SVector{3, Float64}}(undef, N)
+function fibonnaci_points_sphere(::Type{T}, N, r, center) where {T}
+    pts = Vector{SVector{3, T}}(undef, N)
     phi = π * (3 - sqrt(5)) # golden angle in radians
     for i in 1:N
+        # generate in Float64, convert each point to the requested precision
         ytmp = 1 - ((i - 1) / (N - 1)) * 2
         radius = sqrt(1 - ytmp^2)
         theta = phi * i
         x = cos(theta) * radius * r + center[1]
         y = ytmp * r + center[2]
         z = sin(theta) * radius * r + center[3]
-        pts[i] = SVector(x, y, z)
+        pts[i] = SVector{3, T}(x, y, z)
     end
     return pts
 end
+fibonnaci_points_sphere(N, r, center) = fibonnaci_points_sphere(Float64, N, r, center)
 
 # https://discourse.julialang.org/t/putting-threads-threads-or-any-macro-in-an-if-statement/41406/7
 macro usethreads(multithreaded, expr::Expr)
@@ -187,9 +191,9 @@ const Point2D = SVector{2, Float64}
 const Point3D = SVector{3, Float64}
 
 function _normalize_compression(compression, target, source)
-    methods = (:hmatrix, :fmm, :none)
+    methods = (:hmatrix, :fmm, :kernelmatrix, :none)
     # check that method is valid
-    compression.method ∈ (:hmatrix, :fmm, :none) || error(
+    compression.method ∈ methods || error(
         "Unknown compression.method $(compression.method). Available options: $methods",
     )
     # set default tolerance if not provided

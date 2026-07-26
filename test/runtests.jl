@@ -31,6 +31,8 @@ using Aqua
 
 @safetestset "Guiggiani" include("guiggiani_test.jl")
 
+@safetestset "Boundary DIM correction" include("bdim_test.jl")
+
 @testset verbose = true "Corrections (Green identities)" begin
     include("green_identities_test.jl")
 end
@@ -42,6 +44,8 @@ end
 @safetestset "Makie extension" include("meshes_test.jl")
 
 @safetestset "HMatrices extension" include("hmatrices_test.jl")
+
+@safetestset "KernelMatrix extension" include("kernelmatrix_test.jl")
 
 @safetestset "FMM2D extension" include("fmm2d_test.jl")
 

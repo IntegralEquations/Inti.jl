@@ -1,9 +1,19 @@
 """
-    const COMPRESSION_METHODS = [:none, :hmatrix, :fmm]
+    const COMPRESSION_METHODS = [:none, :hmatrix, :fmm, :kernelmatrix]
 
 Available compression methods for the dense linear operators in [`Inti`](@ref).
 """
-const COMPRESSION_METHODS = [:none, :hmatrix, :fmm]
+const COMPRESSION_METHODS = [:none, :hmatrix, :fmm, :kernelmatrix]
+
+# `backend` is optional in the compression named tuple; when absent, let
+# `assemble_kernelmatrix` pick its default (the CPU).
+function _assemble_kernelmatrix(iop, compression)
+    if haskey(compression, :backend)
+        return assemble_kernelmatrix(iop; backend = compression.backend)
+    else
+        return assemble_kernelmatrix(iop)
+    end
+end
 
 """
     const CORRECTION_METHODS = [:none, :dim, :adaptive]
@@ -38,6 +48,14 @@ compressed. The available options are:
     hierarchical matrices with an absolute tolerance `tol` (defaults to `1e-8`).
   - `(method = :fmm, tol)`: the resulting operators are compressed using the
     fast multipole method with an absolute tolerance `tol` (defaults to `1e-8`).
+  - `(method = :kernelmatrix, backend)`: the operators are matrix-free, computing the
+    matrix-vector product on the fly in `O(N²)` work but only `O(N)` memory (no
+    approximation is made — results match the dense operator up to floating-point
+    reduction order). `backend` is an optional `KernelAbstractions` backend selecting
+    the device (defaults to the CPU; pass e.g. `Metal.MetalBackend()` or
+    `CUDABackend()` to run on a GPU, in which case the quadrature precision must be
+    supported by the device, e.g. `Float32` for Metal). Requires `using
+    KernelAbstractions`; see [`assemble_kernelmatrix`](@ref).
 
 # Correction
 
@@ -86,6 +104,9 @@ function single_double_layer(;
     elseif compression.method == :fmm
         Smat = assemble_fmm(Sop; rtol = compression.tol)::LinearMap
         Dmat = assemble_fmm(Dop; rtol = compression.tol)::LinearMap
+    elseif compression.method == :kernelmatrix
+        Smat = _assemble_kernelmatrix(Sop, compression)
+        Dmat = _assemble_kernelmatrix(Dop, compression)
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
@@ -126,6 +147,9 @@ function single_double_layer(;
             elseif compression.method == :fmm
                 Sop_dim_mat = assemble_fmm(Sop_dim; rtol = compression.tol)::LinearMap
                 Dop_dim_mat = assemble_fmm(Dop_dim; rtol = compression.tol)::LinearMap
+            elseif compression.method == :kernelmatrix
+                Sop_dim_mat = _assemble_kernelmatrix(Sop_dim, compression)
+                Dop_dim_mat = _assemble_kernelmatrix(Dop_dim, compression)
             else
                 error("Unknown compression method. Available options: $COMPRESSION_METHODS")
             end
@@ -182,6 +206,10 @@ function single_double_layer(;
     elseif compression.method == :fmm
         S = Smat + LinearMap(δS)
         D = Dmat + LinearMap(δD)
+    elseif compression.method == :kernelmatrix
+        # the matrix-free operator cannot absorb the sparse correction in place
+        S = LinearMap(Smat) + LinearMap(δS)
+        D = LinearMap(Dmat) + LinearMap(δD)
     end
     return S, D
 end
@@ -254,6 +282,11 @@ compressed. The available options are:
     hierarchical matrices with an absolute tolerance `tol` (defaults to `1e-8`).
   - `(method = :fmm, tol)`: the resulting operators are compressed using the
     fast multipole method with an absolute tolerance `tol` (defaults to `1e-8`).
+  - `(method = :kernelmatrix, backend)`: the operators are matrix-free, computing the
+    matrix-vector product on the fly in `O(N²)` work but only `O(N)` memory (no
+    approximation is made). `backend` is an optional `KernelAbstractions` backend
+    selecting the device (defaults to the CPU). Requires `using KernelAbstractions`;
+    see [`assemble_kernelmatrix`](@ref).
 
 ## Correction
 
@@ -291,6 +324,8 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         Vmat = assemble_hmatrix(V; rtol = compression.tol)
     elseif compression.method == :fmm
         Vmat = assemble_fmm(V; rtol = compression.tol)
+    elseif compression.method == :kernelmatrix
+        Vmat = _assemble_kernelmatrix(V, compression)
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
@@ -362,7 +397,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end
     # add correction
-    if compression.method ∈ (:hmatrix, :none)
+    if compression.method ∈ (:hmatrix, :none, :kernelmatrix)
         # TODO: in the hmatrix case, we may want to add the correction directly
         # to the HMatrix so that a direct solver can be later used
         V = LinearMap(Vmat) + LinearMap(δV)

@@ -41,15 +41,50 @@ operator(K::AbstractKernel) = K.op
 """
     apply_kernel(K::AbstractKernel, target, source, v)
 
-Return `K(target, source) * v`, the action of the kernel on a density value `v`.
-
-The generic fallback simply forms the kernel value and multiplies. Kernels whose
-value has exploitable structure (e.g. the identity-plus-rank-one / rank-one Stokes
-kernels) specialize this to compute the action **without ever assembling the
-matrix**, which is both cheaper and lighter on registers — useful for matrix-free
-mat-vecs. Specializations must agree with the fallback to machine precision.
+Return `K(target, source) * v`, the action of the kernel on a density value `v`,
+computed as `kernel_prefactor(K) * apply_kernel_unscaled(K, target, source, v)`.
+Kernels should specialize [`apply_kernel_unscaled`](@ref) (and
+[`kernel_prefactor`](@ref)), not this function.
 """
-apply_kernel(K::AbstractKernel, target, source, v) = K(target, source) * v
+function apply_kernel(K::AbstractKernel, target, source, v)
+    out = apply_kernel_unscaled(K, target, source, v)
+    # `oftype` keeps the working precision of the data: prefactors may be exact
+    # Float64 constants (e.g. 1/4π for Laplace) that must not promote Float32 data.
+    return oftype(out, kernel_prefactor(K) * out)
+end
+
+"""
+    kernel_prefactor(K::AbstractKernel)
+
+A constant (independent of `target` and `source`, but possibly depending on kernel
+parameters such as `μ`) that can be factored out of the kernel action:
+
+    apply_kernel(K, target, source, v) ≈ kernel_prefactor(K) * apply_kernel_unscaled(K, target, source, v)
+
+Matrix-free backends use this to scale the density by `kernel_prefactor` **once** per
+matvec and evaluate only [`apply_kernel_unscaled`](@ref) in the `O(N²)` inner loop;
+this also keeps kernel parameters like `μ` out of the device code, where per-pair
+loads and divisions are costly. The fallback is `true` (the multiplicative identity),
+paired with `apply_kernel_unscaled` falling back to `K(target, source) * v`; the two
+must always be specialized as a consistent pair. The returned value must be a real
+scalar, convertible to the precision of the quadrature weights.
+"""
+kernel_prefactor(K::AbstractKernel) = true
+
+"""
+    apply_kernel_unscaled(K::AbstractKernel, target, source, v)
+
+The kernel action with the constant [`kernel_prefactor`](@ref) factored out; see its
+docstring for the contract.
+
+The generic fallback forms the kernel value and multiplies. Kernels whose value has
+exploitable structure (e.g. the identity-plus-rank-one / rank-one Stokes kernels)
+specialize this to compute the action **without ever assembling the matrix**, which
+is both cheaper and lighter on registers — useful for matrix-free mat-vecs.
+Specializations must agree with the fallback up to the prefactor, to machine
+precision.
+"""
+apply_kernel_unscaled(K::AbstractKernel, target, source, v) = K(target, source) * v
 
 """
     struct SingleLayerKernel{Op} <: AbstractKernel
@@ -170,8 +205,9 @@ function (DL::DoubleLayerKernel{Laplace{N}})(
     if N == 2
         v = @fastmath dot(r, ny) / d2 / 2 / π
     elseif N == 3
-        id2 = @fastmath one(d2) / d2
-        v = @fastmath dot(r, ny) * id2 * sqrt(id2) / 4 / π
+        # single rsqrt: `1/d2` followed by `sqrt` costs two SFU ops on GPUs
+        invd = @fastmath one(d2) / sqrt(d2)
+        v = @fastmath dot(r, ny) * invd * invd * invd / 4 / π
     else
         notimplemented()
     end
@@ -189,8 +225,8 @@ function (ADL::AdjointDoubleLayerKernel{Laplace{N}})(
     if N == 2
         v = @fastmath -dot(r, nx) / d2 / 2 / π
     elseif N == 3
-        id2 = @fastmath one(d2) / d2
-        v = @fastmath -dot(r, nx) * id2 * sqrt(id2) / 4 / π
+        invd = @fastmath one(d2) / sqrt(d2)
+        v = @fastmath -dot(r, nx) * invd * invd * invd / 4 / π
     else
         notimplemented()
     end
@@ -206,19 +242,107 @@ function (HS::HyperSingularKernel{Laplace{N}})(
     ny = normal(source)
     d2 = dot(r, r)
     tol = oftype(d2, SAME_POINT_TOLERANCE)
-    id2 = @fastmath one(d2) / d2
     # nxᵀ(I - N*rrᵀ/d²)ny = nxdny - N*rdnx*rdny/d²
     nxdny = dot(nx, ny)
     rdnx = dot(r, nx)
     rdny = dot(r, ny)
     if N == 2
+        id2 = @fastmath one(d2) / d2
         v = @fastmath id2 * (nxdny - 2 * rdnx * rdny * id2) / 2 / π
     elseif N == 3
-        v = @fastmath id2 * sqrt(id2) * (nxdny - 3 * rdnx * rdny * id2) / 4 / π
+        invd = @fastmath one(d2) / sqrt(d2)
+        id2 = invd * invd
+        v = @fastmath id2 * invd * (nxdny - 3 * rdnx * rdny * id2) / 4 / π
     else
         notimplemented()
     end
     return d2 ≤ tol * tol ? zero(v) : v
+end
+
+# Prefactored actions (see `kernel_prefactor`): same formulas as the kernels above
+# with the constant pulled out; the sign of the adjoint double layer stays in the
+# unscaled part so each body mirrors its kernel.
+kernel_prefactor(::SingleLayerKernel{Laplace{N}}) where {N} = 1 / (4π)
+kernel_prefactor(::DoubleLayerKernel{Laplace{N}}) where {N} = N == 2 ? 1 / (2π) : 1 / (4π)
+function kernel_prefactor(::AdjointDoubleLayerKernel{Laplace{N}}) where {N}
+    return N == 2 ? 1 / (2π) : 1 / (4π)
+end
+kernel_prefactor(::HyperSingularKernel{Laplace{N}}) where {N} = N == 2 ? 1 / (2π) : 1 / (4π)
+
+function apply_kernel_unscaled(
+        SL::SingleLayerKernel{Laplace{N}}, target, source, v,
+    ) where {N}
+    r = coords(target) - coords(source)
+    d2 = dot(r, r)
+    tol = oftype(d2, SAME_POINT_TOLERANCE)
+    if N == 2
+        out = @fastmath -log(d2) * v
+    elseif N == 3
+        out = @fastmath one(d2) / sqrt(d2) * v
+    else
+        notimplemented()
+    end
+    return d2 ≤ tol * tol ? zero(out) : out
+end
+
+function apply_kernel_unscaled(
+        DL::DoubleLayerKernel{Laplace{N}}, target, source, v,
+    ) where {N}
+    ny = normal(source)
+    r = coords(target) - coords(source)
+    d2 = dot(r, r)
+    tol = oftype(d2, SAME_POINT_TOLERANCE)
+    if N == 2
+        out = @fastmath dot(r, ny) / d2 * v
+    elseif N == 3
+        invd = @fastmath one(d2) / sqrt(d2)
+        out = @fastmath dot(r, ny) * invd * invd * invd * v
+    else
+        notimplemented()
+    end
+    return d2 ≤ tol * tol ? zero(out) : out
+end
+
+function apply_kernel_unscaled(
+        ADL::AdjointDoubleLayerKernel{Laplace{N}}, target, source, v,
+    ) where {N}
+    nx = normal(target)
+    r = coords(target) - coords(source)
+    d2 = dot(r, r)
+    tol = oftype(d2, SAME_POINT_TOLERANCE)
+    if N == 2
+        out = @fastmath -dot(r, nx) / d2 * v
+    elseif N == 3
+        invd = @fastmath one(d2) / sqrt(d2)
+        out = @fastmath -dot(r, nx) * invd * invd * invd * v
+    else
+        notimplemented()
+    end
+    return d2 ≤ tol * tol ? zero(out) : out
+end
+
+function apply_kernel_unscaled(
+        HS::HyperSingularKernel{Laplace{N}}, target, source, v,
+    ) where {N}
+    nx = normal(target)
+    ny = normal(source)
+    r = coords(target) - coords(source)
+    d2 = dot(r, r)
+    tol = oftype(d2, SAME_POINT_TOLERANCE)
+    nxdny = dot(nx, ny)
+    rdnx = dot(r, nx)
+    rdny = dot(r, ny)
+    if N == 2
+        id2 = @fastmath one(d2) / d2
+        out = @fastmath id2 * (nxdny - 2 * rdnx * rdny * id2) * v
+    elseif N == 3
+        invd = @fastmath one(d2) / sqrt(d2)
+        id2 = invd * invd
+        out = @fastmath id2 * invd * (nxdny - 3 * rdnx * rdny * id2) * v
+    else
+        notimplemented()
+    end
+    return d2 ≤ tol * tol ? zero(out) : out
 end
 
 ################################################################################
@@ -256,6 +380,9 @@ end
 default_kernel_eltype(::Yukawa) = Float64
 default_density_eltype(::Yukawa) = Float64
 
+# same precision-preserving wrapper as `hankelh1`
+besselk(n, x::T) where {T <: Real} = float(T)(Bessels.besselk(n, x))
+
 function (SL::SingleLayerKernel{<:Yukawa{N, K}})(target, source) where {N, K}
     λ = SL.op.λ
     r = coords(target) - coords(source)
@@ -263,7 +390,7 @@ function (SL::SingleLayerKernel{<:Yukawa{N, K}})(target, source) where {N, K}
     tol = oftype(d2, SAME_POINT_TOLERANCE)
     if N == 2
         d = sqrt(d2)
-        v = Bessels.besselk(0, λ * d) / 2 / π
+        v = besselk(0, λ * d) / 2 / π
     elseif N == 3
         invd = @fastmath one(d2) / sqrt(d2)
         d = d2 * invd
@@ -283,7 +410,7 @@ function (DL::DoubleLayerKernel{<:Yukawa{N, K}})(target, source) where {N, K}
     rdny = dot(r, ny)
     if N == 2
         d = sqrt(d2)
-        v = λ * Bessels.besselk(1, λ * d) * rdny / d / 2 / π
+        v = λ * besselk(1, λ * d) * rdny / d / 2 / π
     elseif N == 3
         invd = @fastmath one(d2) / sqrt(d2)
         d = d2 * invd
@@ -304,7 +431,7 @@ function (ADL::AdjointDoubleLayerKernel{<:Yukawa{N, K}})(target, source) where {
     rdnx = dot(r, nx)
     if N == 2
         d = sqrt(d2)
-        v = -λ * Bessels.besselk(1, λ * d) * rdnx / d / 2 / π
+        v = -λ * besselk(1, λ * d) * rdnx / d / 2 / π
     elseif N == 3
         invd = @fastmath one(d2) / sqrt(d2)
         d = d2 * invd
@@ -328,10 +455,11 @@ function (HS::HyperSingularKernel{<:Yukawa{N, K}})(target, source) where {N, K}
     nxdny = dot(nx, ny)
     if N == 2
         d = sqrt(d2)
-        k1 = Bessels.besselk(1, λ * d)
-        k2 = Bessels.besselk(2, λ * d)
-        a = -λ^2 / (2π * d^2) * k2
-        b = λ / (2π * d) * k1
+        k1 = besselk(1, λ * d)
+        k2 = besselk(2, λ * d)
+        # avoid `2π`: it is a Float64 and would promote single-precision inputs
+        a = -λ^2 / (2 * d2) / π * k2
+        b = λ / (2 * d) / π * k1
         v = a * rdnx * rdny + b * nxdny
     elseif N == 3
         @fastmath begin
@@ -387,7 +515,9 @@ end
 default_kernel_eltype(::Helmholtz) = ComplexF64
 default_density_eltype(::Helmholtz) = ComplexF64
 
-hankelh1(n, x::Real) = Bessels.hankelh1(n, x)
+# Bessels.jl evaluates some order/argument ranges in Float64, so convert back to the
+# input precision to keep kernel evaluations type-stable
+hankelh1(n, x::T) where {T <: Real} = Complex{float(T)}(Bessels.hankelh1(n, x))
 hankelh1(n, x::Complex) = SpecialFunctions.hankelh1(n, x)
 
 function (SL::SingleLayerKernel{<:Helmholtz{N}})(target, source) where {N}
@@ -397,7 +527,8 @@ function (SL::SingleLayerKernel{<:Helmholtz{N}})(target, source) where {N}
     tol = oftype(d2, SAME_POINT_TOLERANCE)
     if N == 2
         d = sqrt(d2)
-        v = im / 4 * hankelh1(0, k * d)
+        # leading with `im / 4` (a ComplexF64) would promote single-precision inputs
+        v = im * hankelh1(0, k * d) / 4
         return d2 ≤ tol * tol ? zero(v) : v
     elseif N == 3
         invd = @fastmath one(d2) / sqrt(d2)
@@ -541,8 +672,9 @@ function (DL::DoubleLayerKernel{<:Stokes{N}})(
         id2 = @fastmath one(d2) / d2
         c = @fastmath id2 * id2 / π * rdny
     elseif N == 3
-        id2 = @fastmath one(d2) / d2
-        c = @fastmath 3 * id2 * id2 * sqrt(id2) / 4 / π * rdny
+        invd = @fastmath one(d2) / sqrt(d2)
+        id2 = invd * invd
+        c = @fastmath 3 * id2 * id2 * invd / 4 / π * rdny
     else
         notimplemented()
     end
@@ -564,79 +696,14 @@ function (ADL::AdjointDoubleLayerKernel{<:Stokes{N}})(
         id2 = @fastmath one(d2) / d2
         c = @fastmath -id2 * id2 / π * rdnx
     elseif N == 3
-        id2 = @fastmath one(d2) / d2
-        c = @fastmath -3 * id2 * id2 * sqrt(id2) / 4 / π * rdnx
+        invd = @fastmath one(d2) / sqrt(d2)
+        id2 = invd * invd
+        c = @fastmath -3 * id2 * id2 * invd / 4 / π * rdnx
     else
         notimplemented()
     end
     v = c * RRT
     return d2 ≤ tol * tol ? zero(v) : v
-end
-
-function apply_kernel(
-        SL::SingleLayerKernel{<:Stokes{N}}, target, source, v,
-    ) where {N}
-    μ = SL.op.μ
-    r = coords(target) - coords(source)
-    d2 = dot(r, r)
-    tol = oftype(d2, SAME_POINT_TOLERANCE)
-    rdv = dot(r, v)
-    if N == 2
-        γ = @fastmath -log(d2) / 2
-        invd2 = @fastmath one(d2) / d2
-        out = (γ * v + (invd2 * rdv) * r) / (μ * 4 * π * (N - 1))
-    elseif N == 3
-        invd = @fastmath one(d2) / sqrt(d2)
-        invd3 = @fastmath invd * invd * invd
-        out = (invd * v + (invd3 * rdv) * r) / (μ * 4 * π * (N - 1))
-    else
-        notimplemented()
-    end
-    return d2 ≤ tol * tol ? zero(out) : out
-end
-
-function apply_kernel(
-        _DL::DoubleLayerKernel{<:Stokes{N}}, target, source, v,
-    ) where {N}
-    ny = normal(source)
-    r = coords(target) - coords(source)
-    d2 = dot(r, r)
-    tol = oftype(d2, SAME_POINT_TOLERANCE)
-    rdny = dot(r, ny)
-    rdv = dot(r, v)
-    if N == 2
-        id2 = @fastmath one(d2) / d2
-        c = @fastmath id2 * id2 / π * rdny * rdv
-    elseif N == 3
-        id2 = @fastmath one(d2) / d2
-        c = @fastmath 3 * id2 * id2 * sqrt(id2) / 4 / π * rdny * rdv
-    else
-        notimplemented()
-    end
-    out = c * r
-    return d2 ≤ tol * tol ? zero(out) : out
-end
-
-function apply_kernel(
-        ADL::AdjointDoubleLayerKernel{<:Stokes{N}}, target, source, v,
-    ) where {N}
-    nx = normal(target)
-    r = coords(target) - coords(source)
-    d2 = dot(r, r)
-    tol = oftype(d2, SAME_POINT_TOLERANCE)
-    rdnx = dot(r, nx)
-    rdv = dot(r, v)
-    if N == 2
-        id2 = @fastmath one(d2) / d2
-        c = @fastmath -id2 * id2 / π * rdnx * rdv
-    elseif N == 3
-        id2 = @fastmath one(d2) / d2
-        c = @fastmath -3 * id2 * id2 * sqrt(id2) / 4 / π * rdnx * rdv
-    else
-        notimplemented()
-    end
-    out = c * r
-    return d2 ≤ tol * tol ? zero(out) : out
 end
 
 function (HS::HyperSingularKernel{<:Stokes{N}})(
@@ -679,8 +746,95 @@ function (HS::HyperSingularKernel{<:Stokes{N}})(
     return d2 ≤ tol * tol ? zero(v) : v
 end
 
-function apply_kernel(HS::HyperSingularKernel{<:Stokes{N}}, target, source, v) where {N}
+# Prefactored actions (see `kernel_prefactor`). Beyond saving a few operations, this
+# keeps `μ` out of the inner loop of matrix-free backends: a division by (or even a
+# multiplication with) a kernel-struct field per pair measurably slows GPU kernels.
+# NOTE: a runtime float (`μ`) must sit lexically first in each product so the
+# `Int`/`Irrational` literals are demoted to its precision (else `4 * π::Float64`
+# would silently promote Float32 data).
+function kernel_prefactor(SL::SingleLayerKernel{<:Stokes{N}}) where {N}
+    μ = SL.op.μ
+    return inv(μ * 4 * (N - 1) * π)
+end
+kernel_prefactor(::DoubleLayerKernel{<:Stokes{N}}) where {N} = N == 2 ? 1 / π : 3 / (4π)
+function kernel_prefactor(::AdjointDoubleLayerKernel{<:Stokes{N}}) where {N}
+    return N == 2 ? 1 / π : 3 / (4π)
+end
+function kernel_prefactor(HS::HyperSingularKernel{<:Stokes{N}}) where {N}
     μ = HS.op.μ
+    return N == 2 ? μ / π : μ / 2 / π
+end
+
+function apply_kernel_unscaled(
+        SL::SingleLayerKernel{<:Stokes{N}}, target, source, v,
+    ) where {N}
+    r = coords(target) - coords(source)
+    d2 = dot(r, r)
+    tol = oftype(d2, SAME_POINT_TOLERANCE)
+    rdv = dot(r, v)
+    if N == 2
+        γ = @fastmath -log(d2) / 2
+        invd2 = @fastmath one(d2) / d2
+        out = γ * v + (invd2 * rdv) * r
+    elseif N == 3
+        invd = @fastmath one(d2) / sqrt(d2)
+        invd3 = @fastmath invd * invd * invd
+        out = invd * v + (invd3 * rdv) * r
+    else
+        notimplemented()
+    end
+    return d2 ≤ tol * tol ? zero(out) : out
+end
+
+function apply_kernel_unscaled(
+        _DL::DoubleLayerKernel{<:Stokes{N}}, target, source, v,
+    ) where {N}
+    ny = normal(source)
+    r = coords(target) - coords(source)
+    d2 = dot(r, r)
+    tol = oftype(d2, SAME_POINT_TOLERANCE)
+    rdny = dot(r, ny)
+    rdv = dot(r, v)
+    if N == 2
+        id2 = @fastmath one(d2) / d2
+        c = @fastmath id2 * id2 * rdny * rdv
+    elseif N == 3
+        invd = @fastmath one(d2) / sqrt(d2)
+        id2 = invd * invd
+        c = @fastmath id2 * id2 * invd * rdny * rdv
+    else
+        notimplemented()
+    end
+    out = c * r
+    return d2 ≤ tol * tol ? zero(out) : out
+end
+
+function apply_kernel_unscaled(
+        ADL::AdjointDoubleLayerKernel{<:Stokes{N}}, target, source, v,
+    ) where {N}
+    nx = normal(target)
+    r = coords(target) - coords(source)
+    d2 = dot(r, r)
+    tol = oftype(d2, SAME_POINT_TOLERANCE)
+    rdnx = dot(r, nx)
+    rdv = dot(r, v)
+    if N == 2
+        id2 = @fastmath one(d2) / d2
+        c = @fastmath -id2 * id2 * rdnx * rdv
+    elseif N == 3
+        invd = @fastmath one(d2) / sqrt(d2)
+        id2 = invd * invd
+        c = @fastmath -id2 * id2 * invd * rdnx * rdv
+    else
+        notimplemented()
+    end
+    out = c * r
+    return d2 ≤ tol * tol ? zero(out) : out
+end
+
+function apply_kernel_unscaled(
+        HS::HyperSingularKernel{<:Stokes{N}}, target, source, v,
+    ) where {N}
     nx = normal(target)
     ny = normal(source)
     r = coords(target) - coords(source)
@@ -692,14 +846,14 @@ function apply_kernel(HS::HyperSingularKernel{<:Stokes{N}}, target, source, v) w
     rdny = dot(r, ny)
     nxdny = dot(nx, ny)
     if N == 2
-        c = μ * id2 / π
+        c = id2
         α = 2 * rdny * id2
         vr = (-4α * rdnx + nxdny) * id2 * r + α * nx / 2
         vnx = ny
         vny = rdnx * id2 * r
         a_diag = α * rdnx / 2
     elseif N == 3
-        c = μ * id2 * invd / 2 / π
+        c = id2 * invd
         α = 3 * rdny * id2
         vr = (-5α * rdnx + 3 * nxdny / 2) * id2 * r + α * nx / 2
         vnx = ny
@@ -836,7 +990,33 @@ function (HS::HyperSingularKernel{<:Elastostatic{N}})(target, source) where {N}
     return iszero(d2) ? zero(v) : v
 end
 
-function apply_kernel(SL::SingleLayerKernel{<:Elastostatic{N}}, target, source, v) where {N}
+# Prefactored actions (see `kernel_prefactor`). The Poisson-ratio coefficients
+# (1 - 2ν etc.) appear non-multiplicatively, so only the overall constant factors out;
+# ν itself is still computed in the unscaled action. NOTE: the runtime floats (`μ`,
+# `1 - ν`) sit lexically first in each product so the `Int`/`Irrational` literals are
+# demoted to their precision.
+function kernel_prefactor(SL::SingleLayerKernel{<:Elastostatic{N}}) where {N}
+    μ, λ = SL.op.μ, SL.op.λ
+    ν = λ / (2 * (μ + λ))
+    return N == 2 ? inv(μ * 8 * (1 - ν) * π) : inv(μ * 16 * (1 - ν) * π)
+end
+function kernel_prefactor(DL::DoubleLayerKernel{<:Elastostatic{N}}) where {N}
+    μ, λ = DL.op.μ, DL.op.λ
+    ν = λ / (2 * (μ + λ))
+    return N == 2 ? inv((1 - ν) * 4 * π) : inv((1 - ν) * 8 * π)
+end
+function kernel_prefactor(ADL::AdjointDoubleLayerKernel{<:Elastostatic{N}}) where {N}
+    μ, λ = ADL.op.μ, ADL.op.λ
+    ν = λ / (2 * (μ + λ))
+    return N == 2 ? inv((1 - ν) * 4 * π) : inv((1 - ν) * 8 * π)
+end
+function kernel_prefactor(HS::HyperSingularKernel{<:Elastostatic{N}}) where {N}
+    μ, λ = HS.op.μ, HS.op.λ
+    ν = λ / (2 * (μ + λ))
+    return N == 2 ? μ / (2 * (1 - ν) * π) : μ / (4 * (1 - ν) * π)
+end
+
+function apply_kernel_unscaled(SL::SingleLayerKernel{<:Elastostatic{N}}, target, source, v) where {N}
     μ, λ = SL.op.μ, SL.op.λ
     ν = λ / (2 * (μ + λ))
     r = coords(target) - coords(source)
@@ -844,18 +1024,18 @@ function apply_kernel(SL::SingleLayerKernel{<:Elastostatic{N}}, target, source, 
     rdv = dot(r, v)
     if N == 2
         id2 = @fastmath one(d2) / d2
-        out = (-(3 - 4 * ν) * log(d2) / 2 * v + (id2 * rdv) * r) / (μ * 8 * π * (1 - ν))
+        out = -(3 - 4 * ν) * log(d2) / 2 * v + (id2 * rdv) * r
     elseif N == 3
         invd = @fastmath one(d2) / sqrt(d2)
         id2 = invd * invd
-        out = invd * ((3 - 4 * ν) * v + (id2 * rdv) * r) / (μ * 16 * π * (1 - ν))
+        out = invd * ((3 - 4 * ν) * v + (id2 * rdv) * r)
     else
         notimplemented()
     end
     return iszero(d2) ? zero(out) : out
 end
 
-function apply_kernel(DL::DoubleLayerKernel{<:Elastostatic{N}}, target, source, v) where {N}
+function apply_kernel_unscaled(DL::DoubleLayerKernel{<:Elastostatic{N}}, target, source, v) where {N}
     μ, λ = DL.op.μ, DL.op.λ
     ν = λ / (2 * (μ + λ))
     ny = normal(source)
@@ -868,16 +1048,16 @@ function apply_kernel(DL::DoubleLayerKernel{<:Elastostatic{N}}, target, source, 
     ν1 = 1 - 2ν
     asym = dot(ny, v) * r - rdv * ny                # (r⊗ny − ny⊗r)·v
     if N == 2
-        out = -invd * (drdn * (ν1 * v + 2 * id2 * rdv * r) + (ν1 * invd) * asym) / 4 / π / (1 - ν)
+        out = -invd * (drdn * (ν1 * v + 2 * id2 * rdv * r) + (ν1 * invd) * asym)
     elseif N == 3
-        out = -id2 * (drdn * (ν1 * v + 3 * id2 * rdv * r) + (ν1 * invd) * asym) / 8 / π / (1 - ν)
+        out = -id2 * (drdn * (ν1 * v + 3 * id2 * rdv * r) + (ν1 * invd) * asym)
     else
         notimplemented()
     end
     return iszero(d2) ? zero(out) : out
 end
 
-function apply_kernel(ADL::AdjointDoubleLayerKernel{<:Elastostatic{N}}, target, source, v) where {N}
+function apply_kernel_unscaled(ADL::AdjointDoubleLayerKernel{<:Elastostatic{N}}, target, source, v) where {N}
     μ, λ = ADL.op.μ, ADL.op.λ
     ν = λ / (2 * (μ + λ))
     nx = normal(target)
@@ -890,16 +1070,16 @@ function apply_kernel(ADL::AdjointDoubleLayerKernel{<:Elastostatic{N}}, target, 
     ν1 = 1 - 2ν
     asym = rdv * nx - dot(nx, v) * r                # (nx⊗r − r⊗nx)·v
     if N == 2
-        out = invd * (drdn * (ν1 * v + 2 * id2 * rdv * r) + (ν1 * invd) * asym) / 4 / π / (1 - ν)
+        out = invd * (drdn * (ν1 * v + 2 * id2 * rdv * r) + (ν1 * invd) * asym)
     elseif N == 3
-        out = id2 * (drdn * (ν1 * v + 3 * id2 * rdv * r) + (ν1 * invd) * asym) / 8 / π / (1 - ν)
+        out = id2 * (drdn * (ν1 * v + 3 * id2 * rdv * r) + (ν1 * invd) * asym)
     else
         notimplemented()
     end
     return iszero(d2) ? zero(out) : out
 end
 
-function apply_kernel(HS::HyperSingularKernel{<:Elastostatic{N}}, target, source, v) where {N}
+function apply_kernel_unscaled(HS::HyperSingularKernel{<:Elastostatic{N}}, target, source, v) where {N}
     μ, λ = HS.op.μ, HS.op.λ
     ν = λ / (2 * (μ + λ))
     nx = normal(target)
@@ -912,14 +1092,14 @@ function apply_kernel(HS::HyperSingularKernel{<:Elastostatic{N}}, target, source
     rdny = dot(r, ny)
     nxdny = dot(nx, ny)
     if N == 2
-        c = μ * id2 / 2 / π / (1 - ν)
+        c = id2
         α = 2 * rdny * id2
         vr = (-4α * rdnx + 2ν * nxdny) * id2 * r + α * ν * nx + (1 - 2ν) * 2 * rdnx * id2 * ny
         vnx = (1 - 2ν) * α * r - (1 - 4ν) * ny
         vny = 2ν * rdnx * id2 * r + (1 - 2ν) * nx
         a_diag = α * ν * rdnx + (1 - 2ν) * nxdny
     elseif N == 3
-        c = μ * id2 * invd / 4 / π / (1 - ν)
+        c = id2 * invd
         α = 3 * rdny * id2
         vr = (-5α * rdnx + 3ν * nxdny) * id2 * r + α * ν * nx + (1 - 2ν) * 3 * rdnx * id2 * ny
         vnx = (1 - 2ν) * α * r - (1 - 4ν) * ny
