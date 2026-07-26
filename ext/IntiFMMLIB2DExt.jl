@@ -276,10 +276,10 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 end
                 return y
             end
-        # X forward (PV part) = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g): dipoles with vector strengths g,
-        # whose target-gradient is ∫∇ₓ∇yG⋅g = -X_forward, so the strengths are negated
-        # (the +1/(2π) Laplace 2D prefactor folds in) and `grad`/`gradtarg` is the
-        # `SVector` output directly.
+            # X forward (PV part) = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g): dipoles with vector strengths g,
+            # whose target-gradient is ∫∇ₓ∇yG⋅g = -X_forward, so the strengths are negated
+            # (the +1/(2π) Laplace 2D prefactor folds in) and `grad`/`gradtarg` is the
+            # `SVector` output directly.
         else
             dipvecs = Matrix{Float64}(undef, 2, n)
             dipstrs = ones(Float64, n)
@@ -598,11 +598,11 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 end
                 return y
             end
-        # X_forward = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g). The bracket quantity is the
-        # ∇yG-dipole field (W forward) and the negative sign is incorporated
-        # into the dipole strengths. hfmm2d needs real dipvecs with complex
-        # strengths, so the complex density is split into real/imag parts
-        # (dipstr = wⱼ resp. i·wⱼ).
+            # X_forward = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g). The bracket quantity is the
+            # ∇yG-dipole field (W forward) and the negative sign is incorporated
+            # into the dipole strengths. hfmm2d needs real dipvecs with complex
+            # strengths, so the complex density is split into real/imag parts
+            # (dipstr = wⱼ resp. i·wⱼ).
         else
             dipvecs = Matrix{Float64}(undef, 2, n)
             dipstr = Vector{ComplexF64}(undef, n)

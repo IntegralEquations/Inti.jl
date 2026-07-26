@@ -19,7 +19,7 @@ Random.seed!(1)
 rtol1 = 1.0e-2 # single and double layer
 rtol2 = 5.0e-2 # hypersingular (higher tolerance to avoid use of fine mesh + long unit tests)
 dims = (2, 3)
-meshsize    = 0.2  # 2D mesh
+meshsize = 0.2  # 2D mesh
 meshsize_3d = 0.2  # same as 2D; kept separate so it can be tuned independently
 types = (:interior, :exterior)
 
@@ -32,7 +32,7 @@ for N in dims
     tol_adaptive = N == 2 ? 1.0e-2 : 1.0e-3
     corrections = [
         (method = :dim,),
-        (method = :adaptive, maxdist = 2 * (N == 2 ? meshsize : meshsize_3d), rtol = tol_adaptive, atol = tol_adaptive)
+        (method = :adaptive, maxdist = 2 * (N == 2 ? meshsize : meshsize_3d), rtol = tol_adaptive, atol = tol_adaptive),
     ]
     msize = N == 2 ? meshsize : meshsize_3d
     local Γ
@@ -66,8 +66,8 @@ for N in dims
                 @testset "Greens identity $(N)d $op" begin
                     # HelmholtzPeriodic1D with adaptive correction needs higher quadrature order.
                     quad_op = if op isa
-                                 Base.get_extension(Inti, :IntiQPGreenExt).HelmholtzPeriodic1D &&
-                                 correction.method == :adaptive
+                            Base.get_extension(Inti, :IntiQPGreenExt).HelmholtzPeriodic1D &&
+                            correction.method == :adaptive
                         Inti.Quadrature(Γ; meshsize = msize, qorder = 5)
                     else
                         quad
@@ -88,11 +88,11 @@ for N in dims
 
                     @testset "Single/double layer $(string(op))" begin
                         for t in types
-                            σ  = t == :interior ? 1 / 2 : -1 / 2
+                            σ = t == :interior ? 1 / 2 : -1 / 2
                             xs = t == :interior ? ntuple(i -> 3, N) : ntuple(i -> 0.1, N)
-                            T  = Inti.default_density_eltype(op)
-                            c  = rand(T)
-                            u    = (qnode) -> Inti.SingleLayerKernel(op)(qnode, xs) * c
+                            T = Inti.default_density_eltype(op)
+                            c = rand(T)
+                            u = (qnode) -> Inti.SingleLayerKernel(op)(qnode, xs) * c
                             dudn = (qnode) -> Inti.AdjointDoubleLayerKernel(op)(qnode, xs) * c
                             γ₀u = map(u, quad_op)
                             γ₁u = map(dudn, quad_op)
@@ -117,11 +117,11 @@ for N in dims
 
                     @testset "Adjoint double-layer/hypersingular $(string(op))" begin
                         for t in types
-                            σ  = t == :interior ? 1 / 2 : -1 / 2
+                            σ = t == :interior ? 1 / 2 : -1 / 2
                             xs = t == :interior ? ntuple(i -> 3, N) : ntuple(i -> 0.1, N)
-                            T  = Inti.default_density_eltype(op)
-                            c  = rand(T)
-                            u    = (qnode) -> Inti.SingleLayerKernel(op)(qnode, xs) * c
+                            T = Inti.default_density_eltype(op)
+                            c = rand(T)
+                            u = (qnode) -> Inti.SingleLayerKernel(op)(qnode, xs) * c
                             dudn = (qnode) -> Inti.AdjointDoubleLayerKernel(op)(qnode, xs) * c
                             γ₀u = map(u, quad_op)
                             γ₁u = map(dudn, quad_op)
@@ -141,35 +141,45 @@ end
 ## Gradient Green's identity: W*γ₁u - GDL*γ₀u = ∇u (interior representation formula)
 @testset "Gradient Green's identity (kernel_variant = :gradient)" begin
     for N in (2, 3)
-        for op in (Inti.Laplace(; dim = N), Inti.Helmholtz(; k = 1.2, dim = N),
-                   Inti.Elastostatic(; μ = 0.8, λ = 1.3, dim = N),
-                   Inti.Stokes(; μ = 1.2, dim = N))
+        for op in (
+                Inti.Laplace(; dim = N), Inti.Helmholtz(; k = 1.2, dim = N),
+                Inti.Elastostatic(; μ = 0.8, λ = 1.3, dim = N),
+                Inti.Stokes(; μ = 1.2, dim = N),
+            )
             Inti.clear_entities!()
             msize = N == 2 ? meshsize : meshsize_3d
             if N == 2
                 Γ = Inti.parametric_curve(x -> SVector(cos(x), sin(x)), 0.0, 2π) |> Inti.Domain
                 quad = Inti.Quadrature(Γ; meshsize = msize, qorder = 5)
-                target = vec([SVector(x, y) for x in -0.9:0.2:0.9, y in -0.9:0.2:0.9
-                              if x^2 + y^2 < 0.85])
+                target = vec(
+                    [
+                        SVector(x, y) for x in -0.9:0.2:0.9, y in -0.9:0.2:0.9
+                            if x^2 + y^2 < 0.85
+                    ]
+                )
             else
                 Ω = Inti.GeometricEntity("ellipsoid") |> Inti.Domain
                 Γ = Inti.external_boundary(Ω)
                 quad = Inti.Quadrature(Γ; meshsize = msize, qorder = 3)
-                target = vec([SVector(x, y, z) for x in -0.7:0.3:0.7, y in -0.7:0.3:0.7,
-                              z in -0.7:0.3:0.7 if x^2 + y^2 + z^2 < 0.5])
+                target = vec(
+                    [
+                        SVector(x, y, z) for x in -0.7:0.3:0.7, y in -0.7:0.3:0.7,
+                            z in -0.7:0.3:0.7 if x^2 + y^2 + z^2 < 0.5
+                    ]
+                )
             end
             xs = ntuple(i -> 3, N)
             T = Inti.default_density_eltype(op)
             c = rand(T)
-            u      = qnode -> Inti.SingleLayerKernel(op)(qnode, xs) * c
-            dudn   = qnode -> Inti.AdjointDoubleLayerKernel(op)(qnode, xs) * c
-            ∇u_ref = x     -> Inti.GradientSingleLayerKernel(op)(x, xs) * c
-            γ₀u  = map(u, quad)
-            γ₁u  = map(dudn, quad)
-            ∇u   = map(∇u_ref, target)
+            u = qnode -> Inti.SingleLayerKernel(op)(qnode, xs) * c
+            dudn = qnode -> Inti.AdjointDoubleLayerKernel(op)(qnode, xs) * c
+            ∇u_ref = x -> Inti.GradientSingleLayerKernel(op)(x, xs) * c
+            γ₀u = map(u, quad)
+            γ₁u = map(dudn, quad)
+            ∇u = map(∇u_ref, target)
             ∇u_norm = norm(norm.(∇u), Inf)
             # uncorrected
-            Wmat   = Inti.assemble_matrix(Inti.IntegralOperator(Inti.GradientSingleLayerKernel(op), target, quad))
+            Wmat = Inti.assemble_matrix(Inti.IntegralOperator(Inti.GradientSingleLayerKernel(op), target, quad))
             GDLmat = Inti.assemble_matrix(Inti.IntegralOperator(Inti.GradientDoubleLayerKernel(op), target, quad))
             e0 = norm(Wmat * γ₁u - GDLmat * γ₀u - ∇u, Inf) / ∇u_norm
             # corrected

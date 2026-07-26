@@ -28,56 +28,56 @@ _bdim_num_rhs(::Type{SM}) where {N, SM <: SMatrix{N, N}} = N
 _bdim_num_rhs(::Type{SV}) where {K, SM <: SMatrix, SV <: SVector{K, SM}} = K * size(SM, 1)
 
 function _bdim_fill_Θi!(Θi_flat, Θ, j, ::Type{T}) where {T <: Number}
-    @inbounds for m in axes(Θi_flat, 1)
+    return @inbounds for m in axes(Θi_flat, 1)
         Θi_flat[m, 1] = Θ[j, m]
     end
 end
 function _bdim_fill_Θi!(Θi_flat, Θ, j, ::Type{SV}) where {P, SV <: SVector{P, <:Number}}
-    @inbounds for m in axes(Θi_flat, 1)
+    return @inbounds for m in axes(Θi_flat, 1)
         Θi_flat[m, :] .= Θ[j, m]
     end
 end
 function _bdim_fill_Θi!(Θi_flat, Θ, j, ::Type{SM}) where {N, SM <: SMatrix{N, N}}
     ns = size(Θi_flat, 1) ÷ N
-    @inbounds for m in 1:ns
-        Θi_flat[(m - 1) * N + 1:m * N, :] .= transpose(Θ[j, m])
+    return @inbounds for m in 1:ns
+        Θi_flat[((m - 1) * N + 1):(m * N), :] .= transpose(Θ[j, m])
     end
 end
 function _bdim_fill_Θi!(Θi_flat, Θ, j, ::Type{SV}) where {K, SM <: SMatrix, SV <: SVector{K, SM}}
     N = size(SM, 1)
     ns = size(Θi_flat, 1) ÷ N
-    @inbounds for m in 1:ns, kk in 1:K
-        Θi_flat[(m - 1) * N + 1:m * N, (kk - 1) * N + 1:kk * N] .= transpose(Θ[j, m][kk])
+    return @inbounds for m in 1:ns, kk in 1:K
+        Θi_flat[((m - 1) * N + 1):(m * N), ((kk - 1) * N + 1):(kk * N)] .= transpose(Θ[j, m][kk])
     end
 end
 
 function _bdim_push_weights!(Is, Js, Ss, Ds, Wdata, i, jglob, nq, ::Type{T}) where {T <: Number}
-    @inbounds for k in 1:nq
+    return @inbounds for k in 1:nq
         push!(Is, i); push!(Js, jglob[k])
         push!(Ss, -Wdata[nq + k, 1])
-        push!(Ds,  Wdata[k, 1])
+        push!(Ds, Wdata[k, 1])
     end
 end
 function _bdim_push_weights!(Is, Js, Ss, Ds, Wdata, i, jglob, nq, ::Type{SV}) where {P, SV <: SVector{P, <:Number}}
-    @inbounds for k in 1:nq
+    return @inbounds for k in 1:nq
         push!(Is, i); push!(Js, jglob[k])
         push!(Ss, -SV(Wdata[nq + k, :]))
-        push!(Ds,  SV(Wdata[k, :]))
+        push!(Ds, SV(Wdata[k, :]))
     end
 end
 function _bdim_push_weights!(Is, Js, Ss, Ds, Wdata, i, jglob, nq, ::Type{SM}) where {N, SM <: SMatrix{N, N}}
-    @inbounds for k in 1:nq
+    return @inbounds for k in 1:nq
         push!(Is, i); push!(Js, jglob[k])
-        push!(Ss, -transpose(SM(view(Wdata, N * (nq + k - 1) + 1:N * (nq + k), :))))
-        push!(Ds,  transpose(SM(view(Wdata, N * (k - 1) + 1:k * N, :))))
+        push!(Ss, -transpose(SM(view(Wdata, (N * (nq + k - 1) + 1):(N * (nq + k)), :))))
+        push!(Ds, transpose(SM(view(Wdata, (N * (k - 1) + 1):(k * N), :))))
     end
 end
 function _bdim_push_weights!(Is, Js, Ss, Ds, Wdata, i, jglob, nq, ::Type{SV}) where {K, SM <: SMatrix, SV <: SVector{K, SM}}
     N = size(SM, 1)
-    @inbounds for k in 1:nq
+    return @inbounds for k in 1:nq
         push!(Is, i); push!(Js, jglob[k])
-        push!(Ss, SV(ntuple(kk -> -transpose(SM(view(Wdata, N * (nq + k - 1) + 1:N * (nq + k), (kk - 1) * N + 1:kk * N))), Val(K))))
-        push!(Ds, SV(ntuple(kk ->  transpose(SM(view(Wdata, N * (k - 1) + 1:k * N,             (kk - 1) * N + 1:kk * N))), Val(K))))
+        push!(Ss, SV(ntuple(kk -> -transpose(SM(view(Wdata, (N * (nq + k - 1) + 1):(N * (nq + k)), ((kk - 1) * N + 1):(kk * N)))), Val(K))))
+        push!(Ds, SV(ntuple(kk -> transpose(SM(view(Wdata, (N * (k - 1) + 1):(k * N), ((kk - 1) * N + 1):(kk * N)))), Val(K))))
     end
 end
 
@@ -234,7 +234,7 @@ function bdim_correction(
         S_scalar = eltype(Mdata)
         nc = _bdim_num_rhs(Tout)
         Θi_flat = Matrix{S_scalar}(undef, size(Mdata, 2), nc)
-        Wdata   = Matrix{S_scalar}(undef, size(Mdata, 1), nc)
+        Wdata = Matrix{S_scalar}(undef, size(Mdata, 1), nc)
         # for each element, we will solve Mᵀ W = Θiᵀ, where W is a matrix of
         # size (flat_m × nc), and Θiᵀ has size (flat_ns × nc)
         for n in 1:ne

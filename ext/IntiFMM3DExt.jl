@@ -158,10 +158,10 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
                 end
                 return y
             end
-        # X_forward = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g). The bracket quantity is the
-        # ∇yG-dipole field (W forward) and the negative sign is incorporated
-        # into the dipole strengths. It performs a dipole→gradient contraction
-        # of the Hessian: `SVector→SVector`.
+            # X_forward = +∫∇ₓ∇ₓG⋅g = -∇ₓ(∫∇yG⋅g). The bracket quantity is the
+            # ∇yG-dipole field (W forward) and the negative sign is incorporated
+            # into the dipole strengths. It performs a dipole→gradient contraction
+            # of the Hessian: `SVector→SVector`.
         else
             dipvecs = Matrix{Float64}(undef, 3, n)
             return LinearMaps.LinearMap{SVector{3, Float64}}(m, n) do y, x

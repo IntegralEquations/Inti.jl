@@ -17,7 +17,7 @@ logfile = joinpath(@__DIR__, "Xop_iunius5_run.log")
 function logmsg(msg)
     line = "[$(Dates.now())] $msg"
     println(line)
-    open(logfile, "a") do io
+    return open(logfile, "a") do io
         println(io, line)
         flush(io)
     end
@@ -214,14 +214,18 @@ end
 #               1/3 * exp(x[1] + x[2]) * cos(x[3]),
 #               1/3 * exp(x[1] + x[2]) * sin(x[3]) )
 
-α = π/4; β = α; γ = α;
+α = π / 4; β = α; γ = α;
 Ψ(x) = cos(α * x[1]) * sin(β * x[2]) * cos(γ * x[3])
-gradΨ(x) = SVector(-α*sin(α * x[1]) * sin(β * x[2]) * cos(γ * x[3]),
-                   β*cos(α * x[1]) * cos(β * x[2]) * cos(γ * x[3]),
-                   -γ*cos(α * x[1]) * sin(β * x[2]) * sin(γ * x[3]))
-g(x) = SVector(α * sin(α * x[1]) * sin(β * x[2]) * cos(γ * x[3]), 
-               -β * cos(α * x[1]) * cos(β * x[2]) * cos(γ * x[3]),
-               γ * cos(α * x[1]) * sin(β * x[2]) * sin(γ * x[3]))
+gradΨ(x) = SVector(
+    -α * sin(α * x[1]) * sin(β * x[2]) * cos(γ * x[3]),
+    β * cos(α * x[1]) * cos(β * x[2]) * cos(γ * x[3]),
+    -γ * cos(α * x[1]) * sin(β * x[2]) * sin(γ * x[3])
+)
+g(x) = SVector(
+    α * sin(α * x[1]) * sin(β * x[2]) * cos(γ * x[3]),
+    -β * cos(α * x[1]) * cos(β * x[2]) * cos(γ * x[3]),
+    γ * cos(α * x[1]) * sin(β * x[2]) * sin(γ * x[3])
+)
 g_d = [g(q.coords) for q in Ωₕ_quad]
 Ψ_b = [Ψ(q.coords) for q in Γₕ_quad]
 Ψ_d = [Ψ(q.coords) for q in Ωₕ_quad]

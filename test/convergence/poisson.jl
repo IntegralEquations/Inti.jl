@@ -58,7 +58,7 @@ tmsh = @elapsed begin
     ψ =
         (v) ->
     [(r1 + r2 * sin(v[1])) * cos(v[2]), (r1 + r2 * sin(v[1])) * sin(v[2]), r2 * cos(v[1])]
-    θ = min(qorder+1,interpolation_order+3) - 1 # smoothness order of curved elements
+    θ = min(qorder + 1, interpolation_order + 3) - 1 # smoothness order of curved elements
     crvmsh = Inti.curve_mesh(
         msh,
         ψ,
@@ -98,7 +98,7 @@ tmsh = @elapsed begin
     ψ =
         (v) ->
     [(r1 + r2 * sin(v[1])) * cos(v[2]), (r1 + r2 * sin(v[1])) * sin(v[2]), r2 * cos(v[1])]
-    θ = min(qorder+1,interpolation_order+3) - 1 # smoothness order of curved elements
+    θ = min(qorder + 1, interpolation_order + 3) - 1 # smoothness order of curved elements
     crvmsh_coarse = Inti.curve_mesh(
         msh_coarse,
         ψ,

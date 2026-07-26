@@ -25,9 +25,9 @@ Random.seed!(1)
 
 ## Test parameters
 rtol = 1.0e-10  # relative tolerance for volume potential tests
-meshsize    = 0.4  # 2D mesh size
+meshsize = 0.4  # 2D mesh size
 meshsize_3d = 0.8  # 3D mesh size — tests check polynomial exactness (not convergence),
-                   # so a coarser mesh is valid and keeps matrices small
+# so a coarser mesh is valid and keeps matrices small
 meshorder = 1
 bdry_qorder = 5
 interpolation_order = 2
@@ -84,13 +84,13 @@ function test_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize; interpolati
             t = (q) -> basis[idx].neumann_trace(q)
         end
 
-        u_d  = map(q -> u(q), Ωₕ_quad)
-        u_b  = map(q -> u(q), Γₕ_quad)
+        u_d = map(q -> u(q), Ωₕ_quad)
+        u_b = map(q -> u(q), Γₕ_quad)
         du_b = map(q -> t(q), Γₕ_quad)
-        f_d  = map(q -> f(q), Ωₕ_quad)
+        f_d = map(q -> f(q), Ωₕ_quad)
 
-        vref        = u_d + D_b2d * u_b - S_b2d * du_b
-        vapprox     = V_d2d * f_d
+        vref = u_d + D_b2d * u_b - S_b2d * du_b
+        vapprox = V_d2d * f_d
         vapprox_corr = vapprox + δV_d2d * f_d
 
         push!(errors_uncorrected, norm(vref - vapprox, Inf))
@@ -135,10 +135,10 @@ function test_gradient_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize; in
 
     for idx in 1:length(basis)
         ∇u_d = [basis[idx].gradient_solution(q) for q in Ωₕ_quad]
-        u_b  = [basis[idx].solution(q) for q in Γₕ_quad]
+        u_b = [basis[idx].solution(q) for q in Γₕ_quad]
         du_b = [basis[idx].neumann_trace(q) for q in Γₕ_quad]
-        f_d  = [basis[idx].source(q) for q in Ωₕ_quad]
-        vref    = ∇u_d + GDL * u_b - W * du_b
+        f_d = [basis[idx].source(q) for q in Ωₕ_quad]
+        vref = ∇u_d + GDL * u_b - W * du_b
         vapprox = V_grad * f_d + δV_grad * f_d
         push!(errors_corrected, norm(vref - vapprox, Inf))
     end
@@ -285,11 +285,11 @@ gmsh.finalize()
 
 @testset "Volume potential operators 2D" begin
     for (name, op) in [
-        ("2D Laplace",      Inti.Laplace(; dim = 2)),
-        ("2D Helmholtz",    Inti.Helmholtz(; k = 0.7, dim = 2)),
-        ("2D Elastostatic", Inti.Elastostatic(; μ = 0.8, λ = 1.3, dim = 2)),
-        ("2D Stokes",       Inti.Stokes(; μ = 1.0, dim = 2)),
-    ]
+            ("2D Laplace", Inti.Laplace(; dim = 2)),
+            ("2D Helmholtz", Inti.Helmholtz(; k = 0.7, dim = 2)),
+            ("2D Elastostatic", Inti.Elastostatic(; μ = 0.8, λ = 1.3, dim = 2)),
+            ("2D Stokes", Inti.Stokes(; μ = 1.0, dim = 2)),
+        ]
         @testset "$name" begin
             err_uncorr, err_corr = test_volume_potential(op, Ωₕ_quad_2d, Γₕ_quad_2d, meshsize; interpolation_order)
             @test maximum(err_corr) < rtol
@@ -300,11 +300,11 @@ end
 
 @testset "Gradient volume potential 2D" begin
     for (name, op) in [
-        ("Laplace",      Inti.Laplace(; dim = 2)),
-        ("Helmholtz",    Inti.Helmholtz(; k = 0.7, dim = 2)),
-        ("Elastostatic", Inti.Elastostatic(; μ = 0.8, λ = 1.3, dim = 2)),
-        ("Stokes",       Inti.Stokes(; μ = 1.2, dim = 2)),
-    ]
+            ("Laplace", Inti.Laplace(; dim = 2)),
+            ("Helmholtz", Inti.Helmholtz(; k = 0.7, dim = 2)),
+            ("Elastostatic", Inti.Elastostatic(; μ = 0.8, λ = 1.3, dim = 2)),
+            ("Stokes", Inti.Stokes(; μ = 1.2, dim = 2)),
+        ]
         @testset "Gradient volume potential 2D $name" begin
             err_corr = test_gradient_volume_potential(op, Ωₕ_quad_2d, Γₕ_quad_2d, meshsize; interpolation_order)
             @test maximum(err_corr) < rtol
@@ -314,9 +314,9 @@ end
 
 @testset "W volume potential 2D" begin
     for (name, op, Tout) in [
-        ("Laplace",   Inti.Laplace(; dim = 2),               Float64),
-        ("Helmholtz", Inti.Helmholtz(; k = 0.7, dim = 2),    ComplexF64),
-    ]
+            ("Laplace", Inti.Laplace(; dim = 2), Float64),
+            ("Helmholtz", Inti.Helmholtz(; k = 0.7, dim = 2), ComplexF64),
+        ]
         @testset "W volume potential 2D $name" begin
             err, out_eltype = test_W_volume_potential(op, Ωₕ_quad_2d, Γₕ_quad_2d, meshsize; interpolation_order)
             @test maximum(err) < rtol
@@ -327,9 +327,9 @@ end
 
 @testset "X (∇W) volume potential 2D" begin
     for (name, op, Tout) in [
-        ("Laplace", Inti.Laplace(; dim = 2), Float64),
-        ("Helmholtz", Inti.Helmholtz(; dim = 2, k = 1.2), ComplexF64),
-    ]
+            ("Laplace", Inti.Laplace(; dim = 2), Float64),
+            ("Helmholtz", Inti.Helmholtz(; dim = 2, k = 1.2), ComplexF64),
+        ]
         @testset "X volume potential 2D $name" begin
             err, out_eltype = test_X_volume_potential(op, Ωₕ_quad_2d, Γₕ_quad_2d, meshsize; interpolation_order)
             @test maximum(err) < rtol
@@ -359,11 +359,11 @@ gmsh.finalize()
 
 @testset "Volume potential operators 3D" begin
     for (name, op) in [
-        ("3D Laplace",      Inti.Laplace(; dim = 3)),
-        ("3D Helmholtz",    Inti.Helmholtz(; k = 1.2, dim = 3)),
-        ("3D Elastostatic", Inti.Elastostatic(; μ = 1.1, λ = 0.9, dim = 3)),
-        ("3D Stokes",       Inti.Stokes(; μ = 1.0, dim = 3)),
-    ]
+            ("3D Laplace", Inti.Laplace(; dim = 3)),
+            ("3D Helmholtz", Inti.Helmholtz(; k = 1.2, dim = 3)),
+            ("3D Elastostatic", Inti.Elastostatic(; μ = 1.1, λ = 0.9, dim = 3)),
+            ("3D Stokes", Inti.Stokes(; μ = 1.0, dim = 3)),
+        ]
         @testset "$name" begin
             err_uncorr, err_corr = test_volume_potential(op, Ωₕ_quad_3d, Γₕ_quad_3d, meshsize_3d; interpolation_order)
             @test maximum(err_corr) < rtol
@@ -374,11 +374,11 @@ end
 
 @testset "Gradient volume potential 3D" begin
     for (name, op) in [
-        ("Laplace",      Inti.Laplace(; dim = 3)),
-        ("Helmholtz",    Inti.Helmholtz(; k = 1.2, dim = 3)),
-        ("Elastostatic", Inti.Elastostatic(; μ = 1.1, λ = 0.9, dim = 3)),
-        ("Stokes",       Inti.Stokes(; μ = 1.2, dim = 3)),
-    ]
+            ("Laplace", Inti.Laplace(; dim = 3)),
+            ("Helmholtz", Inti.Helmholtz(; k = 1.2, dim = 3)),
+            ("Elastostatic", Inti.Elastostatic(; μ = 1.1, λ = 0.9, dim = 3)),
+            ("Stokes", Inti.Stokes(; μ = 1.2, dim = 3)),
+        ]
         @testset "Gradient volume potential 3D $name" begin
             err_corr = test_gradient_volume_potential(op, Ωₕ_quad_3d, Γₕ_quad_3d, meshsize_3d; interpolation_order)
             @test maximum(err_corr) < rtol
@@ -388,9 +388,9 @@ end
 
 @testset "W volume potential 3D" begin
     for (name, op, Tout) in [
-        ("Laplace",   Inti.Laplace(; dim = 3),               Float64),
-        ("Helmholtz", Inti.Helmholtz(; k = 1.2, dim = 3),    ComplexF64),
-    ]
+            ("Laplace", Inti.Laplace(; dim = 3), Float64),
+            ("Helmholtz", Inti.Helmholtz(; k = 1.2, dim = 3), ComplexF64),
+        ]
         @testset "W volume potential 3D $name" begin
             err, out_eltype = test_W_volume_potential(op, Ωₕ_quad_3d, Γₕ_quad_3d, meshsize_3d; interpolation_order)
             @test maximum(err) < rtol
@@ -401,9 +401,9 @@ end
 
 @testset "X (∇W) volume potential 3D" begin
     for (name, op, Tout) in [
-        ("Laplace", Inti.Laplace(; dim = 3), Float64),
-        ("Helmholtz", Inti.Helmholtz(; dim = 3, k = 1.2), ComplexF64),
-    ]
+            ("Laplace", Inti.Laplace(; dim = 3), Float64),
+            ("Helmholtz", Inti.Helmholtz(; dim = 3, k = 1.2), ComplexF64),
+        ]
         @testset "X volume potential 3D $name" begin
             err, out_eltype = test_X_volume_potential(op, Ωₕ_quad_3d, Γₕ_quad_3d, meshsize_3d; interpolation_order)
             @test maximum(err) < rtol

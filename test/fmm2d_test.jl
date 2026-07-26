@@ -25,7 +25,7 @@ for op in (
         Inti.Stokes(; dim = 2, μ = 0.5),
     )
     @testset "PDE: $op" begin
-    op = Inti.Laplace(; dim = 2)
+        op = Inti.Laplace(; dim = 2)
         for K in (
                 Inti.DoubleLayerKernel(op),
                 Inti.SingleLayerKernel(op),
@@ -109,10 +109,14 @@ end
         )
         @testset "PDE: $op" begin
             cor = (method = :dim, maxdist = 0.5, boundary = Γₕ_quad, interpolation_order = 2)
-            Wd = Inti.volume_potential(; op, target = Ωₕ_quad, source = Ωₕ_quad,
-                compression = (method = :none,), correction = cor, kernel_variant = :gradient_source)
-            Wf = Inti.volume_potential(; op, target = Ωₕ_quad, source = Ωₕ_quad,
-                compression = (method = :fmm, tol = 1.0e-12), correction = cor, kernel_variant = :gradient_source)
+            Wd = Inti.volume_potential(;
+                op, target = Ωₕ_quad, source = Ωₕ_quad,
+                compression = (method = :none,), correction = cor, kernel_variant = :gradient_source
+            )
+            Wf = Inti.volume_potential(;
+                op, target = Ωₕ_quad, source = Ωₕ_quad,
+                compression = (method = :fmm, tol = 1.0e-12), correction = cor, kernel_variant = :gradient_source
+            )
             g = [rand(SVector{2, Tout}) for _ in 1:length(Ωₕ_quad)]
             yd = Wd * g
             yf = Wf * g
@@ -158,10 +162,14 @@ end
             (Inti.Helmholtz(; dim = 2, k = 1.2), ComplexF64),
         )
         @testset "PDE: $op" begin
-            Xd = Inti.volume_potential(; op, target = Ωₕ_quad, source = Ωₕ_quad,
-                compression = (method = :none,), correction = cor, kernel_variant = :hessian)
-            Xf = Inti.volume_potential(; op, target = Ωₕ_quad, source = Ωₕ_quad,
-                compression = (method = :fmm, tol = 1.0e-12), correction = cor, kernel_variant = :hessian)
+            Xd = Inti.volume_potential(;
+                op, target = Ωₕ_quad, source = Ωₕ_quad,
+                compression = (method = :none,), correction = cor, kernel_variant = :hessian
+            )
+            Xf = Inti.volume_potential(;
+                op, target = Ωₕ_quad, source = Ωₕ_quad,
+                compression = (method = :fmm, tol = 1.0e-12), correction = cor, kernel_variant = :hessian
+            )
             g = [rand(SVector{2, Tout}) for _ in 1:length(Ωₕ_quad)]
             yd = Xd * g
             yf = Xf * g

@@ -192,12 +192,16 @@ end
 
 α = 2π; β = α; γ = α;
 Ψ(x) = cos(α * x[1]) * sin(β * x[2]) * cos(γ * x[3])
-gradΨ(x) = SVector(-α*sin(α * x[1]) * sin(β * x[2]) * cos(γ * x[3]),
-                   β*cos(α * x[1]) * cos(β * x[2]) * cos(γ * x[3]),
-                   -γ*cos(α * x[1]) * sin(β * x[2]) * sin(γ * x[3]))
-g(x) = SVector(α * sin(α * x[1]) * sin(β * x[2]) * cos(γ * x[3]), 
-               -β * cos(α * x[1]) * cos(β * x[2]) * cos(γ * x[3]),
-               γ * cos(α * x[1]) * sin(β * x[2]) * sin(γ * x[3]))
+gradΨ(x) = SVector(
+    -α * sin(α * x[1]) * sin(β * x[2]) * cos(γ * x[3]),
+    β * cos(α * x[1]) * cos(β * x[2]) * cos(γ * x[3]),
+    -γ * cos(α * x[1]) * sin(β * x[2]) * sin(γ * x[3])
+)
+g(x) = SVector(
+    α * sin(α * x[1]) * sin(β * x[2]) * cos(γ * x[3]),
+    -β * cos(α * x[1]) * cos(β * x[2]) * cos(γ * x[3]),
+    γ * cos(α * x[1]) * sin(β * x[2]) * sin(γ * x[3])
+)
 g_d = [g(q.coords) for q in Ωₕ_quad]
 Ψ_b = [Ψ(q.coords) for q in Γₕ_quad]
 Ψ_d = [Ψ(q.coords) for q in Ωₕ_quad]

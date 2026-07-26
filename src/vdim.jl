@@ -35,8 +35,8 @@ _vdim_fill_bdata!(bdata, val, m, ::Type{<:Number}) = (bdata[m, 1] = val)
 _vdim_fill_bdata!(bdata, val, m, ::Type{<:SVector}) = (bdata[m, :] .= val)
 
 # Helper: push the weight at quadrature node k into Vs — dispatches on Tout
-_vdim_push_weight!(Vs, wdata, k, ::Type{T}) where {T<:Number} = push!(Vs, -wdata[k, 1])
-_vdim_push_weight!(Vs, wdata, k, ::Type{SV}) where {SV<:SVector} = push!(Vs, -SV(wdata[k, :]))
+_vdim_push_weight!(Vs, wdata, k, ::Type{T}) where {T <: Number} = push!(Vs, -wdata[k, 1])
+_vdim_push_weight!(Vs, wdata, k, ::Type{SV}) where {SV <: SVector} = push!(Vs, -SV(wdata[k, :]))
 
 function vdim_correction(
         op::AbstractDifferentialOperator{N},
