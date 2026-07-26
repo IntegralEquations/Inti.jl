@@ -6,7 +6,7 @@ import LinearMaps
 using StaticArrays
 
 function __init__()
-    return @info "Loading Inti.jl FMMLIB2D extension"
+    return @debug "Loading Inti.jl FMMLIB2D extension"
 end
 
 function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
@@ -27,7 +27,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
         m == n ? isapprox(targets, sources; atol = Inti.SAME_POINT_TOLERANCE) : false
     K = iop.kernel
     # Laplace
-    if K isa Inti.SingleLayerKernel{Float64, <:Inti.Laplace{2}}
+    if K isa Inti.SingleLayerKernel{<:Inti.Laplace{2}}
         charges = Vector{Float64}(undef, n)
         return LinearMaps.LinearMap{Float64}(m, n) do y, x
             # multiply by weights and constant
@@ -46,7 +46,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, out.pottarg)
             end
         end
-    elseif K isa Inti.DoubleLayerKernel{Float64, <:Inti.Laplace{2}}
+    elseif K isa Inti.DoubleLayerKernel{<:Inti.Laplace{2}}
         normals = Matrix{Float64}(undef, 2, n)
         for j in 1:n
             normals[:, j] = Inti.normal(iop.source[j])
@@ -81,7 +81,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, out.pottarg)
             end
         end
-    elseif K isa Inti.AdjointDoubleLayerKernel{Float64, <:Inti.Laplace{2}}
+    elseif K isa Inti.AdjointDoubleLayerKernel{<:Inti.Laplace{2}}
         xnormals = Matrix{Float64}(undef, 2, m)
         for j in 1:m
             xnormals[:, j] = Inti.normal(iop.target[j])
@@ -110,7 +110,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
         end
-    elseif K isa Inti.HyperSingularKernel{Float64, <:Inti.Laplace{2}}
+    elseif K isa Inti.HyperSingularKernel{<:Inti.Laplace{2}}
         xnormals = Matrix{Float64}(undef, 2, m)
         ynormals = Matrix{Float64}(undef, 2, n)
         for j in 1:m
@@ -151,7 +151,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
         end
-    elseif K isa Inti.GradientSingleLayerKernel{<:SVector{2}, <:Inti.Laplace{2}}
+    elseif K isa Inti.GradientSingleLayerKernel{<:Inti.Laplace{2}}
         # ∇ₓG : charges with scalar strengths (SVector output = ∇ₓ of the single layer).
         charges = Vector{Float64}(undef, n)
         return LinearMaps.LinearMap{SVector{2, Float64}}(m, n) do y, x
@@ -176,7 +176,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, reinterpret(SVector{2, Float64}, vec(out.gradtarg)))
             end
         end
-    elseif K isa Inti.GradientDoubleLayerKernel{<:SVector{2}, <:Inti.Laplace{2}}
+    elseif K isa Inti.GradientDoubleLayerKernel{<:Inti.Laplace{2}}
         # ∇ₓ∂_{n_y}G : dipoles (vec = source normal, str = density), SVector output.
         normals = Matrix{Float64}(undef, 2, n)
         for j in 1:n
@@ -213,7 +213,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, reinterpret(SVector{2, Float64}, vec(out.gradtarg)))
             end
         end
-    elseif K isa Inti.SourceGradientSingleLayerKernel{<:Any, <:Inti.Laplace{2}}
+    elseif K isa Inti.SourceGradientSingleLayerKernel{<:Inti.Laplace{2}}
         # ∇yG(x,y)⋅g : dipoles with vector strengths g (scalar output). The W operator
         # W[g] = -∫∇yG⋅g applies the leading minus when this map is assembled.
         dipvecs = Matrix{Float64}(undef, 2, n)
@@ -242,7 +242,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, out.pottarg)
             end
         end
-    elseif K isa Inti.HessianKernel{<:Any, <:Inti.Laplace{2}}
+    elseif K isa Inti.HessianKernel{<:Inti.Laplace{2}}
         # Charge→Hessian realization of the 'Hessian' volume operator used in constructing the
         # `X = ∇W` VDIM correction: a scalar density `ρ` maps to `∫∇ₓ∇ₓG(x,y)ρ(y)dy`
         # (a 2×2 `SMatrix` per target). `rfmm2d` returns the 3 unique second derivatives per
@@ -311,7 +311,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             end
         end
         # Helmholtz
-    elseif K isa Inti.SingleLayerKernel{ComplexF64, <:Inti.Helmholtz{2}}
+    elseif K isa Inti.SingleLayerKernel{<:Inti.Helmholtz{2}}
         charges = Vector{ComplexF64}(undef, n)
         zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
@@ -337,7 +337,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, out.pottarg)
             end
         end
-    elseif K isa Inti.DoubleLayerKernel{ComplexF64, <:Inti.Helmholtz{2}}
+    elseif K isa Inti.DoubleLayerKernel{<:Inti.Helmholtz{2}}
         normals = Matrix{Float64}(undef, 2, n)
         for j in 1:n
             normals[:, j] = Inti.normal(iop.source[j])
@@ -375,7 +375,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, out.pottarg)
             end
         end
-    elseif K isa Inti.AdjointDoubleLayerKernel{ComplexF64, <:Inti.Helmholtz{2}}
+    elseif K isa Inti.AdjointDoubleLayerKernel{<:Inti.Helmholtz{2}}
         xnormals = Matrix{Float64}(undef, 2, m)
         for j in 1:m
             xnormals[:, j] = Inti.normal(iop.target[j])
@@ -407,7 +407,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
         end
-    elseif K isa Inti.HyperSingularKernel{ComplexF64, <:Inti.Helmholtz{2}}
+    elseif K isa Inti.HyperSingularKernel{<:Inti.Helmholtz{2}}
         xnormals = Matrix{Float64}(undef, 2, m)
         ynormals = Matrix{Float64}(undef, 2, n)
         for j in 1:m
@@ -451,7 +451,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
             end
         end
-    elseif K isa Inti.GradientSingleLayerKernel{<:SVector{2}, <:Inti.Helmholtz{2}}
+    elseif K isa Inti.GradientSingleLayerKernel{<:Inti.Helmholtz{2}}
         charges = Vector{ComplexF64}(undef, n)
         zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{SVector{2, ComplexF64}}(m, n) do y, x
@@ -479,7 +479,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, reinterpret(SVector{2, ComplexF64}, vec(out.gradtarg)))
             end
         end
-    elseif K isa Inti.GradientDoubleLayerKernel{<:SVector{2}, <:Inti.Helmholtz{2}}
+    elseif K isa Inti.GradientDoubleLayerKernel{<:Inti.Helmholtz{2}}
         normals = Matrix{Float64}(undef, 2, n)
         for j in 1:n
             normals[:, j] = Inti.normal(iop.source[j])
@@ -519,7 +519,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
                 return copyto!(y, reinterpret(SVector{2, ComplexF64}, vec(out.gradtarg)))
             end
         end
-    elseif K isa Inti.SourceGradientSingleLayerKernel{<:Any, <:Inti.Helmholtz{2}}
+    elseif K isa Inti.SourceGradientSingleLayerKernel{<:Inti.Helmholtz{2}}
         # ∫∇yG⋅g = Σ wⱼ gⱼ⋅∇yG : contraction of ∇yG and dipoles with vector
         # strengths g. The W operator
         #   W[g] = -∫∇yG⋅g
@@ -561,7 +561,7 @@ function Inti._assemble_fmm2d(iop::Inti.IntegralOperator; rtol = sqrt(eps()))
             end
             return y
         end
-    elseif K isa Inti.HessianKernel{<:Any, <:Inti.Helmholtz{2}}
+    elseif K isa Inti.HessianKernel{<:Inti.Helmholtz{2}}
         # Charge→Hessian realization of the 'Hessian' volume operator used in constructing the
         # `X = ∇W` VDIM correction: a scalar density `ρ` maps to `∫∇ₓ∇ₓG(x,y)ρ(y)dy`
         # (a 2×2 `SMatrix` per target). `hfmm2d` returns the 3 unique second derivatives per

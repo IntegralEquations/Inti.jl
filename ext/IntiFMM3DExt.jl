@@ -6,7 +6,7 @@ import LinearMaps
 using StaticArrays # For Stokes types
 
 function __init__()
-    return @info "Loading Inti.jl FMM3D extension"
+    return @debug "Loading Inti.jl FMM3D extension"
 end
 
 function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), ndiv = nothing)
@@ -23,7 +23,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
     weights = [q.weight for q in iop.source]
     K = iop.kernel
     # Laplace
-    if K isa Inti.SingleLayerKernel{Float64, <:Inti.Laplace{3}}
+    if K isa Inti.SingleLayerKernel{<:Inti.Laplace{3}}
         charges = Vector{Float64}(undef, n)
         return LinearMaps.LinearMap{Float64}(m, n) do y, x
             # multiply by weights and constant
@@ -35,7 +35,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, out.pottarg)
         end
-    elseif K isa Inti.DoubleLayerKernel{Float64, <:Inti.Laplace{3}}
+    elseif K isa Inti.DoubleLayerKernel{<:Inti.Laplace{3}}
         normals = Matrix{Float64}(undef, 3, n)
         for j in 1:n
             normals[:, j] = Inti.normal(iop.source[j])
@@ -53,7 +53,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, out.pottarg)
         end
-    elseif K isa Inti.AdjointDoubleLayerKernel{Float64, <:Inti.Laplace{3}}
+    elseif K isa Inti.AdjointDoubleLayerKernel{<:Inti.Laplace{3}}
         xnormals = Matrix{Float64}(undef, 3, m)
         for j in 1:m
             xnormals[:, j] = Inti.normal(iop.target[j])
@@ -69,7 +69,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
         end
-    elseif K isa Inti.HyperSingularKernel{Float64, <:Inti.Laplace{3}}
+    elseif K isa Inti.HyperSingularKernel{<:Inti.Laplace{3}}
         xnormals = Matrix{Float64}(undef, 3, m)
         ynormals = Matrix{Float64}(undef, 3, n)
         for j in 1:m
@@ -91,7 +91,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
         end
-    elseif K isa Inti.GradientSingleLayerKernel{<:SVector{3}, <:Inti.Laplace{3}}
+    elseif K isa Inti.GradientSingleLayerKernel{<:Inti.Laplace{3}}
         charges = Vector{Float64}(undef, n)
         return LinearMaps.LinearMap{SVector{3, Float64}}(m, n) do y, x
             # multiply by weights and constant
@@ -103,7 +103,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, reinterpret(SVector{3, Float64}, vec(out.gradtarg)))
         end
-    elseif K isa Inti.GradientDoubleLayerKernel{<:SVector{3}, <:Inti.Laplace{3}}
+    elseif K isa Inti.GradientDoubleLayerKernel{<:Inti.Laplace{3}}
         normals = Matrix{Float64}(undef, 3, n)
         for j in 1:n
             normals[:, j] = Inti.normal(iop.source[j])
@@ -118,7 +118,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, reinterpret(SVector{3, Float64}, vec(out.gradtarg)))
         end
-    elseif K isa Inti.SourceGradientSingleLayerKernel{<:Any, <:Inti.Laplace{3}}
+    elseif K isa Inti.SourceGradientSingleLayerKernel{<:Inti.Laplace{3}}
         # ∇yG(x,y)⋅g : dipoles with vector strengths g (scalar output). The W operator
         # W[g] = -∫∇yG⋅g applies the leading minus when this map is assembled.
         dipvecs = Matrix{Float64}(undef, 3, n)
@@ -133,7 +133,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, out.pottarg)
         end
-    elseif K isa Inti.HessianKernel{<:Any, <:Inti.Laplace{3}}
+    elseif K isa Inti.HessianKernel{<:Inti.Laplace{3}}
         # Charge→Hessian realization of the 'Hessian' volume operator used in
         # constructing the `X = ∇W` VDIM correction: a scalar density `ρ` maps
         # to `∫∇ₓ∇ₓG(x,y)ρ(y)dy` (a 3×3 `SMatrix` per target).
@@ -177,7 +177,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
         end
         # Helmholtz
-    elseif K isa Inti.SingleLayerKernel{ComplexF64, <:Inti.Helmholtz{3}}
+    elseif K isa Inti.SingleLayerKernel{<:Inti.Helmholtz{3}}
         charges = Vector{ComplexF64}(undef, n)
         zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{ComplexF64}(m, n) do y, x
@@ -190,7 +190,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, out.pottarg)
         end
-    elseif K isa Inti.DoubleLayerKernel{ComplexF64, <:Inti.Helmholtz{3}}
+    elseif K isa Inti.DoubleLayerKernel{<:Inti.Helmholtz{3}}
         normals = Matrix{Float64}(undef, 3, n)
         for j in 1:n
             normals[:, j] = Inti.normal(iop.source[j])
@@ -209,7 +209,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, out.pottarg)
         end
-    elseif K isa Inti.AdjointDoubleLayerKernel{ComplexF64, <:Inti.Helmholtz{3}}
+    elseif K isa Inti.AdjointDoubleLayerKernel{<:Inti.Helmholtz{3}}
         xnormals = Matrix{Float64}(undef, 3, m)
         for j in 1:m
             xnormals[:, j] = Inti.normal(iop.target[j])
@@ -226,7 +226,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
         end
-    elseif K isa Inti.HyperSingularKernel{ComplexF64, <:Inti.Helmholtz{3}}
+    elseif K isa Inti.HyperSingularKernel{<:Inti.Helmholtz{3}}
         xnormals = Matrix{Float64}(undef, 3, m)
         ynormals = Matrix{Float64}(undef, 3, n)
         for j in 1:m
@@ -249,7 +249,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, sum(xnormals .* out.gradtarg; dims = 1) |> vec)
         end
-    elseif K isa Inti.GradientSingleLayerKernel{<:SVector{3}, <:Inti.Helmholtz{3}}
+    elseif K isa Inti.GradientSingleLayerKernel{<:Inti.Helmholtz{3}}
         charges = Vector{ComplexF64}(undef, n)
         zk = ComplexF64(K.op.k)
         return LinearMaps.LinearMap{SVector{3, ComplexF64}}(m, n) do y, x
@@ -262,7 +262,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, reinterpret(SVector{3, ComplexF64}, vec(out.gradtarg)))
         end
-    elseif K isa Inti.GradientDoubleLayerKernel{<:SVector{3}, <:Inti.Helmholtz{3}}
+    elseif K isa Inti.GradientDoubleLayerKernel{<:Inti.Helmholtz{3}}
         normals = Matrix{Float64}(undef, 3, n)
         for j in 1:n
             normals[:, j] = Inti.normal(iop.source[j])
@@ -278,7 +278,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, reinterpret(SVector{3, ComplexF64}, vec(out.gradtarg)))
         end
-    elseif K isa Inti.SourceGradientSingleLayerKernel{<:Any, <:Inti.Helmholtz{3}}
+    elseif K isa Inti.SourceGradientSingleLayerKernel{<:Inti.Helmholtz{3}}
         # ∇yG(x,y)⋅g : dipoles with vector strengths g (scalar output). The W operator
         # W[g] = -∫∇yG⋅g applies the leading minus when this map is assembled.
         dipvecs = Matrix{ComplexF64}(undef, 3, n)
@@ -294,7 +294,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             end
             return copyto!(y, out.pottarg)
         end
-    elseif K isa Inti.HessianKernel{<:Any, <:Inti.Helmholtz{3}}
+    elseif K isa Inti.HessianKernel{<:Inti.Helmholtz{3}}
         # X forward = +∫∇ₓ∇ₓG⋅g, realized as the target-gradient of the
         # ∇yG-dipole field with strengths -g (gradtarg = ∫∇ₓ∇yG⋅g = -X_forward,
         # so the strengths are negated). It performs a dipole→gradient
@@ -316,7 +316,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             return copyto!(y, reinterpret(SVector{3, ComplexF64}, vec(out.gradtarg)))
         end
         # Stokes
-    elseif K isa Inti.SingleLayerKernel{SMatrix{3, 3, Float64, 9}, <:Inti.Stokes{3, Float64}}
+    elseif K isa Inti.SingleLayerKernel{<:Inti.Stokes{3, Float64}}
         T = SVector{3, Float64}
         stoklet = Matrix{Float64}(undef, 3, n)
         return LinearMaps.LinearMap{SMatrix{3, 3, Float64, 9}}(m, n) do y, x
@@ -325,7 +325,7 @@ function Inti._assemble_fmm3d(iop::Inti.IntegralOperator; rtol = sqrt(eps()), nd
             out = FMM3D.stfmm3d(rtol, sources; stoklet, targets, ppregt = 1)
             return copyto!(y, reinterpret(T, out.pottarg))
         end
-    elseif K isa Inti.DoubleLayerKernel{SMatrix{3, 3, Float64, 9}, <:Inti.Stokes{3, Float64}}
+    elseif K isa Inti.DoubleLayerKernel{<:Inti.Stokes{3, Float64}}
         T = SVector{3, Float64}
         normals = Matrix{Float64}(undef, 3, n)
         for j in 1:n

@@ -165,18 +165,18 @@ function bdim_correction(
         error("only 2D and 3D supported")
     end
     # compute traces of monopoles on the source mesh
-    G = SingleLayerKernel(op, Tbase)
-    γ₁G = AdjointDoubleLayerKernel(op, Tbase)
+    G = SingleLayerKernel(op)
+    γ₁G = AdjointDoubleLayerKernel(op)
 
     if kernel_variant === :gradient
-        G_target = GradientSingleLayerKernel(op, Tout)
-        γ₁G_target = GradientDoubleLayerKernel(op, Tout)
+        G_target = GradientSingleLayerKernel(op)
+        γ₁G_target = GradientDoubleLayerKernel(op)
     elseif kernel_variant === :neumann
-        G_target = AdjointDoubleLayerKernel(op, Tout)
-        γ₁G_target = HyperSingularKernel(op, Tout)
+        G_target = AdjointDoubleLayerKernel(op)
+        γ₁G_target = HyperSingularKernel(op)
     else
-        G_target = SingleLayerKernel(op, Tout)
-        γ₁G_target = DoubleLayerKernel(op, Tout)
+        G_target = SingleLayerKernel(op)
+        γ₁G_target = DoubleLayerKernel(op)
     end
 
     γ₀B = DenseBase{Tbase}(undef, length(source), ns)

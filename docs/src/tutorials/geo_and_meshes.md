@@ -80,10 +80,10 @@ or a [`SubMesh`](@ref) containing a view of the mesh:
 Finally, we can visualize the mesh using:
 
 ```@example geo-and-meshes
-using Meshes, GLMakie
+using GLMakie
 fig = Figure(; size = (800,400))
 ax = Axis3(fig[1, 1]; aspect = :data)
-viz!(Γ_msh; showsegments = true, alpha = 0.5)
+plot!(Γ_msh; strokewidth = 1, alpha = 0.5)
 fig
 ```
 
@@ -136,14 +136,29 @@ msh = Inti.meshgen(Γ; meshsize = 0.05)
 nothing # hide
 ```
 
-We can use the [`Meshes.viz`](@extref) function to visualize the mesh, and use
+We can use the `plot` function to visualize the mesh, and use
 domains to index the mesh:
+
+!!! note "Visualizing elements and meshes"
+    Once a `Makie` backend (e.g. `GLMakie` or `CairoMakie`) is loaded, `Inti`
+    elements, vectors of elements, and meshes can be passed directly to
+    `Makie.plot`/`plot!` (and to `Makie`'s native `mesh`, `wireframe`,
+    `scatter`, `lines`). Plotting is implemented as a standard `Makie` recipe,
+    so **any** `Makie` keyword (`color`, `colormap`, `colorrange`, `alpha`,
+    `shading`, `transparency`, ...) is accepted. In addition:
+    - `color` may be a single color, a vector of nodal values, or a vector of
+      elementwise values;
+    - `interpolate` (default `true`) toggles Gouraud vs. flat shading of nodal
+      `color` data;
+    - `strokewidth` (default `0`) and `strokecolor` draw the element edges of
+      surface/volume meshes (as in `Makie.poly`);
+    - for curve (1D) meshes the usual `linewidth` controls the line width.
 
 ```@example geo-and-meshes
 Γ₁ = l1 ∪ l3
 Γ₂ = l2 ∪ l4
-fig, ax, pl = viz(view(msh, Γ₁); segmentsize = 4,  label = "Γ₁")
-viz!(view(msh, Γ₂); segmentsize = 4, color = :red, label = "Γ₂")
+fig, ax, pl = plot(view(msh, Γ₁); linewidth = 4,  label = "Γ₁")
+plot!(view(msh, Γ₂); linewidth = 4, color = :red, label = "Γ₂")
 fig # hide
 ```
 
@@ -181,7 +196,7 @@ end
 patch = Inti.parametric_surface(f, lc, hc, labels = ["patch1"])
 Γ  = Inti.Domain(patch)
 msh = Inti.meshgen(Γ; meshsize = 0.1)
-viz(msh[Γ]; showsegments = true, figure = (; size = (400,400),))
+plot(msh[Γ]; strokewidth = 1, figure = (; size = (400,400),))
 ```
 
 Since creating parametric surfaces that form a closed volume can be a bit more
@@ -198,7 +213,7 @@ for (n,shape) in enumerate(Inti.PREDEFINED_SHAPES)
       i,j = (n-1) ÷ ncols + 1, (n-1) % ncols + 1
       ax = Axis3(fig[i,j]; aspect = :data, title = shape)
       hidedecorations!(ax)
-      viz!(msh; showsegments = true)
+      plot!(msh; strokewidth = 1)
 end
 fig # hide
 ```
@@ -227,7 +242,7 @@ l4 = Inti.parametric_curve(x->SVector(0.1 * sin(2π * x), 1 - x), 0.0, 1.0, labe
 surf = Inti.transfinite_square(l1, l2, l3, l4; labels = ["Ω"])
 Ω = Inti.Domain(surf)
 msh = Inti.meshgen(Ω; meshsize = 0.05)
-viz(msh; showsegments = true)
+plot(msh; strokewidth = 1)
 ```
 
 Note that the `msh` object contains all entities used to construct `Ω`,
@@ -240,7 +255,7 @@ Inti.entities(msh)
 This allows us to probe the `msh` object to extract e.g. the boundary mesh:
 
 ```@example geo-and-meshes
-viz(msh[Inti.boundary(Ω)]; color = :red)
+plot(msh[Inti.boundary(Ω)]; color = :red)
 ```
 
 !!! warning "Limitations"
@@ -276,7 +291,7 @@ gmsh.finalize()
 Ω = Inti.Domain(Inti.entities(msh)) do ent
       return Inti.geometric_dimension(ent) == 2
 end
-viz(msh[Ω], showsegments=true)
+plot(msh[Ω], strokewidth=1)
 Ω_quad = Inti.Quadrature(msh[Ω]; qorder = 10)
 area = Inti.integrate(x->1.0, Ω_quad)
 @assert abs(area - π) > 0.01 # hide

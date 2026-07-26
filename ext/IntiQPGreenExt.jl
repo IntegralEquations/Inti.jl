@@ -7,7 +7,7 @@ import ForwardDiff
 import StaticArrays: SMatrix
 
 function __init__()
-    return @info "Loading Inti.jl QPGreen extension"
+    return @debug "Loading Inti.jl QPGreen extension"
 end
 
 struct HelmholtzPeriodic1D{
@@ -69,13 +69,13 @@ end
 Inti.default_kernel_eltype(::HelmholtzPeriodic1D) = ComplexF64
 Inti.default_density_eltype(::HelmholtzPeriodic1D) = ComplexF64
 
-function (SL::Inti.SingleLayerKernel{T, <:HelmholtzPeriodic1D{N}})(
+function (SL::Inti.SingleLayerKernel{<:HelmholtzPeriodic1D{N}})(
         target,
         source,
         r = Inti.coords(target) - Inti.coords(source),
-    ) where {N, T}
+    ) where {N}
     d = LinearAlgebra.norm(r)
-    (d ≤ Inti.SAME_POINT_TOLERANCE) && return zero(T)
+    (d ≤ Inti.SAME_POINT_TOLERANCE) && return zero(ComplexF64)
     if N == 2
         return QPGreen.eval_qp_green(r, SL.op.params, SL.op.val_interp, SL.op.Yε_cache)
     else
@@ -85,13 +85,13 @@ function (SL::Inti.SingleLayerKernel{T, <:HelmholtzPeriodic1D{N}})(
     end
 end
 
-function (DL::Inti.DoubleLayerKernel{T, <:HelmholtzPeriodic1D{N}})(
+function (DL::Inti.DoubleLayerKernel{<:HelmholtzPeriodic1D{N}})(
         target,
         source,
         r = Inti.coords(target) - Inti.coords(source),
-    ) where {N, T}
+    ) where {N}
     d = LinearAlgebra.norm(r)
-    (d ≤ Inti.SAME_POINT_TOLERANCE) && return zero(T)
+    (d ≤ Inti.SAME_POINT_TOLERANCE) && return zero(ComplexF64)
     ny = Inti.normal(source)
     if N == 2
         grad = -QPGreen.grad_qp_green(r, DL.op.params, DL.op.grad_interp, DL.op.Yε_cache)
@@ -104,13 +104,13 @@ function (DL::Inti.DoubleLayerKernel{T, <:HelmholtzPeriodic1D{N}})(
     end
 end
 
-function (ADL::Inti.AdjointDoubleLayerKernel{T, <:HelmholtzPeriodic1D{N}})(
+function (ADL::Inti.AdjointDoubleLayerKernel{<:HelmholtzPeriodic1D{N}})(
         target,
         source,
         r = Inti.coords(target) - Inti.coords(source),
-    ) where {N, T}
+    ) where {N}
     d = LinearAlgebra.norm(r)
-    (d ≤ Inti.SAME_POINT_TOLERANCE) && return zero(T)
+    (d ≤ Inti.SAME_POINT_TOLERANCE) && return zero(ComplexF64)
     nx = Inti.normal(target)
     if N == 2
         grad = QPGreen.grad_qp_green(r, ADL.op.params, ADL.op.grad_interp, ADL.op.Yε_cache)
@@ -123,13 +123,13 @@ function (ADL::Inti.AdjointDoubleLayerKernel{T, <:HelmholtzPeriodic1D{N}})(
     end
 end
 
-function (HS::Inti.HyperSingularKernel{T, <:HelmholtzPeriodic1D{N}})(
+function (HS::Inti.HyperSingularKernel{<:HelmholtzPeriodic1D{N}})(
         target,
         source,
         r = Inti.coords(target) - Inti.coords(source),
-    ) where {N, T}
+    ) where {N}
     d = LinearAlgebra.norm(r)
-    (d ≤ Inti.SAME_POINT_TOLERANCE) && return zero(T)
+    (d ≤ Inti.SAME_POINT_TOLERANCE) && return zero(ComplexF64)
     nx = Inti.normal(target)
     ny = Inti.normal(source)
     if N == 2

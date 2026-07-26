@@ -21,6 +21,8 @@ using Aqua
 
 @safetestset "Quadrature" include("quadrature_test.jl")
 
+@safetestset "Surface gradient" include("surface_gradient_test.jl")
+
 @safetestset "Normal orientation" include("normal_orientation_test.jl")
 
 @safetestset "Kernels" include("kernels_test.jl")
@@ -38,7 +40,7 @@ end
 
 @safetestset "Gmsh extension" include("gmsh_test.jl")
 
-@safetestset "Meshes extension" include("meshes_test.jl")
+@safetestset "Makie extension" include("meshes_test.jl")
 
 @safetestset "HMatrices extension" include("hmatrices_test.jl")
 

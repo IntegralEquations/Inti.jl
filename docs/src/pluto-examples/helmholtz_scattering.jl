@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.17
+# v1.0.1
 
 using Markdown
 using InteractiveUtils
@@ -17,7 +17,6 @@ begin
     using LinearAlgebra
     using StaticArrays
     using Gmsh
-    using Meshes
     using GLMakie
     using SpecialFunctions
     using GSL
@@ -370,7 +369,7 @@ begin
         interpolate = true,
         axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
     )
-    viz!(Γ_msh; color = :white, segmentsize = 5)
+    plot!(Γ_msh; color = :white, linewidth = 5)
     Colorbar(fig[1, 2], hm)
     fig
 end
@@ -422,7 +421,7 @@ let
         interpolate = true,
         axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
     )
-    viz!(Γ_msh; color = :black, segmentsize = 4)
+    plot!(Γ_msh; color = :black, linewidth = 4)
     Colorbar(fig[1, 2], hm)
     fig
 end
@@ -687,7 +686,7 @@ end
 
 # ╔═╡ 0cec09b1-8806-4aee-970d-cc0b1e4b841c
 md"""
-Finalize, we use [`Meshes.viz`](@extref) to visualize the scattered field:
+Finalize, we use `plot` to visualize the scattered field:
 """
 
 # ╔═╡ dab9a19c-977e-4ab1-a3d9-f9970af69642
@@ -697,8 +696,8 @@ begin
     colormap = :inferno
     fig_3d = Figure(; size = (800, 500))
     ax_3d = Axis3(fig_3d[1, 1]; aspect = :data)
-    viz!(Γ_msh_3d; colorrange, colormap, color = zeros(nv), interpolate = true)
-    viz!(Σ_msh; colorrange, colormap, color = real(u_eval_msh))
+    plot!(Γ_msh_3d; colorrange, colormap, color = zeros(nv), interpolate = true)
+    plot!(Σ_msh; colorrange, colormap, color = real(u_eval_msh))
     cb = Colorbar(fig_3d[1, 2]; label = "real(u)", colormap, colorrange)
     fig_3d #hide
 end

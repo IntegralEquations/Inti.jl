@@ -78,7 +78,7 @@ We now show how to evaluate the layer potentials of an exact solution on a mesh
 created through the Gmsh API. Do to so, let us first define the PDE:g
 
 ```@example layer_potentials
-using Inti, StaticArrays, LinearAlgebra, Meshes, GLMakie, Gmsh
+using Inti, StaticArrays, LinearAlgebra, GLMakie, Gmsh
 # define the PDE
 k = 4π
 op = Inti.Helmholtz(; dim = 2, k)
@@ -111,11 +111,11 @@ gmsh.finalize()
 We can visualize the triangular mesh using:
 
 ```@example layer_potentials
-using Meshes, GLMakie
+using GLMakie
 # extract the domain Ω from the mesh entities
 ents = Inti.entities(msh)
 Ω = Inti.Domain(e->Inti.geometric_dimension(e) == 2, ents)
-viz(msh[Ω]; showsegments = true, axis = (aspect = DataAspect(), ))
+plot(msh[Ω]; strokewidth = 1, axis = (aspect = DataAspect(), ))
 ```
 
 For the purpose of testing the accuracy of the layer potential evaluation, we
@@ -131,7 +131,7 @@ du =  (x,ν) -> sum(c*im*k*dot(d, ν)*exp(im*k*dot(x, d)) for (c,d) in zip(coefs
 # plot the exact solution
 Ω_msh = view(msh, Ω)
 target = Inti.nodes(Ω_msh)
-viz(Ω_msh; showsegments = false, axis = (aspect = DataAspect(), ), color = real(u.(target)))
+plot(Ω_msh; axis = (aspect = DataAspect(), ), color = real(u.(target)))
 ```
 
 Since `u` satisfies the Helmholtz equation, we know that the following
@@ -159,7 +159,7 @@ uₕ = x -> 𝒮[γ₁u](x) - 𝒟[γ₀u](x)
 # plot the error on the target nodes
 er_log10 = log10.(abs.(u.(target) - uₕ.(target)))
 colorrange = extrema(er_log10)
-fig, ax, pl = viz(Ω_msh;
+fig, ax, pl = plot(Ω_msh;
     color = er_log10,
     colormap = :viridis,
     colorrange,
@@ -201,9 +201,9 @@ er_log10_cor = log10.(abs.(S*γ₁u - D*γ₀u - u.(target)))
 colorrange = extrema(er_log10) # use scale without correction
 fig = Figure(resolution = (800, 400))
 ax1 = Axis(fig[1, 1], aspect = DataAspect(), title = "Naive evaluation")
-viz!(Ω_msh; color = er_log10, colormap = :viridis, colorrange,interpolate=true)
+plot!(Ω_msh; color = er_log10, colormap = :viridis, colorrange,interpolate=true)
 ax2 = Axis(fig[1, 2], aspect = DataAspect(), title = "Nearfield correction")
-viz!(Ω_msh; color = er_log10_cor, colormap = :viridis, colorrange, interpolate=true)
+plot!(Ω_msh; color = er_log10_cor, colormap = :viridis, colorrange, interpolate=true)
 Colorbar(fig[1, 3]; label = "log₁₀(error)", colorrange)
 fig
 ```

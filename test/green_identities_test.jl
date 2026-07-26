@@ -105,11 +105,6 @@ for N in dims
                     end
 
                     # ── Adjoint double-layer / hypersingular ──────────────────────────────
-                    # Stokes hypersingular is not implemented; skip.
-                    if op isa Inti.Stokes
-                        continue
-                    end
-
                     Kmat = Inti.assemble_matrix(Inti.IntegralOperator(Inti.AdjointDoubleLayerKernel(op), quad_op))
                     Hmat = Inti.assemble_matrix(Inti.IntegralOperator(Inti.HyperSingularKernel(op), quad_op))
                     K, H = Inti.adj_double_layer_hypersingular(;

@@ -6,7 +6,7 @@ Pkg.activate(docsdir)                 #src
 tinit = time() # hide
 
 #nb ## Environment setup
-#nb const DEPENDENCIES = ["CairoMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "FMM3D", "FMM2D", "Meshes"];
+#nb const DEPENDENCIES = ["CairoMakie", "Gmsh", "HMatrices", "IterativeSolvers","LinearAlgebra", "LinearMaps", "SpecialFunctions", "GSL", "FMM3D", "FMM2D"];
 #nb ## __NOTEBOOK_SETUP__
 
 # # [Poisson solver](@id poisson)
@@ -73,11 +73,12 @@ msh = Inti.import_mesh(name; dim = 2)
 Ω = Inti.Domain(e -> Inti.geometric_dimension(e) == 2, Inti.entities(msh))
 Γ = Inti.boundary(Ω)
 
+using OrderedCollections
 Ωₕ = view(msh, Ω)
 Γₕ = view(msh, Γ)
 # Use VDIM with the Vioreanu-Rokhlin quadrature rule
 Q = Inti.VioreanuRokhlin(; domain = :triangle, order = qorder);
-dict = Dict(E => Q for E in Inti.element_types(Ωₕ))
+dict = OrderedDict(E => Q for E in Inti.element_types(Ωₕ))
 Ωₕ_quad = Inti.Quadrature(Ωₕ, dict)
 Γₕ_quad = Inti.Quadrature(Γₕ; qorder)
 
@@ -179,15 +180,15 @@ er = abs.(uₕ_quad - uₑ_quad)
 er_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, er)
 uₕ_nodes = Inti.quadrature_to_node_vals(Ωₕ_quad, uₕ_quad)
 
-using GLMakie, Meshes
+using GLMakie
 fig = Figure(; size = (1200, 400))
 ax1 = Axis(fig[1, 1]; aspect = DataAspect(), title = "solution")
 colorrange = extrema(uₕ_nodes)
-viz!(Ωₕ; showsegments = true, color = uₕ_nodes, colorrange)
+plot!(Ωₕ; strokewidth = 1, color = uₕ_nodes, colorrange)
 Colorbar(fig[1, 2]; colorrange = colorrange)
 ax2 = Axis(fig[1, 3]; aspect = DataAspect(), title = "error")
 colorrange = extrema(er_nodes)
-viz!(Ωₕ; showsegments = false, color = er_nodes, colorrange)
+plot!(Ωₕ; color = er_nodes, colorrange)
 Colorbar(fig[1, 4]; colorrange = colorrange)
 fig
 
