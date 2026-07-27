@@ -30,14 +30,6 @@ See [anderson2024fast](@cite) for more details on the method.
   single-/double-layer operators and `V` is the gradient volume
   operator.
 """
-# Helper: fill one row of bdata from Θ[i,m] — dispatches on element type
-_vdim_fill_bdata!(bdata, val, m, ::Type{<:Number}) = (bdata[m, 1] = val)
-_vdim_fill_bdata!(bdata, val, m, ::Type{<:SVector}) = (bdata[m, :] .= val)
-
-# Helper: push the weight at quadrature node k into Vs — dispatches on Tout
-_vdim_push_weight!(Vs, wdata, k, ::Type{T}) where {T <: Number} = push!(Vs, -wdata[k, 1])
-_vdim_push_weight!(Vs, wdata, k, ::Type{SV}) where {SV <: SVector} = push!(Vs, -SV(wdata[k, :]))
-
 function vdim_correction(
         op::AbstractDifferentialOperator{N},
         target,
@@ -247,6 +239,15 @@ function vdim_correction(
     δV = sparse(Is, Js, Vs, num_target, num_source)
     return δV
 end
+
+# Helper: fill one row of bdata from Θ[i,m] — dispatches on element type
+_vdim_fill_bdata!(bdata, val, m, ::Type{<:Number}) = (bdata[m, 1] = val)
+_vdim_fill_bdata!(bdata, val, m, ::Type{<:SVector}) = (bdata[m, :] .= val)
+
+# Helper: push the weight at quadrature node k into Vs — dispatches on Tout
+_vdim_push_weight!(Vs, wdata, k, ::Type{T}) where {T <: Number} = push!(Vs, -wdata[k, 1])
+_vdim_push_weight!(Vs, wdata, k, ::Type{SV}) where {SV <: SVector} = push!(Vs, -SV(wdata[k, :]))
+
 
 function translation_and_scaling(el::LagrangeTriangle)
     vertices = el.vals[1:3]
