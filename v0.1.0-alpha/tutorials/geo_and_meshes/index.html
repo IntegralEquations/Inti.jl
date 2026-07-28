@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Geometry and meshes · Inti.jl</title><meta name="title" content="Geometry and meshes · Inti.jl"/><meta property="og:title" content="Geometry and meshes · Inti.jl"/><meta property="twitter:title" content="Geometry and meshes · Inti.jl"/><meta name="description" content="Documentation for Inti.jl."/><meta property="og:description" content="Documentation for Inti.jl."/><meta property="twitter:description" content="Documentation for Inti.jl."/><meta property="og:url" content="https://IntegralEquations.github.io/Inti.jl/tutorials/geo_and_meshes/"/><meta property="twitter:url" content="https://IntegralEquations.github.io/Inti.jl/tutorials/geo_and_meshes/"/><link rel="canonical" href="https://IntegralEquations.github.io/Inti.jl/tutorials/geo_and_meshes/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Inti.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../getting_started/">Getting started</a></li><li class="is-active"><a class="tocitem" href>Geometry and meshes</a><ul class="internal"><li><a class="tocitem" href="#Parametric-curves"><span>Parametric curves</span></a></li><li><a class="tocitem" href="#Transfinite-squares"><span>Transfinite squares</span></a></li><li><a class="tocitem" href="#Importing-meshes"><span>Importing meshes</span></a></li><li><a class="tocitem" href="#Elements-of-a-mesh"><span>Elements of a mesh</span></a></li></ul></li><li><a class="tocitem" href="../integral_operators/">Boundary integral operators</a></li><li><a class="tocitem" href="../layer_potentials/">Layer potentials</a></li><li><a class="tocitem" href="../compression_methods/">Compression methods</a></li><li><a class="tocitem" href="../correction_methods/">Correction methods</a></li><li><a class="tocitem" href="../solvers/">Solvers</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../../examples/generated/toy_example/">Toy example</a></li><li><a class="tocitem" href="../../examples/generated/helmholtz_scattering/">Helmholtz scattering</a></li><li><a class="tocitem" href="../../examples/generated/poisson/">Poisson solver</a></li></ul></li><li><a class="tocitem" href="../../references/">References</a></li><li><a class="tocitem" href="../../docstrings/">Docstrings</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Geometry and meshes</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Geometry and meshes</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl/blob/main/docs/src/tutorials/geo_and_meshes.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Geometry-and-meshes"><a class="docs-heading-anchor" href="#Geometry-and-meshes">Geometry and meshes</a><a id="Geometry-and-meshes-1"></a><a class="docs-heading-anchor-permalink" href="#Geometry-and-meshes" title="Permalink"></a></h1><div class="admonition is-info"><header class="admonition-header">Important points covered in this tutorial</header><div class="admonition-body"><ul><li>Combine simple shapes to create domains</li><li>Import a mesh from a Gmsh file</li><li>...</li></ul></div></div><p>In the <a href="../getting_started/#Getting-started">getting started</a> tutorial, we saw how to solve a simple Helmholtz scattering problem in 2D. Since domains and meshes are fundamental to solving boundary and volume integral equations, we will now dig deeper into how to create and manipulate them in Inti.jl.</p><h2 id="Parametric-curves"><a class="docs-heading-anchor" href="#Parametric-curves">Parametric curves</a><a id="Parametric-curves-1"></a><a class="docs-heading-anchor-permalink" href="#Parametric-curves" title="Permalink"></a></h2><p>Inti.jl offers a limited support for creating simple shapes for which an explicit parametric representation is available. The simplest of such shapes are <a href="../../docstrings/#Inti.parametric_curve-Union{Tuple{F}, Tuple{F, Real, Real}} where F"><code>parametric_curve</code></a>s, which are defined by a function that maps a scalar parameter <code>t</code> to a point in 2D or 3D space. Parametric curves are expected to return an <code>SVector</code>, and can be created as follows:</p><pre><code class="language-julia hljs">using Inti, StaticArrays, Meshes, GLMakie
+l1 = Inti.parametric_curve(x-&gt;SVector(x, 0.1 * sin(2π * x)), 0.0, 1.0, labels = [&quot;l₁&quot;])
+l2 = Inti.parametric_curve(x-&gt;SVector(1 + 0.1 * sin(2π * x), x), 0.0, 1.0, labels = [&quot;l₂&quot;])
+l3 = Inti.parametric_curve(x-&gt;SVector(1 - x, 1 - 0.1 * sin(2π * x)), 0.0, 1.0, labels = [&quot;l₃&quot;])
+l4 = Inti.parametric_curve(x-&gt;SVector(0.1 * sin(2π * x), 1 - x), 0.0, 1.0, labels = [&quot;l₄&quot;])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">EntityKey: (1, 6) =&gt; Inti.GeometricEntity with labels [&quot;l₄&quot;]</code></pre><p>Each variable above represents a geometrical entity, and entities can be combined to form a <a href="../../docstrings/#Inti.Domain"><code>Domain</code></a> object which can be passed to the <a href="../../docstrings/#Inti.meshgen-Tuple{Inti.Domain, Vararg{Any}}"><code>meshgen</code></a> function. For instance, the following code creates two domains comprised of two curves each, and meshes them:</p><pre><code class="language-julia hljs">Γ1 = Inti.Domain(l1, l3)
+Γ2 = Inti.Domain(l2, l4)
+Γ1_msh = Inti.meshgen(Γ1; meshsize = 0.05)
+Γ2_msh = Inti.meshgen(Γ2; meshsize = 0.05)
+fig, ax, pl = viz(Γ1_msh; segmentsize = 4,  label = &quot;Γ₁&quot;)
+viz!(Γ2_msh; segmentsize = 4, color = :red, label = &quot;Γ₂&quot;)
+axislegend()</code></pre><img src="61fa073a.png" alt="Example block output"/><p><code>Domain</code>s can be manipulated using basic set operations, such as <code>intersect</code></p><pre><code class="language-julia hljs">Γ1 ∩ Γ2 # empty</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Domain with 0 entities</code></pre><p>and <code>union</code>:</p><pre><code class="language-julia hljs">Γ  = Γ1 ∪ Γ2 # the whole boundary</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Domain with 4 entities
+ EntityKey: (1, 3) =&gt; Inti.GeometricEntity with labels [&quot;l₁&quot;]
+ EntityKey: (1, 6) =&gt; Inti.GeometricEntity with labels [&quot;l₄&quot;]
+ EntityKey: (1, 4) =&gt; Inti.GeometricEntity with labels [&quot;l₂&quot;]
+ EntityKey: (1, 5) =&gt; Inti.GeometricEntity with labels [&quot;l₃&quot;]</code></pre><h2 id="Transfinite-squares"><a class="docs-heading-anchor" href="#Transfinite-squares">Transfinite squares</a><a id="Transfinite-squares-1"></a><a class="docs-heading-anchor-permalink" href="#Transfinite-squares" title="Permalink"></a></h2><p>Note that you can also combine the lines to form a transfinite square, which inherits its parametrization from the lines that form it:</p><pre><code class="language-julia hljs">surf = Inti.transfinite_square(l1, l2, l3, l4; labels = [&quot;Ω&quot;])
+Ω = Inti.Domain(surf)
+msh = Inti.meshgen(Ω; meshsize = 0.05)
+viz(msh; showsegments = true)</code></pre><img src="9d26152f.png" alt="Example block output"/><p>Note that the <code>msh</code> object contains all entities used to construct <code>Ω</code>, including the boundary segments:</p><pre><code class="language-julia hljs">Inti.entities(msh)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">KeySet for a Dict{Inti.EntityKey, Dict{DataType, Vector{Int64}}} with 5 entries. Keys:
+  EntityKey: (1, 3) =&gt; Inti.GeometricEntity with labels [&quot;l₁&quot;]
+  EntityKey: (1, 6) =&gt; Inti.GeometricEntity with labels [&quot;l₄&quot;]
+  EntityKey: (2, 2) =&gt; Inti.GeometricEntity with labels [&quot;Ω&quot;]
+  EntityKey: (1, 4) =&gt; Inti.GeometricEntity with labels [&quot;l₂&quot;]
+  EntityKey: (1, 5) =&gt; Inti.GeometricEntity with labels [&quot;l₃&quot;]</code></pre><p>This allows you to index the mesh by <code>Domain</code>s, extracting either a new mesh:</p><pre><code class="language-julia hljs">msh[Γ1]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Inti.LagrangeMesh{2, Float64} containing:
+	 22 elements of type Inti.ParametricElement{Inti.ReferenceHyperCube{1}, StaticArraysCore.SVector{2, Float64}, Inti.var&quot;#27#28&quot;{Inti.var&quot;#97#98&quot;{Main.var&quot;Main&quot;.var&quot;#1#2&quot;}, Inti.HyperRectangle{1, Float64}}}
+	 22 elements of type Inti.ParametricElement{Inti.ReferenceHyperCube{1}, StaticArraysCore.SVector{2, Float64}, Inti.var&quot;#27#28&quot;{Inti.var&quot;#97#98&quot;{Main.var&quot;Main&quot;.var&quot;#5#6&quot;}, Inti.HyperRectangle{1, Float64}}}</code></pre><p>or a view of the mesh:</p><pre><code class="language-julia hljs">view(msh, Γ1)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Inti.SubMesh{2, Float64} containing:
+	 22 elements of type Inti.ParametricElement{Inti.ReferenceHyperCube{1}, StaticArraysCore.SVector{2, Float64}, Inti.var&quot;#27#28&quot;{Inti.var&quot;#97#98&quot;{Main.var&quot;Main&quot;.var&quot;#1#2&quot;}, Inti.HyperRectangle{1, Float64}}}
+	 22 elements of type Inti.ParametricElement{Inti.ReferenceHyperCube{1}, StaticArraysCore.SVector{2, Float64}, Inti.var&quot;#27#28&quot;{Inti.var&quot;#97#98&quot;{Main.var&quot;Main&quot;.var&quot;#5#6&quot;}, Inti.HyperRectangle{1, Float64}}}</code></pre><pre><code class="language-julia hljs">fig, ax, p = viz(view(msh,Γ1); segmentsize = 4, label = &quot;view of Γ₁&quot;)
+axislegend()</code></pre><img src="2c8aaffb.png" alt="Example block output"/><h2 id="Importing-meshes"><a class="docs-heading-anchor" href="#Importing-meshes">Importing meshes</a><a id="Importing-meshes-1"></a><a class="docs-heading-anchor-permalink" href="#Importing-meshes" title="Permalink"></a></h2><p>While creating simple geometries natively in Inti.jl is useful for testing and academic problems, most real-world applications require manipulating complex geometries through CAD and meshing software. Inti.jl possesses a <a href="https://gmsh.info">Gmsh</a> extension that will load additional functionality if Gmsh.jl is loaded. This extension allows you to import meshes from Gmsh files:</p><pre><code class="language-julia hljs">using Gmsh
+filename = joinpath(Inti.PROJECT_ROOT,&quot;docs&quot;, &quot;assets&quot;, &quot;piece.msh&quot;)
+msh = Inti.import_mesh(filename)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Inti.LagrangeMesh{3, Float64} containing:
+	 126 elements of type StaticArraysCore.SVector{3, Float64}
+	 852 elements of type Inti.LagrangeElement{Inti.ReferenceHyperCube{1}, 2, StaticArraysCore.SVector{3, Float64}}
+	 7156 elements of type Inti.LagrangeElement{Inti.ReferenceSimplex{2}, 3, StaticArraysCore.SVector{3, Float64}}
+	 14035 elements of type Inti.LagrangeElement{Inti.ReferenceSimplex{3}, 4, StaticArraysCore.SVector{3, Float64}}</code></pre><p>Note that the <code>msh</code> object contains all entities used to construct the mesh:</p><pre><code class="language-julia hljs">ents = Inti.entities(msh)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">KeySet for a Dict{Inti.EntityKey, Dict{DataType, Vector{Int64}}} with 356 entries. Keys:
+  EntityKey: (1, 28) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (1, 109) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (0, 374) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (2, 239) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (1, 65) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (0, 331) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (1, 294) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (2, 151) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (0, 166) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (2, 271) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (1, 9) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (1, 346) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (2, 343) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (2, 211) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (1, 218) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (1, 158) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (0, 100) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (0, 127) =&gt; Inti.GeometricEntity with labels String[]
+  EntityKey: (0, 210) =&gt; Inti.GeometricEntity with labels String[]
+  ⋮</code></pre><p>You need to filter entities satisfying a certain condition, e.g., entities of a given dimension of containing a certain label, in order to construct a domain:</p><pre><code class="language-julia hljs">filter = e -&gt; Inti.geometric_dimension(e) == 2
+Γ = Inti.Domain(filter, ents)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Domain with 65 entities
+ EntityKey: (2, 239) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 139) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 90) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 175) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 151) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 313) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 47) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 267) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 317) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 271) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 147) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 167) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 301) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 343) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 211) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 243) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 251) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 223) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 367) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 219) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 78) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 215) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 66) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 371) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 321) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 203) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 163) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 325) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 70) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 247) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 82) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 159) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 305) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 372) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 259) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 347) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 235) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 355) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 171) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 309) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 330) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 199) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 231) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 179) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 74) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 227) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 143) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 135) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 155) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 183) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 329) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 49) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 62) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 187) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 351) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 91) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 207) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 263) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 191) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 255) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 86) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 363) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 359) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 288) =&gt; Inti.GeometricEntity with labels String[]
+ EntityKey: (2, 195) =&gt; Inti.GeometricEntity with labels String[]</code></pre><p>As before, you can visualize the mesh using Meshes.jl:</p><pre><code class="language-julia hljs">using Meshes, GLMakie
+viz(view(msh,Γ); showsegments = true, alpha = 0.5)</code></pre><img src="02b16015.png" alt="Example block output"/><h2 id="Elements-of-a-mesh"><a class="docs-heading-anchor" href="#Elements-of-a-mesh">Elements of a mesh</a><a id="Elements-of-a-mesh-1"></a><a class="docs-heading-anchor-permalink" href="#Elements-of-a-mesh" title="Permalink"></a></h2><p>Although we have created several meshes this far in the tutorial, we have not done much with them except for visualizing. Conceptually, a mesh is simply a collection of elements, of possibly different type. To iterate over the elements of a mesh and perform some computation, you can simply use the <code>elements</code> function:</p><pre><code class="language-julia hljs">els = Inti.elements(view(msh, Γ))
+centers = map(el -&gt; Inti.center(el), els)
+scatter([c[1] for c in centers], [c[2] for c in centers], [c[3] for c in centers], markersize = 5)</code></pre><img src="2fd437c1.png" alt="Example block output"/><p>This example shows how to extract the centers of the elements in the mesh, and of course you can perform any computation you like on the elements.</p><div class="admonition is-success"><header class="admonition-header">Type-stable iteration over elements</header><div class="admonition-body"><p>Since a mesh in Inti.jl can contain elements of various types, the   <code>elements</code> function above is not type-stable. For a type-stable iterator   approach, you should first iterate over the element types using   <a href="../../docstrings/#Inti.element_types"><code>element_types</code></a>, and then use <code>elements(msh, E)</code> to iterate over a   specific element type <code>E</code>.</p></div></div><p>Under the hood, each element is simply a functor which maps points <code>x̂</code> from a <a href="../../docstrings/#Inti.ReferenceShape"><code>ReferenceShape</code></a> into the physical space:</p><pre><code class="language-julia hljs">el = first(els)
+x̂ = SVector(1/3,1/3)
+el(x̂)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3-element StaticArraysCore.SVector{3, Float64} with indices SOneTo(3):
+  0.39387910029734335
+ -0.9007432012747503
+  0.010343743999368918</code></pre><p>You can compute the Jacobian of an element</p><pre><code class="language-julia hljs">Inti.jacobian(el, x̂)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3×2 StaticArraysCore.SMatrix{3, 2, Float64, 6} with indices SOneTo(3)×SOneTo(2):
+ -0.011654   -0.0190649
+  0.0241968   0.0340432
+  0.0310312   0.0</code></pre><p>or its normal vector if the element is of co-dimension one:</p><pre><code class="language-julia hljs">Inti.normal(el, x̂)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3-element StaticArraysCore.SVector{3, Float64} with indices SOneTo(3):
+ -0.8712600043557412
+ -0.4879241878134799
+  0.053254030425778455</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../getting_started/">« Getting started</a><a class="docs-footer-nextpage" href="../integral_operators/">Boundary integral operators »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Wednesday 5 June 2024 16:01">Wednesday 5 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

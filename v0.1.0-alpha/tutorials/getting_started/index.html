@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Getting started · Inti.jl</title><meta name="title" content="Getting started · Inti.jl"/><meta property="og:title" content="Getting started · Inti.jl"/><meta property="twitter:title" content="Getting started · Inti.jl"/><meta name="description" content="Documentation for Inti.jl."/><meta property="og:description" content="Documentation for Inti.jl."/><meta property="twitter:description" content="Documentation for Inti.jl."/><meta property="og:url" content="https://IntegralEquations.github.io/Inti.jl/tutorials/getting_started/"/><meta property="twitter:url" content="https://IntegralEquations.github.io/Inti.jl/tutorials/getting_started/"/><link rel="canonical" href="https://IntegralEquations.github.io/Inti.jl/tutorials/getting_started/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Inti.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li class="is-active"><a class="tocitem" href>Getting started</a></li><li><a class="tocitem" href="../geo_and_meshes/">Geometry and meshes</a></li><li><a class="tocitem" href="../integral_operators/">Boundary integral operators</a></li><li><a class="tocitem" href="../layer_potentials/">Layer potentials</a></li><li><a class="tocitem" href="../compression_methods/">Compression methods</a></li><li><a class="tocitem" href="../correction_methods/">Correction methods</a></li><li><a class="tocitem" href="../solvers/">Solvers</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../../examples/generated/toy_example/">Toy example</a></li><li><a class="tocitem" href="../../examples/generated/helmholtz_scattering/">Helmholtz scattering</a></li><li><a class="tocitem" href="../../examples/generated/poisson/">Poisson solver</a></li></ul></li><li><a class="tocitem" href="../../references/">References</a></li><li><a class="tocitem" href="../../docstrings/">Docstrings</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Getting started</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Getting started</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/IntegralEquations/Inti.jl/blob/main/docs/src/tutorials/getting_started.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Getting-started"><a class="docs-heading-anchor" href="#Getting-started">Getting started</a><a id="Getting-started-1"></a><a class="docs-heading-anchor-permalink" href="#Getting-started" title="Permalink"></a></h1><div class="admonition is-info"><header class="admonition-header">Important points covered in this tutorial</header><div class="admonition-body"><ul><li>Create a domain and its accompanying mesh</li><li>Solve a basic boundary integral equation</li><li>Visualize the solution</li></ul></div></div><p>This first tutorial will guide you through the basic steps of setting up a boundary integral equation problem and solving it using Inti.jl. We will consider the classic Helmholtz scattering problem in 2D, and solve it using a <em>direct</em> boundary integral formulation. More precisely, letting <span>$\Omega \subset \mathbb{R}^2$</span> be a bounded domain, and denoting by <span>$\Gamma = \partial \Omega$</span> its boundary, we will solve the following Helmholtz problem:</p><p class="math-container">\[\begin{aligned}
+    \Delta u + k^2 u  &amp;= 0 \quad &amp;&amp;\text{in} \quad \mathbb{R}^2 \setminus \overline{\Omega},\\
+    \partial_\nu u &amp;= g \quad &amp;&amp;\text{on} \quad \Gamma,\\
+    \sqrt{r} \left( \frac{\partial u}{\partial r} - i k u \right) &amp;= o(1) \quad &amp;&amp;\text{as} \quad r = |\boldsymbol{x}| \to \infty,
+\end{aligned}\]</p><p>where <span>$g$</span> is a (given) boundary datum, <span>$\nu$</span> is the outward unit normal to <span>$\Gamma$</span>, and <span>$k$</span> is the constant wavenumber.</p><div class="admonition is-success"><header class="admonition-header">Sommerfeld radiation condition</header><div class="admonition-body"><p>The last condition is the <em>Sommerfeld radiation condition</em>, and is required to ensure the uniqueness of the solution; physically, it means that the solution sought should radiate energy towards infinity.</p></div></div><p>Let us begin by specifying the partial differential equation, and creating the domain, mesh, and quadrature for the problem:</p><pre><code class="language-julia hljs">using Inti, LinearAlgebra, StaticArrays
+
+# PDE
+k = 2π
+pde = Inti.Helmholtz(; dim = 2, k)
+
+# Create the geometry as the union of a kite and a circle
+kite = Inti.parametric_curve(0.0, 1.0) do s
+    return SVector(2.5 + cos(2π * s[1]) + 0.65 * cos(4π * s[1]) - 0.65, 1.5 * sin(2π * s[1]))
+end
+circle = Inti.parametric_curve(0.0, 1.0) do s
+    return SVector(cos(2π * s[1]), sin(2π * s[1]))
+end
+Γ = kite ∪ circle
+# Create a mesh for the geometry
+msh = Inti.meshgen(Γ; meshsize = 2π / k / 10)
+# Create a quadrature
+Q = Inti.Quadrature(msh; qorder = 5)</code></pre><p>We can easily check the mesh by visualizing it using the <code>Meshes.jl</code> package:</p><pre><code class="language-julia hljs">using Meshes, GLMakie
+fig, ax, pl = viz(msh; segmentsize = 3, axis = (aspect = DataAspect(), ))</code></pre><img src="81a37ee8.png" alt="Example block output"/><p>Next we need to reformulate the Helmholtz problem as a boundary integral equation. Among the plethora of options, we will use in this tutorial a simple <em>direct</em> formulation, which uses Green&#39;s third identity to relate the values of <span>$u$</span> and <span>$\partial_{\nu} u$</span> on <span>$\Gamma$</span>:</p><p class="math-container">\[    -\frac{u(\boldsymbol{x})}{2} + D[u](\boldsymbol{x}) = S[\partial_\nu u](\boldsymbol{x}), \quad \boldsymbol{x} \in \Gamma.\]</p><p>Here <span>$S$</span> and <span>$D$</span> are the single- and double-layer operators, formally defined as:</p><p class="math-container">\[    S[\sigma](\boldsymbol{x}) = \int_\Gamma G(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}), \quad
+    D[\sigma](\boldsymbol{x}) = \int_\Gamma \frac{\partial G}{\partial \nu_{\boldsymbol{y}}}(\boldsymbol{x}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}),\]</p><p>where <span>$G$</span> is the fundamental solution of the Helmholtz equation. Note that <span>$G$</span> is typically singular when <span>$\boldsymbol{x} = \boldsymbol{y}$</span>, and therefore the numerical discretization of these integral operators requires special care.</p><p>To approximate <span>$S$</span> and <span>$D$</span> in Inti.jl we can proceed as follows:</p><pre><code class="language-julia hljs">S, D = Inti.single_double_layer(;
+    pde,
+    target = Q,
+    source = Q,
+    compression = (method = :none,),
+    correction = (method = :dim,),
+)</code></pre><div class="admonition is-success"><header class="admonition-header">Fast algorithms</header><div class="admonition-body"><p>Powered by external libraries, Inti.jl supports several acceleration methods for matrix-vector multiplication, including so far:</p><ul><li><strong>Fast multipole method</strong> (FMM) <span>$\mapsto$</span> <code>correction = (method = :fmm, tol = 1e-8)</code></li><li><strong>Hierarchical matrix</strong> (H-matrix) <span>$\mapsto$</span> `correction = (method = :hmatrix, tol =</li></ul><p>1e-8)`</p><p>Note that in such cases only the matrix-vector product may not be available, and therefore iterative solvers such as GMRES may be required for the solution of the resulting linear systems.</p></div></div><p>Much of the complexity involved in the numerical computation is hidden in the function above; later in the tutorials we will discuss in more details the options available for the <em>compression</em> and <em>correction</em> methods, as well as how to define your own kernels and operators. For now, it suffices to know that <code>S</code> and <code>D</code> are matrix-like objects that can be used to solve the boundary integral equation. For that, we need to provide the boundary data <span>$g$</span>.</p><p>We are interested in the scattered field <span>$u$</span> produced by an incident plane wave <span>$u_i = e^{i k \boldsymbol{d} \cdot \boldsymbol{x}}$</span>, where <span>$\boldsymbol{d}$</span> is a unit vector denoting the direction of the plane wave. Assuming that the total field <span>$u_t = u_i + u$</span> satisfies a homogenous Neumann condition on <span>$\Gamma$</span>, and that the scattered field <span>$u$</span> satisfies the Sommerfeld radiation condition, we can write the boundary condition as:</p><p class="math-container">\[    \partial_\nu u = -\partial_\nu u_i, \quad \boldsymbol{x} \in \Gamma.\]</p><p>We can thus solve the boundary integral equation to find <span>$u$</span> on <span>$\Gamma$</span>:</p><pre><code class="language-julia hljs"># define the incident field and compute its normal derivative
+θ = 0
+d = SVector(cos(θ), sin(θ))
+g = map(Q) do q
+    # normal derivative of e^{ik*d⃗⋅x}
+    x, ν = q.coords, q.normal
+    return -im * k * exp(im * k * dot(x, d)) * dot(d, ν)
+end ## Neumann trace on boundary
+u = (-I / 2 + D) \ (S * g) # Dirichlet trace on boundary</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">942-element Vector{ComplexF64}:
+  0.9187328380710671 + 0.23326666113075545im
+  0.9197893673542495 + 0.2311539453363505im
+  0.9255068912409347 + 0.21959641919677253im
+  0.9378508905044305 + 0.19388166216848923im
+  0.9528502909317692 + 0.16105889486228628im
+  0.9629921501223607 + 0.13773521319621995im
+  0.9658113564467891 + 0.13107009873130723im
+  0.9769807836842588 + 0.10379682277261049im
+  0.9974949024219231 + 0.04939037406582785im
+  1.0214630357533936 - 0.024210983799045824im
+                     ⋮
+ -1.3732126783991097 - 3.1793918621288793im
+ -1.2706054323009113 - 3.150748077285865im
+ -1.2170934389524029 - 3.1356098368061702im
+  -1.203802919732877 - 3.131830361438346im
+  -1.156630601309938 - 3.1183556272927495im
+ -1.0884819793629061 - 3.098731701349147im
+  -1.033633430526623 - 3.0828113001074806im
+ -1.0085600790014444 - 3.075497993793488im
+ -1.0039482321338427 - 3.0741504761714493im</code></pre><p>Now that we know both the Dirichlet and Neumann data on the boundary, we can use Green&#39;s representation formula, i.e., </p><p class="math-container">\[    \mathcal{D}[u](\boldsymbol{r}) - \mathcal{S}[\partial_{\nu} u](\boldsymbol{r}) = \begin{cases}
+        u(\boldsymbol{r}) &amp; \text{if } \boldsymbol{r} \in \mathbb{R}^2 \setminus \overline{\Omega},\\
+        0 &amp; \text{if } \boldsymbol{r} \in \Omega,
+    \end{cases}\]</p><p>where <span>$\mathcal{D}$</span> and <span>$\mathcal{S}$</span> are the double- and single-layer potentials defined as:</p><p class="math-container">\[    \mathcal{S}[\sigma](\boldsymbol{r}) = \int_{\Gamma} G(\boldsymbol{r}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}), \quad
+    \mathcal{D}[\sigma](\boldsymbol{r}) = \int_{\Gamma} \frac{\partial G}{\partial \nu_{\boldsymbol{y}}}(\boldsymbol{r}, \boldsymbol{y}) \sigma(\boldsymbol{y}) \ \mathrm{d}s(\boldsymbol{y}),\]</p><p>to compute the solution <span>$u$</span> in the domain:</p><pre><code class="language-julia hljs">𝒮, 𝒟 = Inti.single_double_layer_potential(; pde, source = Q)
+uₛ = x -&gt; 𝒟[u](x) - 𝒮[g](x)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">#7 (generic function with 1 method)</code></pre><p>To wrap things up, let&#39;s visualize the scattered field:</p><pre><code class="language-julia hljs">using GLMakie # or your favorite plotting backend for Makie
+xx = yy = range(-5; stop = 5, length = 100)
+U = map(uₛ, Iterators.product(xx, yy))
+Ui = map(x -&gt; exp(im*k*dot(x, d)), Iterators.product(xx, yy))
+Ut = Ui + U
+fig, ax, hm = heatmap(
+    xx,
+    yy,
+    real(Ut);
+    colormap = :inferno,
+    interpolate = true,
+    axis = (aspect = DataAspect(), xgridvisible = false, ygridvisible = false),
+)
+viz!(msh; segmentsize = 2)
+Colorbar(fig[1, 2], hm; label = &quot;real(u)&quot;)</code></pre><img src="8c27a438.png" alt="Example block output"/><div class="admonition is-success"><header class="admonition-header">Going further</header><div class="admonition-body"><ul><li>...</li></ul></div></div><pre><code class="language-julia hljs"># build an exact solution
+G = Inti.SingleLayerKernel(pde)
+dG = Inti.DoubleLayerKernel(pde)
+xs = map(θ -&gt; 0.5 * rand() * SVector(cos(θ), sin(θ)), 2π * rand(10))
+cs = rand(ComplexF64, length(xs))
+uₑ  = q -&gt; sum(c * G(x, q) for (x, c) in zip(xs, cs))
+∂ₙu = q -&gt; sum(c * dG(x, q) for (x, c) in zip(xs, cs))
+g  = map(∂ₙu, Q)
+u = (-I / 2 + D) \ (S * g)
+uₛ = x -&gt; 𝒟[u](x) - 𝒮[g](x)
+pts = [5*SVector(cos(θ), sin(θ)) for θ in range(0, 2π, length = 100)]
+er = norm(uₛ.(pts) - uₑ.(pts), Inf)
+println(&quot;maximum error on circle of radius 5: $er&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">maximum error on circle of radius 5: 5.198118667375668e-11</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../geo_and_meshes/">Geometry and meshes »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Wednesday 5 June 2024 16:01">Wednesday 5 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
