@@ -19,10 +19,10 @@ msh = Inti.import_mesh(; dim = 3)
 Q = Inti.Quadrature(Γ_msh; qorder = 2)
 gmsh.finalize()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Info    : Meshing 1D...
 Info    : Meshing curve 1 (Ellipse)
-Info    : Done meshing 1D (Wall 0.000162306s, CPU 0.000161s)
+Info    : Done meshing 1D (Wall 0.000164808s, CPU 0.000163s)
 Info    : Meshing 2D...
 Info    : Meshing surface 1 (Plane, Frontal-Delaunay)
-Info    : Done meshing 2D (Wall 0.00759523s, CPU 0.007594s)
+Info    : Done meshing 2D (Wall 0.00716313s, CPU 0.007161s)
 Info    : 123 nodes 245 elements</code></pre><p>Note that we have used second-order elements for the mesh, which is useful for better representing the edges of the circular crack.</p><h2 id="Integral-operators"><a class="docs-heading-anchor" href="#Integral-operators">Integral operators</a><a id="Integral-operators-1"></a><a class="docs-heading-anchor-permalink" href="#Integral-operators" title="Permalink"></a></h2><p>We will now build an approximation to <span>$T$</span> using:</p><ul><li>A hierarchical matrix representation for the integral operator</li><li>An adaptive correction to account for the singular and nearly singular interactions</li></ul><pre><code class="language-julia hljs">using HMatrices
 using LinearMaps
 using LinearAlgebra
@@ -73,26 +73,26 @@ Inti.singularity_order(::typeof(Kw)) = -3</code></pre><p>With this new kernel, w
 Tw₀ = Inti.assemble_hmatrix(Tw_op)
 δTw = Inti.adaptive_correction(Tw_op; maxdist = 2*meshsize, atol = 1e-2)
 φw = solve(Tw₀, δTw, t)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">636-element Vector{StaticArraysCore.SVector{3, Float64}}:
- [0.0, 0.0, 1.391349659657386]
- [0.0, 0.0, 1.4231844415716344]
- [0.0, 0.0, 1.3810611656759255]
- [0.0, 0.0, 1.4116497651813977]
- [0.0, 0.0, 1.3698751444047301]
- [0.0, 0.0, 1.370572227627872]
- [0.0, 0.0, 1.4393634620164013]
- [0.0, 0.0, 1.4092446425817051]
- [0.0, 0.0, 1.4484860004272015]
- [0.0, 0.0, 1.4433134084057926]
+ [0.0, 0.0, 1.391349659656966]
+ [0.0, 0.0, 1.4231844415712738]
+ [0.0, 0.0, 1.3810611656756595]
+ [0.0, 0.0, 1.4116497651809283]
+ [0.0, 0.0, 1.3698751444044945]
+ [0.0, 0.0, 1.3705722276275494]
+ [0.0, 0.0, 1.4393634620160496]
+ [0.0, 0.0, 1.409244642581109]
+ [0.0, 0.0, 1.4484860004268314]
+ [0.0, 0.0, 1.4433134084051773]
  ⋮
- [0.0, 0.0, 1.4549863332741932]
- [0.0, 0.0, 1.4556524770758321]
- [0.0, 0.0, 1.4302700754731328]
- [0.0, 0.0, 1.4578427470782975]
- [0.0, 0.0, 1.4540629620510073]
- [0.0, 0.0, 1.432105806140424]
- [0.0, 0.0, 1.4508144851144813]
- [0.0, 0.0, 1.457279445351109]
- [0.0, 0.0, 1.4325696763928875]</code></pre><p>We now plot the displacement field again, but this with the weighted kernel approach, and compare it to the previous approach. Note that we must multiply the solution <code>φw</code> by the weight function to obtain the actual displacement jump <code>φ</code>.</p><pre><code class="language-julia hljs">weights = [weight(q.coords) for q in Q]
+ [0.0, 0.0, 1.454986333273439]
+ [0.0, 0.0, 1.455652477075107]
+ [0.0, 0.0, 1.4302700754727702]
+ [0.0, 0.0, 1.4578427470776343]
+ [0.0, 0.0, 1.4540629620505867]
+ [0.0, 0.0, 1.4321058061401262]
+ [0.0, 0.0, 1.4508144851138165]
+ [0.0, 0.0, 1.4572794453505602]
+ [0.0, 0.0, 1.432569676392547]</code></pre><p>We now plot the displacement field again, but this with the weighted kernel approach, and compare it to the previous approach. Note that we must multiply the solution <code>φw</code> by the weight function to obtain the actual displacement jump <code>φ</code>.</p><pre><code class="language-julia hljs">weights = [weight(q.coords) for q in Q]
 scatter(r, getindex.(φw,3) .* weights, label = &quot;Numerical solution (weighted)&quot;)
 lines!(0:0.01:1, φ₃, label = &quot;Exact solution&quot;, color = :red, linewidth = 4)
 axislegend()
@@ -106,4 +106,4 @@ ax = Axis3(fig[1, 1])
 n = length(Q.mesh.nodes)
 plot!(Q.mesh; color = φ3_nodes, interpolate = false, strokewidth=1)
 cb = Colorbar(fig[1, 2]; label = &quot;φ₃&quot;, colorrange)
-fig</code></pre><img src="1523d29b.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes_drag/">« Stokes drag</a><a class="docs-footer-nextpage" href="../pep/">Plasmonic eigenvalues »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Thursday 23 July 2026 19:44">Thursday 23 July 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+fig</code></pre><img src="1523d29b.png" alt="Example block output"/></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stokes_drag/">« Stokes drag</a><a class="docs-footer-nextpage" href="../pep/">Plasmonic eigenvalues »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Tuesday 28 July 2026 11:16">Tuesday 28 July 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
