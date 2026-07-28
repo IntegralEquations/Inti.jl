@@ -6,13 +6,35 @@ using Gmsh
 using LinearAlgebra
 using HMatrices
 using FMM3D
-using CairoMakie
 using DataStructures
+using Dates
 
-include("../test_utils.jl")
-compression = (method = :fmm, tol = 1.0e-11)
+tinit = time() # hide
 
-meshsize = 0.05
+include(joinpath(@__DIR__, "../test_utils.jl"))
+outfile = joinpath(@__DIR__, "Xop_iunius5_results.tsv")
+logfile = joinpath(@__DIR__, "Xop_iunius5_run.log")
+function logmsg(msg)
+    line = "[$(Dates.now())] $msg"
+    println(line)
+    return open(logfile, "a") do io
+        println(io, line)
+        flush(io)
+    end
+end
+
+open(outfile, "w") do io
+    println(
+        io,
+        "timestamp\tmeshsize\tinterpolation_order\tqorder\tbdry_qorder\tndofs\tvol_err\terr_inf\ttmsh\tttotal",
+    )
+end
+open(logfile, "w") do io end
+
+compression = (method = :fmm, tol = 1.0e-13, ndiv = 700)
+#compression = (method = :none,)
+
+meshsize = 0.4
 meshsize_bdry = meshsize
 Inti.clear_entities!()
 tmsh = @elapsed begin
@@ -36,10 +58,11 @@ meshsize_bdry = meshsize
 #    Γₕ_coarse = view(msh_coarse, Γ_coarse)
 #end
 #@info "Mesh generation time: $tmsh"
+logmsg("Mesh generation time: $tmsh")
 
-interpolation_order = 2
+interpolation_order = 1
 VR_qorder = Inti.Tetrahedron_VR_interpolation_order_to_quadrature_order(interpolation_order)
-bdry_qorder = 7 #min(2 * VR_qorder, 7)
+bdry_qorder = 10 #min(2 * VR_qorder, 7)
 
 tquad = @elapsed begin
     # Use VDIM with the Vioreanu-Rokhlin quadrature rule for Ωₕ
@@ -86,17 +109,17 @@ tbnd = @elapsed begin
     )
 end
 @info "(Standard) Boundary operators time: $tbnd"
-#tbnd = @elapsed begin
-#    S_b2d_grad, D_b2d_grad = Inti.single_double_layer(;
-#        op,
-#        target = Ωₕ_quad,
-#        source = Γₕ_quad,
-#        compression,
-#        correction = (method = :dim, maxdist = 5 * meshsize_bdry, target_location = :inside),
-#        kernel_variant = :gradient,
-#    )
-#end
-#@info "(Gradient) Boundary operators time: $tbnd"
+tbnd = @elapsed begin
+    S_b2d_grad, D_b2d_grad = Inti.single_double_layer(;
+        op,
+        target = Ωₕ_quad,
+        source = Γₕ_quad,
+        compression,
+        correction = (method = :dim, maxdist = 5 * meshsize_bdry, target_location = :inside),
+        kernel_variant = :gradient,
+    )
+end
+@info "(Gradient) Boundary operators time: $tbnd"
 
 ## Volume potentials
 #tvol = @elapsed begin
@@ -136,7 +159,7 @@ end
 #end
 #@info "(Gradient) Volume potential time: $tvol"
 tvol = @elapsed begin
-    W_d2d = Inti.volume_potential(;
+    X_d2d = Inti.volume_potential(;
         op,
         target = Ωₕ_quad,
         source = Ωₕ_quad,
@@ -149,10 +172,11 @@ tvol = @elapsed begin
             S_b2d = S_b2d_std,
             D_b2d = D_b2d_std,
         ),
-        kernel_variant = :gradient_source,
+        kernel_variant = :hessian,
+        #kernel_variant = :gradient_source,
     )
 end
-@info "(W) Volume potential time: $tvol"
+@info "(X) Volume potential time: $tvol"
 
 # Standard plane wave test
 #u_d_nonpoly_std = [u_exact(q.coords) for q in Ωₕ_quad]
@@ -190,7 +214,7 @@ end
 #               1/3 * exp(x[1] + x[2]) * cos(x[3]),
 #               1/3 * exp(x[1] + x[2]) * sin(x[3]) )
 
-α = 2π; β = α; γ = α;
+α = π / 4; β = α; γ = α;
 Ψ(x) = cos(α * x[1]) * sin(β * x[2]) * cos(γ * x[3])
 gradΨ(x) = SVector(
     -α * sin(α * x[1]) * sin(β * x[2]) * cos(γ * x[3]),
@@ -205,9 +229,49 @@ g(x) = SVector(
 g_d = [g(q.coords) for q in Ωₕ_quad]
 Ψ_b = [Ψ(q.coords) for q in Γₕ_quad]
 Ψ_d = [Ψ(q.coords) for q in Ωₕ_quad]
+gradΨ_d = [gradΨ(q.coords) for q in Ωₕ_quad]
 BvΨ_plus_gnu = [dot(gradΨ(q.coords), q.normal) for q in Γₕ_quad] + [dot(g(q.coords), q.normal) for q in Γₕ_quad]
-w_ref = Ψ_d + D_b2d_std * Ψ_b - S_b2d_std * BvΨ_plus_gnu
-w_app = W_d2d * g_d
+w_ref = gradΨ_d + D_b2d_grad * Ψ_b - S_b2d_grad * BvΨ_plus_gnu
+#Id = [1 0 0; 0 1 0; 0 0 1]
+#Sdotg = similar(w_ref)
+#for i in 1:length(w_ref)
+#    Sdotg[i] = -1/3 * Id * g_d[i]
+#end
+#w_ref = Ψ_d + D_b2d_std * Ψ_b - S_b2d_std * BvΨ_plus_gnu
+w_app = X_d2d * g_d
 err = norm(w_app - w_ref, Inf)
 ndofs = length(w_app)
 @show ndofs, meshsize, err
+
+tend = time() # hide
+ttotal = tend - tinit
+logmsg("Example completed in $ttotal seconds") # hide
+ndofs = length(Ωₕ_quad)
+logmsg("ndofs: $ndofs")
+logmsg("Result meshsize=$(meshsize) ndofs=$(ndofs) err_inf=$(err)")
+
+open(outfile, "a") do io
+    println(
+        io,
+        string(
+            Dates.now(),
+            "\t",
+            meshsize,
+            "\t",
+            interpolation_order,
+            "\t",
+            VR_qorder,
+            "\t",
+            bdry_qorder,
+            "\t",
+            ndofs,
+            "\t",
+            err,
+            "\t",
+            tmsh,
+            "\t",
+            ttotal,
+        ),
+    )
+    flush(io)
+end

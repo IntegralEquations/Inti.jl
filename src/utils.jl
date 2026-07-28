@@ -193,7 +193,11 @@ function _normalize_compression(compression, target, source)
         "Unknown compression.method $(compression.method). Available options: $methods",
     )
     # set default tolerance if not provided
+    if haskey(compression, :fmmndiv) && !isnothing(compression.fmmndiv)
+        compression.method == :fmm || error("FMM ndiv passed but compression method is not FMM!")
+    end
     compression = merge((tol = 1.0e-8,), compression)
+    compression = merge((fmmndiv = nothing,), compression)
     return compression
 end
 
@@ -241,6 +245,15 @@ Things which should probably be implemented at some point.
 """
 function notimplemented()
     return error("not (yet) implemented")
+end
+
+"""
+    debug_mode()
+
+Return `true` if the current logger's minimum enabled level is `Debug` or lower.
+"""
+function debug_mode()
+    return Logging.min_enabled_level(Logging.current_logger()) <= Logging.Debug
 end
 
 """

@@ -15,13 +15,14 @@ const CORRECTION_METHODS = [:none, :dim, :adaptive]
 
 """
     single_double_layer(; op, target, source::Quadrature, compression,
-    correction, derivative = false)
+    correction, kernel_variant = :default)
 
 Construct a discrete approximation to the single- and double-layer integral operators for
 `op`, mapping values defined on the quadrature nodes of `source` to values defined on the
-nodes of `target`. If `derivative = true`, return instead the adjoint double-layer and
-hypersingular operators (which are the generalized Neumann trace of the single- and
-double-layer, respectively).
+nodes of `target`. The `kernel_variant` keyword controls which pair of kernels is used:
+`:default` gives the standard single- and double-layer kernels, `:neumann` gives the
+adjoint double-layer and hypersingular kernels (i.e. the generalized Neumann trace of the
+single- and double-layer), and `:gradient` gives the gradient kernels.
 
 For finer control, you must choose a `compression` method and a `correction` method, as
 described below.
@@ -68,12 +69,28 @@ function single_double_layer(;
         source,
         compression = (method = :none,),
         correction = (method = :adaptive,),
-        derivative = false,
+        kernel_variant::Symbol = :default,
+        derivative = nothing,
     )
+    if !isnothing(derivative)
+        Base.depwarn(
+            "The `derivative` keyword is deprecated; use `kernel_variant = :neumann` instead.",
+            :single_double_layer,
+        )
+        kernel_variant = derivative ? :neumann : :default
+    end
     compression = _normalize_compression(compression, target, source)
     correction = _normalize_correction(correction, target, source)
-    G = derivative ? AdjointDoubleLayerKernel(op) : SingleLayerKernel(op)
-    dG = derivative ? HyperSingularKernel(op) : DoubleLayerKernel(op)
+    if kernel_variant === :gradient
+        G = GradientSingleLayerKernel(op)
+        dG = GradientDoubleLayerKernel(op)
+    elseif kernel_variant === :neumann
+        G = AdjointDoubleLayerKernel(op)
+        dG = HyperSingularKernel(op)
+    else
+        G = SingleLayerKernel(op)
+        dG = DoubleLayerKernel(op)
+    end
     Sop = IntegralOperator(G, target, source)
     Dop = IntegralOperator(dG, target, source)
     # handle compression
@@ -143,7 +160,7 @@ function single_double_layer(;
                 Dop_dim_mat;
                 green_multiplier = green_multiplier[glob_near_trgs],
                 correction.maxdist,
-                derivative,
+                kernel_variant,
                 filter_target_params,
             )
         else
@@ -155,7 +172,7 @@ function single_double_layer(;
                 Dmat;
                 green_multiplier,
                 correction.maxdist,
-                derivative,
+                kernel_variant,
             )
         end
     elseif correction.method == :adaptive
@@ -207,7 +224,7 @@ function adj_double_layer_hypersingular(;
         source,
         compression,
         correction,
-        derivative = true,
+        kernel_variant = :neumann,
     )
 end
 
@@ -279,10 +296,22 @@ the specified compression method. If no compression is specified, the operator
 is returned as is. If a correction method is specified, the correction is
 computed and added to the compressed operator.
 """
-function volume_potential(; op, target, source::Quadrature, compression, correction)
+function volume_potential(; op, target, source::Quadrature, compression, correction, kernel_variant::Symbol = :default)
     correction = _normalize_correction(correction, target, source)
     compression = _normalize_compression(compression, target, source)
-    G = SingleLayerKernel(op)
+    if kernel_variant === :gradient
+        G = GradientSingleLayerKernel(op)
+    elseif kernel_variant === :gradient_source
+        # naive forward map of W[g] = -∫∇yG⋅g (vector density -> scalar). The
+        # kernel is ∇yG; the leading minus is applied when the operator is
+        # assembled.
+        G = SourceGradientSingleLayerKernel(op)
+    elseif kernel_variant === :hessian
+        # forward map of X[g] = ∇W[g] (vector density -> vector).
+        G = HessianKernel(op, :dipole)
+    else
+        G = SingleLayerKernel(op)
+    end
     V = IntegralOperator(G, target, source)
     # compress V
     if compression.method == :none
@@ -290,7 +319,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
     elseif compression.method == :hmatrix
         Vmat = assemble_hmatrix(V; rtol = compression.tol)
     elseif compression.method == :fmm
-        Vmat = assemble_fmm(V; rtol = compression.tol)
+        Vmat = assemble_fmm(V; rtol = compression.tol, ndiv = compression.fmmndiv)
     else
         error("Unknown compression method. Available options: $COMPRESSION_METHODS")
     end
@@ -322,6 +351,10 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
         else
             error("Missing correction.boundary field for :dim method on a volume potential")
         end
+        # The W (3.25) and X (3.28) regularizations both use the standard scalar
+        # single-/double-layer potentials, so for those variants the boundary
+        # operators are built with the `:default` kernel.
+        boundary_variant = kernel_variant in (:gradient_source, :hessian) ? :default : kernel_variant
         # Advanced usage: Use previously constructed layer operators for VDIM
         if !haskey(correction, :S_b2d) || !haskey(correction, :D_b2d)
             if haskey(correction, :green_multiplier)
@@ -331,6 +364,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
                     source = boundary,
                     compression,
                     correction,
+                    kernel_variant = boundary_variant,
                 )
             else
                 S, D = single_double_layer(;
@@ -339,11 +373,60 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
                     source = boundary,
                     compression,
                     correction = (correction..., target_location = loc),
+                    kernel_variant = boundary_variant,
                 )
             end
         else
             S = correction.S_b2d
             D = correction.D_b2d
+        end
+        # The X regularization (3.28) additionally needs the gradient single-layer
+        # ∇ₓS for the `-∇ₓS[gⱼν]` term; build it from the `:gradient` variant (its
+        # single-layer return, `GS`, is the gradient single-layer).
+        grad_single_layer = nothing
+        if kernel_variant === :hessian
+            if haskey(correction, :green_multiplier)
+                grad_single_layer, _ = single_double_layer(;
+                    op, target, source = boundary, compression, correction,
+                    kernel_variant = :gradient,
+                )
+            else
+                grad_single_layer, _ = single_double_layer(;
+                    op, target, source = boundary, compression,
+                    correction = (correction..., target_location = loc),
+                    kernel_variant = :gradient,
+                )
+            end
+        end
+        # Volume operator used to build the correction.
+        if kernel_variant === :gradient_source
+            Vg = IntegralOperator(GradientSingleLayerKernel(op), target, source)
+            if compression.method == :none
+                Vcorr = assemble_matrix(Vg)
+            elseif compression.method == :hmatrix
+                Vcorr = assemble_hmatrix(Vg; rtol = compression.tol)
+            else
+                Vcorr = assemble_fmm(Vg; rtol = compression.tol)
+            end
+        elseif kernel_variant === :hessian && compression.method == :fmm
+            # Here we construct the uncorrected forward map that is regularized
+            # by VDIM. There are two viable paths: (1) dipole→gradient map
+            # (`SVector` output) applied to a vector (the dipole) quantity,
+            # iterated over the number of cardinal directions and (2)
+            # charge→Hessian map (scalar→`SMatrix` output) applied to a scalar
+            # (monomial). As (2) can re-use the scalars across all cardinal
+            # directions, it is more efficient, but not all FMMs support this
+            # option. Note that this applies only for construction of the
+            # operator; in the application phase, the dipole→gradient map is the
+            # desired one.
+            if (ambient_dimension(op) == 3 && op isa Laplace) || (ambient_dimension(op) == 2 && (op isa Laplace || op isa Helmholtz))
+                Vh = IntegralOperator(HessianKernel(op, :charge), target, source)
+            else
+                Vh = IntegralOperator(HessianKernel(op, :dipole), target, source)
+            end
+            Vcorr = assemble_fmm(Vh; rtol = compression.tol)
+        else
+            Vcorr = Vmat
         end
         interpolation_order = correction.interpolation_order
         δV = vdim_correction(
@@ -353,16 +436,33 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
             boundary,
             S,
             D,
-            Vmat;
+            Vcorr;
             green_multiplier,
             correction.maxdist,
             interpolation_order,
+            kernel_variant,
+            grad_single_layer,
         )
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end
     # add correction
-    if compression.method ∈ (:hmatrix, :none)
+    if kernel_variant === :gradient_source
+        # W maps a vector (`SVector`) density to a scalar. `Vmat` assembles
+        # `∫∇yG⋅g`; the desired operator is W[g] = -∫∇yG⋅g.
+        # Wrap it together with the sparse correction in a
+        # `VectorDensityOperator` so that `W * g` allocates a clean scalar output
+        V = VectorDensityOperator{default_kernel_eltype(op)}(-Vmat, δV, size(δV))
+    elseif kernel_variant === :hessian
+        # The PV part of `X[g] = ∇W[g]` equals `+∫∇ₓ∇ₓG⋅g` and maps a vector
+        # (`SVector`) density to a vector (`SVector`) output, so the forward map
+        # is `Vmat`.
+        # Wrap it with the sparse correction in a `VectorDensityOperator` so
+        # that `X * g` allocates a clean `Vector{SVector}` output (a plain
+        # `LinearMap` would infer an abstract `SArray` eltype).
+        N = ambient_dimension(op)
+        V = VectorDensityOperator{SVector{N, default_kernel_eltype(op)}}(Vmat, δV, size(δV))
+    elseif compression.method ∈ (:hmatrix, :none)
         # TODO: in the hmatrix case, we may want to add the correction directly
         # to the HMatrix so that a direct solver can be later used
         V = LinearMap(Vmat) + LinearMap(δV)

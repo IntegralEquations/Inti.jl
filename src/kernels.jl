@@ -31,6 +31,17 @@ abstract type AbstractDifferentialOperator{N} end
 
 ambient_dimension(::AbstractDifferentialOperator{N}) where {N} = N
 
+function range_dimension(op::AbstractDifferentialOperator)
+    T = default_density_eltype(op)
+    if T <: Number
+        return 1
+    elseif hasmethod(length, Tuple{Type{T}})
+        return length(T)
+    else
+        error("default_density_eltype($(typeof(op))) = $T does not define length(::Type{$T}); cannot determine range dimension")
+    end
+end
+
 # convenient constructor for e.g. SingleLayerKernel(op) or DoubleLayerKernel(op)
 function (::Type{K})(op::Op) where {Op, K <: AbstractKernel}
     return K{Op}(op)
@@ -122,6 +133,107 @@ end
 ################################################################################
 ################################# LAPLACE ######################################
 ################################################################################
+
+"""
+    struct GradientSingleLayerKernel{Op} <: AbstractKernel
+
+Given an operator `Op`, construct its free-space gradient single-layer kernel.
+This evaluates the gradient of the fundamental solution with respect to the target variable.
+"""
+struct GradientSingleLayerKernel{Op} <: AbstractKernel
+    op::Op
+end
+
+function singularity_order(K::GradientSingleLayerKernel)
+    N = ambient_dimension(K.op)
+    return 1 - N
+end
+
+"""
+    struct GradientDoubleLayerKernel{Op} <: AbstractKernel
+
+Given an operator `Op`, construct its free-space gradient double-layer kernel.
+This evaluates the gradient of the double-layer kernel with respect to the target variable.
+"""
+struct GradientDoubleLayerKernel{Op} <: AbstractKernel
+    op::Op
+end
+
+function singularity_order(K::GradientDoubleLayerKernel)
+    N = ambient_dimension(K.op)
+    return -N
+end
+
+"""
+    struct SourceGradientSingleLayerKernel{Op} <: AbstractKernel
+
+Gradient of the single-layer kernel `G(x,y)` with respect to the source variable `y`,
+i.e. ``\\nabla_y G(x,y)``. The value is returned as the (row) covector
+`transpose(∇_yG)`, so that `K(x,y) * g(y)` contracts an `SVector` density to a
+scalar. It is the source-variable counterpart of [`GradientSingleLayerKernel`](@ref)
+(which is the target gradient ``\\nabla_x G``), and since ``\\nabla_y G = -\\nabla_x
+G`` it is built by negating the latter's evaluation.
+
+The associated volume integral operator is ``\\mathcal{W}[g](x) = -\\int_\\Omega
+\\nabla_y G(x,y) \\cdot g(y)\\,dy``; note the leading minus sign, so the
+discrete operator that evaluates ``\\mathcal{W}`` is the negative of
+`IntegralOperator(SourceGradientSingleLayerKernel(op), ...)`.
+"""
+struct SourceGradientSingleLayerKernel{Op} <: AbstractKernel
+    op::Op
+end
+
+function singularity_order(K::SourceGradientSingleLayerKernel)
+    N = ambient_dimension(K.op)
+    return 1 - N
+end
+
+function (K::SourceGradientSingleLayerKernel)(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    )
+    # ∇_y G(x,y) = -∇_x G(x,y); returned as a row covector to contract a vector density
+    gx = GradientSingleLayerKernel(K.op)(target, source, r)
+    return transpose(-gx)
+end
+
+# `zero` for the covector element type, needed when assembling the sparse VDIM
+# correction whose entries map an `SVector` density to a scalar.
+Base.zero(::Type{Transpose{T, SVector{N, T}}}) where {N, T} = transpose(zero(SVector{N, T}))
+
+"""
+    struct HessianKernel{Op} <: AbstractKernel
+
+The Hessian of the single-layer kernel `G(x,y)` with respect to the *target*
+variable `x`, i.e. ``\\nabla_x\\nabla_x G(x,y)``, returned as an `N×N`
+`SMatrix`.
+
+This is the kernel of the strongly-singular volume integral operator
+``\\mathcal{X}[g](x) = \\nabla\\mathcal{W}[g](x) = \\mathsf{S}\\,g(x) -
+\\mathrm{p.v.}\\!\\int_\\Omega \\nabla_x\\nabla_y G(x,y)\\cdot g(y)\\,dy`` (eq.
+(2.24) of [anderson2026general](@cite)) acting on a vector density `g`. Since
+``\\nabla_x\\nabla_y G = -\\nabla_x\\nabla_x G``, the principal-value integral
+equals ``+\\int_\\Omega \\nabla_x\\nabla_x G \\cdot g``, so this (target) Hessian
+is the kernel assembled for the forward map of ``\\mathcal{X}``; the free-term
+tensor ``\\mathsf{S}`` is handled by the density-interpolation regularization.
+"""
+struct HessianKernel{Op} <: AbstractKernel
+    op::Op
+    charge_dipole::Symbol
+end
+
+function HessianKernel(op::AbstractDifferentialOperator, charge_dipole::Symbol = :charge)
+    if !(charge_dipole == :charge || charge_dipole == :dipole)
+        error("Invalid charge/dipole selection")
+    end
+    return HessianKernel{typeof(op)}(op, charge_dipole)
+end
+
+function singularity_order(K::HessianKernel)
+    N = ambient_dimension(K.op)
+    return -N
+end
 
 struct Laplace{N} <: AbstractDifferentialOperator{N} end
 
@@ -219,6 +331,57 @@ function (HS::HyperSingularKernel{Laplace{N}})(
         notimplemented()
     end
     return d2 ≤ tol * tol ? zero(v) : v
+end
+
+function (GSL::GradientSingleLayerKernel{Laplace{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N}
+    d = norm(r)
+    if N == 2
+        v = -1 / (2π) / (d^2) * r
+    elseif N == 3
+        v = -1 / (4π) / (d^3) * r
+    else
+        notimplemented()
+    end
+    return d ≤ SAME_POINT_TOLERANCE ? zero(v) : v
+end
+
+function (GDL::GradientDoubleLayerKernel{Laplace{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N}
+    ny = normal(source)
+    d = norm(r)
+    if N == 2
+        v = 1 / (2π) / (d^2) * (ny - 2 * dot(r, ny) / d^2 * r)
+    elseif N == 3
+        v = 1 / (4π) / (d^3) * (ny - 3 * dot(r, ny) / d^2 * r)
+    else
+        notimplemented()
+    end
+    return d ≤ SAME_POINT_TOLERANCE ? zero(v) : v
+end
+
+function (HSL::HessianKernel{Laplace{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N}
+    d = norm(r)
+    # ∇ₓ∇ₓG: for Laplace, ∂ᵢ∂ⱼG = c/dᴺ (k·r̂ᵢr̂ⱼ - δᵢⱼ) with (c,k) = (1/2π,2) in 2D
+    # and (1/4π,3) in 3D.
+    if N == 2
+        v = 1 / (2π) / d^2 * (2 * r * transpose(r) / d^2 - I)
+    elseif N == 3
+        v = 1 / (4π) / d^3 * (3 * r * transpose(r) / d^2 - I)
+    else
+        notimplemented()
+    end
+    return d ≤ SAME_POINT_TOLERANCE ? zero(v) : v
 end
 
 ################################################################################
@@ -482,6 +645,68 @@ function (HS::HyperSingularKernel{<:Helmholtz{N}})(target, source) where {N}
         notimplemented()
     end
     return d2 ≤ tol * tol ? zero(v) : v
+end
+
+function (GSL::GradientSingleLayerKernel{<:Helmholtz{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N}
+    k = GSL.op.k
+    d = norm(r)
+    if N == 2
+        v = -im * k / 4 / d * hankelh1(1, k * d) * r
+    elseif N == 3
+        v = 1 / (4π) / d^2 * exp(im * k * d) * (im * k - 1 / d) * r
+    else
+        notimplemented()
+    end
+    return d ≤ SAME_POINT_TOLERANCE ? zero(v) : v
+end
+
+function (GDL::GradientDoubleLayerKernel{<:Helmholtz{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N}
+    ny = normal(source)
+    k = GDL.op.k
+    d = norm(r)
+    rdotny = dot(r, ny)
+    if N == 2
+        v = im * k / (4 * d) * hankelh1(1, k * d) * ny -
+            im * k^2 / (4 * d^2) * hankelh1(2, k * d) * r * rdotny
+    elseif N == 3
+        pref = 1 / (4π) / d^3 * exp(im * k * d)
+        v = pref * ((1 - im * k * d) * ny + (k^2 * d^2 + 3 * im * k * d - 3) / d^2 * r * rdotny)
+    else
+        notimplemented()
+    end
+    return d ≤ SAME_POINT_TOLERANCE ? zero(v) : v
+end
+
+function (HSL::HessianKernel{<:Helmholtz{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N}
+    k = HSL.op.k
+    d = norm(r)
+    # ∇ₓ∇ₓG = (g″−g′/d) r̂r̂ᵀ + (g′/d) I for the isotropic G = g(d).
+    if N == 2
+        # 2D: G = (i/4)H₀⁽¹⁾(kd);  recurrence leads to H₂.
+        v = im * k^2 / 4 / d^2 * hankelh1(2, k * d) * (r * transpose(r)) -
+            im * k / 4 / d * hankelh1(1, k * d) * I
+    elseif N == 3
+        # 3D: G = eⁱᵏᵈ/(4πd).
+        pref = exp(im * k * d) / (4π)
+        cI = pref * (im * k / d^2 - 1 / d^3)
+        cR = pref * (3 / d^5 - 3 * im * k / d^4 - k^2 / d^3)
+        v = cR * (r * transpose(r)) + cI * I
+    else
+        notimplemented()
+    end
+    return d ≤ SAME_POINT_TOLERANCE ? zero(v) : v
 end
 
 ############################ STOKES ############################3
@@ -930,6 +1155,195 @@ function apply_kernel(HS::HyperSingularKernel{<:Elastostatic{N}}, target, source
     end
     out = c * (dot(vr, v) * r + dot(vnx, v) * nx + dot(vny, v) * ny + a_diag * v)
     return iszero(d2) ? zero(out) : out
+end
+
+################################################################################
+############################ ELASTOSTATIC GRADIENT ############################
+################################################################################
+
+# Algebra needed for SVector{N, <:SMatrix} output type.
+# These products arise when gradient kernels for vector-valued operators (Elastostatic, Stokes)
+# act on matrix-valued densities (DIM method) or vector-valued densities (final application).
+function Base.:*(t::SVector{N, M}, m::SMatrix{P, Q}) where {N, P, Q, M <: SMatrix{P, Q}}
+    return typeof(t)(ntuple(k -> t[k] * m, N))
+end
+function Base.:*(t::SVector{N, M}, v::SVector{P}) where {N, P, M <: SMatrix{P, P}}
+    return SMatrix{P, N}(hcat(ntuple(k -> t[k] * v, N)...))
+end
+
+# The `ntuple` construction below defeats `promote_op`, so declare the value type
+# explicitly rather than let `IntegralOperator` fall back to `Any`.
+function return_type(
+        ::Union{
+            GradientSingleLayerKernel{<:Elastostatic{N}},
+            GradientDoubleLayerKernel{<:Elastostatic{N}},
+        },
+        args...,
+    ) where {N}
+    return SVector{N, SMatrix{N, N, Float64, N * N}}
+end
+
+function (K::GradientSingleLayerKernel{<:Elastostatic{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N}
+    μ, λ = K.op.μ, K.op.λ
+    ν = λ / (2 * (μ + λ))
+    d = norm(r)
+    RRT = r * r'
+    SM = SMatrix{N, N, Float64, N * N}
+    if N == 2
+        C = 1 / (8π * μ * (1 - ν))
+        v = SVector{N}(
+            ntuple(N) do k
+                ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+                SM(C * (-(3 - 4ν) * r[k] / d^2 * I + (ek * r' + r * ek') / d^2 - 2 * r[k] * RRT / d^4))
+            end
+        )
+    elseif N == 3
+        C = 1 / (16π * μ * (1 - ν))
+        v = SVector{N}(
+            ntuple(N) do k
+                ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+                SM(C * (-(3 - 4ν) * r[k] / d^3 * I + (ek * r' + r * ek') / d^3 - 3 * r[k] * RRT / d^5))
+            end
+        )
+    else
+        notimplemented()
+    end
+    return d == 0 ? zero(v) : v
+end
+
+function (K::GradientDoubleLayerKernel{<:Elastostatic{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N}
+    μ, λ = K.op.μ, K.op.λ
+    ν = λ / (2 * (μ + λ))
+    ny = normal(source)
+    d = norm(r)
+    RRT = r * r'
+    qr = dot(ny, r)
+    B = r * ny' - ny * r'
+    SM = SMatrix{N, N, Float64, N * N}
+    if N == 2
+        C = 1 / (4π * (1 - ν))
+        A = (1 - 2ν) * I + 2 * RRT / d^2
+        v = SVector{N}(
+            ntuple(N) do k
+                ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+                SM(
+                    C * (
+                        (ny[k] / d^2 - 2 * qr * r[k] / d^4) * A
+                            + 2 * qr / d^4 * (ek * r' + r * ek')
+                            - 4 * qr * r[k] * RRT / d^6
+                            - (1 - 2ν) / d^2 * (ek * ny' - ny * ek')
+                            + 2 * r[k] * (1 - 2ν) / d^4 * B
+                    )
+                )
+            end
+        )
+    elseif N == 3
+        C = 1 / (8π * (1 - ν))
+        A = (1 - 2ν) * I + 3 * RRT / d^2
+        v = SVector{N}(
+            ntuple(N) do k
+                ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+                SM(
+                    C * (
+                        (ny[k] / d^3 - 3 * qr * r[k] / d^5) * A
+                            + 3 * qr / d^5 * (ek * r' + r * ek')
+                            - 6 * qr * r[k] * RRT / d^7
+                            - (1 - 2ν) / d^3 * (ek * ny' - ny * ek')
+                            + 3 * r[k] * (1 - 2ν) / d^5 * B
+                    )
+                )
+            end
+        )
+    else
+        notimplemented()
+    end
+    return d == 0 ? zero(v) : v
+end
+
+################################################################################
+################################### STOKES GRADIENT ############################
+################################################################################
+
+# See the note on the Elastostatic gradient `return_type` above.
+function return_type(
+        ::Union{
+            GradientSingleLayerKernel{<:Stokes{N}},
+            GradientDoubleLayerKernel{<:Stokes{N}},
+        },
+        args...,
+    ) where {N}
+    return SVector{N, SMatrix{N, N, Float64, N * N}}
+end
+
+function (K::GradientSingleLayerKernel{<:Stokes{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N}
+    μ = K.op.μ
+    d = norm(r)
+    RRT = r * r'
+    SM = SMatrix{N, N, Float64, N * N}
+    if N == 2
+        C = 1 / (4π * μ)
+        v = SVector{N}(
+            ntuple(N) do k
+                ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+                SM(C * (-r[k] / d^2 * I + (ek * r' + r * ek') / d^2 - 2 * r[k] * RRT / d^4))
+            end
+        )
+    elseif N == 3
+        C = 1 / (8π * μ)
+        v = SVector{N}(
+            ntuple(N) do k
+                ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+                SM(C * (-r[k] / d^3 * I + (ek * r' + r * ek') / d^3 - 3 * r[k] * RRT / d^5))
+            end
+        )
+    else
+        notimplemented()
+    end
+    return d == 0 ? zero(v) : v
+end
+
+function (K::GradientDoubleLayerKernel{<:Stokes{N}})(
+        target,
+        source,
+        r = coords(target) - coords(source),
+    ) where {N}
+    ny = normal(source)
+    d = norm(r)
+    RRT = r * r'
+    qr = dot(ny, r)
+    SM = SMatrix{N, N, Float64, N * N}
+    if N == 2
+        C = 1 / π
+        v = SVector{N}(
+            ntuple(N) do k
+                ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+                SM(C * (ny[k] * RRT / d^4 + qr * (ek * r' + r * ek') / d^4 - 4 * qr * r[k] * RRT / d^6))
+            end
+        )
+    elseif N == 3
+        C = 3 / (4π)
+        v = SVector{N}(
+            ntuple(N) do k
+                ek = SVector{N}(ntuple(i -> i == k ? 1.0 : 0.0, N))
+                SM(C * (ny[k] * RRT / d^5 + qr * (ek * r' + r * ek') / d^5 - 5 * qr * r[k] * RRT / d^7))
+            end
+        )
+    else
+        notimplemented()
+    end
+    return d == 0 ? zero(v) : v
 end
 
 ################################################################################
