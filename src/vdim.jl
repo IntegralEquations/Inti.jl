@@ -29,6 +29,8 @@ See [anderson2024fast](@cite) for more details on the method.
   the same `kernel_variant`; for `:gradient_source`, `S`/`D` are the standard
   single-/double-layer operators and `V` is the gradient volume
   operator.
+  - `grad_single_layer`: gradient of single layer potential; only used when
+  `kernel_variant = :hessian`.
 """
 function vdim_correction(
         op::AbstractDifferentialOperator{N},

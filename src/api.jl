@@ -243,7 +243,8 @@ function single_double_layer_potential(; op, source)
 end
 
 """
-    volume_potential(; op, target, source::Quadrature, compression, correction)
+    volume_potential(; op, target, source::Quadrature, compression, correction,
+    kernel_variant = :default)
 
 Compute the volume potential operator for a given PDE.
 
@@ -253,11 +254,43 @@ Compute the volume potential operator for a given PDE.
 - `source`: The source domain where the potential is generated.
 - `compression`: The compression method to use for the potential operator.
 - `correction`: The correction method to use for the potential operator.
+- `kernel_variant`: which volume operator to build (see below); defaults to
+  `:default`.
 
 ## Returns
 
 The volume potential operator `V` that represents the interaction between the
 target and source domains.
+
+## Kernel variant
+
+The `kernel_variant` keyword selects the volume operator that is assembled and
+regularized. Writing `G` for the fundamental solution of `op` and `Ω` for the
+domain of `source`, the available options are:
+
+  - `:default`: the volume potential `V[u](x) = ∫_Ω G(x,y) u(y) dy`, mapping a
+    scalar density to a scalar output.
+  - `:gradient`: the gradient of the volume potential, `∇V[u](x) = ∫_Ω ∇ₓG(x,y)
+    u(y) dy`, mapping a scalar density to an `SVector` output.
+  - `:gradient_source`: the operator `W[g](x) = -∫_Ω ∇_yG(x,y) ⋅ g(y) dy`, which
+    contracts a vector (`SVector`) density to a scalar output. Note the leading
+    minus sign: the kernel assembled is
+    [`SourceGradientSingleLayerKernel`](@ref) and the sign is applied when the
+    operator is formed.
+  - `:hessian`: the operator `X[g](x) = ∇W[g](x) = S g(x) - p.v.∫_Ω ∇ₓ∇_yG(x,y) ⋅
+    g(y) dy`, which maps a vector (`SVector`) density to a vector (`SVector`)
+    output. The free-term tensor `S` and the principal value are handled by the
+    density-interpolation regularization; see eq. (2.24) of
+    [anderson2026general](@cite).
+
+The two vector-density variants `:gradient_source` and `:hessian` return a
+[`VectorDensityOperator`](@ref) instead of a `LinearMap`, so that `W * g` and `X
+* g` allocate a concretely-typed output vector. They are meant to be used with
+`correction = (method = :dim, ...)`: the regularizations employed are described
+in [anderson2026general](@cite)). The `:hessian` variant additionally builds its
+correction from a charge→Hessian FMM map when the FMM backend supports it
+(Laplace in 2D/3D and Helmholtz in 2D), falling back to the dipole→gradient map
+otherwise.
 
 ## Compression
 
@@ -278,23 +311,24 @@ The `correction` argument is a named tuple with a `method` field followed by
 method-specific fields. It specifies how the singular and nearly-singular
 integrals should be computed. The available options are:
 
-  - `(method = :none, )`: no correction is performed. This is not recommented,
+  - `(method = :none, )`: no correction is performed. This is not recommended,
     as the resulting approximation will be inaccurate if the source and target
     are not sufficiently far apart.
   - `(method = :dim, maxdist, target_location)`: use the density interpolation
     method to compute the correction. `maxdist` specifies the distance between
     source and target points above which no correction is performed (defaults to
     `Inf`). `target_location` should be either `:inside`, `:outside`, or `:on`,
-    and specifies where the `target`` points lie relative to the to the
+    and specifies where the `target` points lie relative to the to the
     `source`'s boundary. When `target === source`, `target_location` is not
     needed.
 
 ## Details
 The volume potential operator is computed by assembling the integral operator
-`V` using the single-layer kernel `G`. The operator `V` is then compressed using
-the specified compression method. If no compression is specified, the operator
-is returned as is. If a correction method is specified, the correction is
-computed and added to the compressed operator.
+`V` using the kernel selected by `kernel_variant` (the single-layer kernel `G`
+for the default variant). The operator `V` is then compressed using the
+specified compression method. If no compression is specified, the operator is
+returned as is. If a correction method is specified, the correction is computed
+and added to the compressed operator.
 """
 function volume_potential(; op, target, source::Quadrature, compression, correction, kernel_variant::Symbol = :default)
     correction = _normalize_correction(correction, target, source)
