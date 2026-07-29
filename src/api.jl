@@ -35,7 +35,7 @@ compressed. The available options are:
 
   - `(method = :none, )`: no compression is performed, the resulting matrices
     are dense. This is the default, but not recommended for large problems.
-  - `(method =:hmatrix, tol)`: the resulting operators are compressed using
+  - `(method = :hmatrix, tol)`: the resulting operators are compressed using
     hierarchical matrices with an absolute tolerance `tol` (defaults to `1e-8`).
   - `(method = :fmm, tol)`: the resulting operators are compressed using the
     fast multipole method with an absolute tolerance `tol` (defaults to `1e-8`).
@@ -59,7 +59,7 @@ integrals should be computed. The available options are:
     compute the correction. `maxdist` specifies the distance between source and target
     points above which no correction is performed (defaults to `Inf`). `target_location`
     should be either `:inside`, `:outside`, or `:on`, and specifies where the `target`
-    points lie relative to the to the `source` curve/surface (which is assumed to be
+    points lie relative to the `source` curve/surface (which is assumed to be
     closed). When `target === source`, `target_location` is not needed. See
     [`bdim_correction`](@ref) and [`vdim_correction`](@ref) for more details.
 """
@@ -284,10 +284,10 @@ domain of `source`, the available options are:
     [anderson2026general](@cite).
 
 The two vector-density variants `:gradient_source` and `:hessian` return a
-[`VectorDensityOperator`](@ref) instead of a `LinearMap`, so that `W * g` and `X
-* g` allocate a concretely-typed output vector. They are meant to be used with
+[`VectorDensityOperator`](@ref) instead of a `LinearMap`, so that `W * g` and
+`X * g` allocate a concretely-typed output vector. They are meant to be used with
 `correction = (method = :dim, ...)`: the regularizations employed are described
-in [anderson2026general](@cite)). The `:hessian` variant additionally builds its
+in [anderson2026general](@cite). The `:hessian` variant additionally builds its
 correction from a charge→Hessian FMM map when the FMM backend supports it
 (Laplace in 2D/3D and Helmholtz in 2D), falling back to the dipole→gradient map
 otherwise.
@@ -300,7 +300,7 @@ compressed. The available options are:
 
   - `(method = :none, )`: no compression is performed, the resulting matrices
     are dense.
-  - `(method =:hmatrix, tol)`: the resulting operators are compressed using
+  - `(method = :hmatrix, tol)`: the resulting operators are compressed using
     hierarchical matrices with an absolute tolerance `tol` (defaults to `1e-8`).
   - `(method = :fmm, tol)`: the resulting operators are compressed using the
     fast multipole method with an absolute tolerance `tol` (defaults to `1e-8`).
@@ -318,7 +318,7 @@ integrals should be computed. The available options are:
     method to compute the correction. `maxdist` specifies the distance between
     source and target points above which no correction is performed (defaults to
     `Inf`). `target_location` should be either `:inside`, `:outside`, or `:on`,
-    and specifies where the `target` points lie relative to the to the
+    and specifies where the `target` points lie relative to the
     `source`'s boundary. When `target === source`, `target_location` is not
     needed.
 

@@ -29,7 +29,7 @@ See [anderson2024fast](@cite) for more details on the method.
   the same `kernel_variant`; for `:gradient_source`, `S`/`D` are the standard
   single-/double-layer operators and `V` is the gradient volume
   operator.
-  - `grad_single_layer`: gradient of single layer potential; only used when
+- `grad_single_layer`: gradient of single layer potential; only used when
   `kernel_variant = :hessian`.
 """
 function vdim_correction(
@@ -760,12 +760,13 @@ Build a basis for the VDIM evaluation of the singular operator `X[g] = ∇W[g] =
 S·g(x) - PV∫∇ₓ∇_yG(x,y)·g(y)dy` acting on a vector density `g`, using the
 regularization of eq. (3.12) in [anderson2026general](@cite).
 
-As for `W` ([`polynomial_solutions_vdim_W`](@ref)), the density is interpolated
+The polynomial solutions are related to those for `W`
+([`polynomial_solutions_vdim_W`](@ref)). Like `W`, the density is interpolated
 component-wise, so the basis is indexed by the scalar monomials `pₐ = yᴵ`
-(`|I| ≤ order`). For each monomial, and each coordinate direction `j`, the vector
-monomial is `gₐⱼ = pₐeⱼ`, whose divergence is `∂ⱼpₐ`; the polynomial PDE solution
-`Ψₐⱼ` satisfies `ℒΨₐⱼ = ∂ⱼpₐ`, and the relevant solution for `X` is `Υₐⱼ = ∇Ψₐⱼ`
-(so that `ℒΥₐⱼ = ∇∂ⱼpₐ`). Per (3.12),
+(`|I| ≤ order`). For each monomial, and each coordinate direction `j`, the
+vector monomial is `gₐⱼ = pₐeⱼ`, whose divergence is `∂ⱼpₐ`; the polynomial PDE
+solution `Ψₐⱼ` satisfies `ℒΨₐⱼ = ∂ⱼpₐ`, and the relevant solution for `X` is
+`Υₐⱼ = ∇Ψₐⱼ` (so that `ℒΥₐⱼ = ∇∂ⱼpₐ`). Per (3.12),
 
     X[gₐⱼ] = μ(x)Υₐⱼ(x) - ∇ₓS[pₐνⱼ](x) - S[(∂ⱼpₐ)ν + BνΥₐⱼ](x) + D[Υₐⱼ](x),
 
