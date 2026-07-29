@@ -52,6 +52,7 @@ include("entities.jl")
 include("domain.jl")
 include("simpleshapes.jl")
 include("mesh.jl")
+include("curve_mesh.jl")
 include("quadrature.jl")
 
 # Nyström methods
