@@ -77,8 +77,9 @@ target(iop::IntegralOperator) = iop.target
 source(iop::IntegralOperator) = iop.source
 
 function IntegralOperator(k, X, Y::Quadrature = X)
-    # check that all entities in the quadrature are of the same dimension
-    if !allequal(geometric_dimension(ent) for ent in entities(Y))
+    # check that all entities in the quadrature are of the same dimension. A
+    # mesh-less quadrature (see [`Quadrature`](@ref)) has no entities to check.
+    if !isnothing(Y.mesh) && !allequal(geometric_dimension(ent) for ent in entities(Y))
         msg = "entities in the target quadrature have different geometric dimensions"
         throw(ArgumentError(msg))
     end

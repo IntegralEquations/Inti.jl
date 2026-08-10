@@ -194,6 +194,20 @@ function order(q::Gauss{ReferenceTriangle, N}) where {N}
     return TRIANGLE_GAUSS_NPTS_TO_ORDER[N]
 end
 
+"""
+    gauss_triangle_order(q)
+
+The smallest tabulated `Gauss` triangle order that is at least `q`, or the largest
+tabulated one if `q` exceeds them all. Rounds *up*, never down, so a caller asking for
+`q` never silently integrates less accurately than it asked.
+"""
+function gauss_triangle_order(q)
+    avail = sort!(collect(keys(TRIANGLE_GAUSS_ORDER_TO_NPTS)))
+    i = findfirst(≥(q), avail)
+    isnothing(i) && error("requested order $q exceeds largest tabulated order $(last(avail))")
+    return avail[i]
+end
+
 function order(q::Gauss{ReferenceTetrahedron, N}) where {N}
     return TETRAHEDRON_GAUSS_NPTS_TO_ORDER[N]
 end
@@ -465,6 +479,9 @@ function interpolation_order(qrule::Inti.TensorProductQuadrature)
     @assert allequal(k1d) "interpolation order must be the same in all dimensions"
     return first(k1d)
 end
+
+# maximal ℚₖ that is exactly integrated
+order(qrule::TensorProductQuadrature) = minimum(order, qrule.quads1d)
 
 """
     adaptive_quadrature(ref_domain::ReferenceShape; kwargs...)

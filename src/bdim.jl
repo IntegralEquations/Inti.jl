@@ -82,6 +82,37 @@ function _bdim_push_weights!(Is, Js, Ss, Ds, Wdata, i, jglob, nq, ::Type{SV}) wh
 end
 
 """
+    _bdim_source_points(op, source, ns, parameters)
+
+Return the `ns` points used to center the monopoles/dipoles that make up the
+density interpolation basis in [`bdim_correction`](@ref). The points must lie
+*outside* the domain enclosed by `source` (so that the basis functions are
+solutions of the underlying PDE in its interior), and be spread out enough for
+their traces on each element to be a well-conditioned interpolation basis.
+
+The default places them on a circle (2D) or sphere (3D) surrounding the
+bounding box of `source`, with radius scaled by
+`parameters.sources_radius_multiplier`. Operators for which this is not
+admissible — e.g. an axisymmetric operator, whose "monopoles" are rings and
+therefore require a positive radial coordinate — should specialize this method
+on their `op` type.
+"""
+function _bdim_source_points(op::AbstractDifferentialOperator, source, ns, parameters)
+    N = ambient_dimension(source)
+    low_corner = reduce((p, q) -> min.(coords(p), coords(q)), source)
+    high_corner = reduce((p, q) -> max.(coords(p), coords(q)), source)
+    xc = (low_corner + high_corner) / 2
+    R = parameters.sources_radius_multiplier * norm(high_corner - low_corner) / 2
+    return if N === 2
+        uniform_points_circle(ns, R, xc)
+    elseif N === 3
+        fibonnaci_points_sphere(ns, R, xc)
+    else
+        error("only 2D and 3D supported")
+    end
+end
+
+"""
     bdim_correction(op,X,Y,S,D; green_multiplier, kwargs...)
 
 Given a `op` and a (possibly inaccurate) discretizations of its single and
@@ -135,7 +166,6 @@ function bdim_correction(
     Tbase = default_kernel_eltype(op)
     # determine type for dense matrices
     DenseBase = Tbase <: SMatrix ? BlockArray : Array
-    N = ambient_dimension(source)
     @assert eltype(Dop) == Tout "eltype of S and D must match"
     m, n = length(target), length(source)
     # check if we are in debug mode to avoid expensive computations
@@ -152,18 +182,7 @@ function bdim_correction(
     # find first an appropriate set of source points to center the monopoles
     qmax = sum(size(mat, 1) for mat in values(source.etype2qtags)) # max number of qnodes per el
     ns = ceil(Int, parameters.sources_oversample_factor * qmax)
-    # compute a bounding box for source points
-    low_corner = reduce((p, q) -> min.(coords(p), coords(q)), source)
-    high_corner = reduce((p, q) -> max.(coords(p), coords(q)), source)
-    xc = (low_corner + high_corner) / 2
-    R = parameters.sources_radius_multiplier * norm(high_corner - low_corner) / 2
-    xs = if N === 2
-        uniform_points_circle(ns, R, xc)
-    elseif N === 3
-        fibonnaci_points_sphere(ns, R, xc)
-    else
-        error("only 2D and 3D supported")
-    end
+    xs = _bdim_source_points(op, source, ns, parameters)
     # compute traces of monopoles on the source mesh
     G = SingleLayerKernel(op)
     γ₁G = AdjointDoubleLayerKernel(op)

@@ -83,7 +83,7 @@ end
     )
 
     # Test Green's identity with polynomial solution
-    basis = Inti.polynomial_solutions_vdim(op, 2)
+    basis = manufactured_basis(op, 2)
 
     # Use polynomial 2: x
     u_d = [basis[2].gradient_solution(q) for q in Ωₕ_quad]

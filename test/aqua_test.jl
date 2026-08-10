@@ -11,7 +11,9 @@ using Aqua
         project_extras = true,
         stale_deps = true,
         deps_compat = true,
-        piracies = (; broken = true), # piracy related to ElementaryPDESolutions
+        # remaining piracies are the `SVector{N,SMatrix}` products and the `Transpose`
+        # `zero` in src/kernels.jl, unrelated to the polynomial bases
+        piracies = (; broken = true),
         persistent_tasks = (; broken = false), # fixed?
     )
     Aqua.test_ambiguities(Inti)

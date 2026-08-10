@@ -609,6 +609,62 @@ function connectivity(msh::SubMesh, E::DataType)
 end
 
 """
+    topological_neighbors(msh::AbstractMesh, k=1)
+
+Return the `k` neighbors of each element in `msh`. The one-neighbors are the
+elements that share a common vertex with the element, `k` neighbors are the
+one-neighbors of the `k-1` neighbors.
+
+This function returns a dictionary where the key is an `(Eᵢ,i)` tuple denoting
+the element `i` of type `E` in the mesh, and the value is a set of tuples
+`(Eⱼ,j)` where `Eⱼ` is the type of the element and `j` its index.
+"""
+function topological_neighbors(msh::AbstractMesh, k = 1)
+    # dictionary mapping a node index to all elements containing it. Note
+    # that the elements are stored as a tuple (type, index)
+    T = Tuple{DataType, Int}
+    node2els = OrderedDict{Int, Vector{T}}()
+    for E in element_types(msh)
+        mat = connectivity(msh, E)::Matrix{Int} # connectivity matrix
+        np, Nel = size(mat)
+        for n in 1:Nel
+            for i in 1:np
+                idx = mat[i, n]
+                els = get!(node2els, idx, Vector{T}())
+                push!(els, (E, n))
+            end
+        end
+    end
+    # now revert the map to get the neighbors
+    one_neighbors = OrderedDict{T, Set{T}}()
+    for (_, els) in node2els
+        for el in els
+            nei = get!(one_neighbors, el, Set{T}())
+            for el′ in els
+                push!(nei, el′)
+            end
+        end
+    end
+    # Recursively compute the neighbors from the one-neighbors
+    if k > 1
+        k_neighbors = deepcopy(one_neighbors)
+    else
+        k_neighbors = one_neighbors
+    end
+    while k > 1
+        # update neighborhood of each element
+        for el in keys(one_neighbors)
+            knn = k_neighbors[el]
+            for el′ in copy(knn)
+                union!(knn, one_neighbors[el′])
+            end
+        end
+        k -= 1
+    end
+    return k_neighbors
+end
+
+"""
     near_interaction_list(X,Y::AbstractMesh; tol)
 
 For each element `el` of type `E` in `Y`, return the indices of the points in

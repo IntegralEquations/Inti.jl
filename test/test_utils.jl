@@ -127,3 +127,83 @@ function gmsh_cut_ball(; center, radius, meshsize, cutelevation)
     end
     return Ω, msh
 end
+
+using StaticArrays
+
+# Manufactured `(f, u, γ₁u)` triples with `ℒu = f`, in the per-index shape these tests use,
+# from the same `particular_basis` the corrections are built on. That is not circular: the
+# Green identity `μu + D[γ₀u] - S[γ₁u] = V[f]` holds for *any* particular solution, so what a
+# reference has to be is internally consistent, not canonical — and that consistency is
+# pinned independently, by automatic differentiation, in `particular_basis_test.jl`.
+#
+# `source` is scalar for every operator (see `particular_basis`); the vector-valued cases
+# recover their tensor by multiplying it with a direction, exactly as before.
+function manufactured_basis(op, order)
+    N = Inti.ambient_dimension(op)
+    pb = Inti.particular_basis(op, order)
+    c, r = zero(SVector{N, Float64}), 1.0
+    b, Ψ, γ₁Ψ = pb(c, r)
+    ∇Ψ = Inti.gradient_solution(pb, c, r)
+    return map(1:length(pb)) do k
+        (
+            source = q -> b(Inti.coords(q))[k],
+            solution = q -> Ψ(Inti.coords(q))[k],
+            neumann_trace = q -> γ₁Ψ(Inti.coords(q), Inti.normal(q))[k],
+            gradient_solution = q -> ∇Ψ(Inti.coords(q))[k],
+        )
+    end
+end
+
+# The `W` counterpart: `ℒΨₐⱼ = ∂ⱼpₐ` bundled over the density directions `j`, with the
+# `+ pₐνⱼ` of the (3.11) regularization folded into the trace.
+function manufactured_basis_W(op, order)
+    N = Inti.ambient_dimension(op)
+    pb = Inti.particular_basis(op, order)
+    c, r = zero(SVector{N, Float64}), 1.0
+    b = first(pb(c, r))
+    pbj = ntuple(j -> Inti.source_derivative(pb, j)(c, r), N)
+    return map(1:length(pb)) do k
+        (
+            source = q -> b(Inti.coords(q))[k],
+            solution = q -> SVector(ntuple(j -> pbj[j][2](Inti.coords(q))[k], N)),
+            neumann_trace = q -> SVector(
+                ntuple(N) do j
+                    x, ν = Inti.coords(q), Inti.normal(q)
+                    pbj[j][3](x, ν)[k] + b(x)[k] * ν[j]
+                end,
+            ),
+        )
+    end
+end
+
+# The `X` counterpart: `Υₐⱼ = ∇Ψₐⱼ` as the columns of an `SMatrix`, plus the two traces of
+# (3.12) — `(∂ⱼpₐ)ν + (HessΨₐⱼ)·ν` and `pₐν`.
+function manufactured_basis_X(op, order)
+    N = Inti.ambient_dimension(op)
+    pb = Inti.particular_basis(op, order)
+    c, r = zero(SVector{N, Float64}), 1.0
+    b = first(pb(c, r))
+    Υ = ntuple(j -> Inti.gradient_solution(Inti.source_derivative(pb, j), c, r), N)
+    # `∂ν` of each component of `Υⱼ`, i.e. the rows of the Hessian contracted with `ν`
+    BνΥ = ntuple(
+        j -> ntuple(d -> last(Inti.solution_derivative(Inti.source_derivative(pb, j), d)(c, r)), N),
+        N,
+    )
+    ∂p = ntuple(j -> Inti.derivative_matrix(Inti.source_space(pb), j), N)
+    m = Inti.source_space(pb)
+    return map(1:length(pb)) do k
+        (
+            source = q -> b(Inti.coords(q))[k],
+            solution = q -> reduce(hcat, ntuple(j -> Υ[j](Inti.coords(q))[k], N)),
+            single_trace = q -> begin
+                x, ν = Inti.coords(q), Inti.normal(q)
+                ∂pv = ntuple(j -> (∂p[j] * m(x))[k], N)
+                reduce(
+                    hcat,
+                    ntuple(j -> SVector(ntuple(d -> ∂pv[j] * ν[d] + BνΥ[j][d](x, ν)[k], N)), N),
+                )
+            end,
+            grad_single_trace = q -> b(Inti.coords(q))[k] * Inti.normal(q),
+        )
+    end
+end

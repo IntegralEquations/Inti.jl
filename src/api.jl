@@ -6,12 +6,12 @@ Available compression methods for the dense linear operators in [`Inti`](@ref).
 const COMPRESSION_METHODS = [:none, :hmatrix, :fmm]
 
 """
-    const CORRECTION_METHODS = [:none, :dim, :adaptive]
+    const CORRECTION_METHODS = [:none, :dim, :ldim, :adaptive]
 
 Available correction methods for the singular and nearly-singular integrals in
 [`Inti`](@ref).
 """
-const CORRECTION_METHODS = [:none, :dim, :adaptive]
+const CORRECTION_METHODS = [:none, :dim, :ldim, :adaptive]
 
 """
     single_double_layer(; op, target, source::Quadrature, compression,
@@ -180,6 +180,13 @@ function single_double_layer(;
         correction_kw = Base.structdiff(correction, NamedTuple{(:method,)})
         δS = adaptive_correction(Sop; correction_kw...)
         δD = adaptive_correction(Dop; correction_kw...)
+    elseif correction.method == :ldim
+        throw(
+            ArgumentError(
+                "correction method :ldim has a volume path only; use :dim or \
+                 :adaptive for layer operators",
+            ),
+        )
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")
     end
@@ -476,6 +483,25 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
             interpolation_order,
             kernel_variant,
             grad_single_layer,
+        )
+    elseif correction.method == :ldim
+        if haskey(correction, :green_multiplier)
+            @assert length(correction.green_multiplier) == length(target)
+            green_multiplier = correction.green_multiplier
+        else
+            loc = target === source ? :inside : correction.target_location
+            green_multiplier = fill(_green_multiplier(loc), length(target))
+        end
+        δV = lvdim_correction(
+            op,
+            target,
+            source;
+            green_multiplier,
+            correction.maxdist,
+            correction.interpolation_order,
+            correction.bdry_qorder,
+            correction.nneighbors,
+            kernel_variant,
         )
     else
         error("Unknown correction method. Available options: $CORRECTION_METHODS")

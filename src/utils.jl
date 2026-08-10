@@ -170,6 +170,40 @@ function fibonnaci_points_sphere(N, r, center)
     return pts
 end
 
+"""
+    vandermonde!(V, b, pts) -> V
+
+
+Vandermonde matrix of the basis `b` evaluated at the points `pts`: column `i` holds
+`b(pts[i])`, so `V` has size `length(b(pts[1])) × length(pts)`.
+
+`b` is a *batched* basis: a callable mapping a single point to the vector of all
+basis-function values at that point. The mutating form writes into a preallocated
+`V` (to reuse the storage across several point sets); the allocating form infers the
+size and element type from `b(first(pts))`.
+
+`pts` is only iterated, so a generator may be passed to avoid materializing the points —
+e.g. `vandermonde(b, (coords(q) for q in nodes))`.
+"""
+function vandermonde!(V, b, pts)
+    for (i, p) in enumerate(pts)
+        V[:, i] .= b(p)
+    end
+    return V
+end
+
+"""
+    vandermonde(b, pts) -> V
+
+Like [`vandermonde!`](@ref), but allocates the output matrix `V` instead of writing into a
+preallocated one.
+"""
+function vandermonde(b, pts)
+    v1 = b(first(pts))
+    V = Matrix{eltype(v1)}(undef, length(v1), length(pts))
+    return vandermonde!(V, b, pts)
+end
+
 # https://discourse.julialang.org/t/putting-threads-threads-or-any-macro-in-an-if-statement/41406/7
 macro usethreads(multithreaded, expr::Expr)
     ex = quote
@@ -202,12 +236,12 @@ function _normalize_compression(compression, target, source)
 end
 
 function _normalize_correction(correction, target, source)
-    methods = (:dim, :adaptive, :none)
+    methods = (:dim, :ldim, :adaptive, :none)
     # check that method is valid
     correction.method ∈ methods ||
         error("Unknown correction.method $(correction.method). Available options: $methods")
     # set default values if absent
-    if correction.method == :dim
+    if correction.method == :dim || correction.method == :ldim
         haskey(correction, :target_location) &&
             target === source &&
             correction.target_location != :on &&
@@ -223,10 +257,24 @@ function _normalize_correction(correction, target, source)
         haskey(correction, :maxdist) ||
             target === source ||
             @warn("missing maxdist field in correction: setting to Inf")
-        correction = merge(
+        defaults, extra = if correction.method == :ldim
+            (
+                    maxdist = Inf, interpolation_order = nothing, bdry_qorder = nothing,
+                    nneighbors = 1,
+                ), ()
+        else
+            # `boundary`/`S_b2d`/`D_b2d` are read only on the volume-potential path
             (maxdist = Inf, interpolation_order = nothing, center = nothing),
-            correction,
-        )
+                (:boundary, :S_b2d, :D_b2d)
+        end
+        # reject unknown fields: `merge` would otherwise keep a misspelled or stale one and
+        # it would be silently ignored, which reads as the option having no effect
+        known = (keys(defaults)..., :method, :target_location, :green_multiplier, extra...)
+        for k in keys(correction)
+            k in known || error("unknown field $k in correction for method \
+                                 $(correction.method); expected one of $known")
+        end
+        correction = merge(defaults, correction)
     end
     return correction
 end

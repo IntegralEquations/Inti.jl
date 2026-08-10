@@ -1,4 +1,145 @@
 """
+    _dim_correction(source, dict_near, bfun, Θ, Tw) -> δV
+
+Sparse correction of a volume potential from the right-hand side `Θ` of the Green identity
+(`num_target × num_basis`) and the batched interpolation basis `bfun`: on every source element
+with near targets, interpolate `Θ` in `bfun` over the element's own quadrature nodes and store
+the resulting weights, of type `Tw`.
+
+Everything the method does once `Θ` is known. `lvdim` assembles `Θ` one element at a time and so
+calls [`_dim_solve!`](@ref) directly, rather than through this loop.
+"""
+function _dim_correction(source, dict_near, bfun, Θ, ::Type{Tw}) where {Tw}
+    Is, Js, Vs = Int[], Int[], Tw[]
+    do_debug = debug_mode()
+    vander_cond = vander_norm = -Inf
+    for (E, qtags) in source.etype2qtags
+        near_list = dict_near[E]
+        nq, ne = size(qtags)
+        @assert length(near_list) == ne
+        # each element contributes exactly `nq * length(near)` entries, so the output is
+        # sized up front and every element fills a disjoint slice
+        counts = [nq * length(near) for near in near_list]
+        offs = length(Is) .+ cumsum(counts) .- counts
+        for v in (Is, Js, Vs)
+            resize!(v, length(v) + sum(counts))
+        end
+        for n in 1:ne
+            isempty(near_list[n]) && continue
+            jglob = @view qtags[:, n]
+            L = vandermonde(bfun, (coords(source[j]) for j in jglob))
+            if do_debug
+                vander_cond = max(vander_cond, cond(L))
+                vander_norm = max(vander_norm, norm(L))
+            end
+            # basis index first, as `_dim_solve!` wants it; a permuted view rather than a
+            # `transpose`, which would also transpose the `SMatrix` entries
+            Θt = PermutedDimsArray(view(Θ, near_list[n], :), (2, 1))
+            _dim_solve!(Is, Js, Vs, offs[n], L, Θt, jglob, near_list[n])
+        end
+    end
+    @debug """Condition properties of the vdim correction:
+    |-- max interp. matrix condition: $vander_cond
+    |-- max interp. matrix norm:      $vander_norm
+    """
+    return sparse(Is, Js, Vs, size(Θ, 1), length(source))
+end
+
+"""
+    _dim_interpolation_order(source) -> order
+
+Default degree of the interpolation basis for a density integrated by `source`: the
+[`interpolation_order`](@ref) of `source`'s own quadrature rules, the *weakest* of them on a
+mixed mesh.
+
+The density is interpolated on each element's quadrature nodes, so the basis must be one those
+nodes can determine — which is what a rule's interpolation order reports, and it is well below
+its quadrature order. A Vioreanu-Rokhlin triangle rule of quadrature order 7 has 15 nodes and
+interpolation order 4: asking for the quadrature order would pose 36 basis functions on them.
+"""
+_dim_interpolation_order(source::Quadrature) =
+    minimum(interpolation_order, values(source.etype2qrule))
+
+"""
+    _dim_solve!(Is, Js, Vs, off, L, Θ, jglob, near)
+
+Solve the local interpolation system of the density interpolation method for one element and
+write that element's block of `δV` into the preallocated `(Is, Js, Vs)`, starting at `off`.
+
+- `L`     — the interpolation basis' Vandermonde on the element's own quadrature nodes,
+            `num_basis × nq`, and always **scalar** (see [`particular_basis`](@ref));
+- `Θ`     — the right-hand side of the Green identity, `num_basis × length(near)`, i.e.
+            transposed relative to the correction it becomes;
+- `jglob` — the element's global quadrature-node indices, `near` the targets it corrects.
+
+The *same* for every variant: `vdim_correction`'s four kernel variants and `lvdim_correction`
+differ only in how `Θ` is assembled. Whatever the entries of `Θ` are, a density multiplies them
+componentwise, so the system decouples into [`_dim_ncomponents`](@ref) scalar right-hand sides
+sharing one factorization of `L`. For a vector-valued PDE that is what replaces the
+`num_basis·N × nq·N` system `kron(L, I)` would pose: the same solve, once instead of `N` times.
+"""
+function _dim_solve!(Is, Js, Vs, off, L, Θ, jglob, near)
+    nb, nq = size(L)
+    T, nc = _dim_scalar_type(eltype(Θ)), _dim_ncomponents(eltype(Θ))
+    F = svd(L)
+    bdata, wdata = Matrix{T}(undef, nb, nc), Matrix{T}(undef, nq, nc)
+    for (t, i) in enumerate(near)
+        for m in 1:nb
+            _dim_components!(bdata, m, Θ[m, t])
+        end
+        ldiv!(wdata, F, bdata)
+        # column-major over the block: target slowest, the element's own nodes fastest
+        for s in 1:nq
+            q = off + (t - 1) * nq + s
+            Is[q], Js[q] = i, jglob[s]
+            Vs[q] = -_dim_weight(eltype(Vs), wdata, s)
+        end
+    end
+    return nothing
+end
+
+"""
+    _dim_ncomponents(T) -> nc
+    _dim_scalar_type(T) -> S
+
+The number of scalar components of one entry of `Θ`, and the scalar type they live in —
+the width and element type of the right-hand side [`_dim_solve!`](@ref) poses.
+"""
+_dim_ncomponents(::Type{<:Number}) = 1
+_dim_ncomponents(::Type{T}) where {T <: StaticArray} = length(T) * _dim_ncomponents(eltype(T))
+
+@doc (@doc _dim_ncomponents)
+_dim_scalar_type(::Type{T}) where {T <: Number} = T
+_dim_scalar_type(::Type{T}) where {T <: StaticArray} = _dim_scalar_type(eltype(T))
+
+# `Θ[m, t]` spread over row `m` of the right-hand side, and the inverse map rebuilding one entry
+# of the correction out of row `s` of the solution. The two need only be inverse to each other:
+# the solve treats the columns independently, so any consistent flattening gives the same
+# answer.
+_dim_components!(bdata, m, val::Number) = (bdata[m, 1] = val)
+# `Tuple`, not the value itself: broadcasting an `SMatrix` into a row would compare shapes
+_dim_components!(bdata, m, val::StaticArray{<:Any, <:Number}) = (bdata[m, :] .= Tuple(val))
+function _dim_components!(bdata, m, val::StaticArray{<:Any, <:StaticArray})
+    nc = _dim_ncomponents(eltype(val))
+    for (k, blk) in enumerate(val)
+        bdata[m, ((k - 1) * nc + 1):(k * nc)] .= Tuple(blk)
+    end
+    return bdata
+end
+
+_dim_weight(::Type{T}, wdata, s) where {T <: Number} = wdata[s, 1]
+_dim_weight(::Type{T}, wdata, s) where {T <: StaticArray{<:Any, <:Number}} =
+    T(ntuple(c -> wdata[s, c], length(T)))
+function _dim_weight(::Type{T}, wdata, s) where {T <: StaticArray{<:Any, <:StaticArray}}
+    B = eltype(T)
+    nc = _dim_ncomponents(B)
+    return T(ntuple(k -> B(ntuple(c -> wdata[s, (k - 1) * nc + c], nc)), length(T)))
+end
+# `W`'s correction maps an `SVector` density to a scalar, so its entries are row vectors
+_dim_weight(::Type{Transpose{S, V}}, wdata, s) where {S, V} =
+    transpose(_dim_weight(V, wdata, s))
+
+"""
     vdim_correction(op,X,Y,Y_boundary,S,D,V; green_multiplier, kwargs...)
 
 Compute a correction to the volume potential `V : Y → X` such that `V + δV` is a
@@ -17,20 +158,21 @@ See [anderson2024fast](@cite) for more details on the method.
 
 ## Optional `kwargs`:
 
-- `interpolation_order`: the order of the polynomial interpolation. By default,
-  the maximum order of the quadrature rules is used.
+- `interpolation_order`: the order of the polynomial interpolation. Defaults to
+  [`_dim_interpolation_order`](@ref)`(Y)`, the interpolation order of `Y`'s own
+  quadrature rules.
 - `maxdist`: distance beyond which interactions are considered sufficiently far
   so that no correction is needed. This is used to determine a threshold for
   nearly-singular corrections.
-- `kernel_variant`: `:default` for the standard volume potential, `:gradient` for
-  the gradient of the volume potential, `:gradient_source` for the operator
-  `W[g] = -∫∇yG⋅g` acting on a vector density `g`, or `:hessian` for the operator
-  `X[g] = ∇W[g]`. For `:default`/`:gradient`, `S`, `D`, and `V` must be built with
-  the same `kernel_variant`; for `:gradient_source`, `S`/`D` are the standard
-  single-/double-layer operators and `V` is the gradient volume
-  operator.
-- `grad_single_layer`: gradient of single layer potential; only used when
-  `kernel_variant = :hessian`.
+- `kernel_variant`: which volume operator is being corrected — `:default` for `V`,
+  `:gradient` for `∇V`, `:gradient_source` for `W[g] = -∫∇yG⋅g`, `:hessian` for
+  `X[g] = ∇W[g]`. This selects the Green identity, and hence which operators must
+  be passed: `:default`/`:gradient` want `S`, `D` and `V` all built with the same
+  variant, while `:gradient_source` and `:hessian` want the *scalar* `S`/`D`
+  alongside a `V` that is the gradient (resp. Hessian) volume operator. See
+  [`particular_basis`](@ref) for the derivation.
+- `grad_single_layer`: the gradient single-layer `∇ₓS`; required by `:hessian` and
+  unused otherwise.
 """
 function vdim_correction(
         op::AbstractDifferentialOperator{N},
@@ -46,22 +188,8 @@ function vdim_correction(
         maxdist = Inf,
         grad_single_layer = nothing,
     ) where {N}
-    # The W operator (vector density -> scalar) is handled by a dedicated
-    # routine: its boundary potentials are single-/double-layers (so `Sop`/`Dop`
-    # here are scalar-valued), `Vop` is the gradient volume
-    # operator, and the resulting correction maps an `SVector` density to a
-    # scalar.
-    if kernel_variant === :gradient_source
-        return _vdim_correction_W(
-            op, target, source, boundary, Sop, Dop, Vop;
-            green_multiplier, interpolation_order, maxdist,
-        )
-    end
-    # The X = ∇W operator (vector density -> vector output) is handled by another
-    # dedicated routine: `Sop`/`Dop` are the scalar single-/double-layer,
-    # `grad_single_layer` is the gradient single-layer (∇ₓS), and `Vop` is the
-    # Hessian volume operator. The resulting correction has
-    # `SMatrix` entries mapping an `SVector` density to an `SVector` output.
+    # `X` is the one variant needing two by-parts boundary terms, on two different operators —
+    # one more than `green_identity_terms` carries — so it keeps its own assembly.
     if kernel_variant === :hessian
         isnothing(grad_single_layer) &&
             error("kernel_variant = :hessian requires the `grad_single_layer` operator")
@@ -70,39 +198,80 @@ function vdim_correction(
             green_multiplier, interpolation_order, maxdist,
         )
     end
-    # variables for debugging the condition properties of the method
-    vander_cond = vander_norm = rhs_norm = res_norm = shift_norm = -Inf
     Tout = eltype(Vop)
     Tbase = default_kernel_eltype(op)
     # determine type for dense matrices
     DenseOut = Tout <: SMatrix ? BlockArray : Array
     DenseBase = Tbase <: SMatrix ? BlockArray : Array
-    @assert eltype(Dop) == eltype(Sop) == Tout "eltype of Sop, Dop, and Vop must match"
-    # figure out if we are dealing with a scalar or vector PDE
     num_target, num_source = length(target), length(source)
     # a reasonable interpolation_order if not provided
     isnothing(interpolation_order) &&
-        (interpolation_order = maximum(order, values(source.etype2qrule)))
-    # check if we are in debug mode to avoid expensive computations
-    do_debug = debug_mode()
-    # by default basis centered at origin
-    basis = polynomial_solutions_vdim(op, interpolation_order, Tbase)
+        (interpolation_order = _dim_interpolation_order(source))
+    # One basis for the whole mesh, centered at the origin and unscaled: unlike
+    # `lvdim_correction`, `Θ` here comes from *global* forward maps over whole columns, so a
+    # single frame must serve every element.
+    pb = particular_basis(op, interpolation_order)
+    c, r = zero(SVector{N, Float64}), 1.0
+    bfun, γ₀Ψ, γ₁Ψ, σfun = green_identity_terms(pb, kernel_variant, c, r)
     dict_near = etype_to_nearest_points(target, source; maxdist)
-    num_basis = length(basis)
-    b = DenseBase{Tbase}(undef, length(source), num_basis)
-    γ₀B = DenseBase{Tbase}(undef, length(boundary), num_basis)
-    γ₁B = DenseBase{Tbase}(undef, length(boundary), num_basis)
-    for k in 1:num_basis, j in 1:length(source)
-        b[j, k] = basis[k].source(source[j])
+    num_basis = length(pb)
+    # `W`'s density carries a direction index the layer operators never see, so its traces are
+    # `SVector`s over `nc = N` components against *scalar* `Sop`/`Dop`. Every other variant has
+    # `nc = 1` and lets the operator carry whatever structure the output has.
+    nc = kernel_variant === :gradient_source ? N : 1
+    if nc == 1
+        @assert eltype(Dop) == eltype(Sop) == Tout "eltype of Sop, Dop, and Vop must match"
+    else
+        @assert eltype(Dop) == eltype(Sop) == Tbase "Sop and Dop must be the scalar layers"
     end
-    for k in 1:num_basis, j in 1:length(boundary)
-        γ₀B[j, k] = basis[k].solution(boundary[j])
-        γ₁B[j, k] = basis[k].neumann_trace(boundary[j])
+    Trace = nc == 1 ? DenseBase{Tbase} : Matrix{SVector{nc, Tbase}}
+    b = DenseBase{Tbase}(undef, length(source), num_basis)
+    γ₀B = Trace(undef, length(boundary), num_basis)
+    γ₁B = Trace(undef, length(boundary), num_basis)
+    # The basis is *batched* — one call per node yields all `num_basis` values — so these
+    # fill row-wise
+    for j in 1:length(source)
+        v = bfun(coords(source[j]))
+        for k in 1:num_basis
+            b[j, k] = _vdim_basis_value(v[k], Tbase)
+        end
+    end
+    for j in 1:length(boundary)
+        x, ν = coords(boundary[j]), normal(boundary[j])
+        v, dv = γ₀Ψ(x), γ₁Ψ(x, ν)
+        for k in 1:num_basis
+            γ₀B[j, k] = v[k]
+            γ₁B[j, k] = dv[k]
+        end
     end
     Θ = DenseOut{Tout}(undef, num_target, num_basis)
     fill!(Θ, zero(Tout))
     # Compute Θ <-- S * γ₁B - D * γ₀B + V * b + σ * B(x) using in-place matvec
-    if DenseOut <: Array || (Sop isa BlockArray && Dop isa BlockArray && Vop isa BlockArray)
+    if nc > 1
+        # One scalar application of `Sop`/`Dop` per density direction, its result landing in
+        # that same component of `Θ`. The volume term needs no such split: by R2 the density
+        # direction *is* the gradient direction, so `Vop * b` already delivers all `nc`.
+        g₀ = Vector{Tbase}(undef, length(boundary))
+        g₁ = Vector{Tbase}(undef, length(boundary))
+        for n in 1:num_basis
+            vol = Vop * view(b, :, n)
+            for i in 1:num_target
+                Θ[i, n] += vol[i]
+            end
+            for cc in 1:nc
+                for j in 1:length(boundary)
+                    g₀[j] = γ₀B[j, n][cc]
+                    g₁[j] = γ₁B[j, n][cc]
+                end
+                sc, dc = Sop * g₁, Dop * g₀
+                for i in 1:num_target
+                    Θ[i, n] += Tout(
+                        ntuple(d -> d == cc ? sc[i] - dc[i] : zero(Tbase), nc),
+                    )
+                end
+            end
+        end
+    elseif DenseOut <: Array || (Sop isa BlockArray && Dop isa BlockArray && Vop isa BlockArray)
         for n in 1:num_basis
             @views mul!(Θ[:, n], Sop, γ₁B[:, n])
             @views mul!(Θ[:, n], Dop, γ₀B[:, n], -1, 1)
@@ -128,352 +297,24 @@ function vdim_correction(
             mul!(y, Vop, x, 1, 1)
         end
     end
-    # Add σ * B(x) term
-    for n in 1:num_basis
-        for i in 1:num_target
-            if kernel_variant === :gradient
-                Θ[i, n] += green_multiplier[i] * basis[n].gradient_solution(target[i])
-            else
-                Θ[i, n] += green_multiplier[i] * basis[n].solution(target[i])
-            end
+    # Add the free term `μ(x)σ(x)`
+    for i in 1:num_target
+        v = σfun(coords(target[i]))
+        for n in 1:num_basis
+            Θ[i, n] += green_multiplier[i] * v[n]
         end
     end
-    # compute sparse correction
-    Is = Int[]
-    Js = Int[]
-    Vs = eltype(Vop)[]
-    for (E, qtags) in source.etype2qtags
-        near_list = dict_near[E]
-        nq, ne = size(qtags)
-        @assert length(near_list) == ne
-        L_arr = DenseBase{Tbase}(undef, num_basis, nq)
-        Ldata = parent(L_arr)::Matrix
-        # Preallocate solve buffers. Vector-valued PDEs (Tout <: SMatrix or
-        # Tout <: SVector{K,<:SMatrix}) need BlockArray so that LAPACK sees a
-        # plain float matrix while we can still index with SMatrix semantics.
-        # Scalar/SVector{P,<:Number} PDEs use a plain float matrix directly.
-        if Tout <: SMatrix
-            b_arr = BlockArray{Tout}(undef, num_basis, 1)
-            wei_arr = BlockArray{Tout}(undef, nq, 1)
-            bdata = parent(b_arr)::Matrix
-            weidata = parent(wei_arr)::Matrix
-        elseif Tout <: SVector && eltype(Tout) <: SMatrix
-            K = length(Tout)
-            SM = eltype(Tout)
-            b_kk = BlockArray{SM}(undef, num_basis, 1)
-            wei_kk = BlockArray{SM}(undef, nq, 1)
-            bdata_kk = parent(b_kk)::Matrix
-            weidata_kk = parent(wei_kk)::Matrix
-            Vs_mat = Matrix{SM}(undef, nq, K)
-        else
-            # Scalar (Tout <: Number) and gradient-scalar (Tout <: SVector{P,<:Number})
-            # cases share the same structure: P columns in the solve, where P=1 for scalar.
-            S = eltype(Tout)
-            P = Tout <: Number ? 1 : length(Tout)
-            bdata = Matrix{S}(undef, num_basis, P)
-            weidata = Matrix{S}(undef, nq, P)
-        end
-        for n in 1:ne
-            isempty(near_list[n]) && continue
-            jglob = @view qtags[:, n]
-            for k in 1:nq, m in 1:num_basis
-                L_arr[m, k] = basis[m].source(view(source, jglob)[k])
-            end
-            F = svd(Ldata)
-            if do_debug
-                vander_cond = max(vander_cond, cond(Ldata))
-                shift_norm = max(shift_norm, 1)
-                vander_norm = max(vander_norm, norm(Ldata))
-            end
-            for i in near_list[n]
-                if Tout <: SMatrix
-                    b_arr .= @views transpose(Θ[i:i, :])
-                    ldiv!(weidata, F, bdata)
-                    if do_debug
-                        rhs_norm = max(rhs_norm, norm(bdata))
-                        res_norm = max(res_norm, norm(Ldata * weidata - bdata))
-                    end
-                    for k in 1:nq
-                        push!(Is, i)
-                        push!(Js, jglob[k])
-                        push!(Vs, -transpose(wei_arr[k]))
-                    end
-                elseif Tout <: SVector && eltype(Tout) <: SMatrix
-                    for kk in 1:K
-                        for m in 1:num_basis
-                            b_kk[m, 1] = transpose(Θ[i, m][kk])
-                        end
-                        ldiv!(weidata_kk, F, bdata_kk)
-                        for k in 1:nq
-                            Vs_mat[k, kk] = -transpose(wei_kk[k])
-                        end
-                    end
-                    for k in 1:nq
-                        push!(Is, i)
-                        push!(Js, jglob[k])
-                        push!(Vs, Tout(ntuple(kk -> Vs_mat[k, kk], K)))
-                    end
-                else
-                    for m in 1:num_basis
-                        _vdim_fill_bdata!(bdata, Θ[i, m], m, Tout)
-                    end
-                    ldiv!(weidata, F, bdata)
-                    if do_debug
-                        rhs_norm = max(rhs_norm, norm(bdata))
-                        res_norm = max(res_norm, norm(Ldata * weidata - bdata))
-                    end
-                    for k in 1:nq
-                        push!(Is, i)
-                        push!(Js, jglob[k])
-                        _vdim_push_weight!(Vs, weidata, k, Tout)
-                    end
-                end
-            end
-        end
-    end
-    @debug """Condition properties of vdim correction:
-    |-- max interp. matrix condition: $vander_cond
-    |-- max norm of source term:      $rhs_norm
-    |-- max residual error:           $res_norm
-    |-- max interp. matrix norm :     $vander_norm
-    |-- max shift norm :              $shift_norm
-    """
-    δV = sparse(Is, Js, Vs, num_target, num_source)
-    return δV
+    # `W`'s correction contracts an `SVector` density to a scalar, hence the adjoint entry
+    Tw = nc == 1 ? Tout : Transpose{Tbase, Tout}
+    return _dim_correction(source, dict_near, bfun, Θ, Tw)
 end
 
-# Helper: fill one row of bdata from Θ[i,m] — dispatches on element type
-_vdim_fill_bdata!(bdata, val, m, ::Type{<:Number}) = (bdata[m, 1] = val)
-_vdim_fill_bdata!(bdata, val, m, ::Type{<:SVector}) = (bdata[m, :] .= val)
+# `particular_basis` returns a *scalar* interpolation basis for every operator: for a
+# vector-valued PDE the source of `Ψ_β`'s `n`-th column is `b_β e_n`, i.e. the identity is
+# implicit. The volume term `Vop * b` is typed by `Tbase`, so spell it out there.
+_vdim_basis_value(v, ::Type{T}) where {T <: Number} = T(v)
+_vdim_basis_value(v, ::Type{SM}) where {SM <: SMatrix} = v * one(SM)
 
-# Helper: push the weight at quadrature node k into Vs — dispatches on Tout
-_vdim_push_weight!(Vs, wdata, k, ::Type{T}) where {T <: Number} = push!(Vs, -wdata[k, 1])
-_vdim_push_weight!(Vs, wdata, k, ::Type{SV}) where {SV <: SVector} = push!(Vs, -SV(wdata[k, :]))
-
-
-function translation_and_scaling(el::LagrangeTriangle)
-    vertices = el.vals[1:3]
-    l1 = norm(vertices[1] - vertices[2])
-    l2 = norm(vertices[2] - vertices[3])
-    l3 = norm(vertices[3] - vertices[1])
-    if ((l1^2 + l2^2 >= l3^2) && (l2^2 + l3^2 >= l1^2) && (l3^2 + l1^2 > l2^2))
-        acuteright = true
-    else
-        acuteright = false
-    end
-
-    if acuteright
-        # Compute the circumcenter and circumradius
-        Bp = vertices[2] - vertices[1]
-        Cp = vertices[3] - vertices[1]
-        Dp = 2 * (Bp[1] * Cp[2] - Bp[2] * Cp[1])
-        Upx = 1 / Dp * (Cp[2] * (Bp[1]^2 + Bp[2]^2) - Bp[2] * (Cp[1]^2 + Cp[2]^2))
-        Upy = 1 / Dp * (Bp[1] * (Cp[1]^2 + Cp[2]^2) - Cp[1] * (Bp[1]^2 + Bp[2]^2))
-        Up = SVector{2}(Upx, Upy)
-        r = norm(Up)
-        c = Up + vertices[1]
-    else
-        if (l1 >= l2) && (l1 >= l3)
-            c = (vertices[1] + vertices[2]) / 2
-            r = l1 / 2
-        elseif (l2 >= l1) && (l2 >= l3)
-            c = (vertices[2] + vertices[3]) / 2
-            r = l2 / 2
-        else
-            c = (vertices[1] + vertices[3]) / 2
-            r = l3 / 2
-        end
-    end
-    return c, r
-end
-
-function translation_and_scaling(el::ParametricElement{ReferenceSimplex{3}})
-    straight_nodes =
-        [el([0.0, 0.0, 0.0]), el([1.0, 0.0, 0.0]), el([0.0, 1.0, 0.0]), el([0.0, 0.0, 1.0])]
-    return translation_and_scaling(
-        LagrangeElement{ReferenceSimplex{3}, 4, SVector{3, Float64}}(straight_nodes),
-    )
-end
-
-function translation_and_scaling(el::ParametricElement{ReferenceSimplex{2}})
-    straight_nodes = [el([1.0e-18, 1.0e-18]), el([1.0, 0.0]), el([0.0, 1.0])]
-    return translation_and_scaling(
-        LagrangeElement{ReferenceSimplex{2}, 3, SVector{2, Float64}}(straight_nodes),
-    )
-end
-
-function translation_and_scaling(el::LagrangeTetrahedron)
-    vertices = el.vals[1:4]
-    # Compute the circumcenter in barycentric coordinates
-    # formulas here are due to: https://math.stackexchange.com/questions/2863613/tetrahedron-centers
-    a = norm(vertices[4] - vertices[1])
-    b = norm(vertices[2] - vertices[4])
-    c = norm(vertices[3] - vertices[4])
-    d = norm(vertices[3] - vertices[2])
-    e = norm(vertices[3] - vertices[1])
-    f = norm(vertices[2] - vertices[1])
-    f² = f^2
-    a² = a^2
-    b² = b^2
-    c² = c^2
-    d² = d^2
-    e² = e^2
-
-    ρ =
-        a² * d² * (-d² + e² + f²) + b² * e² * (d² - e² + f²) + c² * f² * (d² + e² - f²) -
-        2 * d² * e² * f²
-    α =
-        a² * d² * (b² + c² - d²) + e² * b² * (-b² + c² + d²) + f² * c² * (b² - c² + d²) -
-        2 * b² * c² * d²
-    β =
-        b² * e² * (a² + c² - e²) + d² * a² * (-a² + c² + e²) + f² * c² * (a² - c² + e²) -
-        2 * a² * c² * e²
-    γ =
-        c² * f² * (a² + b² - f²) + d² * a² * (-a² + b² + f²) + e² * b² * (a² - b² + f²) -
-        2 * a² * b² * f²
-    if (ρ >= 0 && α >= 0 && β >= 0 + γ >= 0)
-        # circumcenter lays inside `el`
-        center =
-            (α * vertices[1] + β * vertices[2] + γ * vertices[3] + ρ * vertices[4]) /
-            (ρ + α + β + γ)
-        # ref: https://math.stackexchange.com/questions/1087011/calculating-the-radius-of-the-circumscribed-sphere-of-an-arbitrary-tetrahedron
-        R = sqrt(1 / 2 * (β * f² + γ * e² + ρ * a²) / (ρ + α + β + γ))
-    else
-        if (a >= b && a >= c && a >= d && a >= e && a >= f)
-            center = (vertices[1] + vertices[4]) / 2
-            R = a / 2
-        elseif (b >= a && b >= c && b >= d && b >= e && b >= f)
-            center = (vertices[2] + vertices[4]) / 2
-            R = b / 2
-        elseif (c >= a && c >= b && c >= d && c >= e && c >= f)
-            center = (vertices[3] + vertices[4]) / 2
-            R = c / 2
-        elseif (d >= a && d >= b && d >= c && d >= e && d >= f)
-            center = (vertices[3] + vertices[2]) / 2
-            R = d / 2
-        elseif (e >= a && e >= b && e >= c && e >= d && e >= f)
-            center = (vertices[3] + vertices[1]) / 2
-            R = e / 2
-        else
-            center = (vertices[2] + vertices[1]) / 2
-            R = f / 2
-        end
-    end
-    return center, R
-end
-
-"""
-    _vdim_correction_W(op, target, source, boundary, Sop, Dop, Vop; kwargs...)
-
-VDIM correction for the operator `W[g] = -∫∇yG(x,y)⋅g(y)dy` (vector density `g`,
-scalar output), using the regularization (3.11) of [anderson2026general](@cite).
-
-Here `Sop`, `Dop` are the (scalar) single-/double-layer, and `Vop` is the
-*gradient* volume operator (scalar density -> `SVector` output);
-the per-monomial volume contribution `W[pₐeⱼ] = [∇ₓV[pₐ]]ⱼ` is exactly `Vop`
-applied to the scalar monomial.
-
-The assembly mirrors the scalar/gradient case: per basis monomial `α` and target `i`,
-`Θ[i,α] = Sop·γ₁B - Dop·γ₀B + Vop·b + σ·Ψ(x)` is an `SVector{N}` over the density
-directions; the local interpolation system is solved against the scalar Vandermonde,
-and the weights are stored as `transpose`d `SVector`s so the resulting sparse matrix
-maps an `SVector{N}` density to a scalar.
-"""
-function _vdim_correction_W(
-        op::AbstractDifferentialOperator{N},
-        target,
-        source::Quadrature{N},
-        boundary::Quadrature,
-        Sop,
-        Dop,
-        Vop;
-        green_multiplier::Vector{<:Real},
-        interpolation_order = nothing,
-        maxdist = Inf,
-    ) where {N}
-    T = default_kernel_eltype(op)          # scalar element type (Float64 / ComplexF64)
-    SV = SVector{N, T}                      # density / Θ element type
-    @assert eltype(Vop) == SV "Vop must be the gradient volume operator (SVector output)"
-    num_target, num_source = length(target), length(source)
-    isnothing(interpolation_order) &&
-        (interpolation_order = maximum(order, values(source.etype2qrule)))
-    basis = polynomial_solutions_vdim_W(op, interpolation_order, T)
-    num_basis = length(basis)
-    dict_near = etype_to_nearest_points(target, source; maxdist)
-
-    # source-node monomial values (scalar) for the volume term and the Vandermonde
-    b = Matrix{T}(undef, num_source, num_basis)
-    for k in 1:num_basis, j in 1:num_source
-        b[j, k] = basis[k].source(source[j])
-    end
-    # boundary traces: SVector{N} over the density directions j
-    nbnd = length(boundary)
-    γ₀B = Matrix{SV}(undef, nbnd, num_basis)
-    γ₁B = Matrix{SV}(undef, nbnd, num_basis)
-    for k in 1:num_basis, j in 1:nbnd
-        γ₀B[j, k] = basis[k].solution(boundary[j])
-        # actually `q -> SVector(∂νΨₐⱼ(q) + pₐ(q) νⱼ(q))ⱼ`; see polynomial_solutions_vdim_W
-        γ₁B[j, k] = basis[k].neumann_trace(boundary[j])
-    end
-
-    # Assemble Θ[i,n] ∈ SVector{N} (column by column, FMM-friendly).
-    Θ = Matrix{SV}(undef, num_target, num_basis)
-    g0 = Vector{T}(undef, nbnd)
-    g1 = Vector{T}(undef, nbnd)
-    for n in 1:num_basis
-        vol = Vop * view(b, :, n)          # Vector{SVector{N}} of length num_target
-        # boundary contribution, one density-direction component at a time
-        bnd = [zero(SV) for _ in 1:num_target]
-        for c in 1:N
-            for j in 1:nbnd
-                g0[j] = γ₀B[j, n][c]
-                g1[j] = γ₁B[j, n][c]
-            end
-            sc = Sop * g1
-            dc = Dop * g0
-            for i in 1:num_target
-                bnd[i] += SV(ntuple(d -> d == c ? sc[i] - dc[i] : zero(T), N))
-            end
-        end
-        for i in 1:num_target
-            Θ[i, n] = vol[i] + bnd[i] + green_multiplier[i] * basis[n].solution(target[i])
-        end
-    end
-
-    # Local interpolation solve + adjoint-SVector storage.
-    Is = Int[]
-    Js = Int[]
-    Vs = Transpose{T, SV}[]
-    for (E, qtags) in source.etype2qtags
-        near_list = dict_near[E]
-        nq, ne = size(qtags)
-        @assert length(near_list) == ne
-        L = Matrix{T}(undef, num_basis, nq)
-        bdata = Matrix{T}(undef, num_basis, N)
-        weidata = Matrix{T}(undef, nq, N)
-        for n in 1:ne
-            isempty(near_list[n]) && continue
-            jglob = @view qtags[:, n]
-            for k in 1:nq, m in 1:num_basis
-                L[m, k] = basis[m].source(view(source, jglob)[k])
-            end
-            F = svd(L)
-            for i in near_list[n]
-                for m in 1:num_basis
-                    bdata[m, :] .= Θ[i, m]
-                end
-                ldiv!(weidata, F, bdata)
-                for k in 1:nq
-                    push!(Is, i)
-                    push!(Js, jglob[k])
-                    push!(Vs, -transpose(SV(ntuple(c -> weidata[k, c], N))))
-                end
-            end
-        end
-    end
-    δV = sparse(Is, Js, Vs, num_target, num_source)
-    return δV
-end
 
 """
     _vdim_correction_X(op, target, source, boundary, Sop, Dop, GSop, Vop; kwargs...)
@@ -492,6 +333,15 @@ Per basis monomial `pₐ` and target `i`, `Θ[i,α] ∈ SMatrix{N,N}` collects, 
 volume term; the local interpolation system is solved component-wise against the
 scalar Vandermonde and the weights are stored as `SMatrix`es so the resulting
 sparse correction maps an `SVector{N}` density to an `SVector{N}` output.
+
+This is the one variant that builds its polynomial data here rather than from
+[`green_identity_terms`](@ref). Taking `∂_c V[h] = V[∂_c h] - S[h ν_c]` twice
+leaves the `Ψ` part of the identity on the *plain* `S`/`D` — hence `Sop`/`Dop`
+above — and produces *two* by-parts terms rather than one: `S[(∂ⱼpₐ)ν_c]`, which
+rides `γ₁` as usual, and `W`'s leftover `S[pₐνⱼ]`, which can only be
+differentiated as `∇ₓS[pₐνⱼ]`, hence `GSop`. One by-parts term is all the Green
+identity of [`green_identity_terms`](@ref) carries, which is why this variant is
+assembled here.
 
 (Implementation notes: This routine makes no use of Green's function isotropy
 which would allow to exploit Φ'_{σ(β)} = σ(Φ'_β) for a coordinate permutation σ
@@ -525,24 +375,39 @@ function _vdim_correction_X(
     @assert eltype(GSop) == SV "GSop must be the gradient single-layer operator (SVector output)"
     num_target, num_source = length(target), length(source)
     isnothing(interpolation_order) &&
-        (interpolation_order = maximum(order, values(source.etype2qrule)))
-    basis = polynomial_solutions_vdim_X(op, interpolation_order, T)
-    num_basis = length(basis)
+        (interpolation_order = _dim_interpolation_order(source))
+    # the operator layer, not a variant: `X` needs `Υₐⱼ = ∇Ψₐⱼ` and the conormal
+    # `BνΥₐⱼ = (HessΨₐⱼ)·ν`, second and third derivatives of the one solve `ℒΨₐⱼ = ∂ⱼpₐ`
+    pb = particular_basis(op, interpolation_order)
+    c, r = zero(SVector{N, Float64}), 1.0
+    bfun = first(pb(c, r))
+    # `Υ[j](x)[α]` = ∇Ψₐⱼ(x), an `SVector{N}`
+    Υ = ntuple(j -> gradient_solution(source_derivative(pb, j), c, r), N)
+    num_basis = length(pb)
     dict_near = etype_to_nearest_points(target, source; maxdist)
 
     # source-node monomial values (scalar) for the volume term and the Vandermonde
     b = Matrix{T}(undef, num_source, num_basis)
-    for k in 1:num_basis, j in 1:num_source
-        b[j, k] = basis[k].source(source[j])
+    for j in 1:num_source
+        v = bfun(coords(source[j]))
+        for k in 1:num_basis
+            b[j, k] = v[k]
+        end
     end
-    # multi-index `I` of each basis monomial (same ordering as polynomial_solutions_vdim_X)
-    indices = [I for I in Iterators.product(ntuple(i -> 0:interpolation_order, N)...) if sum(I) <= interpolation_order]
+    # multi-index `I` of each basis monomial. Must be `monomial_exponents`, the ordering the
+    # basis itself uses — a raw `Iterators.product` has the same length but a different order,
+    # which would silently mispair `indices[n]` with basis function `n` below.
+    indices = monomial_exponents(N, interpolation_order)
     @assert length(indices) == num_basis
     # grad_single_trace (pₐν) on the boundary, for the ∇ₓS term
     nbnd = length(boundary)
     γs = Matrix{SV}(undef, nbnd, num_basis)
-    for k in 1:num_basis, q in 1:nbnd
-        γs[q, k] = basis[k].grad_single_trace(boundary[q])
+    for q in 1:nbnd
+        x, ν = coords(boundary[q]), normal(boundary[q])
+        v = bfun(x)
+        for k in 1:num_basis
+            γs[q, k] = v[k] * ν
+        end
     end
 
     # --- Optimization: dedup the S/D boundary applications over β = I − eⱼ ---
@@ -553,23 +418,26 @@ function _vdim_correction_X(
     # Thus, the nominal per-(n,j,c) applications in the above description can be
     # reduced to per-(β,c), β over |β| ≤ order−1, each scaled by Iⱼ in the
     # assembly below.
-    βindices = [B for B in Iterators.product(ntuple(i -> 0:(interpolation_order - 1), N)...) if sum(B) <= interpolation_order - 1]
+    # `β` ranges over the *lower-degree* basis, which the graded ordering makes a prefix of
+    # the full one — so `β2k` is just the position in `monomial_exponents` and the `β` data
+    # is a prefix of the same solve. `Φ′_β` is the basis's own `Ψ`, `∂_cΦ′_β` its gradient,
+    # and `∂ν(∂_cΦ′_β)` the `∂_ν` trace of `solution_derivative(pb, c)` — the dedup is now
+    # exactly the sparsity of `derivative_matrix`, at no extra cost.
+    βindices = monomial_exponents(N, interpolation_order - 1)
     β2k = Dict(B => k for (k, B) in enumerate(βindices))
     nβ = length(βindices)
+    ∇Φ = gradient_solution(pb, c, r)
+    ∂νΦc = ntuple(d -> last(solution_derivative(pb, d)(c, r)), N)
     g₀ = Matrix{T}(undef, nbnd, nβ * N)    # γ₀ traces ∂_cΦ′_β, column index (β,c) = (k-1)N+c
     g₁ = Matrix{T}(undef, nbnd, nβ * N)    # γ₁ traces τ_{β,c}
-    for k in 1:nβ
-        pβ = Polynomial(βindices[k] => one(T))
-        Φβ, _ = basis_from_monomial(op, pβ)
-        ∇Φβ = ElementaryPDESolutions.gradient(Φβ)                       # ∂_cΦ′_β
-        HessΦβ = ntuple(c -> ElementaryPDESolutions.gradient(∇Φβ[c]), N) # ∂_d∂_cΦ′_β
-        for q in 1:nbnd
-            xq, nu = coords(boundary[q]), normal(boundary[q])
-            pv = pβ(xq)
-            for c in 1:N
-                g₀[q, (k - 1) * N + c] = ∇Φβ[c](xq)
-                g₁[q, (k - 1) * N + c] = pv * nu[c] + dot(nu, HessΦβ[c](xq))
-            end
+    for q in 1:nbnd
+        xq, nu = coords(boundary[q]), normal(boundary[q])
+        pv = bfun(xq)
+        gv = ∇Φ(xq)
+        hv = ntuple(d -> ∂νΦc[d](xq, nu), N)
+        for k in 1:nβ, cc in 1:N
+            g₀[q, (k - 1) * N + cc] = gv[k][cc]
+            g₁[q, (k - 1) * N + cc] = pv[k] * nu[cc] + hv[cc][k]
         end
     end
     # Apply D (resp. S) once over all (β,c) columns; reused (scaled by Iⱼ) for every n.
@@ -591,6 +459,10 @@ function _vdim_correction_X(
     # passes (which re-traverse `Vop` N·num_basis times). All other operators — the dense
     # `BlockArray{SMatrix}` and the FMM dipole→gradient map (`SVector` output) — use the
     # per-direction application below.
+    # `Υ[j]` evaluated at every target once, up front: `Υtargall[j][i][n] = ∇Ψₙⱼ(xᵢ)`.
+    # Converted to `SV`, since the basis coefficients are real even when the kernel — and
+    # hence everything accumulated alongside these below — is complex.
+    Υtargall = ntuple(j -> [SV.(Υ[j](coords(target[i]))) for i in 1:num_target], N)
     opt_vol = eltype(Vop) == SM && !(Vop isa BlockArray)
     MVol = Matrix{SM}(undef, opt_vol ? num_target : 0, opt_vol ? num_basis : 0)
     if opt_vol
@@ -604,7 +476,10 @@ function _vdim_correction_X(
     end
     for n in 1:num_basis
         I = indices[n]
-        Υtarg = [basis[n].solution(target[i]) for i in 1:num_target]   # SMatrix Υₙ(xᵢ)
+        # SMatrix Υₙ(xᵢ), column `j` equal to `∇Ψₙⱼ`
+        Υtarg = [
+            reduce(hcat, ntuple(j -> Υtargall[j][i][n], N)) for i in 1:num_target
+        ]
         colvecs = ntuple(N) do j
             # σ-term: green_multiplier · Υₙⱼ(x)
             col = [green_multiplier[i] * Υtarg[i][:, j] for i in 1:num_target]
@@ -640,330 +515,5 @@ function _vdim_correction_X(
         end
     end
 
-    # Local interpolation solve + SMatrix storage (flatten column-major over the
-    # N×N entries, solve against the scalar Vandermonde, reconstruct the SMatrix).
-    Is = Int[]
-    Js = Int[]
-    Vs = SM[]
-    for (E, qtags) in source.etype2qtags
-        near_list = dict_near[E]
-        nq, ne = size(qtags)
-        @assert length(near_list) == ne
-        L = Matrix{T}(undef, num_basis, nq)
-        bdata = Matrix{T}(undef, num_basis, N * N)
-        weidata = Matrix{T}(undef, nq, N * N)
-        for n in 1:ne
-            isempty(near_list[n]) && continue
-            jglob = @view qtags[:, n]
-            for k in 1:nq, m in 1:num_basis
-                L[m, k] = basis[m].source(view(source, jglob)[k])
-            end
-            F = svd(L)
-            for i in near_list[n]
-                for m in 1:num_basis
-                    bdata[m, :] .= vec(Θ[i, m])
-                end
-                ldiv!(weidata, F, bdata)
-                for k in 1:nq
-                    push!(Is, i)
-                    push!(Js, jglob[k])
-                    push!(Vs, -SM(ntuple(idx -> weidata[k, idx], N * N)))
-                end
-            end
-        end
-    end
-    δV = sparse(Is, Js, Vs, num_target, num_source)
-    return δV
-end
-
-"""
-    polynomial_solutions_vdim(op, order, [T])
-
-Build a basis of polynomial solutions for the VDIM method.
-
-For every monomial `pₙ` of degree at most `order`, computes a polynomial solution `Pₙ`
-satisfying `ℒ[Pₙ] = pₙ`, where `ℒ` is the differential operator of `op`.
-
-Returns a vector of named tuples with fields `source = pₙ`, `solution = Pₙ`, `neumann_trace = γ₁Pₙ`, and `gradient_solution = ∇Pₙ`.
-"""
-function polynomial_solutions_vdim(
-        op::AbstractDifferentialOperator{N},
-        order::Integer,
-        ::Type{T} = default_kernel_eltype(op),
-    ) where {N, T}
-    indices = [I for I in Iterators.product(ntuple(i -> 0:order, N)...) if sum(I) <= order]
-    return map(indices) do I
-        monomial = Polynomial(I => one(T))
-        P, γ₁P = basis_from_monomial(op, monomial)
-        ∇P = ElementaryPDESolutions.gradient(P)
-        (source = monomial, solution = P, neumann_trace = γ₁P, gradient_solution = ∇P)
-    end
-end
-
-"""
-    polynomial_solutions_vdim_W(op, order, [T])
-
-Build a basis for the VDIM evaluation of the operator `W[g] = -∫∇yG(x,y)⋅g(y)dy`
-acting on a vector density `g`, using the regularization of eq. (3.11) in
-[anderson2026general](@cite).
-
-The density is interpolated component-wise, so the basis is indexed by the scalar
-monomials `pₐ = yᴵ` (`|I| ≤ order`). For each monomial, and each coordinate direction
-`j`, the associated vector monomial is `gₐⱼ = pₐ eⱼ`, whose divergence is `∂ⱼpₐ`; the
-polynomial PDE solution `Ψₐⱼ` then satisfies `ℒΨₐⱼ = ∂ⱼpₐ`. Per (3.11),
-
-    W[gₐⱼ] = μ(x)Ψₐⱼ(x) + D[Ψₐⱼ](x) - S[∂νΨₐⱼ + (gₐⱼ⋅ν)](x),
-
-Each returned named tuple bundles the `N` directions into `SVector`-valued
-traces:
-
-- `source`        : the scalar monomial `pₐ` (used for the volume term and the Vandermonde)
-- `solution`      : `q -> SVector(Ψₐⱼ(q))ⱼ`  (γ₀ trace for `D`, and the σ-term)
-- `neumann_trace` : `q -> SVector(∂νΨₐⱼ(q) + pₐ(q) νⱼ(q))ⱼ`  (γ₁ trace for `S`)
-                    (an abuse of notation for consistency with other vdim)
-"""
-function polynomial_solutions_vdim_W(
-        op::AbstractDifferentialOperator{N},
-        order::Integer,
-        ::Type{T} = default_kernel_eltype(op),
-    ) where {N, T}
-    indices = [I for I in Iterators.product(ntuple(i -> 0:order, N)...) if sum(I) <= order]
-    return map(indices) do I
-        monomial = Polynomial(I => one(T))      # raw monomial yᴵ
-        ∂p = ElementaryPDESolutions.gradient(monomial)   # (∂₁,…,∂_N) yᴵ
-        sols = ntuple(N) do j
-            dj = ∂p[j]
-            if isempty(dj.order2coeff)
-                # ∂ⱼyᴵ = 0  ⇒  Ψⱼ = 0
-                (_ -> zero(T), _ -> zero(T))
-            else
-                Ψj, γ₁Ψj = basis_from_monomial(op, dj)   # ℒΨⱼ = ∂ⱼyᴵ
-                (x -> Ψj(x), γ₁Ψj)
-            end
-        end
-        Ψ = ntuple(j -> sols[j][1], N)
-        γ₁Ψ = ntuple(j -> sols[j][2], N)
-        solution = q -> svector(j -> Ψ[j](coords(q)), N)
-        neumann_trace = q -> begin
-            pv = monomial(coords(q))
-            nu = normal(q)
-            svector(j -> γ₁Ψ[j](q) + pv * nu[j], N)
-        end
-        (source = monomial, solution = solution, neumann_trace = neumann_trace)
-    end
-end
-
-"""
-    polynomial_solutions_vdim_X(op, order, [T])
-
-Build a basis for the VDIM evaluation of the singular operator `X[g] = ∇W[g] =
-S·g(x) - PV∫∇ₓ∇_yG(x,y)·g(y)dy` acting on a vector density `g`, using the
-regularization of eq. (3.12) in [anderson2026general](@cite).
-
-The polynomial solutions are related to those for `W`
-([`polynomial_solutions_vdim_W`](@ref)). Like `W`, the density is interpolated
-component-wise, so the basis is indexed by the scalar monomials `pₐ = yᴵ`
-(`|I| ≤ order`). For each monomial, and each coordinate direction `j`, the
-vector monomial is `gₐⱼ = pₐeⱼ`, whose divergence is `∂ⱼpₐ`; the polynomial PDE
-solution `Ψₐⱼ` satisfies `ℒΨₐⱼ = ∂ⱼpₐ`, and the relevant solution for `X` is
-`Υₐⱼ = ∇Ψₐⱼ` (so that `ℒΥₐⱼ = ∇∂ⱼpₐ`). Per (3.12),
-
-    X[gₐⱼ] = μ(x)Υₐⱼ(x) - ∇ₓS[pₐνⱼ](x) - S[(∂ⱼpₐ)ν + BνΥₐⱼ](x) + D[Υₐⱼ](x),
-
-with `BνΥₐⱼ` the (Laplace) conormal derivative `∂ν∇Ψₐⱼ = (HessΨₐⱼ)·ν`. Since `X`
-maps a vector density to a vector output, the `N` directions are bundled into
-`SMatrix{N,N}`-valued traces (column `j` ↔ density direction `j`, row ↔ output
-component):
-
-- `source`           : the scalar monomial `pₐ` (volume term and Vandermonde)
-- `solution`         : `q -> SMatrix` with column `j` equal to `Υₐⱼ(q) = ∇Ψₐⱼ(q)`
-                       (γ₀ trace for `D`, and the σ-term `μΥ`)
-- `single_trace`     : `q -> SMatrix` with column `j` equal to
-                       `(∂ⱼpₐ)(q)ν(q) + BνΥₐⱼ(q)`  (γ₁-type trace for `S`)
-                       NOTE: This is not actually used in the associated
-                       correction routine, because there is de-duping performed
-                       there that is more efficient than use of `single-trace`
-                       would be. However this is useful in the testsuite
-                       (`test_X_volume_potential`) so is kept.
-- `grad_single_trace`: `q -> SVector` equal to `pₐ(q)ν(q)`, whose component `j`
-                       is the scalar trace `pₐνⱼ` for the `∇ₓS` term
-"""
-function polynomial_solutions_vdim_X(
-        op::AbstractDifferentialOperator{N},
-        order::Integer,
-        ::Type{T} = default_kernel_eltype(op),
-    ) where {N, T}
-    indices = [I for I in Iterators.product(ntuple(i -> 0:order, N)...) if sum(I) <= order]
-    return map(indices) do I
-        monomial = Polynomial(I => one(T))       # raw monomial yᴵ
-        ∂p = ElementaryPDESolutions.gradient(monomial)   # (∂₁,…,∂_N) yᴵ
-        # per direction j: Υⱼ = ∇Ψⱼ (with ℒΨⱼ = ∂ⱼpₐ) and the conormal BνΥⱼ = HessΨⱼ·ν.
-        dirs = ntuple(N) do j
-            dj = ∂p[j]
-            if isempty(dj.order2coeff)
-                # ∂ⱼyᴵ = 0  ⇒  Ψⱼ = 0, Υⱼ = 0, BνΥⱼ = 0
-                (
-                    Υ = (_ -> zero(SVector{N, T})),
-                    BνΥ = (_ -> zero(SVector{N, T})),
-                    ∂jp = (_ -> zero(T)),
-                )
-            else
-                Ψj, _ = basis_from_monomial(op, dj)        # ℒΨⱼ = ∂ⱼpₐ
-                Υj = ElementaryPDESolutions.gradient(Ψj)    # ∇Ψⱼ (NTuple{N,Polynomial})
-                Hessj = ntuple(c -> ElementaryPDESolutions.gradient(Υj[c]), N) # ∇(∂_cΨⱼ)
-                (
-                    Υ = (x -> Υj(x)),
-                    BνΥ = (q -> svector(c -> dot(normal(q), Hessj[c](coords(q))), N)),
-                    ∂jp = (x -> dj(x)),
-                )
-            end
-        end
-        solution = q -> reduce(hcat, ntuple(j -> dirs[j].Υ(coords(q)), N))
-        single_trace = q -> begin
-            nu = normal(q)
-            x = coords(q)
-            reduce(hcat, ntuple(j -> dirs[j].∂jp(x) * nu + dirs[j].BνΥ(q), N))
-        end
-        grad_single_trace = q -> monomial(coords(q)) * normal(q)
-        (
-            source = monomial,
-            solution = solution,
-            single_trace = single_trace,
-            grad_single_trace = grad_single_trace,
-        )
-    end
-end
-
-"""
-    basis_from_monomial(op, monomial) -> (solution, neumann_trace)
-
-Compute a polynomial solution `P` to `ℒ[P] = monomial` and its Neumann trace `γ₁P`.
-
-Each operator implements this to handle its specific PDE structure, including any
-auxiliary fields (e.g., pressure for Stokes) needed to compute the Neumann trace.
-"""
-function basis_from_monomial end
-
-
-# Laplace
-function basis_from_monomial(::Laplace{N}, monomial::Polynomial{N, T}) where {N, T}
-    P = ElementaryPDESolutions.solve_laplace(-monomial)
-    ∇P = ElementaryPDESolutions.gradient(P)
-    γ₁P = q -> dot(normal(q), ∇P(coords(q)))
-    return P, γ₁P
-end
-
-# Helmholtz
-
-function basis_from_monomial(op::Helmholtz{N}, monomial::Polynomial{N, T}) where {N, T}
-    P = ElementaryPDESolutions.solve_helmholtz(-monomial, op.k^2)
-    ∇P = ElementaryPDESolutions.gradient(P)
-    γ₁P = q -> dot(normal(q), ∇P(coords(q)))
-    return P, γ₁P
-end
-
-# Elastostatic
-
-function basis_from_monomial(op::Elastostatic{N}, monomial::Polynomial{N, T}) where {N, T}
-    monomial = -monomial
-    @assert T <: StaticMatrix && size(T) == (N, N)
-    S = eltype(T)
-    ord2coef = monomial.order2coeff
-    @assert length(ord2coef) == 1 "Input must be a monomial"
-    coef = first(values(ord2coef))
-    idx = first(keys(ord2coef))
-    μ, λ = op.μ, op.λ
-    ν = λ / (2 * (λ + μ))
-    # Solve for each column of the tensor
-    sol_tuple = ntuple(N) do n
-        p = ntuple(d -> Polynomial(idx => coef[d, n]), N)
-        u = ElementaryPDESolutions.solve_elastostatic(p; μ, ν)
-        ntuple(d -> convert(Polynomial{N, S}, u[d]), N)
-    end
-    P = flatten_polynomial_ntuple(sol_tuple)
-    ∇P = ElementaryPDESolutions.gradient(P)
-    # Neumann trace: traction vector
-    γ₁P = q -> begin
-        n = normal(q)
-        x = coords(q)
-        M = ∇P(x)  # M[j] = ∂P/∂xⱼ
-        cols = svector(N) do m
-            gradu = hcat(ntuple(j -> M[j][:, m], N)...)
-            divu = tr(gradu)
-            λ * divu * n + μ * (gradu + gradu') * n
-        end
-        reduce(hcat, cols)
-    end
-    return P, γ₁P
-end
-
-# Stokes
-
-function basis_from_monomial(op::Stokes{N}, monomial::Polynomial{N, T}) where {N, T}
-    monomial = -monomial
-    @assert T <: StaticMatrix && size(T) == (N, N)
-    S = eltype(T)
-    ord2coef = monomial.order2coeff
-    @assert length(ord2coef) == 1 "Input must be a monomial"
-    coef = first(values(ord2coef))
-    idx = first(keys(ord2coef))
-    μ = op.μ
-    # Solve for each column: velocity and pressure
-    solutions = ntuple(N) do n
-        f = ntuple(d -> Polynomial(idx => coef[d, n]), N)
-        u, p = ElementaryPDESolutions.solve_stokes(f; μ)
-        vel = ntuple(d -> convert(Polynomial{N, S}, u[d]), N)
-        pres = convert(Polynomial{N, S}, p)
-        (velocity = vel, pressure = pres)
-    end
-    velocities = ntuple(n -> solutions[n].velocity, N)
-    pressures = ntuple(n -> solutions[n].pressure, N)
-    U = flatten_polynomial_ntuple(velocities)
-    ∇U = ElementaryPDESolutions.gradient(U)
-    # Neumann trace: traction using velocity gradient and pressure
-    γ₁U = q -> begin
-        n = normal(q)
-        x = coords(q)
-        M = ∇U(x)  # M[j] = ∂U/∂xⱼ
-        cols = svector(N) do m
-            gradu = hcat(ntuple(j -> M[j][:, m], N)...)
-            p_val = pressures[m](x)
-            -p_val * n + μ * (gradu + gradu') * n
-        end
-        reduce(hcat, cols)
-    end
-    return U, γ₁U
-end
-
-function flatten_polynomial_ntuple(P::NTuple{N, NTuple{N, Polynomial{DIM, T}}}) where {N, DIM, T <: Number}
-    V = SMatrix{N, N, T, N * N}
-    # collect all multi-indices
-    idxs = Set{NTuple{DIM, Int}}()
-    foreach(p -> union!(idxs, keys(p.order2coeff)), Iterators.flatten(P))
-    # now loop over keys and build flattened coefficients
-    idx2coef = Dict{NTuple{DIM, Int}, V}()
-    for idx in idxs
-        coef_tuple = ntuple(N^2) do n
-            m = div(n - 1, N) + 1
-            l = mod(n - 1, N) + 1
-            p = P[m][l]
-            get(p.order2coeff, idx, zero(T))
-        end
-        idx2coef[idx] = V(coef_tuple)
-    end
-    return Polynomial{DIM, V}(idx2coef)
-end
-
-function (P::NTuple{N, <:Polynomial})(x) where {N}
-    return svector(n -> P[n](x), N)
-end
-
-function (P::Polynomial)(q::QuadratureNode)
-    x = coords(q)
-    return P(x)
-end
-
-function (P::NTuple{N, <:Polynomial})(q::QuadratureNode) where {N}
-    x = coords(q)
-    return P(x)
+    return _dim_correction(source, dict_near, bfun, Θ, SM)
 end

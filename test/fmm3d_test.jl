@@ -82,7 +82,7 @@ end
     )
 
     # Test Green's identity with polynomial solution
-    basis = Inti.polynomial_solutions_vdim(op, 2)
+    basis = manufactured_basis(op, 2)
     c = SVector(1.0, 2.0, 3.0)
     u_d = [basis[1].solution(q) * c for q in Ωₕ_quad]
     u_b = [basis[1].solution(q) * c for q in Γₕ_quad]
@@ -128,7 +128,7 @@ end
     )
 
     # Test Green's identity with polynomial solution
-    basis = Inti.polynomial_solutions_vdim(op, 2)
+    basis = manufactured_basis(op, 2)
 
     # Use polynomial 2: x
     u_d = [basis[2].gradient_solution(q) for q in Ωₕ_quad]

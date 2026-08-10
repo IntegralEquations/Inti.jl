@@ -21,10 +21,30 @@ using StaticArrays
 using ForwardDiff
 using Gmsh
 
+include("test_utils.jl")
+
 Random.seed!(1)
 
 ## Test parameters
 rtol = 1.0e-10  # relative tolerance for volume potential tests
+# `:ldim` is compared against an independently-accurate reference rather than one built from
+# the same `S`/`D` it uses (see `test_lvdim_volume_potential`), so it is not credited with the
+# error cancellation that lets `:dim` sit at `rtol` regardless of how good those operators are.
+# At the default `nneighbors = 1` on these deliberately coarse meshes the local method is a
+# ~1e-6 method; deepening the patch converges it toward the global one (see `lvdim_gain`).
+lvdim_rtol = 1.0e-5
+lvdim_deep = 3       # patch depth at which the local method should be close to global
+# ...and by at least this factor better than the default depth. Measured on the 2D disk:
+# Laplace 116x, Elastostatic 170x, Stokes 83x, Helmholtz 9.4x — the threshold is set below the
+# weakest so the assertion tests convergence rather than tracking one operator's constant.
+lvdim_gain = 5
+# The 3D fixture is deliberately coarse (62 tetrahedra), and at `nneighbors = 1` every patch
+# already covers 100% of the mesh — so there the local method *is* the global one, there is no
+# room for the patch to grow, and only the tolerance is asserted. It is looser than 2D because
+# the mesh is: `∂Ωτ` is `∂Ω`, a coarse polyhedron, and every target sits within a couple of
+# elements of it.
+lvdim_rtol_3d = 5.0e-5
+lvdim_skin_3d = 0.3
 meshsize = 0.4  # 2D mesh size
 meshsize_3d = 0.8  # 3D mesh size — tests check polynomial exactness (not convergence),
 # so a coarser mesh is valid and keeps matrices small
@@ -66,7 +86,7 @@ function test_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize; interpolati
         maxdist = Inf
     )
 
-    basis = Inti.polynomial_solutions_vdim(op, interpolation_order)
+    basis = manufactured_basis(op, interpolation_order)
 
     errors_uncorrected = Float64[]
     errors_corrected = Float64[]
@@ -101,6 +121,88 @@ function test_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize; interpolati
 end
 
 """
+    test_lvdim_volume_potential(op, Ωₕ_quad, Γₕ, meshsize)
+
+The same identity as [`test_volume_potential`](@ref), but with the *local* VDIM correction
+(`:ldim`) in place of the global one. Driven through the high-level `volume_potential` with
+every `:ldim`-specific keyword left at its default, so this also pins the defaults.
+
+`:ldim` needs no boundary quadrature and no `S`/`D`: each patch carries its own, which is the
+one API difference from `vdim_correction` — and the reason this needs a **different reference**
+from `test_volume_potential`.
+
+`vdim_correction` is *handed* `S` and `D`, and its reference `u + D[γ₀u] - S[γ₁u]` is built
+from those same operators, so their error cancels identically — a self-consistency check that
+passes at `rtol` however inaccurate they are. `:ldim` builds its own patch-boundary potentials,
+so nothing cancels. Two changes make the reference true in *absolute* terms:
+
+  * its layer potentials use a much finer boundary quadrature (`ref_qorder`);
+  * targets closer than `skin` to `∂Ω` are excluded, where the reference is itself limited by
+    the near-singular accuracy of its `S`/`D`.
+
+Against an accurate reference the local method converges to the global one as the patch grows,
+which `nneighbors` is passed through to let the testset assert.
+
+Both quadratures are built on the *same* mesh as `Ωₕ_quad`, so the domain is the same polygon
+(`meshorder = 1`) for reference and method alike and no geometry error enters the comparison.
+"""
+function test_lvdim_volume_potential(
+        op, Ωₕ_quad, Γₕ, meshsize;
+        interpolation_order = 2, ref_qorder = 16, skin = 1.5 * meshsize, nneighbors = nothing,
+    )
+    # Explicit Gauss rule: `Quadrature(Γₕ; qorder)` selects a Vioreanu-Rokhlin rule on a
+    # triangle, and those are *interpolation* rules tabulated only at select orders — a plain
+    # `qorder = 16` is not available in 3D. Nothing here is interpolated.
+    Eb = only(Inti.element_types(Γₕ))
+    ref_rule = if Inti.domain(Eb) isa Inti.ReferenceSimplex{2}
+        Inti.Gauss(; domain = :triangle, order = Inti.gauss_triangle_order(ref_qorder))
+    else
+        Inti.GaussLegendre(; order = ref_qorder)
+    end
+    Γ_ref = Inti.Quadrature(Γₕ, ref_rule)
+    S_b2d, D_b2d = Inti.single_double_layer(;
+        op, target = Ωₕ_quad, source = Γ_ref,
+        compression = (method = :none,),
+        correction = (method = :dim, maxdist = 5 * meshsize, target_location = :inside),
+    )
+    corr = isnothing(nneighbors) ? (method = :ldim, interpolation_order) :
+        (method = :ldim, interpolation_order, nneighbors)
+    V = Inti.volume_potential(;
+        op, target = Ωₕ_quad, source = Ωₕ_quad,
+        compression = (method = :none,), correction = corr,
+    )
+    Vraw = Inti.volume_potential(;
+        op, target = Ωₕ_quad, source = Ωₕ_quad,
+        compression = (method = :none,), correction = (method = :none,),
+    )
+    # geometry-agnostic interior mask: distance to the boundary quadrature nodes
+    Γpts = [Inti.coords(q) for q in Γ_ref]
+    interior = [minimum(y -> norm(Inti.coords(x) - y), Γpts) > skin for x in Ωₕ_quad]
+    @assert any(interior) "skin = $skin leaves no interior targets"
+    basis = manufactured_basis(op, interpolation_order)
+    errors_uncorrected, errors_corrected = Float64[], Float64[]
+    for idx in 1:length(basis)
+        if Inti.default_density_eltype(op) <: SVector
+            N = Inti.ambient_dimension(Ωₕ_quad)
+            c = SVector(ntuple(i -> rand(), N)...)
+            f = (q) -> basis[idx].source(q) * c
+            u = (q) -> basis[idx].solution(q) * c
+            t = (q) -> basis[idx].neumann_trace(q) * c
+        else
+            f = (q) -> basis[idx].source(q)
+            u = (q) -> basis[idx].solution(q)
+            t = (q) -> basis[idx].neumann_trace(q)
+        end
+        u_d, u_b = map(u, Ωₕ_quad), map(u, Γ_ref)
+        du_b, f_d = map(t, Γ_ref), map(f, Ωₕ_quad)
+        vref = u_d + D_b2d * u_b - S_b2d * du_b
+        push!(errors_uncorrected, norm((vref - Vraw * f_d)[interior], Inf))
+        push!(errors_corrected, norm((vref - V * f_d)[interior], Inf))
+    end
+    return errors_uncorrected, errors_corrected
+end
+
+"""
     test_gradient_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize)
 
 Test the gradient volume potential identity.
@@ -130,7 +232,7 @@ function test_gradient_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize; in
         kernel_variant = :gradient,
     )
 
-    basis = Inti.polynomial_solutions_vdim(op, interpolation_order)
+    basis = manufactured_basis(op, interpolation_order)
     errors_corrected = Float64[]
 
     for idx in 1:length(basis)
@@ -151,7 +253,8 @@ end
 Test the `W[g] = -∫∇yG⋅g` volume integral operator (vector density `g`, scalar output)
 regularized via eq. (3.25) of the 3D VDIM paper. For each scalar monomial `pₐ` and
 direction `j`, the density `g = pₐeⱼ` is itself a polynomial, so the method must reproduce
-the (3.25) boundary representation `μΨⱼ + D[Ψⱼ] - S[∂νΨⱼ + pₐνⱼ]` to machine precision.
+the (3.25) boundary representation `-μΨⱼ + D[Ψⱼ] - S[∂νΨⱼ + pₐνⱼ]` to machine precision,
+i.e. `Ψⱼ + D[Ψⱼ] - S[…]` at the interior targets used below, where `μ = -1`.
 
 Builds the operator through the high-level `volume_potential(...; kernel_variant = :gradient_source)` so
 the `VectorDensityOperator` return path (and bare `W*g`) is exercised. Returns the list of
@@ -170,7 +273,7 @@ function test_W_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize; interpola
         correction = (method = :dim, maxdist = 5 * meshsize, boundary = Γₕ_quad, interpolation_order),
         kernel_variant = :gradient_source,
     )
-    basis = Inti.polynomial_solutions_vdim_W(op, interpolation_order)
+    basis = manufactured_basis_W(op, interpolation_order)
     errors = Float64[]
     out_eltype = eltype(W * [zero(SVector{N, Float64}) for _ in Ωₕ_quad])
     for b in basis, j in 1:N
@@ -231,7 +334,7 @@ function test_X_volume_potential(op, Ωₕ_quad, Γₕ_quad, meshsize; interpola
         correction = (method = :dim, maxdist = 5 * meshsize, boundary = Γₕ_quad, interpolation_order),
         kernel_variant = :hessian,
     )
-    basis = Inti.polynomial_solutions_vdim_X(op, interpolation_order)
+    basis = manufactured_basis_X(op, interpolation_order)
     ntarget = length(Ωₕ_quad)
     errors = Float64[]
     out_eltype = eltype(X * [zero(SVector{N, Float64}) for _ in Ωₕ_quad])
@@ -294,6 +397,16 @@ gmsh.finalize()
             err_uncorr, err_corr = test_volume_potential(op, Ωₕ_quad_2d, Γₕ_quad_2d, meshsize; interpolation_order)
             @test maximum(err_corr) < rtol
             @test maximum(err_corr) < maximum(err_uncorr)
+            # the local method, against an independently-accurate reference
+            err_uncorr_l, err_corr_l = test_lvdim_volume_potential(op, Ωₕ_quad_2d, Γₕ_2d, meshsize; interpolation_order)
+            @test maximum(err_corr_l) < lvdim_rtol
+            @test maximum(err_corr_l) < maximum(err_uncorr_l)
+            # and it must converge to the global method as the patch grows — the property
+            # that distinguishes a correct local method from a broken one
+            _, err_deep = test_lvdim_volume_potential(
+                op, Ωₕ_quad_2d, Γₕ_2d, meshsize; interpolation_order, nneighbors = lvdim_deep
+            )
+            @test maximum(err_deep) * lvdim_gain < maximum(err_corr_l)
         end
     end
 end
@@ -368,6 +481,13 @@ gmsh.finalize()
             err_uncorr, err_corr = test_volume_potential(op, Ωₕ_quad_3d, Γₕ_quad_3d, meshsize_3d; interpolation_order)
             @test maximum(err_corr) < rtol
             @test maximum(err_corr) < maximum(err_uncorr)
+            # the local method, against an independently-accurate reference
+            err_uncorr_l, err_corr_l = test_lvdim_volume_potential(
+                op, Ωₕ_quad_3d, Γₕ_3d, meshsize_3d;
+                interpolation_order, skin = lvdim_skin_3d,
+            )
+            @test maximum(err_corr_l) < lvdim_rtol_3d
+            @test maximum(err_corr_l) < maximum(err_uncorr_l)
         end
     end
 end

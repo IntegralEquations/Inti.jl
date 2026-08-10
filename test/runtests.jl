@@ -38,6 +38,9 @@ end
 
 @testset "Accelerated density interpolation" include("dim_test.jl")
 
+@safetestset "Particular basis" include("particular_basis_test.jl")
+@safetestset "Local DIM" include("lvdim_test.jl")
+
 @safetestset "Gmsh extension" include("gmsh_test.jl")
 
 @safetestset "Makie extension" include("meshes_test.jl")

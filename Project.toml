@@ -5,7 +5,6 @@ version = "0.2.1"
 [deps]
 Bessels = "0e736298-9ec6-45e8-9647-e4fc86a2fe38"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-ElementaryPDESolutions = "88a69b33-da0f-4502-8c8c-d680cf4d883b"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 HAdaptiveIntegration = "eaa5ad34-b243-48e9-b09c-54bc0655cecf"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -43,7 +42,6 @@ IntiQPGreenExt = "QPGreen"
 [compat]
 Bessels = "0.2"
 DataStructures = "0.18 - 0.19"
-ElementaryPDESolutions = "0.2 - 0.3"
 FMM2D = "0.2"
 # FMM3D <2.1.0 has a different scaling convention for the kernels, not
 # including the 1/(4pi) prefactor

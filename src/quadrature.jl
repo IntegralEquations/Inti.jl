@@ -59,11 +59,11 @@ end
 """
     struct Quadrature{N,T} <: AbstractVector{QuadratureNode{N,T}}
 
-A collection of [`QuadratureNode`](@ref)s used to integrate over an
-[`AbstractMesh`](@ref).
+A collection of [`QuadratureNode`](@ref)s typically used to integrate over an
+[`AbstractMesh`](@ref). In case `mesh === nothing`, the quadrature is a bare list of nodes.
 """
 struct Quadrature{N, T} <: AbstractVector{QuadratureNode{N, T}}
-    mesh::AbstractMesh{N, T}
+    mesh::Union{AbstractMesh{N, T}, Nothing}
     etype2qrule::OrderedDict{DataType, ReferenceQuadrature}
     qnodes::Vector{QuadratureNode{N, T}}
     etype2qtags::OrderedDict{DataType, Matrix{Int}}
@@ -75,7 +75,10 @@ Base.getindex(quad::Quadrature, i) = quad.qnodes[i]
 Base.setindex!(quad::Quadrature, q, i) = (quad.qnodes[i] = q)
 
 qnodes(quad::Quadrature) = quad.qnodes
-mesh(quad::Quadrature) = quad.mesh
+function mesh(quad::Quadrature)
+    isnothing(quad.mesh) && error("The Quadrature has no mesh!")
+    return quad.mesh
+end
 etype2qtags(quad::Quadrature, E) = quad.etype2qtags[E]
 
 quadrature_rule(quad::Quadrature, E) = quad.etype2qrule[E]
@@ -86,7 +89,7 @@ function Base.show(io::IO, quad::Quadrature)
 end
 
 """
-    Quadrature(msh::AbstractMesh, etype2qrule::Dict)
+    Quadrature(msh::AbstractMesh, etype2qrule::OrderedDict)
     Quadrature(msh::AbstractMesh, qrule::ReferenceQuadrature)
     Quadrature(msh::AbstractMesh; qorder)
 
@@ -117,6 +120,19 @@ function Quadrature(msh::AbstractMesh{N, T}, etype2qrule::OrderedDict) where {N,
         _build_quadrature!(quad, els, ori, qrule)
     end
     return quad
+end
+
+"""
+    Quadrature{N,T}(etype2qrule::OrderedDict)
+
+An empty quadrature not backed by a mesh, to be filled in place with
+[`_build_quadrature!`](@ref). Used for the ad-hoc local patches of
+[`lvdim_correction`](@ref).
+"""
+function Quadrature{N, T}(etype2qrule::OrderedDict) where {N, T}
+    return Quadrature{N, T}(
+        nothing, etype2qrule, QuadratureNode{N, T}[], OrderedDict{DataType, Matrix{Int}}(),
+    )
 end
 
 function Quadrature(msh::AbstractMesh{N, T}, qrule::ReferenceQuadrature) where {N, T}

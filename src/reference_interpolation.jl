@@ -360,6 +360,7 @@ const LagrangeCube = LagrangeElement{ReferenceCube}
 
 """
     vertices_idxs(el::LagrangeElement)
+    vertices_idxs(::Type{LagrangeElement})
 
 The indices of the nodes in `el` that define the vertices of the element.
 """
@@ -398,22 +399,98 @@ Coordinates of the vertices of `el`.
 vertices(el::LagrangeElement) = view(vals(el), vertices_idxs(el))
 
 """
-    boundary_idxs(el::LagrangeElement)
+    boundary_vertex_idxs(::Type{<:ReferenceInterpolant})
 
-The indices of the nodes in `el` that define the boundary of the element.
+For each face of the element, the indices *into its vertices* of that face's
+vertices. This is the single definition of face ordering and winding: the
+winding is chosen so that `_normal` gives the outward normal, and both
+[`boundary_idxs`](@ref) (the topological view) and [`boundary_element`](@ref)
+(the geometric view) are derived from it, so the two cannot drift apart.
 """
-function boundary_idxs(el::LagrangeLine)
-    return 1, length(vals(el))
+boundary_vertex_idxs(el::ReferenceInterpolant) = boundary_vertex_idxs(typeof(el))
+boundary_vertex_idxs(::Type{<:ReferenceInterpolant{ReferenceLine}}) = ((1,), (2,))
+boundary_vertex_idxs(::Type{<:ReferenceInterpolant{ReferenceTriangle}}) =
+    ((1, 2), (2, 3), (3, 1))
+boundary_vertex_idxs(::Type{<:ReferenceInterpolant{ReferenceSquare}}) =
+    ((1, 2), (2, 3), (3, 4), (4, 1))
+boundary_vertex_idxs(::Type{<:ReferenceInterpolant{ReferenceTetrahedron}}) =
+    ((3, 2, 1), (1, 4, 3), (2, 3, 4), (1, 2, 4))
+
+"""
+    boundary_idxs(el)
+    boundary_idxs(::Type{<:ReferenceInterpolant})
+
+The indices of the nodes in `el` that define the boundary of the element,
+returned as a tuple of faces, each face itself a tuple of node indices, wound as
+in [`boundary_vertex_idxs`](@ref).
+
+Indices are expressed through [`vertices_idxs`](@ref) rather than hard-coded, so
+the methods hold for elements of any order (and for the curved
+[`ParametricElement`](@ref)s, whose connectivity stores only the vertices).
+
+This is a purely *topological* view — it identifies a face by its nodes, which is
+what makes shared faces comparable. To obtain a face's geometry, use
+[`boundary_element`](@ref): a face of a high-order or curved element is not the
+straight span of its vertices.
+"""
+boundary_idxs(el::ReferenceInterpolant) = boundary_idxs(typeof(el))
+
+function boundary_idxs(T::Type{<:ReferenceInterpolant})
+    I = vertices_idxs(T)
+    return map(f -> map(i -> I[i], f), boundary_vertex_idxs(T))
 end
 
-function boundary_idxs(el::LagrangeTriangle)
-    I = vertices_idxs(el)
-    return (I[1], I[2]), (I[2], I[3]), (I[3], I[1])
+"""
+    boundary_element(el, k)
+
+The `k`-th face of `el` (ordered and wound as in [`boundary_idxs`](@ref)), as a
+`ReferenceInterpolant` of one geometric dimension less.
+
+The face is the element map restricted to the corresponding face of the
+*reference* shape, so it follows the element's true geometry: high-order
+`LagrangeElement`s and curved `ParametricElement`s alike. Rebuilding a face from
+its vertex coordinates instead would silently straighten it.
+"""
+function boundary_element end
+
+# the element map, without `ParametricElement`'s domain-membership assertion,
+# which points sitting exactly on ∂(reference shape) can trip
+_element_map(el::ParametricElement) = parametrization(el)
+_element_map(el::ReferenceInterpolant) = el
+
+function boundary_element(
+        el::ReferenceInterpolant{D, T}, k::Integer,
+    ) where {D <: Union{ReferenceTriangle, ReferenceSquare}, T}
+    v = vertices(D())
+    i, j = boundary_vertex_idxs(typeof(el))[k]
+    ra, rb = v[i], v[j]
+    f = _element_map(el)
+    return ParametricElement{ReferenceHyperCube{1}, T}(u -> f(ra + u[1] * (rb - ra)))
 end
 
-function boundary_idxs(el::LagrangeSquare)
-    I = vertices_idxs(el)
-    return (I[1], I[2]), (I[2], I[3]), (I[3], I[4]), (I[4], I[1])
+function boundary_element(el::ReferenceInterpolant{ReferenceTetrahedron, T}, k::Integer) where {T}
+    v = vertices(ReferenceTetrahedron())
+    i, j, l = boundary_vertex_idxs(typeof(el))[k]
+    ra, rb, rc = v[i], v[j], v[l]
+    f = _element_map(el)
+    return ParametricElement{ReferenceSimplex{2}, T}(
+        u -> f(ra + u[1] * (rb - ra) + u[2] * (rc - ra)),
+    )
+end
+
+# A simplex with only vertex nodes is affine, so its faces are exactly the
+# straight spans of their vertices. Keep them as `LagrangeElement`s: the generic
+# path above would wrap them in a closure and take its jacobian by AD.
+function boundary_element(el::LagrangeElement{ReferenceTriangle, 3, T}, k::Integer) where {T}
+    i, j = boundary_vertex_idxs(typeof(el))[k]
+    V = vertices(el)
+    return LagrangeElement{ReferenceHyperCube{1}, 2, T}(SVector(V[i], V[j]))
+end
+
+function boundary_element(el::LagrangeElement{ReferenceTetrahedron, 4, T}, k::Integer) where {T}
+    i, j, l = boundary_vertex_idxs(typeof(el))[k]
+    V = vertices(el)
+    return LagrangeElement{ReferenceSimplex{2}, 3, T}(SVector(V[i], V[j], V[l]))
 end
 
 # generic ℚₖ elements for ReferenceHyperCube
@@ -607,4 +684,129 @@ value of each basis function at `x`.
 function lagrange_basis(::Type{LagrangeElement{D, N, T}}) where {D, N, T}
     vals = svector(i -> svector(j -> i == j, N), N)
     return LagrangeElement{D}(vals)
+end
+
+"""
+    translation_and_scaling(el) -> (c, r)
+
+Center and radius of a ball containing `el`, the frame the scaled coordinate `x̃ = (x - c)/r`
+of [`lvdim_correction`](@ref) is normalized against: the circumscribed ball of the element's
+straight-sided vertices where its circumcenter lies inside it, and the ball on the longest
+edge otherwise. Sharper than [`radius`](@ref) on a simplex, which is what wants it.
+"""
+function translation_and_scaling end
+
+# fallback for elements with no sharper formula (e.g. the curved quadrilaterals `meshgen`
+# produces): the element's own center and radius
+translation_and_scaling(el::ReferenceInterpolant) = (center(el), radius(el))
+
+function translation_and_scaling(el::LagrangeTriangle)
+    vertices = el.vals[1:3]
+    l1 = norm(vertices[1] - vertices[2])
+    l2 = norm(vertices[2] - vertices[3])
+    l3 = norm(vertices[3] - vertices[1])
+    if ((l1^2 + l2^2 >= l3^2) && (l2^2 + l3^2 >= l1^2) && (l3^2 + l1^2 > l2^2))
+        acuteright = true
+    else
+        acuteright = false
+    end
+
+    if acuteright
+        # Compute the circumcenter and circumradius
+        Bp = vertices[2] - vertices[1]
+        Cp = vertices[3] - vertices[1]
+        Dp = 2 * (Bp[1] * Cp[2] - Bp[2] * Cp[1])
+        Upx = 1 / Dp * (Cp[2] * (Bp[1]^2 + Bp[2]^2) - Bp[2] * (Cp[1]^2 + Cp[2]^2))
+        Upy = 1 / Dp * (Bp[1] * (Cp[1]^2 + Cp[2]^2) - Cp[1] * (Bp[1]^2 + Bp[2]^2))
+        Up = SVector{2}(Upx, Upy)
+        r = norm(Up)
+        c = Up + vertices[1]
+    else
+        if (l1 >= l2) && (l1 >= l3)
+            c = (vertices[1] + vertices[2]) / 2
+            r = l1 / 2
+        elseif (l2 >= l1) && (l2 >= l3)
+            c = (vertices[2] + vertices[3]) / 2
+            r = l2 / 2
+        else
+            c = (vertices[1] + vertices[3]) / 2
+            r = l3 / 2
+        end
+    end
+    return c, r
+end
+
+function translation_and_scaling(el::ParametricElement{ReferenceSimplex{3}})
+    straight_nodes =
+        [el([0.0, 0.0, 0.0]), el([1.0, 0.0, 0.0]), el([0.0, 1.0, 0.0]), el([0.0, 0.0, 1.0])]
+    return translation_and_scaling(
+        LagrangeElement{ReferenceSimplex{3}, 4, SVector{3, Float64}}(straight_nodes),
+    )
+end
+
+function translation_and_scaling(el::ParametricElement{ReferenceSimplex{2}})
+    straight_nodes = [el([1.0e-18, 1.0e-18]), el([1.0, 0.0]), el([0.0, 1.0])]
+    return translation_and_scaling(
+        LagrangeElement{ReferenceSimplex{2}, 3, SVector{2, Float64}}(straight_nodes),
+    )
+end
+
+function translation_and_scaling(el::LagrangeTetrahedron)
+    vertices = el.vals[1:4]
+    # Compute the circumcenter in barycentric coordinates
+    # formulas here are due to: https://math.stackexchange.com/questions/2863613/tetrahedron-centers
+    a = norm(vertices[4] - vertices[1])
+    b = norm(vertices[2] - vertices[4])
+    c = norm(vertices[3] - vertices[4])
+    d = norm(vertices[3] - vertices[2])
+    e = norm(vertices[3] - vertices[1])
+    f = norm(vertices[2] - vertices[1])
+    f² = f^2
+    a² = a^2
+    b² = b^2
+    c² = c^2
+    d² = d^2
+    e² = e^2
+
+    ρ =
+        a² * d² * (-d² + e² + f²) + b² * e² * (d² - e² + f²) + c² * f² * (d² + e² - f²) -
+        2 * d² * e² * f²
+    α =
+        a² * d² * (b² + c² - d²) + e² * b² * (-b² + c² + d²) + f² * c² * (b² - c² + d²) -
+        2 * b² * c² * d²
+    β =
+        b² * e² * (a² + c² - e²) + d² * a² * (-a² + c² + e²) + f² * c² * (a² - c² + e²) -
+        2 * a² * c² * e²
+    γ =
+        c² * f² * (a² + b² - f²) + d² * a² * (-a² + b² + f²) + e² * b² * (a² - b² + f²) -
+        2 * a² * b² * f²
+    if (ρ >= 0 && α >= 0 && β >= 0 && γ >= 0)
+        # circumcenter lays inside `el`
+        center =
+            (α * vertices[1] + β * vertices[2] + γ * vertices[3] + ρ * vertices[4]) /
+            (ρ + α + β + γ)
+        # ref: https://math.stackexchange.com/questions/1087011/calculating-the-radius-of-the-circumscribed-sphere-of-an-arbitrary-tetrahedron
+        R = sqrt(1 / 2 * (β * f² + γ * e² + ρ * a²) / (ρ + α + β + γ))
+    else
+        if (a >= b && a >= c && a >= d && a >= e && a >= f)
+            center = (vertices[1] + vertices[4]) / 2
+            R = a / 2
+        elseif (b >= a && b >= c && b >= d && b >= e && b >= f)
+            center = (vertices[2] + vertices[4]) / 2
+            R = b / 2
+        elseif (c >= a && c >= b && c >= d && c >= e && c >= f)
+            center = (vertices[3] + vertices[4]) / 2
+            R = c / 2
+        elseif (d >= a && d >= b && d >= c && d >= e && d >= f)
+            center = (vertices[3] + vertices[2]) / 2
+            R = d / 2
+        elseif (e >= a && e >= b && e >= c && e >= d && e >= f)
+            center = (vertices[3] + vertices[1]) / 2
+            R = e / 2
+        else
+            center = (vertices[2] + vertices[1]) / 2
+            R = f / 2
+        end
+    end
+    return center, R
 end

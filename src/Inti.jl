@@ -8,11 +8,8 @@ module Inti
 const PROJECT_ROOT = pkgdir(Inti)
 
 import Bessels
-import ElementaryPDESolutions
 import HAdaptiveIntegration
 import SpecialFunctions
-
-import ElementaryPDESolutions: Polynomial
 
 using DataStructures
 using ForwardDiff
@@ -29,7 +26,6 @@ using StaticArrays
 using TOML
 using OrderedCollections
 
-import ElementaryPDESolutions
 import SpecialFunctions
 import Bessels # faster than SpecialFunctions for Bessel functions with real args
 import HAdaptiveIntegration
@@ -60,6 +56,8 @@ include("nystrom.jl")
 include("adaptive_correction.jl")
 include("bdim.jl")
 include("vdim.jl")
+include("particular_basis.jl")
+include("lvdim.jl")
 
 # some zero-argument methods for the Inti's gmsh extension
 include("gmsh_api.jl")
