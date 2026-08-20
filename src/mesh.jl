@@ -893,9 +893,21 @@ function curve_mesh(
             verts_on_bdry = findall(x -> x ∈ bdry_node_idx, node_indices)
             j = length(verts_on_bdry) # j in C. Bernardi SINUM Sec. 6
             if j > 1
-                append!(connect_curve, node_indices)
                 node_indices_on_bdry = node_indices[verts_on_bdry]
-                append!(connect_curve_bdry, node_indices_on_bdry)
+                # The connectivity must list an element's nodes in the order its
+                # map sends the *reference* vertices to them. `F̃ₖ` below sends
+                # `(0,0), (1,0), (0,1)` to `bₖ, cₖ, aₖ` — the interior node,
+                # then the two boundary nodes in reverse; this is not gmsh's
+                # node order. This is so that the topological view of a face
+                # (`boundary_idxs` read off this matrix) and its geometric view
+                # (`boundary_element`) name the same edge. This is very
+                # important for lvdim.
+                aₖ_idx, cₖ_idx = node_indices_on_bdry[1], node_indices_on_bdry[2]
+                bₖ_idx = setdiff(node_indices, node_indices_on_bdry)[1]
+                append!(connect_curve, (bₖ_idx, cₖ_idx, aₖ_idx))
+                # likewise, `ψₖ(s) = Fₖ([1-s, s])` below runs from `cₖ` at `s = 0` to `aₖ`
+                # at `s = 1`, the reverse of the order the boundary nodes were found in
+                append!(connect_curve_bdry, (cₖ_idx, aₖ_idx))
 
                 # Need parametric coordinates of curved mapping to be consistent with straight simplex nodes
                 α₁ = min(
@@ -1120,18 +1132,19 @@ function curve_mesh(
                 # Zlamal nonlinear map
                 #Φₖ_Z = (x) -> x[2]/(1 - x[1]) * (ψ(x[1] * α₁ + (1 - x[1]) * α₂) - x[1] * a₁ - (1 - x[1])*a₂)
 
-                # Affine map
-                aₖ = crvmsh.nodes[node_indices_on_bdry[1]]
-                bₖ = crvmsh.nodes[setdiff(node_indices, node_indices[verts_on_bdry])[1]]
-                cₖ = crvmsh.nodes[node_indices_on_bdry[2]]
+                # Affine map. Read through the same indices the connectivity was built
+                # from above, so the two orderings cannot drift apart.
+                aₖ = crvmsh.nodes[aₖ_idx]
+                bₖ = crvmsh.nodes[bₖ_idx]
+                cₖ = crvmsh.nodes[cₖ_idx]
                 F̃ₖ =
                     (x::AbstractVector) -> [
                     (cₖ[1] - bₖ[1]) * x[1] + (aₖ[1] - bₖ[1]) * x[2] + bₖ[1],
                     (cₖ[2] - bₖ[2]) * x[1] + (aₖ[2] - bₖ[2]) * x[2] + bₖ[2],
                 ]
 
-                # Full transformation
-                Fₖ = (x) -> F̃ₖ(x) + Φₖ(x)
+                # the iszero() check is to prevent NaNs at the vertices
+                Fₖ = (x) -> F̃ₖ(x) + (iszero(x[1] + x[2]) ? zero(SVector{2, eltype(x)}) : Φₖ(x))
                 D = ReferenceTriangle
                 T = SVector{2, Float64}
                 el = ParametricElement{D, T}(x -> Fₖ(x))
@@ -1335,7 +1348,14 @@ function curve_mesh(
                 j = nverts_in_chart
             end
             if j > 1
-                append!(connect_curve, node_indices)
+                # `connect_curve` is appended further below, once the element
+                # map's own vertex order `(dₖ, aₖ, bₖ, cₖ)` is known. The
+                # connectivity must list an element's nodes in the order its map
+                # sends the *reference* vertices to them; the revse of gmsh's
+                # order. This keeps the topological view of a face
+                # (`boundary_idxs` read off this matrix) and its geometric view
+                # (`boundary_element`, which follows the element map)
+                # consistent.
                 node_indices_on_bdry = node_indices[verts_on_bdry]
                 node_to_param = chart_1_node_to_param
                 α₁ = copy(node_to_param[node_indices_on_bdry[1]])
@@ -1487,6 +1507,12 @@ function curve_mesh(
                 aₖ = a₁
                 bₖ = a₂
                 cₖ = a₃
+                # ...and the node each of them is, carried along so the connectivity below
+                # can be written in this same order. `a₃` is a node of a neighbouring face
+                # simplex when `j == 2`, so `cₖ_idx` is fixed up with `cₖ` there.
+                aₖ_idx = node_indices_on_bdry[1]
+                bₖ_idx = node_indices_on_bdry[2]
+                cₖ_idx = nverts_in_chart >= 3 ? node_indices_on_bdry[3] : 0
                 atol = 10^-12
                 facenodes = [a₁, a₂, a₃]
                 skipnode = 0
@@ -1505,18 +1531,23 @@ function curve_mesh(
                 else
                     error("Uhoh")
                 end
+                dₖ_idx = node_indices[skipnode]
                 if j == 2
                     if all(norm.(Ref(straight_nodes[1]) .- facenodes) .> atol)
                         (skipnode == 1) || (cₖ = copy(straight_nodes[1]))
+                        (skipnode == 1) || (cₖ_idx = node_indices[1])
                     end
                     if all(norm.(Ref(straight_nodes[2]) .- facenodes) .> atol)
                         (skipnode == 2) || (cₖ = copy(straight_nodes[2]))
+                        (skipnode == 2) || (cₖ_idx = node_indices[2])
                     end
                     if all(norm.(Ref(straight_nodes[3]) .- facenodes) .> atol)
                         (skipnode == 3) || (cₖ = copy(straight_nodes[3]))
+                        (skipnode == 3) || (cₖ_idx = node_indices[3])
                     end
                     if all(norm.(Ref(straight_nodes[4]) .- facenodes) .> atol)
                         (skipnode == 4) || (cₖ = copy(straight_nodes[4]))
+                        (skipnode == 4) || (cₖ_idx = node_indices[4])
                     end
                     # Tests that should be satisfied; commented for performance
                     #@assert norm(cₖ - a₃) > atol
@@ -1542,7 +1573,14 @@ function curve_mesh(
                     a₃ = SVector{3, Float64}(ψ(α₃))
                     aₖ = a₁
                     bₖ = a₂
+                    aₖ_idx, bₖ_idx = bₖ_idx, aₖ_idx
                 end
+
+                # `F̃ₖ` below sends the reference vertices `(0,0,0), (1,0,0), (0,1,0),
+                # (0,0,1)` to `dₖ, aₖ, bₖ, cₖ`, and so does `Fₖ`, since `Φₖ` vanishes at the
+                # vertices. That is the order the connectivity lists them in.
+                @assert cₖ_idx != 0
+                append!(connect_curve, (dₖ_idx, aₖ_idx, bₖ_idx, cₖ_idx))
 
                 α₁hat = SVector{2, Float64}(1.0, 0.0)
                 α₂hat = SVector{2, Float64}(0.0, 1.0)
@@ -2020,42 +2058,18 @@ function curve_mesh(
                     end
                 end
 
-                # Full transformation
-                Fₖ = (x::AbstractVector) -> F̃ₖ(x) + Φₖ(x)
-                # Tests that Fₖ should satisfy; commented for performance
-                #@assert norm(Fₖ([1.0, 0.0, 0.0]) - a₁) < atol
-                #@assert norm(Fₖ([0.0, 1.0, 0.0]) - a₂) < atol
-                #@assert norm(Fₖ([1.0, 0.0, 0.0]) - aₖ) < atol
-                #@assert norm(Fₖ([0.0, 1.0, 0.0]) - bₖ) < atol
-                #@assert norm(Fₖ([0.0, 0.0000000000000001, 1.0]) - cₖ) < atol
-                #@assert norm(Fₖ([0.0, 0.0000000000000001, 0.0]) - dₖ) < atol
-                #if j == 3
-                #    @assert norm(a₃ - cₖ) < atol
-                #    @assert norm(Fₖ([0.0, 0.0, 1.0]) - cₖ) < atol
-                #    @assert norm(Fₖ([0.0, 0.0, 1.0]) - a₃) < atol
-                #    @assert norm(Φₖ([0.0, 0.0, 0.3])) < atol
-                #    @assert norm(Φₖ([0.0, 0.3, 0.0])) < atol
-                #    @assert norm(Φₖ([0.3, 0.0, 0.0])) < atol
-                #    @assert norm(
-                #        Φₖ([0.3, 0.45, 0.25]) -
-                #        (ψ(f̂ₖ_comp([0.3, 0.45, 0.25])) - 0.3*a₁ - 0.45*a₂ - 0.25*a₃),
-                #    ) < atol
-                #    @assert norm(
-                #        Φₖ([0.55, 0.45, 0.0]) -
-                #        (ψ(f̂ₖ_comp([0.55, 0.45, 0.0])) - 0.55*a₁ - 0.45*a₂),
-                #    ) < atol
-                #end
-                #@assert norm(Φₖ([0.0, 0.0000000000000001, 0.3])) < atol
-                #@assert norm(Φₖ([0.0, 0.3, 0.0])) < atol
-                #@assert norm(Φₖ([0.3, 0.0, 0.0])) < atol
-                #if j == 2
-                #    @assert norm(Φₖ([0.6, 0.0, 0.4])) < atol
-                #    @assert norm(Φₖ([0.0, 0.6, 0.4])) < atol
-                #    @assert norm(
-                #        Φₖ([0.55, 0.45, 0.0]) -
-                #        (ψ(f̂ₖ_comp([0.55, 0.45, 0.0])) - 0.55*a₁ - 0.45*a₂),
-                #    ) < atol
-                #end
+                # Full transformation, avoiding NaNs at vertices in the
+                # computation of `Φₖ`
+                #
+                # The denominator differs between the two `j` branches above and
+                # once the branch is known the appropriate check to avoid NaNs
+                # is performed.
+                denom_has_x₃ = j == 3
+                Fₖ =
+                    (x::AbstractVector) -> F̃ₖ(x) + (
+                    iszero(denom_has_x₃ ? x[1] + x[2] + x[3] : x[1] + x[2]) ?
+                        zero(SVector{3, eltype(x)}) : Φₖ(x)
+                )
 
                 D = ReferenceTetrahedron
                 T = SVector{3, Float64}
@@ -2067,7 +2081,9 @@ function curve_mesh(
                     bdry_el = ParametricElement{F, T}(s -> ψₖ(s))
                     push!(els_curve_bdry, bdry_el)
                     Ecurvebdry = typeof(first(els_curve_bdry))
-                    append!(connect_curve_bdry, node_indices_on_bdry)
+                    # `ψₖ(s) = Fₖ([s₁, s₂, 1 - s₁ - s₂])` sends the reference triangle's
+                    # vertices `(0,0), (1,0), (0,1)` to `cₖ, aₖ, bₖ`
+                    append!(connect_curve_bdry, (cₖ_idx, aₖ_idx, bₖ_idx))
                 end
 
                 Ecurve = typeof(first(els_curve))
