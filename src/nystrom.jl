@@ -84,8 +84,10 @@ function IntegralOperator(k, X, Y::Quadrature = X)
         throw(ArgumentError(msg))
     end
     T = return_type(k, eltype(X), eltype(Y))
-    msg = """IntegralOperator of nonbits being created: $T"""
-    isbitstype(T) || (@warn msg)
+    if !isbitstype(T)
+        msg = """IntegralOperator of nonbits being created: $T"""
+        @warn msg
+    end
     return IntegralOperator{T, typeof(k), typeof(X), typeof(Y)}(k, X, Y)
 end
 

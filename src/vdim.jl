@@ -61,13 +61,15 @@ _dim_interpolation_order(source::Quadrature) =
     minimum(interpolation_order, values(source.etype2qrule))
 
 """
-    _dim_solve!(Is, Js, Vs, off, L, Θ, jglob, near)
+    _dim_solve!(Is, Js, Vs, off, L, Θ, jglob, near, work = _dim_work(L, Θ, length(near)))
 
 Solve the local interpolation system of the density interpolation method for one element and
 write that element's block of `δV` into the preallocated `(Is, Js, Vs)`, starting at `off`.
 
 - `L`     — the interpolation basis' Vandermonde on the element's own quadrature nodes,
-            `num_basis × nq`, and always **scalar** (see [`particular_basis`](@ref));
+            `num_basis × nq`, and always **scalar** (see [`particular_basis`](@ref)).
+            **Overwritten**: it is factored in place, and both callers rebuild it for the
+            next element anyway;
 - `Θ`     — the right-hand side of the Green identity, `num_basis × length(near)`, i.e.
             transposed relative to the correction it becomes;
 - `jglob` — the element's global quadrature-node indices, `near` the targets it corrects.
@@ -78,24 +80,51 @@ componentwise, so the system decouples into [`_dim_ncomponents`](@ref) scalar ri
 sharing one factorization of `L`. For a vector-valued PDE that is what replaces the
 `num_basis·N × nq·N` system `kron(L, I)` would pose: the same solve, once instead of `N` times.
 """
-function _dim_solve!(Is, Js, Vs, off, L, Θ, jglob, near)
+function _dim_solve!(
+        Is, Js, Vs, off, L, Θ, jglob, near, work = _dim_work(L, Θ, length(near)),
+    )
     nb, nq = size(L)
-    T, nc = _dim_scalar_type(eltype(Θ)), _dim_ncomponents(eltype(Θ))
-    F = svd(L)
-    bdata, wdata = Matrix{T}(undef, nb, nc), Matrix{T}(undef, nq, nc)
-    for (t, i) in enumerate(near)
+    nc, nt = _dim_ncomponents(eltype(Θ)), length(near)
+    # `svd!`: `L` is the caller's Vandermonde and is rebuilt for the next element anyway
+    F = svd!(L)
+    # every target is a right-hand side against the *same* factorization, so they are posed
+    # as one `nb × nt·nc` block and solved once: `Θ` is already that block up to the
+    # component flattening, and one `ldiv!` on it replaces `nt` of them on a single column
+    bdata = view(work.bdata, :, 1:(nt * nc))
+    wdata = view(work.wdata, :, 1:(nt * nc))
+    for t in 1:nt
+        blk = view(bdata, :, ((t - 1) * nc + 1):(t * nc))
         for m in 1:nb
-            _dim_components!(bdata, m, Θ[m, t])
+            _dim_components!(blk, m, Θ[m, t])
         end
-        ldiv!(wdata, F, bdata)
+    end
+    ldiv!(wdata, F, bdata)
+    @inbounds for (t, i) in enumerate(near)
+        blk = view(wdata, :, ((t - 1) * nc + 1):(t * nc))
         # column-major over the block: target slowest, the element's own nodes fastest
         for s in 1:nq
             q = off + (t - 1) * nq + s
             Is[q], Js[q] = i, jglob[s]
-            Vs[q] = -_dim_weight(eltype(Vs), wdata, s)
+            Vs[q] = -_dim_weight(eltype(Vs), blk, s)
         end
     end
     return nothing
+end
+
+"""
+    _dim_work(L, Θ, nt) -> (; bdata, wdata)
+
+Right-hand-side and solution storage for [`_dim_solve!`](@ref), for at most `nt` targets.
+Split out so that a caller looping over elements — `lvdim` — builds it once per task rather
+than once per element; it is sized for the largest element that task will see and used
+through a view of the leading columns.
+"""
+function _dim_work(L, Θ, nt)
+    nb, nq = size(L)
+    T, nc = _dim_scalar_type(eltype(Θ)), _dim_ncomponents(eltype(Θ))
+    return (
+        bdata = Matrix{T}(undef, nb, nt * nc), wdata = Matrix{T}(undef, nq, nt * nc),
+    )
 end
 
 """

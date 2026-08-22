@@ -3,11 +3,18 @@
 #
 #   pb                = particular_basis(op, order);  length(pb) — how many functions
 #   b, γ₀, γ₁, σ      = green_identity_terms(pb, variant, center, radius)
+#   evaluate!(out, b, x)   /   evaluate!(out, γ₁, x, n)
 #
 # where `b(x)`, `γ₀(x)` and `σ(x)` return a length-`nb` vector of values at the physical point
 # `x` and `γ₁(x, n)` the same given also a unit normal, such that the density interpolated in
 # `b` satisfies `S[γ₁_β] - D[γ₀_β] + μσ_β + 𝒱[b_β] = 0` — `bdim`'s convention for `μ`, so the
 # left-hand side is exactly what `Rt` accumulates below. Green's identity needs nothing more.
+#
+# `evaluate!` is that same value written into storage this file owns, and is what the loops
+# below call: a term is evaluated once per patch node per element, so the vector `b(x)` would
+# otherwise return is the dominant cost of the whole correction. It carries no new
+# information — the fallback in `particular_basis.jl` is `out .= b(x)` — so a term needing
+# nothing faster still satisfies the contract.
 #
 # In particular `lvdim` never learns what `b_β` *is*: not that it is polynomial, not that it
 # is the monomials, not which operators have such a basis (that is `particular_basis`'s
@@ -21,8 +28,9 @@
 # `source`'s quadrature restricted to the patch elements, since `R = quad - exact` cancels the
 # error the forward operator commits. So iterate `source`'s own nodes in place, which also picks
 # up each type's own rule on a mixed patch for free.
-function _lvdim_volume!(Rt, b, X, patch_by_type, source, G)
-    for (E′, idxs) in patch_by_type
+function _lvdim_volume!(Rt, b, bbuf, X, etypes, patch_lists, source, G)
+    for (E′, idxs) in zip(etypes, patch_lists)
+        isempty(idxs) && continue
         qtags = get(source.etype2qtags, E′, nothing)
         isnothing(qtags) && error(
             "lvdim: patch element type $E′ is not integrated over by `source`, so no \
@@ -32,7 +40,7 @@ function _lvdim_volume!(Rt, b, X, patch_by_type, source, G)
         for idx in idxs
             for k in 1:nq
                 y = source.qnodes[qtags[k, idx]]
-                v = b(coords(y))
+                v = evaluate!(bbuf, b, coords(y))
                 w = weight(y)
                 @inbounds for i in eachindex(X)
                     g = G(X[i], y) * w
@@ -50,11 +58,11 @@ end
 # `(target, node)` matrices — the path taken when `∂Ωτ` meets `∂Ω` and `bdim` has to correct
 # them. The interior path never comes through here: it evaluates the kernels on the fly in
 # `_lvdim_layer_onfly!`, which has its own loop.
-function _lvdim_layer!(Rt, Ψ, γ₁Ψ, X, Ybdry, S, D)
+function _lvdim_layer!(Rt, Ψ, γ₁Ψ, vbuf, dvbuf, X, Ybdry, S, D)
     for l in 1:length(Ybdry)
         y = Ybdry[l]
-        v = Ψ(coords(y))
-        dv = γ₁Ψ(coords(y), normal(y))
+        v = evaluate!(vbuf, Ψ, coords(y))
+        dv = evaluate!(dvbuf, γ₁Ψ, coords(y), normal(y))
         @inbounds for i in eachindex(X)
             s, d = S[i, l], D[i, l]
             @simd for β in axes(Rt, 1)
@@ -70,7 +78,7 @@ end
 # is stored. This is the interior-patch path, where `∂Ωτ` is a full layer of elements away from
 # the targets so the free-space kernel evaluates cleanly and needs no `bdim`. A function barrier
 # on the concrete `els` type keeps `boundary_element` type-stable (`E′` is a runtime `DataType`).
-function _lvdim_layer_onfly!(Rt, Ψ, γ₁Ψ, X, els, list, x̂, ŵ, G, dG)
+function _lvdim_layer_onfly!(Rt, Ψ, γ₁Ψ, vbuf, dvbuf, X, els, list, x̂, ŵ, G, dG)
     for (idx, k) in list
         bord = boundary_element(els[idx], k)
         for (x̂i, ŵi) in zip(x̂, ŵ)
@@ -80,11 +88,12 @@ function _lvdim_layer_onfly!(Rt, Ψ, γ₁Ψ, X, els, list, x̂, ŵ, G, dG)
             n = _normal(jac)
             # `dG` reads the source normal, so the kernels need a node, not a bare point
             qy = QuadratureNode(y, w, n)
-            v = Ψ(y)
-            dv = γ₁Ψ(y, n)
+            v = evaluate!(vbuf, Ψ, y)
+            dv = evaluate!(dvbuf, γ₁Ψ, y, n)
             @inbounds for i in eachindex(X)
-                s = G(X[i], qy) * w
-                d = dG(X[i], qy) * w
+                # both kernels at the same pair, so they are asked for together
+                gs, gd = layer_pair_value(G, dG, X[i], qy)
+                s, d = gs * w, gd * w
                 @simd for β in axes(Rt, 1)
                     Rt[β, i] += s * dv[β] - d * v[β]
                 end
@@ -103,28 +112,24 @@ end
 # away from `τ`'s nodes, so plain quadrature suffices, and only where `∂Ωτ` runs along `∂Ω` can
 # it pass through `τ` itself. Distance to `∂Ωτ` would be sharper but needs a length scale to
 # compare against, and any such threshold can silently under-correct on an untested mesh.
-function _lvdim_element_R(
-        ctx, ::Type{Eltype}, γ₀Ψ, γ₁Ψ, σ, b, near, patch_by_type, owners_by_type,
-        need_layer_corr,
-    ) where {Eltype}
+function _lvdim_element_R!(Rt, ctx, scr, γ₀Ψ, γ₁Ψ, σ, b, near, need_layer_corr)
     op, msh, source = ctx.op, ctx.msh, ctx.source
     X, μ = view(ctx.target, near), view(ctx.green_multiplier, near)
-    # `Eltype`, not `Float64`: the contract does not promise `b` is real-valued
-    Rt = Matrix{Eltype}(undef, ctx.nb, length(near))
     Gv, Gs, Gd = ctx.volume_kernel, ctx.layer_kernels...
     # the free term `μ(x)σ_β(x)` seeds `Rt`, hence `=` and not `+=`
     for i in eachindex(X)
-        v = σ(coords(X[i]))
+        v = evaluate!(scr.σbuf, σ, coords(X[i]))
         @inbounds @simd for β in axes(Rt, 1)
             Rt[β, i] = μ[i] * v[β]
         end
     end
-    _lvdim_volume!(Rt, b, X, patch_by_type, source, Gv)
+    _lvdim_volume!(Rt, b, scr.bbuf, X, scr.etypes, scr.patch_lists, source, Gv)
     if need_layer_corr
         # `∂Ωτ` runs along `∂Ω`, so the layer potentials over it are nearly singular at the
         # targets: materialize the boundary quadrature and correct it with `bdim`
         Ybdry = Quadrature{ctx.N, Float64}(OrderedDict{DataType, ReferenceQuadrature}())
-        for (E′, list) in owners_by_type
+        for (E′, list) in zip(scr.etypes, scr.owner_lists)
+            isempty(list) && continue
             _lvdim_add_faces!(Ybdry, elements(msh, E′), list, ctx.bdry_qrule)
         end
         S, D = single_double_layer(;
@@ -137,11 +142,12 @@ function _lvdim_element_R(
             ),
             kernel_variant = ctx.layer_variant,
         )
-        _lvdim_layer!(Rt, γ₀Ψ, γ₁Ψ, X, Ybdry, S, D)
+        _lvdim_layer!(Rt, γ₀Ψ, γ₁Ψ, scr.vbuf, scr.dvbuf, X, Ybdry, S, D)
     else
-        for (E′, list) in owners_by_type
+        for (E′, list) in zip(scr.etypes, scr.owner_lists)
+            isempty(list) && continue
             _lvdim_layer_onfly!(
-                Rt, γ₀Ψ, γ₁Ψ, X,
+                Rt, γ₀Ψ, γ₁Ψ, scr.vbuf, scr.dvbuf, X,
                 elements(msh, E′), list, ctx.bdry_x̂, ctx.bdry_ŵ, Gs, Gd,
             )
         end
@@ -160,33 +166,59 @@ end
 # `SVector{Nf,Int}` in pre-sized flat buffers, which keeps the sort/compare allocation-free (a
 # `Vector{Int}`-per-face version was ~8x slower); in a fixed ambient dimension every element type
 # shares the same face-node count `Nf`.
-const PatchFace = Tuple{DataType, Int, Int}
+#
+# The owning element type travels as an index into the caller's list of element
+# types, not as the `DataType` itself: a tuple holding a type is not `isbits`,
+# so a `Vector{PatchFace}` of them heap-allocates once per face — and a patch's
+# faces are rebuilt for every element in the mesh.
+const PatchFace = Tuple{Int, Int, Int}
 
-function _local_patch_boundary(patch_by_type, conns)
+function _local_patch_boundary(etypes, patch_lists, conns)
     nfaces = Nf = 0
-    for (E′, idxs) in patch_by_type
+    for (E′, idxs) in zip(etypes, patch_lists)
+        isempty(idxs) && continue
         bdi = boundary_idxs(E′)
         Nf = length(first(bdi))
         nfaces += length(idxs) * length(bdi)
     end
     nfaces == 0 && return SVector{Nf, Int}[], PatchFace[]
-    return _local_patch_boundary(patch_by_type, conns, nfaces, Val(Nf))
+    return _local_patch_boundary(etypes, patch_lists, conns, Val(Nf))
 end
 
-function _local_patch_boundary(patch_by_type, conns, nfaces::Int, ::Val{Nf}) where {Nf}
-    faces = Vector{SVector{Nf, Int}}(undef, nfaces)
-    owners = Vector{PatchFace}(undef, nfaces)
+function _local_patch_boundary(etypes, patch_lists, conns, ::Val{Nf}) where {Nf}
+    faces, owners = SVector{Nf, Int}[], PatchFace[]
+    keep = _patch_boundary_faces!(faces, owners, Int[], Int[], etypes, patch_lists, conns)
+    return faces[keep], owners[keep]
+end
+
+# The `keep` half of the above, writing into buffers the caller owns and returning the
+# surviving indices rather than gathered copies. This is what the element loop runs: a
+# patch's topology is rebuilt for every element, so the four arrays here are the ones worth
+# handing back to the next element rather than to the collector.
+function _patch_boundary_faces!(
+        faces::Vector{SVector{Nf, Int}}, owners, perm, keep, etypes, patch_lists, conns,
+    ) where {Nf}
+    nfaces = 0
+    for (E′, idxs) in zip(etypes, patch_lists)
+        isempty(idxs) && continue
+        nfaces += length(idxs) * length(boundary_idxs(E′))
+    end
+    resize!(faces, nfaces)
+    resize!(owners, nfaces)
+    resize!(perm, nfaces)
+    empty!(keep)
+    nfaces == 0 && return keep
     j = 1
-    for (E′, idxs) in patch_by_type
+    for (it, E′) in enumerate(etypes)
+        idxs = patch_lists[it]
+        isempty(idxs) && continue
         # barrier specializing the fill loop on the concrete connectivity-matrix and
         # `boundary_idxs` types (`E′` is a runtime `DataType`)
         j = _fill_patch_faces!(
-            faces, owners, conns[E′], boundary_idxs(E′), E′, idxs, j, Val(Nf),
+            faces, owners, conns[E′], boundary_idxs(E′), it, idxs, j, Val(Nf),
         )
     end
-    perm = sortperm(faces)
-    keep = Int[]
-    sizehint!(keep, nfaces)
+    sortperm!(perm, faces)
     i = 1
     while i <= nfaces
         if i < nfaces && faces[perm[i]] == faces[perm[i + 1]]
@@ -196,16 +228,16 @@ function _local_patch_boundary(patch_by_type, conns, nfaces::Int, ::Val{Nf}) whe
             i += 1
         end
     end
-    return faces[keep], owners[keep]
+    return keep
 end
 
 @inline function _fill_patch_faces!(
-        faces, owners, conn::AbstractMatrix, bdi, E′, idxs, j, ::Val{Nf},
+        faces, owners, conn::AbstractMatrix, bdi, it::Int, idxs, j, ::Val{Nf},
     ) where {Nf}
     for el in idxs
         for (k, face) in enumerate(bdi)
             faces[j] = sort(SVector(ntuple(i -> conn[face[i], el], Val(Nf))))
-            owners[j] = (E′, el, k)
+            owners[j] = (it, el, k)
             j += 1
         end
     end
@@ -220,14 +252,20 @@ end
 # No quadrature is built here: the faces carry their own geometry through the owning element and
 # are realized on the fly, or gathered into an `Ybdry` only when `∂Ωτ` meets `∂Ω`. The patch
 # *volume* quadrature is likewise never materialized — it is `source`'s own nodes.
-function _lvdim_patch_boundary(patch_by_type, conns, bdry_faces)
-    faces, owners = _local_patch_boundary(patch_by_type, conns)
-    touches_bdry = any(in(bdry_faces), faces)
-    by_type = OrderedDict{DataType, Vector{Tuple{Int, Int}}}()
-    for (E′, el, k) in owners
-        push!(get!(by_type, E′, Tuple{Int, Int}[]), (el, k))
+function _lvdim_patch_boundary!(scr, conns, bdry_faces)
+    keep = _patch_boundary_faces!(
+        scr.faces, scr.owners, scr.perm, scr.keep, scr.etypes, scr.patch_lists, conns,
+    )
+    for list in scr.owner_lists
+        empty!(list)
     end
-    return by_type, touches_bdry
+    touches_bdry = false
+    for i in keep
+        touches_bdry |= scr.faces[i] in bdry_faces
+        it, el, k = scr.owners[i]
+        push!(scr.owner_lists[it], (el, k))
+    end
+    return touches_bdry
 end
 
 # function barrier: `E′` is a runtime `DataType`, so specialize the face construction on the
@@ -351,10 +389,10 @@ function lvdim_correction(
     )
     # faces of the whole mesh appearing exactly once are the faces of `∂Ω`: the same
     # criterion `_local_patch_boundary` applies to a patch, so reuse it over every element
-    whole_mesh = OrderedDict{DataType, Vector{Int}}(
-        E => collect(axes(conns[E], 2)) for E in element_types(msh)
-    )
-    bdry_faces = Set(first(_local_patch_boundary(whole_mesh, conns)))
+    etypes = collect(DataType, element_types(msh))
+    etype_index = Dict{DataType, Int}(E => i for (i, E) in enumerate(etypes))
+    whole_mesh = [collect(axes(conns[E], 2)) for E in etypes]
+    bdry_faces = Set(first(_local_patch_boundary(etypes, whole_mesh, conns)))
 
     # Patch quadrature rule (shared, read-only). Chosen here rather than via
     # `_qrule_for_reference_shape`, which returns a Vioreanu-Rokhlin rule on a triangle: VR
@@ -379,9 +417,12 @@ function lvdim_correction(
     # variant travels as a `Val` so that the terms of its identity stay inferrable per element
     ctx = (;
         op, nb, N, msh, source, target, green_multiplier,
-        neighbors, conns, bdry_faces, bdry_qrule, bdry_x̂, bdry_ŵ, pb,
+        neighbors, conns, etypes, etype_index, bdry_faces, bdry_qrule, bdry_x̂, bdry_ŵ, pb,
         variant = Val(kernel_variant),
         volume_kernel, layer_kernels, layer_variant, Rtype,
+        # prototypes for the reusable buffers; see `_lvdim_scratch`
+        face_proto = SVector{length(first(boundary_idxs(first(element_types(msh))))), Int}[],
+        _lvdim_term_prototypes(pb, Val(kernel_variant), msh, source, N)...,
     )
 
     Is, Js, Vs = Int[], Int[], Eltype[]
@@ -390,17 +431,29 @@ function lvdim_correction(
         near_list = dict_near[E]
         nq, ne = size(qtags)
         @assert length(near_list) == ne
-        # Elements are the unit of parallelism: each one allocates everything it writes to,
-        # so tasks share nothing writable. Each contributes exactly `nq * length(near)`
+        ne == 0 && continue
+        # Elements are the unit of parallelism: each contributes exactly `nq * length(near)`
         # entries, so the output is sized up front and every task fills a disjoint slice — no
-        # lock, and a `δV` independent of the thread count.
+        # lock, and a `δV` independent of the thread count. Tasks are spawned per *chunk* so
+        # that the scratch each element writes through (see `_lvdim_scratch`) is built once
+        # per task; more chunks than threads keeps the boundary elements, which cost a
+        # `bdim_correction` the interior ones do not, from unbalancing the split.
         counts = [nq * length(near) for near in near_list]
         offs = length(Is) .+ cumsum(counts) .- counts
         for v in (Is, Js, Vs)
             resize!(v, length(v) + sum(counts))
         end
-        Threads.@threads for el in 1:ne
-            _lvdim_element!(Is, Js, Vs, offs[el], ctx, E, els, qtags, el, near_list[el])
+        maxnear = maximum(length, near_list)
+        chunk = max(1, cld(ne, 8 * Threads.nthreads()))
+        @sync for els_chunk in Iterators.partition(1:ne, chunk)
+            Threads.@spawn begin
+                scr = _lvdim_scratch(ctx, Rtype, nq, maxnear)
+                for el in els_chunk
+                    _lvdim_element!(
+                        Is, Js, Vs, offs[el], ctx, scr, E, els, qtags, el, near_list[el],
+                    )
+                end
+            end
         end
     end
     return sparse(Is, Js, Vs, m, n)
@@ -409,26 +462,78 @@ end
 # One element's block of `δV`, written into the caller's preallocated `(I, J, V)` starting at
 # `off`. A function rather than the `@threads` body inlined, so that what it captures stays
 # concretely typed and `E` — a runtime `DataType` — is specialized on once per element.
-function _lvdim_element!(Is, Js, Vs, off, ctx, E, els, qtags, el, near)
+function _lvdim_element!(Is, Js, Vs, off, ctx, scr, E, els, qtags, el, near)
     isempty(near) && return nothing
     # the terms of this element's Green identity, centred and scaled to the element
     b, γ₀Ψ, γ₁Ψ, σ =
         green_identity_terms(ctx.pb, ctx.variant, translation_and_scaling(els[el])...)
     # on a curved mesh a single patch mixes straight `LagrangeElement`s with curved
-    # `ParametricElement`s, so indices must stay paired with their type
-    patch_by_type = OrderedDict{DataType, Vector{Int}}()
-    for (E′, idx) in ctx.neighbors[(E, el)]
-        push!(get!(patch_by_type, E′, Int[]), idx)
+    # `ParametricElement`s, so indices must stay paired with their type. The lists are keyed
+    # on every type in the mesh once and emptied per element, so a patch costs no allocation
+    for idxs in scr.patch_lists
+        empty!(idxs)
     end
-    owners_by_type, need_corr =
-        _lvdim_patch_boundary(patch_by_type, ctx.conns, ctx.bdry_faces)
-    Rt = _lvdim_element_R(
-        ctx, ctx.Rtype, γ₀Ψ, γ₁Ψ, σ, b, near, patch_by_type, owners_by_type, need_corr,
-    )
+    for (E′, idx) in ctx.neighbors[(E, el)]
+        push!(scr.patch_lists[ctx.etype_index[E′]], idx)
+    end
+    need_corr = _lvdim_patch_boundary!(scr, ctx.conns, ctx.bdry_faces)
+    Rt = view(scr.Rt, :, 1:length(near))
+    _lvdim_element_R!(Rt, ctx, scr, γ₀Ψ, γ₁Ψ, σ, b, near, need_corr)
     jglob = @view qtags[:, el]
     # `b` is a *batched* basis, so the Vandermonde is one column per node
-    L = vandermonde(b, (coords(q) for q in view(ctx.source, jglob)))
+    L = vandermonde!(scr.L, b, (coords(q) for q in view(ctx.source, jglob)))
     # the same interpolation solve `vdim_correction` performs, on a locally computed `Rt`
-    _dim_solve!(Is, Js, Vs, off, L, Rt, jglob, near)
+    _dim_solve!(Is, Js, Vs, off, L, Rt, jglob, near, scr.solve)
     return nothing
+end
+
+"""
+    _lvdim_scratch(ctx, Rtype, nq, maxnear) -> scr
+
+Everything one task reuses across the elements it owns: the patch-topology
+buffers, the per-element `Rᵀ` and Vandermonde, and one output vector per term of
+the Green identity.
+
+This keeps the element loop allocation-free; the loop below spawns one task per
+chunk of elements.
+
+The term buffers are sized and typed from `ctx`'s prototypes rather than from
+`Rtype`: how long a term's vector is and what it holds is not something this
+file is told (see the header), so it is read off one evaluation instead of
+derived.
+"""
+function _lvdim_scratch(ctx, ::Type{Rtype}, nq, maxnear) where {Rtype}
+    nt = length(ctx.etypes)
+    return (;
+        # positional, not keyed: `_fill_patch_faces!` stores the owning type as its index
+        etypes = ctx.etypes,
+        patch_lists = [Int[] for _ in 1:nt],
+        owner_lists = [Tuple{Int, Int}[] for _ in 1:nt],
+        faces = similar(ctx.face_proto, 0),
+        owners = PatchFace[],
+        perm = Int[],
+        keep = Int[],
+        # `Rtype`, not `Float64`: the contract does not promise `b` is real-valued
+        Rt = Matrix{Rtype}(undef, ctx.nb, maxnear),
+        L = similar(ctx.b_proto, ctx.nb, nq),
+        solve = _dim_work(similar(ctx.b_proto, ctx.nb, nq), Matrix{Rtype}(undef, 0, 0), maxnear),
+        bbuf = similar(ctx.b_proto),
+        σbuf = similar(ctx.σ_proto),
+        vbuf = similar(ctx.γ₀_proto),
+        dvbuf = similar(ctx.γ₁_proto),
+    )
+end
+
+# One evaluation of each term of the identity, for the buffer sizes and element
+# types the element loop then reuses, executed on the first element of the first
+# type.
+function _lvdim_term_prototypes(pb, variant, msh, source, N)
+    E = first(keys(source.etype2qtags))
+    c, r = translation_and_scaling(elements(msh, E)[1])
+    b, γ₀, γ₁, σ = green_identity_terms(pb, variant, c, r)
+    ν = SVector(ntuple(i -> i == 1 ? 1.0 : 0.0, N))
+    return (
+        b_proto = collect(b(c)), γ₀_proto = collect(γ₀(c)),
+        γ₁_proto = collect(γ₁(c, ν)), σ_proto = collect(σ(c)),
+    )
 end

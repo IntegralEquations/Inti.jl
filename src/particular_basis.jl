@@ -203,12 +203,35 @@ it and the first `nb` entries are exactly the basis they would form on their own
 a lower-degree family is evaluated without a second basis.
 """
 function (m::MonomialBasis)(x, nb::Integer = length(m))
-    v = Vector{float(eltype(x))}(undef, nb)
+    return monomial_values!(Vector{float(eltype(x))}(undef, nb), m, x)
+end
+
+"""
+    monomial_values!(v, m::MonomialBasis, x)        -> v
+    monomial_values!(v, dv, m::MonomialBasis, x, ν) -> (v, dv)
+
+The recursions above writing into caller storage, evaluating as many monomials as `v` is
+long. The allocating methods are these plus an allocation, and are the ones to read: the
+only reason these exist is that `lvdim` calls them once per patch node per element, where
+the vector is the entire cost.
+"""
+@inline function monomial_values!(v, m::MonomialBasis, x)
     @inbounds v[1] = one(eltype(v))
-    @inbounds for j in 2:nb
+    @inbounds for j in 2:length(v)
         v[j] = v[m.parent[j]] * x[m.axis[j]]
     end
     return v
+end
+
+@doc (@doc monomial_values!)
+@inline function monomial_values!(v, dv, m::MonomialBasis, x, ν)
+    @inbounds v[1], dv[1] = one(eltype(v)), zero(eltype(dv))
+    @inbounds for j in 2:length(v)
+        p, a = m.parent[j], m.axis[j]
+        v[j] = v[p] * x[a]
+        dv[j] = dv[p] * x[a] + v[p] * ν[a]
+    end
+    return v, dv
 end
 
 """
@@ -224,14 +247,7 @@ recursion contracts against `ν` as it goes, where coefficient space would contr
 """
 function (m::MonomialBasis)(x, ν::AbstractVector, nb::Integer = length(m))
     T = float(promote_type(eltype(x), eltype(ν)))
-    v, dv = Vector{T}(undef, nb), Vector{T}(undef, nb)
-    @inbounds v[1], dv[1] = one(T), zero(T)
-    @inbounds for j in 2:nb
-        p, a = m.parent[j], m.axis[j]
-        v[j] = v[p] * x[a]
-        dv[j] = dv[p] * x[a] + v[p] * ν[a]
-    end
-    return v, dv
+    return monomial_values!(Vector{T}(undef, nb), Vector{T}(undef, nb), m, x, ν)
 end
 
 """
@@ -526,6 +542,25 @@ and `∂ₓ = ∂x̃/r`.
 solution_order(::AbstractParticularBasis) = 2
 
 """
+    evaluate!(out, f, x)     -> out
+    evaluate!(out, f, x, ν)  -> out
+
+The value of a Green-identity term written into caller storage rather than a fresh vector.
+Semantically `out .= f(x)` and nothing else — the fallback here is exactly that, so every
+term already satisfies this contract and a caller may always use it.
+
+It exists because `lvdim` evaluates these terms once per patch node per element, where the
+vector `f(x)` returns *is* the cost: the terms on that path
+([`MonomialTerm`](@ref), [`ValueTerm`](@ref), [`TraceTerm`](@ref), [`TiltedTerm`](@ref))
+implement it directly and allocate nothing. Those carry scratch, so a term is single-consumer — see
+[`ValueTerm`](@ref).
+"""
+evaluate!(out, f, x) = copyto!(out, f(x))
+
+@doc (@doc evaluate!)
+evaluate!(out, f, x, ν) = copyto!(out, f(x, ν))
+
+"""
     source_closure(pb, c, r) -> b
 
 The interpolation basis `b` on the element `(c, r)`, scalar for every operator (see
@@ -534,7 +569,24 @@ as a prefix of `m₊` so that nothing of higher degree is computed for them; onl
 branch of [`ShiftedLaplaceParticularBasis`](@ref) departs from them.
 """
 source_closure(pb::AbstractParticularBasis, c, r) =
-    x -> solution_space(pb)((x - c) / r, length(pb))
+    MonomialTerm(solution_space(pb), c, r, length(pb))
+
+"""
+    MonomialTerm(m₊, c, r, nb)
+
+`x ↦ m₊((x-c)/r)` truncated to its first `nb` entries — the identity's `b` wherever that is
+the plain monomials, which is every operator but the tilted branch of
+[`ShiftedLaplaceParticularBasis`](@ref).
+"""
+struct MonomialTerm{N, C, R}
+    m₊::MonomialBasis{N}
+    c::C
+    r::R
+    nb::Int
+end
+
+(t::MonomialTerm)(x) = t.m₊((x - t.c) / t.r, t.nb)
+evaluate!(out, t::MonomialTerm, x) = monomial_values!(out, t.m₊, (x - t.c) / t.r)
 
 function (pb::AbstractParticularBasis)(c, r)
     Ψ̂ = solution_matrix(pb, r)
@@ -558,7 +610,7 @@ function value_closure(
         pb::AbstractParticularBasis, c, r, Ψ̂ = solution_matrix(pb, r),
     )
     m₊, s = solution_space(pb), solution_order(pb)
-    return x -> r^s * (Ψ̂ * m₊((x - c) / r))
+    return ValueTerm(m₊, c, r, r^s * Ψ̂, _term_buffer(Ψ̂, m₊))
 end
 
 @doc (@doc value_closure)
@@ -566,7 +618,53 @@ function trace_closure(
         pb::AbstractParticularBasis, c, r, Ψ̂ = solution_matrix(pb, r),
     )
     m₊, s = solution_space(pb), solution_order(pb)
-    return (x, ν) -> r^(s - 1) * (Ψ̂ * last(m₊((x - c) / r, ν)))
+    return TraceTerm(
+        m₊, c, r, r^(s - 1) * Ψ̂, _term_buffer(Ψ̂, m₊), _term_buffer(Ψ̂, m₊),
+    )
+end
+
+# scratch for one `m₊` evaluation, in whatever type the matvec against `Ψ̂` wants
+_term_buffer(Ψ̂, m₊) = Vector{eltype(Ψ̂)}(undef, length(m₊))
+
+"""
+    ValueTerm(m₊, c, r, A, buf)
+    TraceTerm(m₊, c, r, A, vbuf, dbuf)
+
+`Ψ` and `γ₁Ψ` on the element `(c, r)`, as `x ↦ A·m₊((x-c)/r)` and `(x,ν) ↦ A·∂_ν m₊((x-c)/r)`
+with the element's `r^s` folded into `A` once. The scratch is what makes
+[`evaluate!`](@ref) allocation-free, and is why a term is **single-consumer**: `lvdim`
+builds one per element inside the task that uses it, and nothing else may evaluate it
+concurrently. The allocating call keeps its own storage and stays reentrant.
+"""
+struct ValueTerm{N, C, R, M, T}
+    m₊::MonomialBasis{N}
+    c::C
+    r::R
+    A::M
+    buf::Vector{T}
+end
+
+@doc (@doc ValueTerm)
+struct TraceTerm{N, C, R, M, T}
+    m₊::MonomialBasis{N}
+    c::C
+    r::R
+    A::M
+    vbuf::Vector{T}
+    dbuf::Vector{T}
+end
+
+(t::ValueTerm)(x) = t.A * t.m₊((x - t.c) / t.r)
+(t::TraceTerm)(x, ν) = t.A * last(t.m₊((x - t.c) / t.r, ν))
+
+function evaluate!(out, t::ValueTerm, x)
+    monomial_values!(t.buf, t.m₊, (x - t.c) / t.r)
+    return mul!(out, t.A, t.buf)
+end
+
+function evaluate!(out, t::TraceTerm, x, ν)
+    monomial_values!(t.vbuf, t.dbuf, t.m₊, (x - t.c) / t.r, ν)
+    return mul!(out, t.A, t.dbuf)
 end
 
 """
@@ -887,13 +985,41 @@ end
 
 function source_closure(pb::ShiftedLaplaceParticularBasis, c, r)
     m₊, nb = solution_space(pb), length(pb)
-    _tilted(pb, r) || return x -> m₊((x - c) / r, nb)
-    # the Laplace solution is kept as is, so the shift term of `ℒ` lands on `b` instead
+    _tilted(pb, r) || return MonomialTerm(m₊, c, r, nb)
+    # the Laplace solution is kept as is, so the shift term of `ℒ` lands on `b` instead.
+    # `[I 0] + κ²R` is assembled once per element rather than applied as a slice plus a
+    # matvec plus a sum per point: same `b`, one matvec and no temporaries.
     κ², R = _kappa2(pb, r), pb.R
-    return function (x)
-        v = m₊((x - c) / r)
-        return v[1:nb] + κ² * (R * v)
+    T = promote_type(typeof(κ²), eltype(R), Float64)
+    return TiltedTerm(m₊, c, r, R, κ², nb, Vector{T}(undef, length(m₊)))
+end
+
+"""
+    TiltedTerm(m₊, c, r, R, κ², nb, buf)
+
+`b = [I 0]m₊(x̃) + κ²R m₊(x̃)`, the tilted branch's interpolation basis. The two pieces are
+applied in place — a copy of the leading `nb` entries, then one `mul!` accumulating onto it —
+rather than assembled into a single matrix per element, so neither the slice nor the sum
+exists as an array.
+"""
+struct TiltedTerm{N, C, R, M, K, T}
+    m₊::MonomialBasis{N}
+    c::C
+    r::R
+    R̂::M
+    κ²::K
+    nb::Int
+    buf::Vector{T}
+end
+
+(t::TiltedTerm)(x) = (v = t.m₊((x - t.c) / t.r); v[1:(t.nb)] + t.κ² * (t.R̂ * v))
+
+function evaluate!(out, t::TiltedTerm, x)
+    v = monomial_values!(t.buf, t.m₊, (x - t.c) / t.r)
+    @inbounds for β in 1:(t.nb)
+        out[β] = v[β]
     end
+    return mul!(out, t.R̂, v, t.κ², one(eltype(out)))
 end
 
 # `ℒ = -(μΔ + (λ+μ)∇∇·)` carries its own sign, so — as for Laplace — the right inverse is the

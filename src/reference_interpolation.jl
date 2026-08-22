@@ -448,8 +448,7 @@ The `k`-th face of `el` (ordered and wound as in [`boundary_idxs`](@ref)), as a
 
 The face is the element map restricted to the corresponding face of the
 *reference* shape, so it follows the element's true geometry: high-order
-`LagrangeElement`s and curved `ParametricElement`s alike. Rebuilding a face from
-its vertex coordinates instead would silently straighten it.
+`LagrangeElement`s and curved `ParametricElement`s alike.
 """
 function boundary_element end
 

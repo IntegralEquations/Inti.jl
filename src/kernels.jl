@@ -553,14 +553,107 @@ default_density_eltype(::Helmholtz) = ComplexF64
 hankelh1(n, x::Real) = Bessels.hankelh1(n, x)
 hankelh1(n, x::Complex) = SpecialFunctions.hankelh1(n, x)
 
+# ---------------------------------------------------------------------------
+# `H₀⁽¹⁾(z)` and `H₁⁽¹⁾(z)/z` at small argument
+# ---------------------------------------------------------------------------
+#
+# The 2D Helmholtz kernels evaluated the way a *near-field* caller needs them. Two
+# structural facts pay for a separate routine:
+#
+#  * both are **even** in `z` up to a single `log z`, so `u = z²/4 = (k²/4)|x-y|²` is the
+#    natural variable — no square root is taken at all, and `ln(z/2) = ½ln u` is the only
+#    transcendental left;
+#  * `J` and `Y` share every power of `u`, and so do orders `0` and `1`, so one pass over
+#    the series produces the whole pair a layer operator wants.
+#
+# This is an evaluation strategy, not an approximation: outside the series' range the
+# general routine is called instead, and the branch is on `u` alone. The two term counts
+# below hold the relative error, against `Bessels`, at 5e-16 for `u ≤ 1` and 4e-15 for
+# `u ≤ 25/4`; past that the ascending series loses digits to cancellation faster than added
+# terms recover them, which is where the fallback starts. In `lvdim` terms the fast path
+# covers `k·|x-y| ≤ 5`, and `|x-y|` there is at most a patch across.
+
+const HANKEL_SERIES_U_LO = 1.0     # z ≤ 2
+const HANKEL_SERIES_U_HI = 6.25    # z ≤ 5
+
+# `J₀ = Σ aₘuᵐ`, `Y₀ = (2/π)[(ln(z/2)+γ)J₀ + Σ bₘuᵐ]`,
+# `J₁/z = Σ cₘuᵐ`, `Y₁/z = (2/π)[ln(z/2)·J₁/z - 1/(4u)] - (1/2π)Σ dₘuᵐ`   (DLMF 10.8.1)
+_hankel_a(m) = (-1)^m // factorial(big(m))^2
+_hankel_c(m) = (-1)^m // (2 * factorial(big(m)) * factorial(big(m + 1)))
+_harmonic(n) = sum(1 // big(j) for j in 1:n; init = 0 // big(1))
+_hankel_series(f, nt) = ntuple(i -> Float64(f(i - 1)), nt)
+
+for (lo, nt) in ((:LO, 12), (:HI, 20))
+    @eval begin
+        const $(Symbol(:HANKEL_J0_, lo)) = _hankel_series(_hankel_a, $nt)
+        const $(Symbol(:HANKEL_Y0_, lo)) =
+            _hankel_series(m -> -_hankel_a(m) * _harmonic(m), $nt)
+        const $(Symbol(:HANKEL_J1_, lo)) = _hankel_series(_hankel_c, $nt)
+        const $(Symbol(:HANKEL_Y1_, lo)) = _hankel_series($nt) do m
+            2 * _hankel_c(m) * (_harmonic(m) + _harmonic(m + 1) -
+                                2 * big(MathConstants.eulergamma))
+        end
+    end
+end
+
+@inline function _h0_series(u, aj, ay)
+    j = evalpoly(u, aj)
+    lnz2 = log(u) / 2                              # `ln(z/2)`, since `u = (z/2)²`
+    return complex(j, (2 / π) * ((lnz2 + MathConstants.eulergamma) * j + evalpoly(u, ay)))
+end
+
+@inline function _h01_series(u, aj0, ay0, aj1, ay1)
+    j0, j1 = evalpoly(u, aj0), evalpoly(u, aj1)    # `J₀(z)` and `J₁(z)/z`
+    lnz2 = log(u) / 2
+    h0 = complex(j0, (2 / π) * ((lnz2 + MathConstants.eulergamma) * j0 + evalpoly(u, ay0)))
+    h1 = complex(j1, (2 / π) * (lnz2 * j1 - 1 / (4u)) - evalpoly(u, ay1) / (2π))
+    return h0, h1
+end
+
+"""
+    _hankelh1_0(k, d²)    -> H₀⁽¹⁾(k√d²)
+    _hankelh1_01(k, d²)   -> (H₀⁽¹⁾(z), H₁⁽¹⁾(z)/z),  z = k√d²
+
+The 2D Helmholtz kernels' Hankel functions in terms of the *squared* distance, which is
+what a kernel has and what the series above wants. `H₁⁽¹⁾/z` rather than `H₁⁽¹⁾` because
+that is the even combination, and the `1/d` the double layer divides by is exactly the one
+this cancels.
+
+Complex `k` (a lossy medium) takes the general routine: the series' branch is an inequality
+on `u`.
+"""
+@inline function _hankelh1_0(k::Real, d2::Real)
+    u = (k * k / 4) * d2
+    u ≤ HANKEL_SERIES_U_LO && return _h0_series(u, HANKEL_J0_LO, HANKEL_Y0_LO)
+    u ≤ HANKEL_SERIES_U_HI && return _h0_series(u, HANKEL_J0_HI, HANKEL_Y0_HI)
+    return hankelh1(0, k * sqrt(d2))
+end
+
+_hankelh1_0(k, d2) = hankelh1(0, k * sqrt(d2))
+
+@doc (@doc _hankelh1_0)
+@inline function _hankelh1_01(k::Real, d2::Real)
+    u = (k * k / 4) * d2
+    u ≤ HANKEL_SERIES_U_LO &&
+        return _h01_series(u, HANKEL_J0_LO, HANKEL_Y0_LO, HANKEL_J1_LO, HANKEL_Y1_LO)
+    u ≤ HANKEL_SERIES_U_HI &&
+        return _h01_series(u, HANKEL_J0_HI, HANKEL_Y0_HI, HANKEL_J1_HI, HANKEL_Y1_HI)
+    z = k * sqrt(d2)
+    return hankelh1(0, z), hankelh1(1, z) / z
+end
+
+function _hankelh1_01(k, d2)
+    z = k * sqrt(d2)
+    return hankelh1(0, z), hankelh1(1, z) / z
+end
+
 function (SL::SingleLayerKernel{<:Helmholtz{N}})(target, source) where {N}
     k = SL.op.k
     r = coords(target) - coords(source)
     d2 = dot(r, r)
     tol = oftype(d2, SAME_POINT_TOLERANCE)
     if N == 2
-        d = sqrt(d2)
-        v = im / 4 * hankelh1(0, k * d)
+        v = im / 4 * _hankelh1_0(k, d2)
         return d2 ≤ tol * tol ? zero(v) : v
     elseif N == 3
         invd = @fastmath one(d2) / sqrt(d2)
@@ -580,8 +673,8 @@ function (DL::DoubleLayerKernel{<:Helmholtz{N}})(target, source) where {N}
     tol = oftype(d2, SAME_POINT_TOLERANCE)
     rdny = dot(r, ny)
     if N == 2
-        d = sqrt(d2)
-        v = im * k / (4d) * hankelh1(1, k * d) * rdny
+        # `H₁⁽¹⁾(z)/z` absorbs the `1/d`: `im·k/(4d)·H₁⁽¹⁾(kd) = im·k²/4·H₁⁽¹⁾(z)/z`
+        v = im * k^2 / 4 * last(_hankelh1_01(k, d2)) * rdny
     elseif N == 3
         invd = @fastmath one(d2) / sqrt(d2)
         d = d2 * invd
@@ -591,6 +684,36 @@ function (DL::DoubleLayerKernel{<:Helmholtz{N}})(target, source) where {N}
         notimplemented()
     end
     return d2 ≤ tol * tol ? zero(v) : v
+end
+
+"""
+    layer_pair_value(S, D, target, source) -> (s, d)
+
+`(S(target, source), D(target, source))` as one call, for a caller that always wants both at
+the same pair of points — `lvdim`'s quadrature over `∂Ωτ` is the whole reason this exists.
+The fallback is the two calls, so any kernel pair may be passed; a pair that shares work
+overrides it.
+
+For 2D Helmholtz the sharing is nearly total: one `|x-y|²`, one series pass, and one
+logarithm serve both orders (see [`_hankelh1_01`](@ref)), where two independent kernel calls
+repeat all three.
+"""
+@inline layer_pair_value(S, D, target, source) = (S(target, source), D(target, source))
+
+@inline function layer_pair_value(
+        S::SingleLayerKernel{<:Helmholtz{2}}, D::DoubleLayerKernel{<:Helmholtz{2}},
+        target, source,
+    )
+    k = S.op.k
+    # the fused form reads one wavenumber; a mismatched pair is a caller error, not ours
+    k == D.op.k || return (S(target, source), D(target, source))
+    r = coords(target) - coords(source)
+    d2 = dot(r, r)
+    tol = oftype(d2, SAME_POINT_TOLERANCE)
+    h0, h1z = _hankelh1_01(k, d2)
+    sv = im / 4 * h0
+    dv = im * k^2 / 4 * h1z * dot(r, normal(source))
+    return d2 ≤ tol * tol ? (zero(sv), zero(dv)) : (sv, dv)
 end
 
 function (ADL::AdjointDoubleLayerKernel{<:Helmholtz{N}})(target, source) where {N}

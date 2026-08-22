@@ -187,7 +187,8 @@ e.g. `vandermonde(b, (coords(q) for q in nodes))`.
 """
 function vandermonde!(V, b, pts)
     for (i, p) in enumerate(pts)
-        V[:, i] .= b(p)
+        # `evaluate!`, not `.= b(p)`: `b`'s value goes straight into the column
+        evaluate!(view(V, :, i), b, p)
     end
     return V
 end
