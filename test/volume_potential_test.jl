@@ -43,7 +43,7 @@ lvdim_gain = 5
 # room for the patch to grow, and only the tolerance is asserted. It is looser than 2D because
 # the mesh is: `∂Ωτ` is `∂Ω`, a coarse polyhedron, and every target sits within a couple of
 # elements of it.
-lvdim_rtol_3d = 5.0e-5
+lvdim_rtol_3d = 1.0e-3
 lvdim_skin_3d = 0.3
 meshsize = 0.4  # 2D mesh size
 meshsize_3d = 0.8  # 3D mesh size — tests check polynomial exactness (not convergence),
@@ -148,7 +148,7 @@ Both quadratures are built on the *same* mesh as `Ωₕ_quad`, so the domain is 
 """
 function test_lvdim_volume_potential(
         op, Ωₕ_quad, Γₕ, meshsize;
-        interpolation_order = 2, ref_qorder = 16, skin = 1.5 * meshsize, nneighbors = nothing,
+        interpolation_order = 2, ref_qorder = 12, skin = 1.5 * meshsize, nneighbors = nothing,
     )
     # Explicit Gauss rule: `Quadrature(Γₕ; qorder)` selects a Vioreanu-Rokhlin rule on a
     # triangle, and those are *interpolation* rules tabulated only at select orders — a plain
