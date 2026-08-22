@@ -10,23 +10,17 @@ Everything the method does once `Θ` is known. `lvdim` assembles `Θ` one elemen
 calls [`_dim_solve!`](@ref) directly, rather than through this loop.
 """
 function _dim_correction(source, dict_near, bfun, Θ, ::Type{Tw}) where {Tw}
-    Is, Js, Vs = Int[], Int[], Tw[]
+    m, n = size(Θ, 1), length(source)
+    colptr, rowval, nzval = _dim_csc_storage(source, dict_near, Tw)
     do_debug = debug_mode()
     vander_cond = vander_norm = -Inf
     for (E, qtags) in source.etype2qtags
         near_list = dict_near[E]
         nq, ne = size(qtags)
         @assert length(near_list) == ne
-        # each element contributes exactly `nq * length(near)` entries, so the output is
-        # sized up front and every element fills a disjoint slice
-        counts = [nq * length(near) for near in near_list]
-        offs = length(Is) .+ cumsum(counts) .- counts
-        for v in (Is, Js, Vs)
-            resize!(v, length(v) + sum(counts))
-        end
-        for n in 1:ne
-            isempty(near_list[n]) && continue
-            jglob = @view qtags[:, n]
+        for el in 1:ne
+            isempty(near_list[el]) && continue
+            jglob = @view qtags[:, el]
             L = vandermonde(bfun, (coords(source[j]) for j in jglob))
             if do_debug
                 vander_cond = max(vander_cond, cond(L))
@@ -34,15 +28,56 @@ function _dim_correction(source, dict_near, bfun, Θ, ::Type{Tw}) where {Tw}
             end
             # basis index first, as `_dim_solve!` wants it; a permuted view rather than a
             # `transpose`, which would also transpose the `SMatrix` entries
-            Θt = PermutedDimsArray(view(Θ, near_list[n], :), (2, 1))
-            _dim_solve!(Is, Js, Vs, offs[n], L, Θt, jglob, near_list[n])
+            Θt = PermutedDimsArray(view(Θ, near_list[el], :), (2, 1))
+            _dim_solve!(colptr, rowval, nzval, L, Θt, jglob, near_list[el])
         end
     end
     @debug """Condition properties of the vdim correction:
     |-- max interp. matrix condition: $vander_cond
     |-- max interp. matrix norm:      $vander_norm
     """
-    return sparse(Is, Js, Vs, size(Θ, 1), length(source))
+    return SparseMatrixCSC(m, n, colptr, rowval, nzval)
+end
+
+"""
+    _dim_csc_storage(source, dict_near, Tw) -> (colptr, rowval, nzval)
+
+The CSC arrays of `δV`, with `colptr` final and `rowval`/`nzval` allocated but uninitialized.
+
+`δV`'s columns are the source quadrature nodes, and every node belongs to exactly one element,
+so the elements *partition* the columns: element `el` owns the `nq` columns `qtags[:, el]` and
+each of them holds one entry per target in `near_list[el]`. That makes the column counts — and
+hence every element's slice of `rowval`/`nzval` — known before a single entry is computed, which
+is what lets [`_dim_solve!`](@ref) write the final CSC directly instead of a coordinate triple
+that has to be counting-sorted afterwards.
+
+The caller must fill every slice a nonempty `near_list[el]` claims; nothing else is written, and
+an element with no near targets simply leaves its columns empty.
+"""
+function _dim_csc_storage(source, dict_near, ::Type{Tw}) where {Tw}
+    colptr = zeros(Int, length(source) + 1)
+    claimed = 0
+    for (E, qtags) in source.etype2qtags
+        near_list = dict_near[E]
+        nq, ne = size(qtags)
+        for el in 1:ne
+            cnt = length(near_list[el])
+            cnt == 0 && continue
+            claimed += nq * cnt
+            for s in 1:nq
+                colptr[qtags[s, el] + 1] = cnt
+            end
+        end
+    end
+    colptr[1] = 1
+    cumsum!(colptr, colptr)
+    nnz = colptr[end] - 1
+    # the partition is what makes the layout writable in place: were two elements to claim one
+    # column, the second would silently overwrite the first's count and then its entries
+    nnz == claimed ||
+        error("lvdim/vdim: source quadrature nodes are not partitioned by the elements \
+               ($(claimed) entries claimed, $(nnz) laid out)")
+    return colptr, Vector{Int}(undef, nnz), Vector{Tw}(undef, nnz)
 end
 
 """
@@ -61,10 +96,12 @@ _dim_interpolation_order(source::Quadrature) =
     minimum(interpolation_order, values(source.etype2qrule))
 
 """
-    _dim_solve!(Is, Js, Vs, off, L, Θ, jglob, near, work = _dim_work(L, Θ, length(near)))
+    _dim_solve!(colptr, rowval, nzval, L, Θ, jglob, near, work = _dim_work(L, Θ, length(near)))
 
 Solve the local interpolation system of the density interpolation method for one element and
-write that element's block of `δV` into the preallocated `(Is, Js, Vs)`, starting at `off`.
+write that element's block of `δV` straight into the CSC arrays laid out by
+[`_dim_csc_storage`](@ref); `colptr` says where, so there is no offset to pass and no
+coordinate form to sort afterwards.
 
 - `L`     — the interpolation basis' Vandermonde on the element's own quadrature nodes,
             `num_basis × nq`, and always **scalar** (see [`particular_basis`](@ref)).
@@ -81,7 +118,7 @@ sharing one factorization of `L`. For a vector-valued PDE that is what replaces 
 `num_basis·N × nq·N` system `kron(L, I)` would pose: the same solve, once instead of `N` times.
 """
 function _dim_solve!(
-        Is, Js, Vs, off, L, Θ, jglob, near, work = _dim_work(L, Θ, length(near)),
+        colptr, rowval, nzval, L, Θ, jglob, near, work = _dim_work(L, Θ, length(near)),
     )
     nb, nq = size(L)
     nc, nt = _dim_ncomponents(eltype(Θ)), length(near)
@@ -99,13 +136,22 @@ function _dim_solve!(
         end
     end
     ldiv!(wdata, F, bdata)
-    @inbounds for (t, i) in enumerate(near)
-        blk = view(wdata, :, ((t - 1) * nc + 1):(t * nc))
-        # column-major over the block: target slowest, the element's own nodes fastest
-        for s in 1:nq
-            q = off + (t - 1) * nq + s
-            Is[q], Js[q] = i, jglob[s]
-            Vs[q] = -_dim_weight(eltype(Vs), blk, s)
+    # CSC wants ascending row indices within a column. All `nq` of this element's columns hold
+    # the same rows — `near`, which the near-lists build unsorted — so one sort serves them all
+    rperm, rows = view(work.rperm, 1:nt), view(work.rows, 1:nt)
+    sortperm!(rperm, near)
+    @inbounds for r in 1:nt
+        rows[r] = near[rperm[r]]
+    end
+    # node slowest, target fastest: that is the CSC order, so each column's slice of
+    # `rowval`/`nzval` is written straight through
+    @inbounds for s in 1:nq
+        base = colptr[jglob[s]] - 1
+        copyto!(rowval, base + 1, rows, 1, nt)
+        for r in 1:nt
+            t = rperm[r]
+            blk = view(wdata, :, ((t - 1) * nc + 1):(t * nc))
+            nzval[base + r] = -_dim_weight(eltype(nzval), blk, s)
         end
     end
     return nothing
@@ -124,6 +170,8 @@ function _dim_work(L, Θ, nt)
     T, nc = _dim_scalar_type(eltype(Θ)), _dim_ncomponents(eltype(Θ))
     return (
         bdata = Matrix{T}(undef, nb, nt * nc), wdata = Matrix{T}(undef, nq, nt * nc),
+        # the row-sort `_dim_solve!` needs to emit a column in CSC order
+        rperm = Vector{Int}(undef, nt), rows = Vector{Int}(undef, nt),
     )
 end
 

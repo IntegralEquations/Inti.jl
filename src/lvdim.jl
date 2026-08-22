@@ -425,24 +425,21 @@ function lvdim_correction(
         _lvdim_term_prototypes(pb, Val(kernel_variant), msh, source, N)...,
     )
 
-    Is, Js, Vs = Int[], Int[], Eltype[]
+    # The elements partition `δV`'s columns, so the whole sparsity structure is known before
+    # any entry is: lay out the CSC arrays up front and let every element write its own
+    # columns straight into them (see `_dim_csc_storage`).
+    colptr, rowval, nzval = _dim_csc_storage(source, dict_near, Eltype)
     for (E, qtags) in source.etype2qtags
         els = elements(msh, E)
         near_list = dict_near[E]
         nq, ne = size(qtags)
         @assert length(near_list) == ne
         ne == 0 && continue
-        # Elements are the unit of parallelism: each contributes exactly `nq * length(near)`
-        # entries, so the output is sized up front and every task fills a disjoint slice — no
+        # Elements are the unit of parallelism: each owns a disjoint set of columns, so no
         # lock, and a `δV` independent of the thread count. Tasks are spawned per *chunk* so
         # that the scratch each element writes through (see `_lvdim_scratch`) is built once
         # per task; more chunks than threads keeps the boundary elements, which cost a
         # `bdim_correction` the interior ones do not, from unbalancing the split.
-        counts = [nq * length(near) for near in near_list]
-        offs = length(Is) .+ cumsum(counts) .- counts
-        for v in (Is, Js, Vs)
-            resize!(v, length(v) + sum(counts))
-        end
         maxnear = maximum(length, near_list)
         chunk = max(1, cld(ne, 8 * Threads.nthreads()))
         @sync for els_chunk in Iterators.partition(1:ne, chunk)
@@ -450,19 +447,20 @@ function lvdim_correction(
                 scr = _lvdim_scratch(ctx, Rtype, nq, maxnear)
                 for el in els_chunk
                     _lvdim_element!(
-                        Is, Js, Vs, offs[el], ctx, scr, E, els, qtags, el, near_list[el],
+                        colptr, rowval, nzval, ctx, scr, E, els, qtags, el, near_list[el],
                     )
                 end
             end
         end
     end
-    return sparse(Is, Js, Vs, m, n)
+    return SparseMatrixCSC(m, n, colptr, rowval, nzval)
 end
 
-# One element's block of `δV`, written into the caller's preallocated `(I, J, V)` starting at
-# `off`. A function rather than the `@threads` body inlined, so that what it captures stays
-# concretely typed and `E` — a runtime `DataType` — is specialized on once per element.
-function _lvdim_element!(Is, Js, Vs, off, ctx, scr, E, els, qtags, el, near)
+# One element's columns of `δV`, written into the caller's preallocated CSC arrays at the
+# offsets `colptr` already fixes. A function rather than the `@threads` body inlined, so that
+# what it captures stays concretely typed and `E` — a runtime `DataType` — is specialized on
+# once per element.
+function _lvdim_element!(colptr, rowval, nzval, ctx, scr, E, els, qtags, el, near)
     isempty(near) && return nothing
     # the terms of this element's Green identity, centred and scaled to the element
     b, γ₀Ψ, γ₁Ψ, σ =
@@ -483,7 +481,7 @@ function _lvdim_element!(Is, Js, Vs, off, ctx, scr, E, els, qtags, el, near)
     # `b` is a *batched* basis, so the Vandermonde is one column per node
     L = vandermonde!(scr.L, b, (coords(q) for q in view(ctx.source, jglob)))
     # the same interpolation solve `vdim_correction` performs, on a locally computed `Rt`
-    _dim_solve!(Is, Js, Vs, off, L, Rt, jglob, near, scr.solve)
+    _dim_solve!(colptr, rowval, nzval, L, Rt, jglob, near, scr.solve)
     return nothing
 end
 
