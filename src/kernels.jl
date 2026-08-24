@@ -690,13 +690,7 @@ end
     layer_pair_value(S, D, target, source) -> (s, d)
 
 `(S(target, source), D(target, source))` as one call, for a caller that always wants both at
-the same pair of points — `lvdim`'s quadrature over `∂Ωτ` is the whole reason this exists.
-The fallback is the two calls, so any kernel pair may be passed; a pair that shares work
-overrides it.
-
-For 2D Helmholtz the sharing is nearly total: one `|x-y|²`, one series pass, and one
-logarithm serve both orders (see [`_hankelh1_01`](@ref)), where two independent kernel calls
-repeat all three.
+the same pair of points — `lvdim`'s quadrature over `∂Ωτ` takes advantage of this.
 """
 @inline layer_pair_value(S, D, target, source) = (S(target, source), D(target, source))
 
@@ -705,7 +699,7 @@ repeat all three.
         target, source,
     )
     k = S.op.k
-    # the fused form reads one wavenumber; a mismatched pair is a caller error, not ours
+    # the fused form reads one wavenumber; a mismatched pair is a caller error
     k == D.op.k || return (S(target, source), D(target, source))
     r = coords(target) - coords(source)
     d2 = dot(r, r)
@@ -713,6 +707,80 @@ repeat all three.
     h0, h1z = _hankelh1_01(k, d2)
     sv = im / 4 * h0
     dv = im * k^2 / 4 * h1z * dot(r, normal(source))
+    return d2 ≤ tol * tol ? (zero(sv), zero(dv)) : (sv, dv)
+end
+
+@inline function layer_pair_value(
+        S::SingleLayerKernel{<:Helmholtz{3}}, D::DoubleLayerKernel{<:Helmholtz{3}},
+        target, source,
+    )
+    k = S.op.k
+    k == D.op.k || return (S(target, source), D(target, source))
+    r = coords(target) - coords(source)
+    d2 = dot(r, r)
+    tol = oftype(d2, SAME_POINT_TOLERANCE)
+    invd = @fastmath one(d2) / sqrt(d2)
+    d = d2 * invd
+    # `D = S ⋅ (1/d - ik) ⋅ (r⋅ny)/d`
+    sv = @fastmath cis(k * d) * invd / 4 / π
+    dv = @fastmath sv * (invd - im * k) * (dot(r, normal(source)) * invd)
+    return d2 ≤ tol * tol ? (zero(sv), zero(dv)) : (sv, dv)
+end
+
+@inline function layer_pair_value(
+        S::SingleLayerKernel{Laplace{3}}, D::DoubleLayerKernel{Laplace{3}},
+        target, source,
+    )
+    r = coords(target) - coords(source)
+    d2 = dot(r, r)
+    tol = oftype(d2, SAME_POINT_TOLERANCE)
+    @fastmath begin
+        id2 = one(d2) / d2
+        sv = sqrt(id2) / 4 / π                 # `1/(4πd)`
+        dv = dot(r, normal(source)) * id2 * sv # `(r⋅ny)/(4πd³)`
+    end
+    return d2 ≤ tol * tol ? (zero(sv), zero(dv)) : (sv, dv)
+end
+
+@inline function layer_pair_value(
+        S::GradientSingleLayerKernel{<:Helmholtz{3}},
+        D::GradientDoubleLayerKernel{<:Helmholtz{3}},
+        target, source,
+    )
+    k = S.op.k
+    k == D.op.k || return (S(target, source), D(target, source))
+    ny = normal(source)
+    r = coords(target) - coords(source)
+    d2 = dot(r, r)
+    tol = oftype(d2, SAME_POINT_TOLERANCE)
+    @fastmath begin
+        invd = one(d2) / sqrt(d2)
+        d = d2 * invd
+        id2 = invd * invd
+        pref = cis(k * d) / (4π)
+        ikd = im * k * d
+        sv = pref * id2 * (im * k - invd) * r
+        dv = pref * id2 * invd *
+            ((1 - ikd) * ny + (k * k * d2 + 3 * ikd - 3) * id2 * dot(r, ny) * r)
+    end
+    return d2 ≤ tol * tol ? (zero(sv), zero(dv)) : (sv, dv)
+end
+
+@inline function layer_pair_value(
+        S::GradientSingleLayerKernel{Laplace{3}},
+        D::GradientDoubleLayerKernel{Laplace{3}},
+        target, source,
+    )
+    ny = normal(source)
+    r = coords(target) - coords(source)
+    d2 = dot(r, r)
+    tol = oftype(d2, SAME_POINT_TOLERANCE)
+    @fastmath begin
+        id2 = one(d2) / d2
+        c = id2 * sqrt(id2) / (4π)             # `1/(4πd³)`
+        sv = -c * r
+        dv = c * (ny - 3 * dot(r, ny) * id2 * r)
+    end
     return d2 ≤ tol * tol ? (zero(sv), zero(dv)) : (sv, dv)
 end
 
