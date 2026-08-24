@@ -41,6 +41,8 @@ end
 @safetestset "Particular basis" include("particular_basis_test.jl")
 @safetestset "Local DIM" include("lvdim_test.jl")
 
+@safetestset "Local DIM basis diagnostics" include("lvdim_basis_diagnostics_test.jl")
+
 @safetestset "Gmsh extension" include("gmsh_test.jl")
 
 @safetestset "Makie extension" include("meshes_test.jl")

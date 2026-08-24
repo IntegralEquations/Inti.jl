@@ -429,6 +429,9 @@ function lvdim_correction(
     # any entry is: lay out the CSC arrays up front and let every element write its own
     # columns straight into them (see `_dim_csc_storage`).
     colptr, rowval, nzval = _dim_csc_storage(source, dict_near, Eltype)
+    # conditioning of the interpolation basis, accumulated per task and merged per element type
+    do_debug = debug_mode()
+    stats = _BasisStats()
     for (E, qtags) in source.etype2qtags
         els = elements(msh, E)
         near_list = dict_near[E]
@@ -442,17 +445,23 @@ function lvdim_correction(
         # `bdim_correction` the interior ones do not, from unbalancing the split.
         maxnear = maximum(length, near_list)
         chunk = max(1, cld(ne, 8 * Threads.nthreads()))
-        @sync for els_chunk in Iterators.partition(1:ne, chunk)
+        parts = Iterators.partition(1:ne, chunk)
+        # one accumulator per task, indexed rather than shared, so the diagnostics need no lock
+        task_stats = do_debug ? [_BasisStats() for _ in parts] : nothing
+        @sync for (ci, els_chunk) in enumerate(parts)
             Threads.@spawn begin
                 scr = _lvdim_scratch(ctx, Rtype, nq, maxnear)
+                st = isnothing(task_stats) ? nothing : task_stats[ci]
                 for el in els_chunk
                     _lvdim_element!(
-                        colptr, rowval, nzval, ctx, scr, E, els, qtags, el, near_list[el],
+                        colptr, rowval, nzval, ctx, scr, E, els, qtags, el, near_list[el], st,
                     )
                 end
             end
         end
+        do_debug && foreach(t -> _merge_basis_stats!(stats, t), task_stats)
     end
+    do_debug && _lvdim_basis_report(stats)
     return SparseMatrixCSC(m, n, colptr, rowval, nzval)
 end
 
@@ -460,7 +469,9 @@ end
 # offsets `colptr` already fixes. A function rather than the `@threads` body inlined, so that
 # what it captures stays concretely typed and `E` — a runtime `DataType` — is specialized on
 # once per element.
-function _lvdim_element!(colptr, rowval, nzval, ctx, scr, E, els, qtags, el, near)
+function _lvdim_element!(
+        colptr, rowval, nzval, ctx, scr, E, els, qtags, el, near, st = nothing,
+    )
     isempty(near) && return nothing
     # the terms of this element's Green identity, centred and scaled to the element
     b, γ₀Ψ, γ₁Ψ, σ =
@@ -480,8 +491,113 @@ function _lvdim_element!(colptr, rowval, nzval, ctx, scr, E, els, qtags, el, nea
     jglob = @view qtags[:, el]
     # `b` is a *batched* basis, so the Vandermonde is one column per node
     L = vandermonde!(scr.L, b, (coords(q) for q in view(ctx.source, jglob)))
+    # before the solve, which factors `L` in place
+    isnothing(st) || _lvdim_record_basis!(st, b, L, view(ctx.source, jglob))
     # the same interpolation solve `vdim_correction` performs, on a locally computed `Rt`
     _dim_solve!(colptr, rowval, nzval, L, Rt, jglob, near, scr.solve)
+    return nothing
+end
+
+"""
+    _BasisStats()
+
+Per-task accumulator for the conditioning of the interpolation basis, filled only under
+[`debug_mode`](@ref) and merged across tasks by [`_merge_basis_stats!`](@ref).
+
+`L` is the Vandermonde of an element's interpolation basis on its own quadrature nodes and `L₀`
+that of the unperturbed basis ([`unperturbed_source`](@ref)) on the same nodes. Writing the
+perturbed basis as `b = M b₀ + η`, with `M` the least-squares change of basis and
+`H = L - M L₀` the sampled part of `η` leaving `span(b₀)`, a bound `κ₂(L₀) ≤ K` transfers as
+
+    κ₂(L) ≲ K · κ₂(M) · (1 + ρ)/(1 - ρ),    ρ = ‖H‖₂ / σ_min(M L₀)
+
+and the two halves behave completely differently: the in-span factor `κ₂(M)` costs a constant
+whatever `K` is, while `ρ` is a *threshold* — the bound says nothing once `ρ ≥ 1`, because by
+Eckart–Young the perturbed basis is then within its own perturbation of a singular one. That is
+why `σ_min(L)` is reported and not just `‖L‖`: `σ_min`, not the norm, is what a perturbation of
+the basis has to beat.
+"""
+mutable struct _BasisStats
+    nel::Int         # elements seen
+    nref::Int        # of those, elements whose basis is a perturbed one
+    Lnorm::Float64   # max ‖L‖₂
+    σmin::Float64    # min σ_min(L)
+    κ::Float64       # max κ₂(L)
+    κ₀::Float64      # max κ₂(L₀)
+    κM::Float64      # max κ₂(M)
+    H::Float64       # max ‖H‖₂
+    ρ::Float64       # max ‖H‖₂ / σ_min(M L₀)
+end
+
+_BasisStats() = _BasisStats(0, 0, -Inf, Inf, -Inf, -Inf, -Inf, -Inf, -Inf)
+
+"""
+    _merge_basis_stats!(a, b) -> a
+
+Fold one task's [`_BasisStats`](@ref) into another's. Every field is an extremum over elements,
+so the merge is the same extremum again and the result is independent of the thread count.
+"""
+function _merge_basis_stats!(a::_BasisStats, b::_BasisStats)
+    a.nel += b.nel
+    a.nref += b.nref
+    a.Lnorm = max(a.Lnorm, b.Lnorm)
+    a.σmin = min(a.σmin, b.σmin)
+    a.κ = max(a.κ, b.κ)
+    a.κ₀ = max(a.κ₀, b.κ₀)
+    a.κM = max(a.κM, b.κM)
+    a.H = max(a.H, b.H)
+    a.ρ = max(a.ρ, b.ρ)
+    return a
+end
+
+# One element's contribution to `st`. `L` is read only — it is the caller's Vandermonde, which
+# `_dim_solve!` goes on to factor in place, so this must run before the solve. Allocating and
+# `O(nb²·nq)`, which is why it is reached only under `debug_mode()`.
+#
+# `nq == nb` makes `L₀` square and its rows a basis of `ℝ^nq`, so *every* basis is in its span on
+# the nodes and `H` comes out zero to rounding, `κ₂(M)` accounting for the whole perturbation.
+# That is the right reading, not a degenerate one: with as many nodes as basis functions the
+# sampled perturbation genuinely is a pure change of basis, and only `nq > nb` can see past it.
+function _lvdim_record_basis!(st::_BasisStats, b, L, nodes)
+    s = svdvals(L)
+    st.nel += 1
+    st.Lnorm = max(st.Lnorm, first(s))
+    st.σmin = min(st.σmin, last(s))
+    st.κ = max(st.κ, first(s) / last(s))
+    # `nothing` when this basis is the unperturbed one, and then there is no `M`, no `H` and
+    # nothing to compare: the first three numbers are the whole story for such an element
+    b₀ = unperturbed_source(b)
+    isnothing(b₀) && return st
+    st.nref += 1
+    L₀ = vandermonde(b₀, (coords(q) for q in nodes))
+    s₀ = svdvals(L₀)
+    st.κ₀ = max(st.κ₀, first(s₀) / last(s₀))
+    # `pinv`, not `/`: the fit is the same least-squares one, but `L₀` is wide and may be rank
+    # deficient, which `pinv` reports as a dropped singular value rather than as an error
+    M = L * pinv(L₀)
+    ML₀ = M * L₀
+    H = opnorm(L - ML₀)
+    st.κM = max(st.κM, cond(M))
+    st.H = max(st.H, H)
+    st.ρ = max(st.ρ, H / last(svdvals(ML₀)))
+    return st
+end
+
+function _lvdim_basis_report(st::_BasisStats)
+    st.nel == 0 && return nothing
+    # `"\n" *`: a triple-quoted literal drops the newline right after its opening delimiter,
+    # and this block has to start on a line of its own
+    tilt = st.nref == 0 ? "" : "\n" * """
+    |-- perturbed-basis elements:     $(st.nref) of $(st.nel)
+    |-- max κ₂(L₀)  (unperturbed):    $(st.κ₀)
+    |-- max κ₂(M)   (in-span part):   $(st.κM)
+    |-- max ‖H‖₂    (out-of-span):    $(st.H)
+    |-- max ρ = ‖H‖₂/σ_min(M·L₀):     $(st.ρ)"""
+    @debug """Interpolation-basis conditioning of the lvdim correction ($(st.nel) elements):
+    |-- max ‖L‖₂:                     $(st.Lnorm)
+    |-- min σ_min(L):                 $(st.σmin)
+    |-- max κ₂(L):                    $(st.κ)$tilt
+    """
     return nothing
 end
 

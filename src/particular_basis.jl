@@ -588,6 +588,20 @@ end
 (t::MonomialTerm)(x) = t.m₊((x - t.c) / t.r, t.nb)
 evaluate!(out, t::MonomialTerm, x) = monomial_values!(out, t.m₊, (x - t.c) / t.r)
 
+"""
+    unperturbed_source(b) -> b₀ or `nothing`
+
+The interpolation term `b` would have been had its basis not been perturbed, or `nothing` when
+`b` *is* that unperturbed basis. Diagnostics only — nothing the method computes depends on it,
+and a term is free to leave it at this fallback.
+
+Only [`TiltedTerm`](@ref) answers with a term: the monomials it tilts. Comparing the two
+Vandermondes on an element's nodes is what turns "the basis moved by `O(κ²)`" into the numbers a
+conditioning bound actually needs — the in-span change of basis `M` minimising `‖L - M L₀‖` and
+the out-of-span residual `H = L - M L₀`; see `_lvdim_record_basis!`.
+"""
+unperturbed_source(::Any) = nothing
+
 function (pb::AbstractParticularBasis)(c, r)
     Ψ̂ = solution_matrix(pb, r)
     return source_closure(pb, c, r), value_closure(pb, c, r, Ψ̂), trace_closure(pb, c, r, Ψ̂)
@@ -1021,6 +1035,11 @@ function evaluate!(out, t::TiltedTerm, x)
     end
     return mul!(out, t.R̂, v, t.κ², one(eltype(out)))
 end
+
+# `b = [I 0]m₊ + κ²R m₊` tilts the leading monomials, so those are what it is perturbed *from*.
+# The tilt is not confined to their span: `R m₊` reaches two degrees higher, and that part of it
+# is exactly the `H` the diagnostic measures against `σ_min`
+unperturbed_source(t::TiltedTerm) = MonomialTerm(t.m₊, t.c, t.r, t.nb)
 
 # `ℒ = -(μΔ + (λ+μ)∇∇·)` carries its own sign, so — as for Laplace — the right inverse is the
 # solution outright and `b` is the plain monomials, here times the identity because the source of
