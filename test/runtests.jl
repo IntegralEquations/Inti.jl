@@ -51,3 +51,12 @@ end
 @safetestset "Curve 2D Mesh" include("curved_test_2d.jl")
 
 @safetestset "Curve 3D Mesh" include("curved_test_3d.jl")
+
+# SparsifyAndSweep is unregistered, so it is not a test dependency; its extension
+# is exercised only when the package can be found in the active environment (see
+# the header of the test file for how to put it there)
+if isnothing(Base.identify_package("SparsifyAndSweep"))
+    @info "SparsifyAndSweep not installed: skipping the SparsifyAndSweep extension tests"
+else
+    @testset "SparsifyAndSweep extension" include("sparsify_and_sweep_test.jl")
+end
