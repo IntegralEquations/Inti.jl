@@ -16,6 +16,11 @@ QPGreen = "8ff76263-3d2e-4b9c-88ff-2ca8b003e2a7"
 QuadGK = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
+SparsifyAndSweep = "3f8a1c62-5d4b-4e7a-9c31-6b0d2e4f8a15"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
+
+[sources]
+Inti = {path = ".."}
+SparsifyAndSweep = {path = "../../SparsifyAndSweep.jl"}

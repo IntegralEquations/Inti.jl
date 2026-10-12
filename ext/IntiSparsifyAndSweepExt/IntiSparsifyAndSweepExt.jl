@@ -42,6 +42,9 @@ using SparsifyAndSweep
 using SparsifyAndSweep: Grid, nphys, plin, offsets
 using LinearAlgebra
 using SparseArrays
+using SparsifyAndSweep: Printf   # not an Inti dependency
+# SparsifyAndSweep already depends on IterativeSolvers, so this adds no dependency
+using SparsifyAndSweep: IterativeSolvers
 
 function __init__()
     return @debug "Loading Inti.jl SparsifyAndSweep extension"

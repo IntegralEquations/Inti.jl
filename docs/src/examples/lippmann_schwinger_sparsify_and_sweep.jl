@@ -77,7 +77,7 @@ using .SAS: PhysicalGrid, unit_frequency, sample_field, physcoords,
 
 function gmsh_disk(; name, meshsize, order = 2, center = (0.0, 0.0), radius = 1.0)
     ndiv = 2π * radius / meshsize
-    try
+    return try
         gmsh.initialize()
         gmsh.option.setNumber("General.Terminal", 0)
         gmsh.option.setNumber("Mesh.SaveAll", 1)
@@ -109,7 +109,7 @@ function gmsh_disk(; name, meshsize, order = 2, center = (0.0, 0.0), radius = 1.
         nexp = 4π * radius^2 / (sqrt(3) * meshsize^2)
         ntri ≥ 0.2 * nexp || error(
             "gmsh_disk under-resolved: $ntri triangles, expected ≈$(round(Int, nexp)) " *
-            "at meshsize=$meshsize (per-curve cap?)",
+                "at meshsize=$meshsize (per-curve cap?)",
         )
         gmsh.model.mesh.setOrder(order)
         gmsh.write(name)
@@ -386,13 +386,13 @@ function run(label, P)
     t = @elapsed begin
         u, hist = P === nothing ?
             IterativeSolvers.gmres!(
-            u, Lω, bΩ; log = true, reltol, abstol = 0.0,
-            maxiter = 80, restart = 40
-        ) :
+                u, Lω, bΩ; log = true, reltol, abstol = 0.0,
+                maxiter = 80, restart = 40
+            ) :
             IterativeSolvers.gmres!(
-            u, Lω, bΩ; Pl = P, log = true, reltol, abstol = 0.0,
-            maxiter = 80, restart = 40
-        )
+                u, Lω, bΩ; Pl = P, log = true, reltol, abstol = 0.0,
+                maxiter = 80, restart = 40
+            )
     end
     @printf("%-24s iters = %4d   time = %7.2f s\n", label, hist.iters, t)
     return u, hist.iters

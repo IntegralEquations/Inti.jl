@@ -21,7 +21,7 @@ medium with [`sample_field`](@ref).
 """
 struct PhysicalGrid{D}
     g::Grid{D}
-    origin::NTuple{D,Float64}
+    origin::NTuple{D, Float64}
     L::Float64
 end
 
@@ -36,8 +36,10 @@ inside `Ω`, and since its PML occupies the outermost `b` layers, the scatterer 
 not reach the edge of the cube.  [`check_support`](@ref) verifies this after the
 medium has been sampled.
 """
-function PhysicalGrid(::Val{D}, lo::NTuple{D,<:Real}, hi::NTuple{D,<:Real},
-                      n::Integer; b::Integer = 8, pad::Real = 0.15) where {D}
+function PhysicalGrid(
+        ::Val{D}, lo::NTuple{D, <:Real}, hi::NTuple{D, <:Real},
+        n::Integer; b::Integer = 8, pad::Real = 0.15
+    ) where {D}
     all(d -> hi[d] > lo[d], 1:D) || throw(ArgumentError("need hi > lo componentwise"))
     side = maximum(ntuple(d -> hi[d] - lo[d], D))
     L = side * (1 + 2 * pad)
@@ -49,7 +51,7 @@ end
 SparsifyAndSweep.dim(::PhysicalGrid{D}) where {D} = D
 
 "Physical coordinates of the Cartesian node with integer index `i ∈ {1,…,n}^D`."
-@inline physcoords(pg::PhysicalGrid{D}, i::NTuple{D,Int}) where {D} =
+@inline physcoords(pg::PhysicalGrid{D}, i::NTuple{D, Int}) where {D} =
     ntuple(d -> pg.origin[d] + pg.L * (i[d] * pg.g.h), D)
 
 "Unit-cube coordinates `ξ ∈ (0,1)^D` of a physical point."
@@ -72,7 +74,7 @@ hand to the core solver.  `f` takes a physical coordinate tuple.
 """
 function sample_field(f, pg::PhysicalGrid{D}) where {D}
     n = pg.g.n
-    out = Array{Float64,D}(undef, ntuple(_ -> n, D))
+    out = Array{Float64, D}(undef, ntuple(_ -> n, D))
     for c in CartesianIndices(out)
         out[c] = f(physcoords(pg, Tuple(c)))
     end
@@ -86,8 +88,10 @@ Errors if the sampled medium fails to vanish within `margin` layers of the edge
 of the cube, which the PML and the Lippmann–Schwinger formulation both require.
 Otherwise, returns the largest `|m|` found in that shell.
 """
-function check_support(m::AbstractArray{Float64,D}, pg::PhysicalGrid{D};
-                       margin::Integer = pg.g.b, atol::Real = 1e-10) where {D}
+function check_support(
+        m::AbstractArray{Float64, D}, pg::PhysicalGrid{D};
+        margin::Integer = pg.g.b, atol::Real = 1.0e-10
+    ) where {D}
     n = pg.g.n
     worst = 0.0
     for c in CartesianIndices(m)
@@ -95,9 +99,12 @@ function check_support(m::AbstractArray{Float64,D}, pg::PhysicalGrid{D};
         any(d -> i[d] <= margin || i[d] > n - margin, 1:D) || continue
         worst = max(worst, abs(m[c]))
     end
-    worst > atol && throw(ArgumentError(
-        "the medium does not vanish within $margin layers of the box edge " *
-        "(max |m| there is $worst); increase `pad` when building the PhysicalGrid"))
+    worst > atol && throw(
+        ArgumentError(
+            "the medium does not vanish within $margin layers of the box edge " *
+                "(max |m| there is $worst); increase `pad` when building the PhysicalGrid"
+        )
+    )
     return worst
 end
 
