@@ -139,6 +139,7 @@ function _lvdim_element_R!(Rt, ctx, scr, γ₀Ψ, γ₁Ψ, σ, b, near, need_lay
                 method = :dim,
                 green_multiplier = collect(Float64, μ),
                 maxdist = Inf,
+                dim_parameters = ctx.dim_parameters,
             ),
             kernel_variant = ctx.layer_variant,
         )
@@ -339,6 +340,12 @@ whereas here every potential is evaluated directly on a patch of `O(1)` elements
   [`topological_neighbors`](@ref)). Defaults to `1`. A deeper patch pushes `∂Ωτ` further from
   the targets, so the layer potentials over it are less nearly singular, at the cost of a
   patch that grows with the depth.
+- `dim_parameters`: a [`DimParameters`](@ref) for the `bdim_correction` applied
+  to the layer potentials over `∂Ωτ` where the local skeleton region coincides
+  with `∂Ω` (the only place `lvdim` uses one); `nothing` takes the defaults. The
+  source count is the oversampling factor times the nodes per face, so
+  `bdry_qorder` together with this parameter determine how well that correction
+  resolves the nearly singular integrals at the volume nodes next to `∂Ω`.
 - `kernel_variant`: which volume operator is being corrected — `:default` for `V`,
   `:gradient` for `∇V`, or `:gradient_source` for `W[g] = -∫∇yG⋅g`. Unlike
   [`vdim_correction`](@ref) no operators are passed in, so this selects the *kernels* the
@@ -360,6 +367,7 @@ function lvdim_correction(
         interpolation_order = nothing,
         bdry_qorder = nothing,
         nneighbors = 1,
+        dim_parameters = nothing,
         maxdist = Inf,
         kernel_variant::Symbol = :default,
     )
@@ -418,6 +426,7 @@ function lvdim_correction(
     ctx = (;
         op, nb, N, msh, source, target, green_multiplier,
         neighbors, conns, etypes, etype_index, bdry_faces, bdry_qrule, bdry_x̂, bdry_ŵ, pb,
+        dim_parameters,
         variant = Val(kernel_variant),
         volume_kernel, layer_kernels, layer_variant, Rtype,
         # prototypes for the reusable buffers; see `_lvdim_scratch`

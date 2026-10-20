@@ -162,6 +162,7 @@ function single_double_layer(;
                 correction.maxdist,
                 kernel_variant,
                 filter_target_params,
+                parameters = something(correction.dim_parameters, DimParameters()),
             )
         else
             δS, δD = bdim_correction(
@@ -173,6 +174,7 @@ function single_double_layer(;
                 green_multiplier,
                 correction.maxdist,
                 kernel_variant,
+                parameters = something(correction.dim_parameters, DimParameters()),
             )
         end
     elseif correction.method == :adaptive
@@ -483,6 +485,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
             interpolation_order,
             kernel_variant,
             grad_single_layer,
+            correction.translate_and_scale,
         )
     elseif correction.method == :ldim
         if haskey(correction, :green_multiplier)
@@ -501,6 +504,7 @@ function volume_potential(; op, target, source::Quadrature, compression, correct
             correction.interpolation_order,
             correction.bdry_qorder,
             correction.nneighbors,
+            correction.dim_parameters,
             kernel_variant,
         )
     else

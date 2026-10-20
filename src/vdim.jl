@@ -9,19 +9,44 @@ the resulting weights, of type `Tw`.
 Everything the method does once `Θ` is known. `lvdim` assembles `Θ` one element at a time and so
 calls [`_dim_solve!`](@ref) directly, rather than through this loop.
 """
-function _dim_correction(source, dict_near, bfun, Θ, ::Type{Tw}) where {Tw}
+function _dim_correction(
+        source, dict_near, bfun, Θ, ::Type{Tw};
+        translate_and_scale::Bool = false, basis = nothing,
+    ) where {Tw}
     m, n = size(Θ, 1), length(source)
+    if translate_and_scale
+        isnothing(basis) && throw(
+            ArgumentError("translate_and_scale needs the monomial `basis` indexing the columns of `Θ`"),
+        )
+        length(basis) == size(Θ, 2) ||
+            throw(ArgumentError("`basis` has $(length(basis)) monomials but `Θ` has $(size(Θ, 2)) columns"))
+    end
     colptr, rowval, nzval = _dim_csc_storage(source, dict_near, Tw)
     do_debug = debug_mode()
     vander_cond = vander_norm = -Inf
+    msh = mesh(source)
     for (E, qtags) in source.etype2qtags
         near_list = dict_near[E]
         nq, ne = size(qtags)
         @assert length(near_list) == ne
+        els = translate_and_scale ? elements(msh, E) : nothing
         for el in 1:ne
             isempty(near_list[el]) && continue
             jglob = @view qtags[:, el]
-            L = vandermonde(bfun, (coords(source[j]) for j in jglob))
+            if translate_and_scale
+                # Interpolate in the element-local shifted and scaled
+                # coordinates `x̃ = (x - c)/r`, so that the resulting
+                # Vandermonde system is well conditioned; the translation
+                # matrix moves the coefficients back to the global basis; this
+                # is described in the Anderson-Bonnet-Faria-Perez-Arancibia
+                # (JCP 2024) work.
+                c, r = translation_and_scaling(els[el])
+                L = _scaled_vandermonde(basis, c, r, (coords(source[j]) for j in jglob))
+                P = translation_matrix(basis, c, r)
+            else
+                L = vandermonde(bfun, (coords(source[j]) for j in jglob))
+                P = nothing
+            end
             if do_debug
                 vander_cond = max(vander_cond, cond(L))
                 vander_norm = max(vander_norm, norm(L))
@@ -29,7 +54,7 @@ function _dim_correction(source, dict_near, bfun, Θ, ::Type{Tw}) where {Tw}
             # basis index first, as `_dim_solve!` wants it; a permuted view rather than a
             # `transpose`, which would also transpose the `SMatrix` entries
             Θt = PermutedDimsArray(view(Θ, near_list[el], :), (2, 1))
-            _dim_solve!(colptr, rowval, nzval, L, Θt, jglob, near_list[el])
+            _dim_solve!(colptr, rowval, nzval, L, Θt, jglob, near_list[el]; P)
         end
     end
     @debug """Condition properties of the vdim correction:
@@ -37,6 +62,55 @@ function _dim_correction(source, dict_near, bfun, Θ, ::Type{Tw}) where {Tw}
     |-- max interp. matrix norm:      $vander_norm
     """
     return SparseMatrixCSC(m, n, colptr, rowval, nzval)
+end
+
+"""
+    translation_matrix(m::MonomialBasis, c, r) -> P
+
+The change of basis from the monomials of `m` in the element-local coordinate
+system `x̃ = (x - c)/r` to the same monomials in global coordinates: `m(x̃) = Pᵀ
+m(x)`, i.e.
+
+    x̃^β = Σ_{α ≤ β} P[α, β] x^α,    P[α, β] = binom(β, α) (-c)^{β-α} r^{-|β|},
+
+using the binomial theorem (nb: `m` are the plain monomials `x^α`---no
+factorials). This is the translation formula of the
+Anderson-Bonnet-Faria-Perez-Arancibia (JCP 2024) work: its norm grows like
+`(|c|/r)^n`, which is the amplification an element far from the origin relative
+to its size suffers when its well-conditioned local interpolation is expressed
+in the global basis.
+"""
+# `m` is a `MonomialBasis`, left unannotated because that type is defined after this file
+function translation_matrix(m, c, r)
+    E = exponents(m)
+    nb, N = length(E), length(first(E))
+    T = promote_type(eltype(c), typeof(r), Float64)
+    P = zeros(T, nb, nb)
+    for j in 1:nb
+        β = E[j]
+        sβ = r^(-sum(β))
+        for i in 1:nb
+            α = E[i]
+            all(α .<= β) || continue
+            v = one(T)
+            for d in 1:N
+                v *= binomial(β[d], α[d]) * (-c[d])^(β[d] - α[d])
+            end
+            P[i, j] = v * sβ
+        end
+    end
+    return P
+end
+
+# The Vandermonde of the monomials `m` (a `MonomialBasis`) in the element-local
+# coordinate system `x̃ = (x - c)/r` on `pts`, in the `num_basis × nq` layout
+# compatible with [`_dim_solve!`](@ref).
+function _scaled_vandermonde(m, c, r, pts)
+    L = Matrix{float(eltype(c))}(undef, length(m), length(pts))
+    for (i, y) in enumerate(pts)
+        monomial_values!(view(L, :, i), m, (y - c) / r)
+    end
+    return L
 end
 
 """
@@ -109,7 +183,10 @@ coordinate form to sort afterwards.
             next element anyway;
 - `Θ`     — the right-hand side of the Green identity, `num_basis × length(near)`, i.e.
             transposed relative to the correction it becomes;
-- `jglob` — the element's global quadrature-node indices, `near` the targets it corrects.
+- `jglob` — the element's global quadrature-node indices, `near` the targets it corrects;
+- `P`     — optional [`translation_matrix`](@ref) when `L` is the Vandermonde of the
+            element's *own* frame while `Θ` is indexed by the global basis: the right-hand
+            side is then `Pᵀ Θ`, so that the weights become `Θ P L⁻ᵀ`.
 
 The *same* for every variant: `vdim_correction`'s four kernel variants and `lvdim_correction`
 differ only in how `Θ` is assembled. Whatever the entries of `Θ` are, a density multiplies them
@@ -118,7 +195,8 @@ sharing one factorization of `L`. For a vector-valued PDE that is what replaces 
 `num_basis·N × nq·N` system `kron(L, I)` would pose: the same solve, once instead of `N` times.
 """
 function _dim_solve!(
-        colptr, rowval, nzval, L, Θ, jglob, near, work = _dim_work(L, Θ, length(near)),
+        colptr, rowval, nzval, L, Θ, jglob, near, work = _dim_work(L, Θ, length(near));
+        P = nothing,
     )
     nb, nq = size(L)
     nc, nt = _dim_ncomponents(eltype(Θ)), length(near)
@@ -135,6 +213,8 @@ function _dim_solve!(
             _dim_components!(blk, m, Θ[m, t])
         end
     end
+    # `P` acts on the basis index alone, so it applies to the flattened block as it stands
+    isnothing(P) || (bdata .= transpose(P) * bdata)
     ldiv!(wdata, F, bdata)
     # CSC wants ascending row indices within a column. All `nq` of this element's columns hold
     # the same rows — `near`, which the near-lists build unsorted — so one sort serves them all
@@ -250,6 +330,17 @@ See [anderson2024fast](@cite) for more details on the method.
   [`particular_basis`](@ref) for the derivation.
 - `grad_single_layer`: the gradient single-layer `∇ₓS`; required by `:hessian` and
   unused otherwise.
+- `translate_and_scale`: interpolate on every element in the element-local
+  coordinate system `x̃ = (x - c_K)/r_K` (center and radius from
+  [`translation_and_scaling`](@ref)), so that the Vandermonde system is well
+  conditioned, and map the coefficients back to the global basis through the
+  [`translation_matrix`](@ref) — the strategy of the
+  Anderson-Bonnet-Faria-Perez-Arancibia (JCP 2024) work. The default `false`
+  interpolates directly in the global basis, solving each element's
+  (ill-conditioned) Vandermonde by a truncated SVD.  Requires the global
+  interpolation basis to be the plain monomials, which excludes the tilted
+  low-frequency branch of the Helmholtz basis
+  (`|k| <` [`BASIS_CROSSOVER_KR`](@ref)).
 """
 function vdim_correction(
         op::AbstractDifferentialOperator{N},
@@ -264,6 +355,7 @@ function vdim_correction(
         kernel_variant::Symbol = :default,
         maxdist = Inf,
         grad_single_layer = nothing,
+        translate_and_scale::Bool = false,
     ) where {N}
     # `X` is the one variant needing two by-parts boundary terms, on two different operators —
     # one more than `green_identity_terms` carries — so it keeps its own assembly.
@@ -272,7 +364,7 @@ function vdim_correction(
             error("kernel_variant = :hessian requires the `grad_single_layer` operator")
         return _vdim_correction_X(
             op, target, source, boundary, Sop, Dop, grad_single_layer, Vop;
-            green_multiplier, interpolation_order, maxdist,
+            green_multiplier, interpolation_order, maxdist, translate_and_scale,
         )
     end
     Tout = eltype(Vop)
@@ -289,6 +381,7 @@ function vdim_correction(
     # single frame must serve every element.
     pb = particular_basis(op, interpolation_order)
     c, r = zero(SVector{N, Float64}), 1.0
+    translate_and_scale && _check_monomial_global_frame(pb, r)
     bfun, γ₀Ψ, γ₁Ψ, σfun = green_identity_terms(pb, kernel_variant, c, r)
     dict_near = etype_to_nearest_points(target, source; maxdist)
     num_basis = length(pb)
@@ -383,7 +476,23 @@ function vdim_correction(
     end
     # `W`'s correction contracts an `SVector` density to a scalar, hence the adjoint entry
     Tw = nc == 1 ? Tout : Transpose{Tbase, Tout}
-    return _dim_correction(source, dict_near, bfun, Θ, Tw)
+    return _dim_correction(
+        source, dict_near, bfun, Θ, Tw; translate_and_scale, basis = source_space(pb),
+    )
+end
+
+# `translate_and_scale` expresses the element-local coordinate system monomials
+# in the global basis through the binomial theorem, which needs that global
+# basis to be the monomials themselves.
+function _check_monomial_global_frame(pb, r)
+    monomial_source(pb, r) && return nothing
+    throw(
+        ArgumentError(
+            "translate_and_scale interpolates in the monomials, but in the global frame this \
+             basis takes its tilted low-frequency branch (|k| < $(BASIS_CROSSOVER_KR)); use \
+             the default frame or a larger |k|",
+        ),
+    )
 end
 
 # `particular_basis` returns a *scalar* interpolation basis for every operator: for a
@@ -441,6 +550,7 @@ function _vdim_correction_X(
         green_multiplier::Vector{<:Real},
         interpolation_order = nothing,
         maxdist = Inf,
+        translate_and_scale::Bool = false,
     ) where {N}
     T = default_kernel_eltype(op)          # scalar element type (Float64 / ComplexF64)
     SV = SVector{N, T}                      # density / output element type
@@ -457,6 +567,7 @@ function _vdim_correction_X(
     # `BνΥₐⱼ = (HessΨₐⱼ)·ν`, second and third derivatives of the one solve `ℒΨₐⱼ = ∂ⱼpₐ`
     pb = particular_basis(op, interpolation_order)
     c, r = zero(SVector{N, Float64}), 1.0
+    translate_and_scale && _check_monomial_global_frame(pb, r)
     bfun = first(pb(c, r))
     # `Υ[j](x)[α]` = ∇Ψₐⱼ(x), an `SVector{N}`
     Υ = ntuple(j -> gradient_solution(source_derivative(pb, j), c, r), N)
@@ -592,5 +703,7 @@ function _vdim_correction_X(
         end
     end
 
-    return _dim_correction(source, dict_near, bfun, Θ, SM)
+    return _dim_correction(
+        source, dict_near, bfun, Θ, SM; translate_and_scale, basis = source_space(pb),
+    )
 end

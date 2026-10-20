@@ -261,12 +261,14 @@ function _normalize_correction(correction, target, source)
         defaults, extra = if correction.method == :ldim
             (
                     maxdist = Inf, interpolation_order = nothing, bdry_qorder = nothing,
-                    nneighbors = 1,
+                    nneighbors = 1, dim_parameters = nothing,
                 ), ()
         else
             # `boundary`/`S_b2d`/`D_b2d` are read only on the volume-potential path
-            (maxdist = Inf, interpolation_order = nothing, center = nothing),
-                (:boundary, :S_b2d, :D_b2d)
+            (
+                    maxdist = Inf, interpolation_order = nothing, center = nothing,
+                    translate_and_scale = false, dim_parameters = nothing,
+                ), (:boundary, :S_b2d, :D_b2d)
         end
         # reject unknown fields: `merge` would otherwise keep a misspelled or stale one and
         # it would be silently ignored, which reads as the option having no effect
