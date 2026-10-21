@@ -20,7 +20,7 @@ jobs:
           version: '1'
       - uses: julia-actions/cache@v3
       - name: Install dependencies
-        run: julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+        run: DISPLAY=:1 xvfb-run -s '-screen 1 1024x768x24' julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
       - name: Build and deploy without coverage
         if: github.ref != 'refs/heads/main'
         env:
