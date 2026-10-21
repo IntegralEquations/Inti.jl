@@ -219,4 +219,10 @@ end
         δ_old = @test_deprecated Inti.bdim_correction(op, quad, quad, K, H; green_multiplier = μ, derivative = true)
         @test δ_old == δ_new
     end
+    @testset "DIM unsupported for Yukawa" begin
+        op = Inti.Yukawa(; dim = 2, λ = 1.0)
+        μ = zeros(length(quad))
+        @test_throws ErrorException Inti.bdim_correction(op, quad, quad, nothing, nothing; green_multiplier = μ)
+        @test_throws ErrorException Inti.vdim_correction(op, quad, quad, quad, nothing, nothing, nothing; green_multiplier = μ)
+    end
 end

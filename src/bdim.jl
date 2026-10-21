@@ -138,6 +138,7 @@ function bdim_correction(
         )
         kernel_variant = derivative ? :neumann : :default
     end
+    op isa Yukawa && error("`:dim` correction not supported for Yukawa")
     imat_cond = imat_norm = res_norm = rhs_norm = theta_norm = -Inf
     Tout = eltype(Sop)
     Tbase = default_kernel_eltype(op)

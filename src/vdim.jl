@@ -46,6 +46,7 @@ function vdim_correction(
         maxdist = Inf,
         grad_single_layer = nothing,
     ) where {N}
+    op isa Yukawa && error("`:dim` correction not supported for Yukawa")
     # The W operator (vector density -> scalar) is handled by a dedicated
     # routine: its boundary potentials are single-/double-layers (so `Sop`/`Dop`
     # here are scalar-valued), `Vop` is the gradient volume
