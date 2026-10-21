@@ -129,7 +129,15 @@ function bdim_correction(
         kernel_variant::Symbol = :default,
         maxdist = Inf,
         filter_target_params = nothing,
+        derivative = nothing,
     )
+    if !isnothing(derivative)
+        Base.depwarn(
+            "The `derivative` keyword is deprecated; use `kernel_variant = :neumann` instead.",
+            :bdim_correction,
+        )
+        kernel_variant = derivative ? :neumann : :default
+    end
     imat_cond = imat_norm = res_norm = rhs_norm = theta_norm = -Inf
     Tout = eltype(Sop)
     Tbase = default_kernel_eltype(op)
