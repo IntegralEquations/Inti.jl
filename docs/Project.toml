@@ -20,3 +20,6 @@ Runic = "62bfec6d-59d7-401d-8490-b29ee721c001"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
+
+[compat]
+Pluto = "1"
