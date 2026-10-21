@@ -12,5 +12,7 @@ chat](https://img.shields.io/badge/zulip-join_chat-brightgreen.svg)](https://int
 A package for efficient and high-order discretization and application of
 boundary and volume integral operators in complex geometries in 2D and 3D.
 
-Documentation and detailed examples can currently be found in the docs linked above;
-Inti's capabilities and behavior can quickly change so devdocs are recommended.
+Documentation and detailed examples can currently be found in the docs linked above.
+The stable docs match the latest registered release (`]add Inti`), while the dev docs
+follow the `main` branch (`]add Inti#main`); since Inti's API can change quickly between
+releases, make sure the docs you follow match the version you have installed.
