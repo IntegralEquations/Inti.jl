@@ -522,7 +522,6 @@ function _regular_integration_errors(el, K, qreg, qref, maxiter)
         return K((coords = x, normal = νₓ), (coords = y, normal = ν)) * τ′
     end
     N = length(x₀)
-    er = 0.0
     cc = 0
     rel_ers = Float64[]
     abs_ers = Float64[]
@@ -535,11 +534,11 @@ function _regular_integration_errors(el, K, qreg, qref, maxiter)
         for dir in (-N):N
             iszero(dir) && continue
             k = abs(dir)
-            x = setindex(x₀, x₀[k] + sign(N) * cc * h, k)
+            x = setindex(x₀, x₀[k] + sign(dir) * cc * h, k)
             I = qref(ŷ -> f(x, ŷ))
             Ia = qreg(ŷ -> f(x, ŷ))
             abs_er = max(abs_er, norm(Ia - I, Inf))
-            rel_er = max(er, norm(Ia - I, Inf) / norm(I, Inf))
+            rel_er = max(rel_er, norm(Ia - I, Inf) / norm(I, Inf))
         end
         push!(rel_ers, rel_er)
         push!(abs_ers, abs_er)
