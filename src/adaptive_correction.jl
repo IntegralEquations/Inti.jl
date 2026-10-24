@@ -537,6 +537,7 @@ function _regular_integration_errors(el, K, qreg, qref, maxiter)
             x = setindex(x₀, x₀[k] + sign(dir) * cc * h, k)
             I = qref(ŷ -> f(x, ŷ))
             Ia = qreg(ŷ -> f(x, ŷ))
+            iszero(norm(I, Inf)) && continue
             abs_er = max(abs_er, norm(Ia - I, Inf))
             rel_er = max(rel_er, norm(Ia - I, Inf) / norm(I, Inf))
         end
