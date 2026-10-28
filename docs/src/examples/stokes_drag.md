@@ -133,7 +133,9 @@ using IterativeSolvers, LinearAlgebra, LinearMaps
 T = SVector{3, Float64} # vector type
 L = I/2 + D + η * S
 L_ = LinearMap{Float64}(3 * size(L, 1)) do y, x
-    σ = reinterpret(T, x)
+    # gmres passes columns of one matrix as x and y; copying x avoids a spurious aliasing
+    # error from sparse `mul!` (reinterpreted views of the same parent look aliased)
+    σ = reinterpret(T, copy(x))
     μ = reinterpret(T, y)
     mul!(μ, L, σ)
     return y
