@@ -51,3 +51,5 @@ end
 @safetestset "Curve 2D Mesh" include("curved_test_2d.jl")
 
 @safetestset "Curve 3D Mesh" include("curved_test_3d.jl")
+
+@safetestset "Curve Multi-patch Mesh" include("curved_multipatch_test.jl")

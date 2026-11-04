@@ -398,21 +398,130 @@ using Green's theorem:
 ```@example geo-and-meshes
 F = (x) -> [1/2*x[1], 1/2*x[2]]
 lineint = Inti.integrate(q -> dot(F(q.coords), q.normal), Γₕ_quad)
-@assert abs(lineint - 6π) < 1e-13 # hide
+@assert abs(lineint - 6π) < 1e-12 # hide
 println("Error in computing area using line integral: ", abs(lineint - 6π))
 ```
 
-Note the following restrictions that (currently) hold for 2D curved meshes:
+Note the following restriction that (currently) holds for 2D curved meshes:
 
-1. Only a single boundary entity can be associated with a given curved volume entity
-2. A curved boundary entity cannot be associated with multiple volume entities.
+1. A curved boundary entity cannot be associated with multiple volume entities.
 
-Curved 3D meshes with the same interface are also available with the following two
-(admittedly significant) restrictions:
+Curved 3D meshes use the same interface, with the complementary restriction that
+only a single curved volume entity is possible. (This could be easily addressed
+in Inti.jl if there is user interest.)
 
-1. The boundary parametrization must be global. Thus, a torus domain is possible but not a sphere.
-2. Only a single curved domain is possible.
-(The second item could be easily addressed in Inti.jl if there is user interest; the first is more difficult to address.)
+### Charts and atlases
+
+Everything above passes `curve_mesh` a bare parametrization, which is shorthand:
+what it actually takes is an *atlas* per volume entity — a vector of
+[`Inti.ParametricChart`](@ref)s whose images cover that entity's curved boundary.
+A bare `ψ` becomes the single chart `[0,1]` with period `1` in 2D, and
+`[0,2π] × [0,2π]` with period `2π` in both directions in 3D.
+
+Each element is curved through a *single* chart containing all of its boundary
+nodes, chosen automatically as the one on which the element sits farthest from
+the edge of the parameter box. What an atlas must therefore satisfy is that
+every boundary element lie inside one of its charts. Overlapping the charts by
+at least one element guarantees that without knowing where the mesh's nodes
+are, and is the only practical option in 3D.
+
+In 2D the charts may instead abut exactly, provided each seam falls on a mesh
+node. That is the natural arrangement for a boundary assembled from several
+smooth pieces: give each piece its own chart and its own curve entity, so that
+the mesher puts a vertex at every junction. It is also the only arrangement that
+can work when the pieces meet at a corner, since no construction can curve an
+element straddling one.
+
+One chart is enough whenever the boundary admits a global smooth parametrization.
+Every closed plane curve does, so in 2D an atlas is only ever a convenience. In
+3D it can be a necessity: a torus is globally parametrized, but a sphere is not,
+since any single chart of it is either non-injective or degenerate (spherical
+coordinates collapse the whole `ϕ` line at each pole). The convenience
+constructor [`Inti.sphere_atlas`](@ref) builds the six overlapping gnomonic
+("cube-sphere") charts of a sphere:
+
+```julia
+Ω, msh = ... # a volume mesh of the ball, e.g. from `gmsh.model.occ.addSphere`
+crvmsh = Inti.curve_mesh(msh, Inti.sphere_atlas(; radius = 1), 3)
+```
+
+The same three forms work in either dimension. Written out explicitly, the disk
+above is curved by the one-chart atlas
+
+```julia
+chart = Inti.ParametricChart(
+    α -> SVector(-1.0, 0.0) + SVector(cos(2π * α[1]), sin(2π * α[1])),
+    SVector(0.0),
+    SVector(1.0);
+    period = SVector(1.0),
+)
+crvmsh = Inti.curve_mesh(msh, [chart], θ)         # or Dict(ent => [chart])
+```
+
+which produces exactly the mesh `Inti.curve_mesh(msh, f, θ)` does. Note that a
+chart's `param` takes an `SVector{M}` — an `SVector{1}` for a plane curve — while
+the bare-`ψ` shorthand accepts a plain number as well, since that is the natural
+parameter of a curve and the convention [`Inti.gmsh_curve`](@ref) uses.
+
+A `ParametricChart` may declare a `period` in each parameter direction, in which
+case the parameters of nodes sharing an element are unwrapped modulo that period.
+That is what lets a single chart be used across the seam of its parameter box.
+
+#### 3D curved face handling
+
+There are two ways `curve_mesh` can lay a curved face over the surface; one can
+select these with the `face_map` keyword. This is a 3D-only question, and in
+fact passing `face_map` to a 2D mesh is an error.
+
+With `face_map = :chart`, the curved face is the chart's parametrization
+composed with an *affine* map in that chart's parameter plane.  It is fast, but
+two adjacent faces curved through *different* charts then agree along their
+shared edge only if the atlas' transition maps are compatible in the sense that
+they carry straight lines in one parameter plane to straight lines in the other.
+Outside of this rare case, each face will still lay exactly on the surface, but
+the two faces cross it along different curves and the mesh cracks open along the
+curves.
+
+With `face_map = :projection`, the curved face is instead the closest point of
+the surface to the flat face. That defines a *geometric* object that does not
+depend on which chart was used to compute it. Therefore, neighbouring faces
+project their shared edge to the identical curve and the mesh is watertight. The
+price paid for this generality is a small Gauss--Newton solve per evaluation,
+controlled by `projection_iterations` (default `4`). Measured cost is between
+about 20% and 50% more time to build a volume quadrature, the fraction depending
+on how expensive the parametrization itself is. Quadrature generation and some
+integral potential construction routines may also be slower.
+
+On a *compatible* atlas both face maps are correct, and there `:chart` is the
+better choice: it is cheaper, and being the exact surface parametrization it
+also integrates considerably more accurately. The purpose of `:projection`,
+then, is when one cannot vouch for the atlas such as whenever the patches did
+not come from a common construction.
+
+The default, `face_map = :auto`, uses `:chart` for a single-chart atlas -- which has
+no transition maps and so is never at risk -- and `:projection` as soon as there is
+more than one chart.
+
+Some atlases are compatible, and for them `:chart` is safe and cheaper. Gnomonic
+charts are, because great circles are precisely the straight lines of every
+gnomonic parameter plane, making the transition maps projective; so are the charts
+obtained by pushing the cube-sphere charts through any global diffeomorphism of
+space, since the transition maps are then those of the sphere.
+
+[`Inti.deformed_sphere_atlas`](@ref) builds such an atlas: given a map `f` carrying
+the unit sphere onto the surface (and, ideally, its inverse), it returns the six
+charts `f ∘ ψᵢ`. [`Inti.bean_atlas`](@ref) is the instance for the bean surface of
+[`Inti.bean`](@ref), whose deformation fixes the third coordinate and rescales the
+other two by functions of it, hence inverts in closed form:
+
+```julia
+crvmsh = Inti.curve_mesh(msh, Inti.bean_atlas(), 4; face_map = :chart)
+```
+
+On a bean meshed at `h = 0.15` this reproduces the surface area to a relative
+`1.5e-9` and the volume to `5.1e-8`, with the curved boundary lying on the exact
+bean surface to `5.6e-16`. Supplying no `inverse` is also supported, in which case
+the charts are inverted numerically at some cost in speed and accuracy.
 
 ## Elements of a mesh
 

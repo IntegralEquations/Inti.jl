@@ -149,17 +149,44 @@ end
 
 function _bean_parametrization(u, v, id, trans, rot, scal)
     x̂ = _unit_sphere_parametrization(u, v, id)
-    a = 0.8
-    b = 0.8
-    alpha1 = 0.3
-    alpha2 = 0.4
-    alpha3 = 0.1
-    x = SVector(
-        a * sqrt(1.0 - alpha3 * cospi(x̂[3])) .* x̂[1],
-        -alpha1 * cospi(x̂[3]) + b * sqrt(1.0 - alpha2 * cospi(x̂[3])) .* x̂[2],
+    return rot * (scal .* _bean_deformation(x̂)) .+ trans
+end
+
+const _BEAN_A = 0.8
+const _BEAN_B = 0.8
+const _BEAN_ALPHA1 = 0.3
+const _BEAN_ALPHA2 = 0.4
+const _BEAN_ALPHA3 = 0.1
+
+"""
+    _bean_deformation(x̂)
+
+Deformation carrying the unit sphere onto the bean surface. It leaves the third
+coordinate alone and rescales the first two by functions of it, so it is a
+diffeomorphism of the slab `|x̂[3]| < 1` and is inverted in closed form by
+[`_bean_deformation_inverse`](@ref).
+"""
+function _bean_deformation(x̂)
+    return SVector(
+        _BEAN_A * sqrt(1.0 - _BEAN_ALPHA3 * cospi(x̂[3])) * x̂[1],
+        -_BEAN_ALPHA1 * cospi(x̂[3]) +
+            _BEAN_B * sqrt(1.0 - _BEAN_ALPHA2 * cospi(x̂[3])) * x̂[2],
         x̂[3],
     )
-    return rot * (scal .* x) .+ trans
+end
+
+"""
+    _bean_deformation_inverse(y)
+
+Inverse of [`_bean_deformation`](@ref).
+"""
+function _bean_deformation_inverse(y)
+    return SVector(
+        y[1] / (_BEAN_A * sqrt(1.0 - _BEAN_ALPHA3 * cospi(y[3]))),
+        (y[2] + _BEAN_ALPHA1 * cospi(y[3])) /
+            (_BEAN_B * sqrt(1.0 - _BEAN_ALPHA2 * cospi(y[3]))),
+        y[3],
+    )
 end
 
 """
