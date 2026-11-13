@@ -199,3 +199,30 @@ end
         end
     end
 end
+
+@testset "BDIM/VDIM misc" begin
+    Inti.clear_entities!()
+    Γ = Inti.parametric_curve(x -> SVector(cos(x), sin(x)), 0.0, 2π) |> Inti.Domain
+    quad = Inti.Quadrature(Γ; meshsize, qorder = 3)
+    @testset "Deprecated `derivative` keyword of bdim_correction" begin
+        op = Inti.Laplace(; dim = 2)
+        K, H = Inti.single_double_layer(;
+            op,
+            target = quad,
+            source = quad,
+            compression = (method = :none,),
+            correction = (method = :none,),
+            kernel_variant = :neumann,
+        )
+        μ = fill(-0.5, length(quad))
+        δ_new = Inti.bdim_correction(op, quad, quad, K, H; green_multiplier = μ, kernel_variant = :neumann)
+        δ_old = @test_deprecated Inti.bdim_correction(op, quad, quad, K, H; green_multiplier = μ, derivative = true)
+        @test δ_old == δ_new
+    end
+    @testset "DIM unsupported for Yukawa" begin
+        op = Inti.Yukawa(; dim = 2, λ = 1.0)
+        μ = zeros(length(quad))
+        @test_throws ErrorException Inti.bdim_correction(op, quad, quad, nothing, nothing; green_multiplier = μ)
+        @test_throws ErrorException Inti.vdim_correction(op, quad, quad, quad, nothing, nothing, nothing; green_multiplier = μ)
+    end
+end

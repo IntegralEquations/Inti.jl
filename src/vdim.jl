@@ -357,6 +357,24 @@ function vdim_correction(
         grad_single_layer = nothing,
         translate_and_scale::Bool = false,
     ) where {N}
+    op isa Yukawa && error("`:dim` correction not supported for Yukawa")
+    # The W operator (vector density -> scalar) is handled by a dedicated
+    # routine: its boundary potentials are single-/double-layers (so `Sop`/`Dop`
+    # here are scalar-valued), `Vop` is the gradient volume
+    # operator, and the resulting correction maps an `SVector` density to a
+    # scalar.
+    if kernel_variant === :gradient_source
+        return _vdim_correction_W(
+            op, target, source, boundary, Sop, Dop, Vop;
+            green_multiplier, interpolation_order, maxdist,
+        )
+    end
+    # The X = ∇W operator (vector density -> vector output) is handled by another
+    # dedicated routine: `Sop`/`Dop` are the scalar single-/double-layer,
+    # `grad_single_layer` is the gradient single-layer (∇ₓS), and `Vop` is the
+    # Hessian volume operator. The resulting correction has
+    # `SMatrix` entries mapping an `SVector` density to an `SVector` output.
+    #
     # `X` is the one variant needing two by-parts boundary terms, on two different operators —
     # one more than `green_identity_terms` carries — so it keeps its own assembly.
     if kernel_variant === :hessian

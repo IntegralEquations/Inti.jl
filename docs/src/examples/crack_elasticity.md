@@ -144,7 +144,9 @@ function solve!(u, T₀, δT, t)
     # write a LinearMap over scalars by reinterpreting them as vectors of SVectors, 
     # applying our operators T₀ and δT, and converting back before returning
     L_ = LinearMap{Float64}(3 * size(T₀, 1)) do y, x
-        σ = reinterpret(SVector{3,Float64}, x)
+        # gmres passes columns of one matrix as x and y; copying x avoids a spurious
+        # aliasing error from sparse `mul!` (reinterpreted views of the same parent look aliased)
+        σ = reinterpret(SVector{3,Float64}, copy(x))
         μ = reinterpret(SVector{3,Float64}, y)
         mul!(μ, T₀, σ)
         mul!(μ, δT, σ, 1, 1)
